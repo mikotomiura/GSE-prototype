@@ -7,9 +7,10 @@
 GSE doesn't read your mind. It reads *keystroke dynamics* (key timing and key type only; no text is stored) — and decides
 whether to offer an invitation to step away from the screen now, or to stay out of the way. The invitation never measures whether you started or finished.
 
-> **Status:** the shipping intervention is **Nudge only**. The full-screen Wall and Monk Mode
-> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Physical Anchor
-> is **designed but not implemented** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)).
+> **Status:** in the normal mode the shipping intervention is still **Nudge**. The full-screen Wall and Monk Mode
+> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)). The invitation to physical return
+> (the PC side of Physical Anchor) is implemented as a glyph in the EH3 study mode, and walking promotion and its measurement
+> have been arranged by the researcher (2026-11-03, per the researcher).
 >
 > **Direction as of 2026-10-31:** Nudge will no longer be shown as an intervention in GSE itself; the core intervention
 > becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). The default change is a
@@ -101,7 +102,7 @@ Matrices, β baselines, quantization, and the tuning history live in **[Design H
 | Level | Trigger | Effect | Dismiss |
 |---|---|---|---|
 | **Nudge** | `action == nudge` | Small click-through side card; opacity scales with Need | auto-dismisses |
-| **Physical Anchor** | *not implemented* | An invitation to step away from the screen | — |
+| **Physical Anchor** (invitation) | EH3 study mode (normal mode: separate task) | An invitation to step away from the screen | closes after 60 s |
 | ~~**Wall**~~ | ~~full-screen block~~ | **Removed 2026-08** — see below | — |
 
 **Suppression** (all shipping): `defer` while actively typing (IKI < 2 s), 10-min cooldown,
@@ -114,7 +115,7 @@ suppressing is narrower than that ("taking the answer as-is"), and a screen bloc
 removed; **HIR (harmful-intervention rate) was kept** — only its target set changed.
 
 **Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is the level that
-actually imposes effort, and it is **not implemented yet**.
+actually imposes effort. Its PC-side invitation runs in the EH3 study mode; walking promotion and its measurement have been arranged by the researcher (2026-11-03, per the researcher).
 **The system judges neither the start nor the completion of it**
 ([ADR-018](docs/adr/ADR-018-physical-anchor-without-completion.md)): there is no threshold on how
 long you stay away or how you come back, and **no timer, countdown, or remaining-time display**.

@@ -60,7 +60,7 @@
 | `intervention-design` | Nudge / 介入判定 / HIR (⚠️ Wall は ADR-015 で削除) |
 | `data-privacy` | `logger.rs` / `hook.rs` / 匿名化 / 外部送信・ML データ収集 |
 | `git-workflow` | コミット / ブランチ / バージョン / `.steering/` 記録 |
-| `physical-anchor` | Lv3/Lv4 Physical Anchor / Flutter 連携 |
+| `physical-anchor` | Physical Anchor（身体回帰の招待）/ Flutter 連携 |
 | `project-status` | 現在の git / タスク / 進捗を動的に把握したい時 |
 | `implementation-workflow` | 実装タスクの共通骨格 (調査→設計→実装→テスト→レビュー) |
 | ★ `verify-before-claiming` | **事実を断定する前**（「不要」「壊れる」「既知」「〜になる」）／削除・簡略化の提案／memory を根拠に使う時 ／ ★★★ **ADR・裁定・仕様を確定する時**（⚠️ **長い一次資料を 1 節だけ読んで代表させない**＝ルール 7 ／ ⚠️ **「核心」「閉じた」と書く前に同じ語で全文 grep**＝ルール 8。★ 2026-09-13 に ADR-030 で 2 回踏み抜いた） |
