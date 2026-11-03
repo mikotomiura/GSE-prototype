@@ -29,10 +29,10 @@
 - [x] conditions.md・SEED・env.md・data.md・run.sh
 - [x] daysim.py と dryrun_v2.py・--selftest
 - [x] 条件とコードをコミット（計算の前・073e0580）
-- [ ] code-reviewer（計算の前）と指摘の対応
-- [ ] 計算・results・notes.md
+- [x] code-reviewer（計算の前）と指摘の対応（判断 6）
+- [x] 計算・results・notes.md（第 2.1 版・判断 7）
 
 ## レビューと完了
-- [ ] /cross-review と指摘の対応（decisions.md）
-- [ ] 引き継ぎを書く（attack-me は凍結の前の版で Codex つき）
+- [x] /cross-review と指摘の対応（判断 8）
+- [x] 引き継ぎを書く（.steering/_handoff/next-session-gse-after-stage1-adr-prereg.md）
 - [ ] コミット・push（PR は研究者に確かめてから）
