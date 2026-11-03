@@ -1,11 +1,11 @@
-# 引き継ぎ —— GSE の全体の設計を整理し、段 1 の配布までの道筋を引く（プローブの配線を含む）
+# 引き継ぎ —— GSE の全体の設計を整理し（MhD の内部の解剖を含む）、段 1 の配布までの道筋を引く（プローブの配線を含む）
 
 > 作成: 2026-11-03（`.steering/20261103-gse-scale-up-ideal/` の後・研究者の依頼「4. も含めて、もう少し全体の設計などの整理などを行いたい」）。
 > このメモを一次資料にしない。事実は ADR・コード・decisions.md で確かめ直す。
 
 ## 0 入口の文（新しいセッションに貼る）
 
-「`.steering/_handoff/next-session-gse-design-consolidation.md` を読み、GSE の全体の設計を整理する。`/start-task` から。議論が主で、整理の結果を SSOT の文書へ落とす。プローブの配線（ADR-031 M5）は、その中で位置と設計を決める」
+「`.steering/_handoff/next-session-gse-design-consolidation.md` を読み、GSE の全体の設計を整理する。MhD の内部の解剖を含め、空回しの結果から設計を直すところを探す。`/start-task` から。議論が主で、整理の結果を SSOT の文書へ落とす。プローブの配線（ADR-031 M5）は、その中で位置と設計を決める」
 
 ## 1 なぜ整理が要るか（確かめた事実）
 
@@ -31,6 +31,32 @@
    - 無作為の枠と層化の発火、6 択 UI、抑制・未回答・遅れの記録（ADR-043 D5・D6）。
    - ADR-040 の配線と同じ所（`intervention.rs`・`invitation.rs`・`probe_scheduler.rs`）を触るので、順番か同時かを決める。
    - 実装は、設計が決まった後に別の worktree で行う。整理と同じセッションで始めない。
+
+## 2.5 MhD の内部の解剖（研究者の追加・2026-11-03）
+
+研究者の言: 「Mh-D 内部の解剖も含めて行おう。具体的に空白の配備の結果なども見た上で設計の修正を行なった方が良さそうなところとかもありそう」。「空白の配備」は配管の空回し（`experiments/20261103-mhd-pipeline-dryrun/`・`experiments/20261103-mhd-dryrun-v2/`）と読んだ。違えば最初に確かめる。
+
+解剖の対象（実装・HMM_VERSION 0.5.0）:
+
+- 特徴量: `src-tauri/src/analysis/features.rs`。5 特徴量・30 秒の窓・`phi(x, β)`・沈黙の観測（`make_silence_observation`）。
+- 推定: `engine.rs`。HMM の 3 状態（Flow / Incubation / Stuck）・遷移と放出の行列・量子化・Forward。β は head が持つ（`heads/`・ADR-006）。
+- 間引きと停止: `loop_step.rs`（1Hz のゲート）・`key_gate.rs`・IME の変換中の停止。
+- 出力の消費者: `intervention.rs`（`p_stuck ≥ 0.60`・Need・Opportunity）・`invitation.rs`・`probe_scheduler.rs`。境界の `level`（`friction_rising` は ADR-041 で中身が未決）。
+- 段の上げ方: ADR-019（Stage 1 = ルールの HMM、Stage 2 以降は約 50 セッションと subject / session holdout の較正で上げる・D5 の順）。単位は ADR-042。
+
+空回しと公開データの当てはめで見えたこと（いずれも詰まりの推定の根拠ではない・数字は notes で確かめ直す）:
+
+- 今の `p_stuck`（B1）は予測の幅がごく狭い。CoAuthor の代理のラベルで、予測の logit の SD は 0.059 だった。傾きが不安定で読めず、合成のラベルでも傾き 2.16 で、幅が真の確率より狭い（第 1 版 notes §2・§3）。HMM の出力が較正の対象として細すぎる疑いがある。
+- 代理の実ラベル（L-real）では、どのモデルも AUC 0.43〜0.56 で見分けられていない。M2（ROCKET）は数百〜千件で過学習した（傾き 0.29・0.07）。ADR-019 D5 の「時系列の段の第一候補は ROCKET 系」と、段 1 の件数との関係を決める必要がある（第 1 版 notes §5 の 1）。
+- 日の揺れがあると、正しいモデルでも周辺の傾きは 1 より小さくなる。評価が 10 日を下回ると推定が不安定になる（第 2.1 版 notes §2.3・§4）。
+- CoAuthor では、打鍵のリズムの 30 秒の上がりで「詰まる前」を先回りする前提が支持されなかった（`experiments/20261101-coauthor-pre-stall-signal/`）。打鍵で確実に見えるのは止まりそのもの。ADR-041 が契機を停滞の分解の後に回した理由の一つ。
+
+整理で決めたいこと（候補）:
+
+- HMM の 3 状態・5 特徴量・`p_stuck` が、段 1 の C4 と criterion 直結の段にとって何の役を持つか。L0 の確証の核として残す部分と、直すか置き換える部分を分ける。
+- `p_stuck` の幅が狭いことは、ADR-024 のトリガー（`p_stuck ≥ 0.60`）と招待の今の契機にも効く。どこまで直すかを決める。直すなら HMM_VERSION を上げ、ゴールデンを作り直す。
+- ADR-019 の段の順を、空回しの結果に合わせて直すかどうか。
+- コードを直すのは整理の後で、別のタスクにする。
 
 ## 3 読むもの
 
