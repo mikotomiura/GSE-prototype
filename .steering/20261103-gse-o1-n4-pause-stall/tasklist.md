@@ -19,6 +19,6 @@
 - [x] 条件とコードをコミット（計算の前・c567c88c）
 - [x] run.sh を 1 回（exit 0・自己検査の食い違い 0）→ 記号の付け直し（判断 8）のため 2 回目（量は同じ）
 - [x] notes.md（人ごとの値・人の間の幅・言える範囲・事前登録 §3 と S1-E7 への材料）
-- [ ] code-reviewer・security-checker・/cross-review
-- [ ] 引き継ぎの更新（C の済み・B の入口・G1 の 2 名の別タスク）
+- [x] code-reviewer・security-checker・/cross-review（Codex に渡したのはコードと条件の文と削除台帳の 10 ファイルだけ。results・notes・.steering は外した）
+- [x] 引き継ぎの更新（C の済み・B の入口・G1 の 2 名の別タスク）
 - [ ] push（PR は研究者に確かめてから）
