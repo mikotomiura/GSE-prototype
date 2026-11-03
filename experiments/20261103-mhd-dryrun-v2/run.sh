@@ -16,7 +16,7 @@ GIT_DIRTY="$(git -C "$REPO_ROOT" status --porcelain -- experiments/20261103-mhd-
 # 陽性対照（通らなければ止まる）
 $PY "$EXP_DIR/scripts/daysim.py" --selftest "$SEED" "$OUT"
 $PY "$EXP_DIR/scripts/dryrun_v2.py" --selftest "$WORK" "$SEED" "$OUT"
-# 変異（P3・C1 が赤になることを JSON で名指しで確かめる。最後まで走らなかったら止める）
+# 変異（P3a・C1 が赤になることを JSON で名指しで確かめる。最後まで走らなかったら止める）
 check_red() {  # $1 = json, $2 = 名指しの対照
   $PY - "$1" "$2" <<'PYEOF'
 import json, sys
@@ -31,7 +31,7 @@ PYEOF
 for m in m1 m2; do
   rm -f "$OUT/selftest_daysim_$m.json" "$OUT/selftest_coauthor_$m.json"
   $PY "$EXP_DIR/scripts/daysim.py" --selftest --mutate "$m" "$SEED" "$OUT" || true
-  check_red "$OUT/selftest_daysim_$m.json" P3
+  check_red "$OUT/selftest_daysim_$m.json" P3a
   $PY "$EXP_DIR/scripts/dryrun_v2.py" --selftest --mutate "$m" "$WORK" "$SEED" "$OUT" || true
   check_red "$OUT/selftest_coauthor_$m.json" C1
 done

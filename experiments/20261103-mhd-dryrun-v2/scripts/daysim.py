@@ -1,4 +1,4 @@
-"""MhD の配管の空回し 第 2 版 (a) 合成の日の模擬（conditions.md の A1〜A6）。
+"""MhD の配管の空回し 第 2 版 (a) 合成の日の模擬（conditions.md の A1〜A6・第 2.1 版の追記 1〜5）。
 
 打鍵は作らない。1 人の中の日を単位に、ラベルと凍結したモデルの予測だけを作り、
 評価の側の日の巡回するブロックの再標本化で、較正の切片と傾きの区間の幅と被覆を出す。
@@ -209,11 +209,16 @@ def one_sim(rng, D, lam, a, s, sd, rho, mode, Lrule):
     sep = int(big.sum())  # 収束しなかったものも含めて数える（分離した再標本は収束しない側に落ちる）
     sep_nc = int((big & ~conv).sum())
     out.update(discarded=discarded, nonconv=int((~conv).sum()), sep=sep, sep_nonconv=sep_nc)
-    if conv.sum() < MIN_OK:
+    if conv.sum() < MIN_OK or out["point"] is None:
         out["ci"] = None
         return out
     bi, bs = bi[conv], bs[conv]
-    out["ci"] = (np.percentile(bi, [2.5, 97.5]).tolist(), np.percentile(bs, [2.5, 97.5]).tolist())
+    out["ci"] = {}
+    for name, v, pt in (("i", bi, out["point"][0]), ("s", bs, out["point"][1])):
+        lo, hi = np.percentile(v, [2.5, 97.5])
+        sd = float(v.std())
+        out["ci"][name] = dict(percentile=(float(lo), float(hi)), normal=(pt - 1.96 * sd, pt + 1.96 * sd),
+                               basic=(2 * pt - float(hi), 2 * pt - float(lo)))
     return out
 
 
@@ -226,8 +231,10 @@ def run_point(seed, idx, D, AUC, pi, lam, sd, rho, R, mode="block", Lrule=rule_m
     rng = np.random.default_rng(ss)
     a, s, prev, av = solve_params(pi, AUC, sd, seed)
     ti, tsl, tconv = population_values(rng, lam, a, s, sd, rho)
-    cov_i = cov_s = 0
-    wi, ws, ns, ps = [], [], [], []
+    METH = ("percentile", "normal", "basic")
+    cov = {(q, m): 0 for q in "is" for m in METH}
+    wid = {(q, m): [] for q in "is" for m in METH}
+    ns, ps = [], []
     disc = nonc = sepc = sepnc = noci = 0
     for _ in range(R):
         o = one_sim(rng, D, lam, a, s, sd, rho, mode, Lrule)
@@ -240,11 +247,11 @@ def run_point(seed, idx, D, AUC, pi, lam, sd, rho, R, mode="block", Lrule=rule_m
         if o["ci"] is None:
             noci += 1
             continue
-        (li, hi_), (ls, hs) = o["ci"]
-        cov_i += li <= ti <= hi_
-        cov_s += ls <= tsl <= hs
-        wi.append(hi_ - li)
-        ws.append(hs - ls)
+        for q, tv in (("i", ti), ("s", tsl)):
+            for m_ in METH:
+                lo, hi = o["ci"][q][m_]
+                cov[(q, m_)] += lo <= tv <= hi
+                wid[(q, m_)].append(hi - lo)
 
     def q(v):
         return [float(x) for x in np.percentile(v, [25, 50, 75])] if v else None
@@ -254,8 +261,10 @@ def run_point(seed, idx, D, AUC, pi, lam, sd, rho, R, mode="block", Lrule=rule_m
                 solved=dict(a=a, s=s, prevalence=prev, auc=av),
                 population=dict(cal_intercept=ti, cal_slope=tsl, converged=tconv),
                 n_label_q=q(ns), n_pos_q=q(ps),
-                width_intercept_q=q(wi), width_slope_q=q(ws),
-                coverage_intercept=cov_i / R, coverage_slope=cov_s / R,
+                width_intercept_q=q(wid[("i", "percentile")]), width_slope_q=q(wid[("s", "percentile")]),
+                coverage_intercept=cov[("i", "percentile")] / R, coverage_slope=cov[("s", "percentile")] / R,
+                by_method={m_: dict(coverage_intercept=cov[("i", m_)] / R, coverage_slope=cov[("s", m_)] / R,
+                                    width_intercept_q=q(wid[("i", m_)]), width_slope_q=q(wid[("s", m_)])) for m_ in METH},
                 sims_without_ci=noci, resamples_discarded_one_class=disc, resamples_nonconverged=nonc,
                 resamples_slope_abs_gt_50=sepc, resamples_slope_abs_gt_50_and_nonconverged=sepnc,
                 solve_ok=bool(abs(prev - pi) <= 0.002 and abs(av - AUC) <= 0.002))
@@ -288,12 +297,17 @@ def selftest(seed):
     res["P2"] = dict(a=a, s=s, prevalence=prev, auc=av, pass_=bool(p2))
     ok &= p2
     # P3
-    r3 = run_point(seed, 10_001, 100, 0.70, 0.30, 6, 0.0, 0.0, 400)
+    # P3a（門）: 日の揺れが無い点で、回答 1 件ずつの再標本化のパーセンタイル区間（第 2.1 版の追記 2）
+    r3 = run_point(seed, 10_001, 100, 0.70, 0.30, 6, 0.0, 0.0, 400, mode="label")
     tv = r3["population"]
     truth_ok = abs(tv["cal_intercept"]) < 0.03 and abs(tv["cal_slope"] - 1) < 0.03  # 日の揺れが無ければ真は (0, 1)
     p3 = truth_ok and 0.92 <= r3["coverage_intercept"] <= 0.98 and 0.92 <= r3["coverage_slope"] <= 0.98
-    res["P3"] = dict(result=r3, pass_=bool(p3))
+    res["P3a"] = dict(result=r3, truth_ok=bool(truth_ok), pass_=bool(p3))
     ok &= p3
+    # P3b（結果・門にしない）: 同じ点の日のブロックの 3 つの作り方
+    r3b = run_point(seed, 10_001, 100, 0.70, 0.30, 6, 0.0, 0.0, 400)
+    res["P3b"] = dict(result=r3b, in_band={m_: bool(0.92 <= v["coverage_intercept"] <= 0.98 and 0.92 <= v["coverage_slope"] <= 0.98)
+                                           for m_, v in r3b["by_method"].items()})
     # P4
     r4b = run_point(seed, 10_002, 50, 0.70, 0.30, 6, 1.0, 0.6, 300)
     r4l = run_point(seed, 10_002, 50, 0.70, 0.30, 6, 1.0, 0.6, 300, mode="label")
@@ -315,14 +329,15 @@ def selftest(seed):
     ok &= p5
     res["mutate"] = MUTATE
     res["SELFTEST"] = "PASS" if ok else "FAIL"
-    for k in ("P1", "P2", "P3", "P4", "P5"):
+    for k in ("P1", "P2", "P3a", "P4", "P5"):
         v = res[k]
         extra = ""
-        if k == "P3":
+        if k == "P3a":
             extra = " cov_i %.3f cov_s %.3f" % (v["result"]["coverage_intercept"], v["result"]["coverage_slope"])
         if k == "P4":
             extra = " block cov_i %.3f label cov_i %.3f" % (v["block"]["coverage_intercept"], v["label"]["coverage_intercept"])
         print(k, v["pass_"], extra)
+    print("P3b (not a gate)", {m_: (round(v["coverage_intercept"], 3), round(v["coverage_slope"], 3)) for m_, v in res["P3b"]["result"]["by_method"].items()})
     print("SELFTEST", res["SELFTEST"])
     return ok, res
 
@@ -341,6 +356,8 @@ def grid():
     pts.append({**base, "Lmul": 0, "vary": "L=1"})
     pts.append({**base, "Lmul": 2, "vary": "L=2x"})
     pts.append({**base, "mode": "label", "vary": "label"})
+    for D in (100, 200):  # 第 2.1 版の追記 4: 日の揺れの無い点で日数を伸ばす
+        pts.append({**base, "D": D, "sd": 0.0, "rho": 0.0, "vary": "sd=0,D=%d" % D})
     return pts
 
 
