@@ -41,6 +41,14 @@ MUTANTS = [
     ("切れ目のまたぎ", "step = min(H - acc, b - t)", "step = H - acc"),
     ("ブロックの半開", "bisect.bisect_left(origins, y) - bisect.bisect_left(origins, x)", "bisect.bisect_right(origins, y) - bisect.bisect_left(origins, x)"),
     ("U4 の幅", "0.35 <= x <= 0.65", "0.35 <= x <= 0.66"),
+    ("温まりの後の 4 時間（H5）", "if sum(b - a for a, b in post_warm(dy.intervals, we)) < MIN_DAY_OBS:", "if sum(b - a for a, b in post_warm(dy.intervals, we)) < 0:"),
+    ("温まりの後の 4 時間（H4a）", "            if sum(b - a for a, b in pw) < MIN_DAY_OBS:", "            if sum(b - a for a, b in pw) < 0:"),
+    ("まとまりの数の境界", "len(bouts) < MIN_BOUTS", "len(bouts) <= MIN_BOUTS"),
+    ("件数の境界", "E + L < MIN_HALF_COUNT", "E + L <= MIN_HALF_COUNT"),
+    ("自己検査を外す", "if port != dy.replay_onsets:", "if False:"),
+    ("SHA-256 の照合を外す", "if d[\"input_sha256\"] != cc.sha256(f):", "if False:"),
+    ("SD の比を丸める", "ratio = sd_b / sd_p if sd_p else None", "ratio = round(sd_b, 4) / round(sd_p, 4) if sd_p else None"),
+    ("f の欠けを繰り返さなかったにする", "\"repeated\": None if missing else rule(x)", "\"repeated\": False if missing else rule(x)"),
     ("U4 の割合のキー", "\"C0_is_C2\", \"ratio\")", "\"C0_is_C2\", \"num\")"),
 ]
 

@@ -127,11 +127,14 @@ def h4a_stats(units):
     lam = tot_n / tot_t
     x2 = sum((n - lam * t / H) ** 2 / (lam * t / H) for t, n in units)
     k = D - 1
-    us = ao.unit_sd(units)
-    ratio = us["sd_between_units"] / us["sd_expected_poisson_mean"] if us["sd_expected_poisson_mean"] else None
+    # SD の比は analyze_o1.unit_sd と同じ式を、丸めずに計算する（unit_sd は 4 桁に丸めて返す）
+    rates = [n / (t / H) for t, n in units]
+    sd_b = statistics.stdev(rates)
+    sd_p = statistics.mean(math.sqrt(statistics.mean(rates) / (t / H)) for t, _ in units)
+    ratio = sd_b / sd_p if sd_p else None
     return {"days": D, "defined": True, "pooled_per_h": lam, "X2": x2, "df": k, "phi": x2 / k,
             "p_one_sided": chi2_sf(x2, k), "phi_upper95": x2 / chi2_ppf(0.025, k),
-            "sd_between": us["sd_between_units"], "sd_poisson": us["sd_expected_poisson_mean"], "sd_ratio": ratio}
+            "sd_between": sd_b, "sd_poisson": sd_p, "sd_ratio": ratio}
 
 
 def h4a_verdict(st):
@@ -200,7 +203,7 @@ def h4a_perm(groups, seed):
         f = anova_f(gs)
         if f is not None and f >= f_obs:
             ge += 1
-    return {"defined": True, "F": f_obs, "p_perm": (1 + ge) / (B + 1), "days": len(groups), "blocks": sum(sizes)}
+    return {"defined": True, "F": "inf" if f_obs == math.inf else f_obs, "p_perm": (1 + ge) / (B + 1), "days": len(groups), "blocks": sum(sizes)}
 
 
 # ---------- U3 H5 ----------
@@ -330,7 +333,8 @@ def readings(cur, ref):
     out = {}
     for k, rule in READ_RULES.items():
         x = cv[k]
-        out[k] = {"value": x, "value_14_days": rv[k], "repeated": rule(x) if x is not None else None}
+        missing = x is None or (isinstance(x, dict) and any(v is None for v in x.values()))
+        out[k] = {"value": x, "value_14_days": rv[k], "repeated": None if missing else rule(x)}
     return out
 
 
@@ -368,22 +372,28 @@ def run(work, seed_file, out, *files):
            "H4a": {}, "H5": {}}
     for k in ("C0", "C1", "C2"):
         flow_of = (lambda dy: dy.act) if k == "C1" else (lambda dy: dy.press)  # θ の流れ（C2 は C0 の部分集合）
-        units, units_incl, groups = [], [], []
+        units, units_incl, groups, short = [], [], [], 0
         for dy, r in zip(days, all_rows):
             ori = [x["o"] for x in r[k]]
             pw = post_warm(dy.intervals, warm_end(flow_of(dy), dy.intervals))
+            if sum(b - a for a, b in pw) < MIN_DAY_OBS:   # θ がそろわない日も含む（判断 8）
+                short += 1
+                continue
             units.append((sum(b - a for a, b in pw), sum(1 for t in ori if any(a <= t <= b for a, b in pw))))
-            units_incl.append((dy.obs, len(ori)))
+            units_incl.append((dy.obs, len(ori)))   # 記述は判定と同じ日で
             groups.append(hour_counts(pw, ori))
         st = h4a_stats(units)
         st["verdict"] = h4a_verdict(st) if k == "C0" else "not_judged"
         st["perm"] = h4a_perm(groups, seed)
         st["including_warmup"] = h4a_stats(units_incl)   # 14 日と同じ式（記述・判断 7）
+        st["excluded_post_warm_lt_4h"] = short
         res["H4a"][k] = st
         bouts, n5 = [], 0
         for dy, r in zip(days, all_rows):
             we = warm_end(flow_of(dy), dy.intervals)
-            n5 += we is not None
+            if sum(b - a for a, b in post_warm(dy.intervals, we)) < MIN_DAY_OBS:
+                continue
+            n5 += 1
             bouts += bouts_of_day(dy.intervals, dy.press, we, [x["o"] for x in r[k]])
         h = h5(bouts, n5, seed)
         if k != "C0":
@@ -440,6 +450,8 @@ def selftest():
     st = h4a_stats([(H, 100 + (13 if i % 2 else -13)) for i in range(40)])
     assert st["p_one_sided"] < 0.01 and st["sd_ratio"] < 1.5 and st["phi_upper95"] > 2.25, st
     assert h4a_verdict(st) == "undetermined"
+    st = h4a_stats([(H, 2), (H, 6), (H, 4), (H, 4), (H, 4)])
+    assert st["sd_ratio"] == statistics.stdev([2, 6, 4, 4, 4]) / 2.0   # 丸めない
     # 1 ポアソンなら支持はまれ・日ごとに 3 倍なら支持・日数 4 は決まらない
     rng = random.Random(1)
     sup = 0
@@ -464,6 +476,7 @@ def selftest():
     assert h4a_perm(same, 7)["p_perm"] > 0.5
     # 同点と ∞: [[1, 2], [1, 2]] は F = 0 で、並べ替えは F = 0 か ∞（群の中が 0）だけ → p = 1
     assert h4a_perm([[1, 2], [1, 2]], 7)["p_perm"] == 1.0
+    assert h4a_perm([[1, 1], [2, 2]], 7)["F"] == "inf"
     # ブロック 2 未満の日は副に入れない
     assert h4a_perm([[5], [1, 2], [3, 5]], 7)["days"] == 2
     # 1 時間のブロック: 区間をまたいで観測時間で切る・境界の原点は 1 度だけ
@@ -500,6 +513,9 @@ def selftest():
     assert abs(r["ci95"][1] - math.exp(math.log(r["RR"]) + 1.96 * r["se_log"])) < 1e-9
     assert r["se_log"] > 0.05
     # 件数の下限・0 の補正・同時に立つときは支持
+    edge = [{"early": 2, "late": 2, "R_ms": H, "thirds": [1, 1, 2], "warm_excluded_ms": 0} for _ in range(10)]
+    assert h5(edge, 5, 5)["verdict"] not in ("undetermined_bouts", "undetermined_counts", "undetermined_days")  # 10 まとまり・40 件・5 日ちょうど
+    assert h5(edge[:9], 5, 5)["verdict"] == "undetermined_bouts"
     few = [{"early": 1, "late": 2, "R_ms": H, "thirds": [1, 1, 1], "warm_excluded_ms": 0} for _ in range(12)]
     assert h5(few, 6, 5)["verdict"] == "undetermined_counts"
     zero = [{"early": 0, "late": 4, "R_ms": H, "thirds": [0, 2, 2], "warm_excluded_ms": 0} for _ in range(12)]
@@ -540,29 +556,36 @@ def selftest():
     ref14 = json.load(open(FOURTEEN))
     rd = readings(ref14, ref14)   # 14 日をそのまま入れると a〜f はすべて繰り返す（14 日の読みの写し）
     assert all(v["repeated"] is True for v in rd.values()), rd
+    import copy
+    miss = copy.deepcopy(ref14)
+    miss["O1_counts_rates"]["C1"]["day_unit_sd"] = None
+    assert readings(miss, ref14)["f_sd_ratio"]["repeated"] is None
     assert abs(rd["a_C0_is_C2"]["value"] - 0.5093) < 1e-4
     # 通し（run の配線）: 合成の 6 日（うち 1 日はフォーカス 0）を中間の形で置いて回す
     with tempfile.TemporaryDirectory() as tmp:
         rng = random.Random(11)
         files = []
-        for i in range(6):
+        for i in range(7):
             f = os.path.join(tmp, f"day{i}.ndjson")
             open(f, "w").write(str(i))
             d = _synth_day(rng, 0, 6, 9 if i % 2 else 3)
             if i == 5:
                 d["focus"] = []
+            if i == 6:   # 押下が 100 個に満たず θ がそろわない 5 時間の日（U1 は通り、H4a・H5 から外れる）
+                d = cc.synth([[j * 120_000, "alphabetic"] for j in range(60)], focus=[1000], intervals=((0, 5 * H),))
+                d["onsets"] = [[s, t0] for s, t0, _ in cc.Day(d).c0()[0]]
             d["input_sha256"] = cc.sha256(f)
             json.dump(d, open(os.path.join(tmp, f"day{i}.json"), "w"))
             files.append(f)
         seed = os.path.join(tmp, "SEED")
         open(seed, "w").write("5")
         res = run(tmp, seed, os.path.join(tmp, "out.json"), *files)
-        assert res["files"] == {"given": 6, "excluded": {"no_focus": 1, "obs_lt_4h": 0}, "used": 5}, res["files"]
-        assert res["selfcheck"]["mismatch_files"] == 0 and res["selfcheck"]["files"] == 6
+        assert res["files"] == {"given": 7, "excluded": {"no_focus": 1, "obs_lt_4h": 0}, "used": 6}, res["files"]
+        assert res["selfcheck"]["mismatch_files"] == 0 and res["selfcheck"]["files"] == 7
         c0 = res["H4a"]["C0"]
         assert c0["days"] == 5 and c0["verdict"] in ("support", "refute", "undetermined")
         assert res["selfcheck"]["onsets_port"] > 100 and c0["pooled_per_h"] > 0, res["selfcheck"]
-        assert c0["including_warmup"]["days"] == 5
+        assert c0["including_warmup"]["days"] == 5 and c0["excluded_post_warm_lt_4h"] == 1
         # 温まりを除いた観測時間は含めた観測時間より短く、件数は同じ（C0 は温まりの中で立たない）
         assert c0["including_warmup"]["pooled_per_h"] < c0["pooled_per_h"]
         assert res["H4a"]["C1"]["verdict"] == "not_judged" and res["H5"]["C2"]["verdict"] == "not_judged"
@@ -570,6 +593,22 @@ def selftest():
         assert res["H5"]["C0"]["days"] == 5 and set(res["U4_readings"]) == set(READ_RULES)
         # 打鍵だけの合成なので C1 の流れは押下と同じ・C2 は 0 件（止まりの間は何も動かない）
         assert res["U4_summary"]["O1_counts_rates"]["C2"]["n"] == 0
+        # 止まる道: 自己検査の不一致・入力の SHA-256 の不一致
+        p0 = os.path.join(tmp, "day0.json")
+        orig = open(p0).read()
+        d6 = json.loads(orig)
+        d6["onsets"] = d6["onsets"][1:]
+        json.dump(d6, open(p0, "w"))
+        for broken, msg in (("onsets", "自己検査"), ("sha", "SHA-256")):
+            if broken == "sha":
+                open(p0, "w").write(orig)
+                open(files[1], "w").write("changed")
+            try:
+                run(tmp, seed, os.path.join(tmp, "out2.json"), *files)
+            except SystemExit as e:
+                assert msg in str(e), (broken, e)
+            else:
+                raise AssertionError("止まらなかった: " + broken)
     print("selftest ok", file=sys.stderr)
 
 
