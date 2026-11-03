@@ -308,11 +308,12 @@ def ci(y, p, base, groups, rng, B, keys=("cal_intercept", "cal_slope", "brier_mi
             c["discarded_one_class"] += 1
             continue
         m = metrics(y[idx], p[idx], base)
+        big = m["cal_slope"] is not None and not (abs(m["cal_slope"]) <= SEP)
+        c["slope_abs_gt_50"] += big  # 収束しなかったものも含めて数える
         if not m["converged"]:
             c["nonconverged"] += 1
+            c["slope_abs_gt_50_and_nonconverged"] = c.get("slope_abs_gt_50_and_nonconverged", 0) + big
             continue
-        if m["cal_slope"] is not None and abs(m["cal_slope"]) > SEP:
-            c["slope_abs_gt_50"] += 1
         c["used"] += 1
         for k in keys:
             if m[k] is not None:
@@ -379,6 +380,17 @@ def selftest(work, seed):
     print("C4 rocket deterministic/constant", det, c4)
     res["C4"] = dict(deterministic=det, pass_=c4)
     ok &= c4
+    # C5 巡回するブロックの単体の対照: セッション 4 本の書き手 1 人で、各セッションの選ばれた回数の期待値が 1
+    r5 = np.random.default_rng(seed + 5)
+    g = [[[0], [1], [2], [3]]]
+    cnt = np.zeros(4)
+    for _ in range(20_000):
+        cnt += np.bincount(boot_index(g, r5), minlength=4)
+    mean5 = cnt / 20_000
+    c5 = bool(np.all(np.abs(mean5 - 1) < 0.03))
+    print("C5 circular block mean per session", mean5.round(3).tolist(), c5)
+    res["C5"] = dict(mean_per_session=mean5.round(4).tolist(), v1_expected=[0.67, 1.33, 1.33, 0.67], pass_=c5)
+    ok &= c5
     # C1・C2（合成のラベルだけ・L-real は計算しない）
     writers = load(work)
     P = build(writers, seed)

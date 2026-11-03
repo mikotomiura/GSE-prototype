@@ -164,11 +164,16 @@ def population_values(rng, lam, a, s, sd, rho):
 
 
 # ---------------------------------------------------------------- 再標本化
-def circ_counts(rng, m, L, R):
-    """巡回するブロック: m 日を円に並べ、長さ L のブロックを m 日に達するまで並べて切る。戻り値 (R, m) の選ばれた回数。"""
+def circ_idx(rng, m, L, R):
+    """巡回するブロック: m 日を円に並べ、長さ L のブロックを m 日に達するまで並べて切る。戻り値 (R, m) の日の番号の列。"""
     nb = math.ceil(m / L)
     starts = rng.integers(0, m, (R, nb))
-    idx = (starts[:, :, None] + np.arange(L)[None, None, :]).reshape(R, -1)[:, :m] % m
+    return (starts[:, :, None] + np.arange(L)[None, None, :]).reshape(R, -1)[:, :m] % m
+
+
+def circ_counts(rng, m, L, R):
+    """戻り値 (R, m) の選ばれた回数。"""
+    idx = circ_idx(rng, m, L, R)
     C = np.zeros((R, m))
     np.add.at(C, (np.repeat(np.arange(R), m), idx.ravel()), 1.0)
     return C
@@ -183,7 +188,7 @@ def one_sim(rng, D, lam, a, s, sd, rho, mode, Lrule):
     n = len(y)
     out = dict(n=n, pos=int(y.sum()), m=m)
     if n == 0 or y.min() == y.max():
-        out.update(point=None, ci=None, discarded=B, nonconv=0, sep=0)
+        out.update(point=None, ci=None, discarded=B, nonconv=0, sep=0, sep_nonconv=0)
         return out
     pi_, ps_, ci0, cs0 = calib_w(y, phat, np.ones((1, n)))
     out["point"] = (float(pi_[0]), float(ps_[0])) if (ci0[0] and cs0[0]) else None
@@ -200,8 +205,10 @@ def one_sim(rng, D, lam, a, s, sd, rho, mode, Lrule):
     Wl = Wl[okc]
     bi, bs, ci_, cs = calib_w(y, phat, Wl)
     conv = ci_ & cs
-    sep = int((np.abs(bs[conv]) > SEP).sum())
-    out.update(discarded=discarded, nonconv=int((~conv).sum()), sep=sep)
+    big = ~np.isfinite(bs) | (np.abs(np.nan_to_num(bs, nan=np.inf)) > SEP)
+    sep = int(big.sum())  # 収束しなかったものも含めて数える（分離した再標本は収束しない側に落ちる）
+    sep_nc = int((big & ~conv).sum())
+    out.update(discarded=discarded, nonconv=int((~conv).sum()), sep=sep, sep_nonconv=sep_nc)
     if conv.sum() < MIN_OK:
         out["ci"] = None
         return out
@@ -221,7 +228,7 @@ def run_point(seed, idx, D, AUC, pi, lam, sd, rho, R, mode="block", Lrule=rule_m
     ti, tsl, tconv = population_values(rng, lam, a, s, sd, rho)
     cov_i = cov_s = 0
     wi, ws, ns, ps = [], [], [], []
-    disc = nonc = sepc = noci = 0
+    disc = nonc = sepc = sepnc = noci = 0
     for _ in range(R):
         o = one_sim(rng, D, lam, a, s, sd, rho, mode, Lrule)
         ns.append(o["n"])
@@ -229,6 +236,7 @@ def run_point(seed, idx, D, AUC, pi, lam, sd, rho, R, mode="block", Lrule=rule_m
         disc += o["discarded"]
         nonc += o["nonconv"]
         sepc += o["sep"]
+        sepnc += o["sep_nonconv"]
         if o["ci"] is None:
             noci += 1
             continue
@@ -249,7 +257,8 @@ def run_point(seed, idx, D, AUC, pi, lam, sd, rho, R, mode="block", Lrule=rule_m
                 width_intercept_q=q(wi), width_slope_q=q(ws),
                 coverage_intercept=cov_i / R, coverage_slope=cov_s / R,
                 sims_without_ci=noci, resamples_discarded_one_class=disc, resamples_nonconverged=nonc,
-                resamples_slope_abs_gt_50=sepc)
+                resamples_slope_abs_gt_50=sepc, resamples_slope_abs_gt_50_and_nonconverged=sepnc,
+                solve_ok=bool(abs(prev - pi) <= 0.002 and abs(av - AUC) <= 0.002))
 
 
 # ---------------------------------------------------------------- 陽性対照
@@ -257,7 +266,7 @@ def selftest(seed):
     res = {}
     ok = True
     # P1
-    rng = np.random.default_rng([seed, 1])
+    rng = np.random.default_rng([seed, 10_000])
     n = 300
     X = np.hstack([np.ones((n, 1)), rng.normal(size=(n, 1))])
     y = (rng.random(n) < sigmoid(X @ np.array([-0.4, 1.1]))).astype(float)
@@ -291,9 +300,22 @@ def selftest(seed):
     p4 = r4l["coverage_intercept"] <= r4b["coverage_intercept"] - 0.03
     res["P4"] = dict(block=r4b, label=r4l, pass_=bool(p4))
     ok &= p4
+    # P5 巡回するブロックの単体の対照（行の和が m・日ごとの期待値が 1・ブロックの中は続いた日）
+    r5 = np.random.default_rng([seed, 10_003])
+    m5, L5, R5 = 8, 3, 20_000
+    idx = circ_idx(r5, m5, L5, R5)
+    C5 = circ_counts(np.random.default_rng([seed, 10_003]), m5, L5, R5)
+    rows_ok = bool(np.all(C5.sum(axis=1) == m5))
+    mean_day = C5.mean(axis=0)
+    mean_ok = bool(np.all(np.abs(mean_day - 1) < 0.03))
+    blk = idx[:, : (m5 // L5) * L5].reshape(R5, -1, L5)
+    contig_ok = bool(np.all((np.diff(blk, axis=2) % m5) == 1))
+    p5 = rows_ok and mean_ok and contig_ok
+    res["P5"] = dict(rows_sum_m=rows_ok, mean_per_day=mean_day.round(4).tolist(), mean_ok=mean_ok, contiguous=contig_ok, pass_=p5)
+    ok &= p5
     res["mutate"] = MUTATE
     res["SELFTEST"] = "PASS" if ok else "FAIL"
-    for k in ("P1", "P2", "P3", "P4"):
+    for k in ("P1", "P2", "P3", "P4", "P5"):
         v = res[k]
         extra = ""
         if k == "P3":
@@ -334,6 +356,8 @@ def run(seed, out):
             Lr = rule_main
         r = run_point(seed, i, p["D"], p["AUC"], p["pi"], p["lam"], p["sd"], p["rho"], 200, mode=p["mode"], Lrule=Lr)
         r["kind"] = p["kind"]
+        if not r["solve_ok"]:
+            sys.exit("格子の点 %d で a・s が狙いから ±0.002 を超えた（A1）" % i)
         r["vary"] = p.get("vary")
         rows.append(r)
         print(i, p["kind"], p.get("vary"), p["D"], p["AUC"], p["pi"], "cov_i %.3f cov_s %.3f w_s %s" % (r["coverage_intercept"], r["coverage_slope"], r["width_slope_q"]), "%.0fs" % (time.time() - t), flush=True)

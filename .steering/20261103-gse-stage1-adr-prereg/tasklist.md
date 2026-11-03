@@ -15,20 +15,21 @@
 - [x] grill（判断 1〜5）
 
 ## ADR-043
-- [ ] 引用する番号の中身を references.md で確かめる
-- [ ] ADR-043 を書く
-- [ ] README の一覧に足し、ADR-031・032 の行に注記
-- [ ] next-study-design 判断 2〜13 との突き合わせ（落ちがないか grep）
+- [x] 引用する番号の中身を references.md で確かめる
+- [x] ADR-043 を書く
+- [x] README の一覧に足し、ADR-031・032 の行に注記
+- [x] next-study-design 判断 2〜13 との突き合わせ（落ちがないか grep）
 
 ## 事前登録の草案
-- [ ] `docs/preregistration-stage1.md` を書く
-- [ ] 出典の対応表で全項目を照合
-- [ ] リンクハブ（agent-shared.md）への追加の要否
+- [x] `docs/preregistration-stage1.md` を書く
+- [x] 出典の対応表で全項目を照合
+- [x] リンクハブ（agent-shared.md）への追加の要否
 
 ## 空回しの次の版
-- [ ] conditions.md・SEED・env.md・data.md・run.sh
-- [ ] daysim.py と dryrun_v2.py・--selftest
-- [ ] 条件とコードをコミット（計算の前）・code-reviewer
+- [x] conditions.md・SEED・env.md・data.md・run.sh
+- [x] daysim.py と dryrun_v2.py・--selftest
+- [x] 条件とコードをコミット（計算の前・073e0580）
+- [ ] code-reviewer（計算の前）と指摘の対応
 - [ ] 計算・results・notes.md
 
 ## レビューと完了
