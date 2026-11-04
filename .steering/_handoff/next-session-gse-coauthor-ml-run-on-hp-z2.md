@@ -62,5 +62,5 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/coauthor_ml_run.log"
 
 ## 6 Mac 側の状態（2026-11-04）
 
-- 枝 `exp/gse-coauthor-ml-improve`。門（P-D1・manifest）は Mac で通した。合成の selftest は 18 対照すべて緑。変異の門の Mac での結果は decisions の判断 13。
+- 枝 `exp/gse-coauthor-ml-improve`（origin に push 済み。条件・コード・門の最後のコミットは `bef80020`。その後はこのメモの直しだけ）。門（P-D1・manifest）は Mac で通した。合成の selftest は 18 対照すべて緑。変異の門の Mac での結果は decisions の判断 13。
 - このメモの後の作業（Mac）: 結果が戻ったら notes.md（4 つ組・各表・言える範囲・逸脱）→ code-reviewer・/cross-review → push（PR は研究者が確かめてから）。
