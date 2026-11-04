@@ -64,3 +64,19 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/coauthor_ml_run.log"
 
 - 枝 `exp/gse-coauthor-ml-improve`（origin に push 済み。条件・コード・門の最後のコミットは `bef80020`。その後はこのメモの直しだけ）。門（P-D1・manifest）は Mac で通した。合成の selftest は 18 対照すべて緑。変異の門の Mac での結果は decisions の判断 13。
 - このメモの後の作業（Mac）: 結果が戻ったら notes.md（4 つ組・各表・言える範囲・逸脱）→ code-reviewer・/cross-review → push（PR は研究者が確かめてから）。
+
+## 7 HP Z2 での実行の記録（2026-11-04・職場の PC のセッションが追記）
+
+- 機械: HP Z2（Windows 11 Pro 10.0.26200・論理 32 コア）。`JOBS=16`。Python 3.11.9（`python`）・numpy 2.4.4。git 2.55.0.windows.3（git-bash）。
+- コード: `exp/gse-coauthor-ml-improve` の `da3219b8` を HTTPS で clone（SSH は鍵が無く拒否）。`run.sh`・`mutate.sh` は LF。provenance の `git_dirty_paths` は空。
+- 入力: `coauthor_ml_inputs.tar.gz`・`input_manifest.json` の SHA-256 は §2-3 と一致。`C:/Users/SDS02/gse-public-data` に展開（Mac の xattr の警告だけ・4 ディレクトリができた）。manifest は `C:/Users/SDS02/Desktop/GSE_ML_run/input_manifest.json`。
+- スリープ: AC のスリープ・休止は元から 0（変えていない）。
+- 各段の時刻（results/ の各ファイルの更新時刻から）:
+  - 開始 14:31:57（`run_id` 20261104T143158-576）
+  - manifest の照合 〜14:32:09・P-D1 の門 2 つ 〜14:32:18
+  - selftest（合成）〜14:35:26 前後・18 対照すべて緑
+  - 変異 10 個 14:35〜14:38:18・`check_mutations` は 10 個すべて名指しの対照が赤（門は緑）
+  - 本計算 14:38:19〜17:08:10（約 2 時間 30 分）
+  - provenance 17:08:11・終了コード 0
+- 結果: `results/` に summary・selftest（`mutations` 欄つき）・check_same_coauthor・check_same_cs1・input_manifest_check・provenance と `mutations/`。summary と provenance の `run_id` は同じ。値は読んでいない。書き手ごとの値（`coauthor_ml_improve_writer_values.*.json`）は repo の外にあり、開いていない。
+- 止まった段: なし。
