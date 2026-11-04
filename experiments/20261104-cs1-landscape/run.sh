@@ -11,7 +11,10 @@ K21="$CS1/raw/2021/keystrokes.csv"
 BIN="${GSE_REPLAY:-$DATA_DIR/klicke/bin/gse-replay}"
 OUT="${OUT:-$EXP_DIR/results}"
 # 部分実行（LIMIT）は正式の results に書かない（レビューの後）。解析の側も部分実行の中間を拒む
-if [ -n "${LIMIT:-}" ] && [ "$OUT" = "$EXP_DIR/results" ]; then echo "LIMIT のときは OUT を results 以外に指定する" >&2; exit 1; fi
+# 比べるのは正規化したパス（末尾の /・相対パス・シンボリックリンクで抜けない・2 巡目のレビューの後）
+if [ -n "${LIMIT:-}" ] && python3 -I -c 'import os,sys;a,b=(os.path.realpath(x) for x in sys.argv[1:]);sys.exit(0 if a==b or a.startswith(b+os.sep) else 1)' "$OUT" "$EXP_DIR/results"; then
+  echo "LIMIT のときは OUT を results の外に指定する" >&2; exit 1
+fi
 SC="$EXP_DIR/scripts"
 SEED="$(cat "$EXP_DIR/SEED")"
 sha() { shasum -a 256 "$1" | cut -d' ' -f1; }

@@ -184,8 +184,10 @@ def check_build(work, hold_ids, hold_path):
     """D4 の照合（レビューの後に、働く形へ直した）。止める条件:
     - 中間の書き手（writers.json の SubjectID の SHA-256）に、取っておく書き手が 1 人でもいる
     - build が使った取っておく一覧が、いま渡された一覧と違う（SHA-256）
-    - 部分実行（--limit）の中間である"""
-    wh = set(json.load(open(os.path.join(work, "writers.json"))).values())
+    - 部分実行（--limit）の中間である
+    - 中間が同じ build の世代でない（units.json・u*.json・build の状態の数が合わない・2 巡目のレビューの後）"""
+    wj = json.load(open(os.path.join(work, "writers.json")))
+    wh = set(wj.values())
     hh = {hashlib.sha256(h.encode()).hexdigest() for h in hold_ids}
     if wh & hh:
         sys.exit("取っておく書き手が中間に入っている")
@@ -194,6 +196,14 @@ def check_build(work, hold_ids, hold_path):
         sys.exit("中間を作ったときの取っておく一覧が違う")
     if bs["attempted"] != bs["units"]:
         sys.exit("部分実行の中間は正式の集計に使わない")
+    if not set(bs["status"]) <= {"ok", "few_presses", "span_too_long"}:
+        sys.exit("build に許していない状態の課題がある")
+    uw = json.load(open(os.path.join(work, "units.json")))
+    n_files = len(glob.glob(os.path.join(work, "u[0-9]*.json")))
+    if not (n_files == len(uw) == bs["status"].get("ok", 0)):
+        sys.exit("中間の課題の数が build の状態と合わない（別の世代の中間が混ざっている）")
+    if not {str(v) for v in uw.values()} <= set(wj):
+        sys.exit("units.json の書き手が writers.json に無い")
     return len(wh)
 
 
@@ -304,12 +314,22 @@ def selftest():
     du = describe_units([[u]])
     assert du["units"] == 1 and du["unit_blocks"]["median"] == 2
     assert posthoc_resume([[u]]) == {"stalls": 1, "resume_in_other_block": 0, "unresumed": 0}
+    # 陽性例: 最初のまとまりの終わり近くの停滞で、次の文字が次のまとまりにある
+    # press[245:250] は 304,000〜308,000（最初のまとまりの終わり）。t0 = 303,500 の後の文字は次のまとまりにだけある
+    d3 = dict(d, keys=[[t, "alphabetic"] for t in press[:245]] + [[t, "backspace"] for t in press[245:250]]
+              + [[t, "alphabetic"] for t in press[250:]], onsets=[[300_000, 303_500, 1000, 199]])
+    assert posthoc_resume([[Unit(d3)]])["resume_in_other_block"] == 1
     d2 = dict(d, events=d["events"] + [[259_000, "multi-insert"], [259_000, "posthoc-ws"], [260_000, "multi-insert"]])
     u2 = Unit(d2)
     assert len(u2.receipts) == 3  # 主の受領は印を読まない
     p4 = posthoc_l4_nonws([[u2]])
-    assert p4["receipt_per_h_by_kind"]["multi-insert-nonws"]["median"] > 0
     assert set(p4["receipt_per_h_by_kind"]) == {"paste", "multi-insert-nonws"}
+    obs_h = u2.obs_ms() / H
+    # 259_000 の挿入は空白の印と対になって外れ、260_000 の 1 件だけが残る（paste は 1 件のまま）
+    assert abs(p4["receipt_per_h_by_kind"]["multi-insert-nonws"]["median"] - 1 / obs_h) < 1e-3
+    assert abs(p4["receipt_per_h_by_kind"]["paste"]["median"] - 1 / obs_h) < 1e-3
+    d4 = dict(d, events=d["events"] + [[259_000, "multi-insert"], [259_000, "posthoc-ws"]])
+    assert posthoc_l4_nonws([[Unit(d4)]])["receipt_per_h_by_kind"]["multi-insert-nonws"]["median"] == 0
     # D4 の照合: 陽性対照（取っておく書き手が混ざる・一覧が違う・部分実行）で止まり、正常で通る
     with tempfile.TemporaryDirectory() as td:
         hp = os.path.join(td, "hold.json")
@@ -317,15 +337,28 @@ def selftest():
         hs = hashlib.sha256(open(hp, "rb").read()).hexdigest()
         sha = lambda x: hashlib.sha256(x.encode()).hexdigest()  # noqa: E731
 
-        def put(writers, bs):
+        ok_st = {"ok": 2, "few_presses": 1}
+
+        def put(writers, bs, units=None, files=("00000", "00001")):
+            for n in glob.glob(os.path.join(td, "u[0-9]*.json")):
+                os.remove(n)
+            for k in files:
+                open(os.path.join(td, "u%s.json" % k), "w").write("{}")
             json.dump(writers, open(os.path.join(td, "writers.json"), "w"))
             json.dump(bs, open(os.path.join(td, "build_summary.json"), "w"))
-        put({"0": sha("A"), "1": sha("C")}, {"holdout_sha256": hs, "attempted": 3, "units": 3})
+            json.dump(units if units is not None else {"00000": 0, "00001": 1},
+                      open(os.path.join(td, "units.json"), "w"))
+        good_w = {"0": sha("A"), "1": sha("C")}
+        good_bs = {"holdout_sha256": hs, "attempted": 3, "units": 3, "status": ok_st}
+        put(good_w, good_bs)
         assert check_build(td, {"B"}, hp) == 2
-        for writers, bs in (({"0": sha("A"), "1": sha("B")}, {"holdout_sha256": hs, "attempted": 3, "units": 3}),
-                            ({"0": sha("A")}, {"holdout_sha256": "0" * 64, "attempted": 3, "units": 3}),
-                            ({"0": sha("A")}, {"holdout_sha256": hs, "attempted": 2, "units": 3})):
-            put(writers, bs)
+        for args in (({"0": sha("A"), "1": sha("B")}, good_bs),
+                     (good_w, dict(good_bs, holdout_sha256="0" * 64)),
+                     (good_w, dict(good_bs, attempted=2)),
+                     (good_w, dict(good_bs, status={"ok": 2, "features_failed": 1})),
+                     (good_w, good_bs, None, ("00000", "00001", "00002")),  # 古い世代の u*.json が残る
+                     (good_w, good_bs, {"00000": 0, "00001": 5})):
+            put(*args)
             try:
                 check_build(td, {"B"}, hp)
                 raise AssertionError("止まらなかった")
