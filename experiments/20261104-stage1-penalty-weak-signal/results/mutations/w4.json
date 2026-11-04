@@ -1,0 +1,26 @@
+{
+ "run_id": "20261104T221214-55210",
+ "mutate": [
+  "w4"
+ ],
+ "gates": {
+  "W1": {
+   "ok": false,
+   "bad": [
+    "セル 6 反復 0 の oracle が違う",
+    "セル 6 反復 1 の oracle が違う",
+    "セル 6 反復 2 の oracle が違う",
+    "セル 6 反復 3 の oracle が違う",
+    "セル 36 反復 0 の oracle が違う",
+    "セル 36 反復 1 の oracle が違う",
+    "セル 36 反復 2 の oracle が違う",
+    "セル 36 反復 3 の oracle が違う",
+    "セル 70 反復 0 の oracle が違う",
+    "セル 70 反復 1 の oracle が違う"
+   ],
+   "n_cells": 36,
+   "n_checked": 12
+  }
+ },
+ "ok": false
+}

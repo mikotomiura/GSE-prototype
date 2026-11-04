@@ -1,6 +1,6 @@
 {
- "run_id": "20261104T214625-53127",
- "git_head": "b9d15684c628126e65e132f6708f098ae6a45146",
+ "run_id": "20261104T221214-55210",
+ "git_head": "5780c0a5306013ba20e69e444fc82b9239f07f56",
  "dirty": [],
  "reps": 400,
  "jobs": 8,
@@ -10,17 +10,18 @@
  "numpy": "2.5.2",
  "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
  "sha256": {
-  "scripts/check_mutations.py": "e34ceaef541167e5f9c0819fa353787f1897fad7c8f71e78304c1f92b5d953ba",
-  "scripts/report_weak.py": "40cc8e84614e109e17975fc52f46d589362826da8e30014f39f2df47b200cecd",
-  "scripts/selftest_weak.py": "ea434c38af0299c482ace2877498fda5a2f5cd6053ebf280cb54f8e94f106084",
-  "scripts/weak.py": "fffb2e4c99069861e36acc2813ec02813cc311f00bf7cbb02e82b07c6fd27f6a",
-  "run.sh": "fe0672ef3f6543db9fe69fd7e8d4ed18d46514990eb939347eca50c0b391c7f2",
-  "mutate.sh": "f00e978b0c763c292885766d8033ebbb4a251aaab47103c32423a46d0c77d3b4",
-  "conditions.md": "5b50c7b0b00ef14b4f975ff4e47d7d05938a30b2bc4d811761357e4dbe6cfdf2",
+  "scripts/check_mutations.py": "2b68d933dfa3432dc716e7c50277e5676b1e82be8dcd8bdc2ede033a5308ae93",
+  "scripts/report_weak.py": "3abd0586b14e6d2fe92d7192d58ad37c0b3db98c391955e520ee6fe9f708e5e0",
+  "scripts/selftest_weak.py": "1f29888dcb502dbbcd54cff2f31ebab4a79942b1eade7b3c4baf260b47ac5392",
+  "scripts/weak.py": "f8598505c5d837a68aee9ac2a41e515af81520e55d1bc2d6ade833dbc1729c87",
+  "run.sh": "23f21fe836d0a6e207f0390707811fab7b7d4324e23bfa4a9a5476881d2bcb7c",
+  "mutate.sh": "1226bc39afb7dd181d751fe51d0a5ecaefd835f669c881071e080d1073322724",
+  "conditions.md": "05eee9508d1415c4a81cda05808be2a2f7f36b6bfcea9353476ca5d804e187fa",
   "SEED": "2961e762519b41fe994e946866ae3f81799dfc5cfd421872827141ce8ba96a98",
   "../20261104-stage1-penalty-synthetic/scripts/sim.py": "a6fca6154c5fe384106fd03f3898e791a3bc445574724221b6db2acc4d3a8c97",
   "../20261104-stage1-penalty-synthetic/scripts/report.py": "4b59e74fba8a27b2ef90ac7e5603ff51bc66bc84d44f9db2b88d591ef2093c64",
   "../20261104-stage1-penalty-synthetic/scripts/selftest.py": "3c53b9ad31bc46d313e5e851db3f38993afc4f48b2e7bff06455ba939fe076a3",
   "../20261104-stage1-penalty-synthetic/results/summary.json": "93c8b4714a5e4844790356897ce85d1aa96a6f837cb75361284b29dd0b122a15"
- }
+ },
+ "changed_during_run": []
 }
