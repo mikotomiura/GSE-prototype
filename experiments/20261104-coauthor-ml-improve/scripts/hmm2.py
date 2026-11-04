@@ -16,30 +16,51 @@ NSYM = 26
 BASE = dict(pi=1.0, A=1.0, B=0.5, H=0.5, C=0.5)  # 基の擬似度数（B と r1・r0 と同じ）
 TOL, MAX_ITER = 1e-7, 500
 CHUNK = 900
+BATCH = 256
 MUT = set()  # "m1" 漏れ・"m2" AR で今の記号を前として使う・"m3" 事前分布の S̄ の A を転置
+
+
+def make_rows(seqs, chunk=None):
+    """系列 → [(観測, 前の記号)]。chunk があれば切れ端に分ける（切れ端の頭の前の記号は切れる前の記号・本当の頭は −1）。"""
+    rows = []
+    for s in seqs:
+        s = np.asarray(s, dtype=np.int64)
+        if len(s) == 0:
+            continue
+        if chunk and len(s) > chunk:
+            for i in range(0, len(s), chunk):
+                o = s[i:i + chunk]
+                p = np.empty(len(o), dtype=np.int64)
+                p[1:] = o[:-1]
+                p[0] = s[i - 1] if i > 0 else -1
+                rows.append((o, p))
+        else:
+            p = np.empty(len(s), dtype=np.int64)
+            p[1:] = s[:-1]
+            p[0] = -1
+            rows.append((s, p))
+    return rows
+
+
+class Batched:
+    """当てはめの系列を BATCH 本ずつの束に分けたもの（E 段の度数と尤度を束ごとに足す・メモリのため・判断 8）。"""
+
+    def __init__(self, seqs, chunk=None, size=None):
+        rows = make_rows(seqs, chunk)
+        size = size or BATCH
+        self.parts = [Data(None, rows=rows[i:i + size]) for i in range(0, len(rows), size)]
+        self.nobs = sum(p.nobs for p in self.parts)
+
+
+def parts_of(D):
+    return D.parts if isinstance(D, Batched) else [D]
 
 
 class Data:
     """詰めた系列。O（観測）・P（前の記号・本当の頭は −1）・M（マスク）。"""
 
-    def __init__(self, seqs, chunk=None):
-        rows = []
-        for s in seqs:
-            s = np.asarray(s, dtype=np.int64)
-            if len(s) == 0:
-                continue
-            if chunk and len(s) > chunk:
-                for i in range(0, len(s), chunk):
-                    o = s[i:i + chunk]
-                    p = np.empty(len(o), dtype=np.int64)
-                    p[1:] = o[:-1]
-                    p[0] = s[i - 1] if i > 0 else -1
-                    rows.append((o, p))
-            else:
-                p = np.empty(len(s), dtype=np.int64)
-                p[1:] = s[:-1]
-                p[0] = -1
-                rows.append((s, p))
+    def __init__(self, seqs, chunk=None, rows=None):
+        rows = make_rows(seqs, chunk) if rows is None else rows
         n, T = len(rows), max(len(o) for o, _ in rows)
         self.O = np.zeros((n, T), dtype=np.int64)
         self.P = np.full((n, T), -1, dtype=np.int64)
@@ -157,7 +178,18 @@ def keys_of(kind):
 
 
 def counts(m, D):
-    """E 段。期待度数（母数と同じ形）と対数尤度。"""
+    """E 段。期待度数（母数と同じ形）と対数尤度。D が束（Batched）なら束ごとに足す。"""
+    if isinstance(D, Batched):
+        S, ll = None, 0.0
+        for part in D.parts:
+            s, l_ = counts_one(m, part)
+            S = s if S is None else {k: S[k] + s[k] for k in S}
+            ll += l_
+        return S, ll
+    return counts_one(m, D)
+
+
+def counts_one(m, D):
     alpha, c, E = forward(m, D)
     beta = backward(m, D, E, c)
     gamma = alpha * beta
@@ -222,9 +254,17 @@ def normalize(kind, X):
     return out
 
 
+def loglik(m, D):
+    """当てはめの系列（切れ端・束）の対数尤度の和。"""
+    tot = 0.0
+    for part in parts_of(D):
+        _, c, _ = forward(m, part)
+        tot += float(np.log(c[part.M]).sum())
+    return tot
+
+
 def objective(m, D, pr):
-    _, c, _ = forward(m, D)
-    return float(np.log(c[D.M]).sum()) + log_prior(m, pr)
+    return loglik(m, D) + log_prior(m, pr)
 
 
 def em_from(m, D, pr):
