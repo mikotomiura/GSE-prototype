@@ -27,5 +27,5 @@
 ## 記録
 - [x] notes.md（結果・案の文・読まないこと）
 - [x] 1-SE 規則の出典を references に（citation-ssot・[V370] provisional）
-- [ ] 完了時の code-reviewer ＋ /cross-review・指摘の直し
+- [x] 完了時の code-reviewer ＋ /cross-review・指摘の直し（2 巡・判断 8・9・計算を 3 回）
 - [ ] tasklist を閉じる・push（PR は研究者に確かめてから）

@@ -1,6 +1,6 @@
 {
  "seed": 2026110402,
- "run_id": "20261104T193118-49439",
+ "run_id": "20261104T194332-50681",
  "mutate": [],
  "gates": {
   "G1": {
@@ -13,7 +13,9 @@
    "d_conv": true,
    "d_fit_tau_grad_max": 2.4868995751603507e-14,
    "d_fit_tau_conv": true,
-   "e_citl_max_diff": 4.262901143192721e-11
+   "e_citl_max_diff": 4.262901143192721e-11,
+   "e_citl_resid": 3.361947165103629e-12,
+   "e_citl_edges": true
   },
   "G2": {
    "ok": true,
