@@ -131,6 +131,27 @@ def backward(m, D, E, c):
     return beta
 
 
+def xi_counts_loop(A, alpha, beta, E, c, M):
+    """遷移の期待度数（時刻ごとのループ・B の hmm.py と同じ作り）。xi_counts の照合にだけ使う。"""
+    K = A.shape[0]
+    xi = np.zeros((K, K))
+    for t in range(M.shape[1] - 1):
+        mk = M[:, t + 1]
+        if not mk.any():
+            break
+        x = alpha[mk, t][:, :, None] * A[None] * (E[mk, t + 1] * beta[mk, t + 1])[:, None, :]
+        xi += (x / c[mk, t + 1][:, None, None]).sum(0)
+    return xi
+
+
+def xi_counts(A, alpha, beta, E, c, M):
+    """遷移の期待度数を全時刻で一度に足す（ループ版と同じ量・selftest の P-XI で照らす）。
+    Σ_{n,t: M[n,t+1]} alpha[n,t,i] A[i,j] E[n,t+1,j] beta[n,t+1,j] / c[n,t+1]。"""
+    w = np.where(M[:, 1:], 1.0 / c[:, 1:], 0.0)
+    R = E[:, 1:] * beta[:, 1:] * w[..., None]
+    return np.einsum("nti,ntj->ij", alpha[:, :-1], R) * A
+
+
 def keys_of(kind):
     return ("pi", "A", "B") if kind == "hmm" else ("pi", "A", "H", "C")
 
@@ -142,13 +163,7 @@ def counts(m, D):
     gamma = alpha * beta
     gamma /= gamma.sum(2, keepdims=True)
     K = len(m["pi"])
-    xi = np.zeros((K, K))
-    for t in range(D.O.shape[1] - 1):
-        mk = D.M[:, t + 1]
-        if not mk.any():
-            break
-        x = alpha[mk, t][:, :, None] * m["A"][None] * (E[mk, t + 1] * beta[mk, t + 1])[:, None, :]
-        xi += (x / c[mk, t + 1][:, None, None]).sum(0)
+    xi = xi_counts(m["A"], alpha, beta, E, c, D.M)
     S = dict(pi=gamma[:, 0].sum(0), A=xi)
     if m["kind"] == "hmm":
         em = np.zeros((NSYM, K))
