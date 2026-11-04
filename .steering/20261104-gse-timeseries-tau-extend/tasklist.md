@@ -13,7 +13,7 @@
 - [x] worktree `/Users/johnd/GSE-prototype-tau-extend`（枝 `exp/gse-timeseries-tau-extend`・前回の枝の `b1771098` から）
 - [x] grill（範囲・τ の格子・構造・集計の行・計算の場所）→ 判断 1〜5
 - [x] `conditions.md`・`SEED`
-- [ ] 条件をコミット（計算の前）
+- [x] 条件をコミット（計算の前・eb7a1884）
 
 ## 次のセッション（コード・合成）
 
