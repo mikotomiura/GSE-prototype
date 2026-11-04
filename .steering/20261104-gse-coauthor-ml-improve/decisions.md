@@ -41,3 +41,17 @@
 | 補完の受け入れの名前 | 変換の前に X-Action の名前の一覧と総数だけを数え、受け入れに当たる名前を決めてから条件をコミットする（候補が増えたらその場で聞く） | 引き継ぎの 2 つで固定 |
 | ロジスティックの入力 | V-tab を主、V-recal（logit(`p_stuck`)）を副。V-em は載せない | V-tab だけ／V-em も |
 | 削る順 | CS1 の k の格子 → CoAuthor の P30 → ふつうの HMM の K = 10 → τ = 100 | grill の順のまま（P30 を削らない） |
+
+## 判断 5: 補完の受け入れの名前（メイン・2026-11-04・条件のコミットの前）
+
+- 取っておいた書き手を除く 2021 年版の `X-Action` の名前と総数だけを数えた（名前 370 種・型の合わない値 1,209 件。人ごとの値・文字の中身は出していない・scratch で数え repo に入れない）。
+- 受け入れに当たりうる名前: `Choose Lookup Item` 6,278・`Choose Lookup Item Replace` 919。ほかに `Undo Choose Lookup Item` 185・`Undo Choose Lookup Item Replace` 26・`Redo Choose Lookup Item` 2・`Redo Choose Lookup Item Replace` 1・`Next Template Variable or Finish In-Place Refactoring` 11。型の合わない値（英数字と空白の形でないもの）に "lookup"・"complet" を含むものは 0。
+- **採用**: ラベルは引き継ぎの 2 つの名前だけ（完全一致）。Undo・Redo は受け入れの出来事ではない（受け入れの取り消し・やり直し）ので入れない。候補が増えなかったので研究者に聞き直していない（判断 4 の「増えたら聞く」に当たらない）。
+
+## 判断 6: CS1 の門の照らす相手（メイン・2026-11-04・条件のコミットの前）
+
+- design §1.2 の門は「俯瞰の中間と完全一致」だが、俯瞰の中間は 11-04 に消してあった。俯瞰の `build_cs1.py` を同じ入力（SHA-256 は俯瞰の run.sh の値と一致）で repo の外 `~/gse-public-data/cs1/work2021_ref` に回し直し、それと照らした。
+- 照らし方: `events` は作り直しの `lookup-accept` を `ide-action` に戻したものが俯瞰と完全一致（design の「除いて比べる」より強い）。ほかは design のとおり（`scripts/check_same_cs1.py`）。
+- 結果: 課題 177・feat 行 2,794,277 で不一致 0、`lookup-accept` の総数 7,197（判断 5 の 6,278 ＋ 919 と一致）。build_summary の書き手 31・課題 179（ok 177・押下不足 2）・holdout の SHA が俯瞰の `build_summary_2021.json` と一致。
+- 陰性の対照: 俯瞰の中間どうしを照らすと、177 課題すべて不一致・受け入れ 0 件で終了コード 1（門が実データの上で素通りしない）。
+- 本計算の run.sh では、この 2 つの中間の SHA-256 の一覧を provenance に入れ、門を頭で回し直す。
