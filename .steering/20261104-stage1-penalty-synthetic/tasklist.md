@@ -17,8 +17,8 @@
 - [x] README.md・conditions.md・SEED・env.md・run.sh・mutate.sh
 - [x] scripts/sim.py・selftest.py・check_mutations.py・report.py
 - [x] selftest 緑（G6 を判断 5 で直した）・変異 5 つが赤・20 反復の通し（判断 6）
-- [ ] conditions とコードをコミット（計算の前）
-- [ ] 計算の前の code-reviewer・指摘の直し・再コミット
+- [x] conditions とコードをコミット（計算の前・1dd2d082）
+- [x] 計算の前の code-reviewer・指摘の直し・再コミット（判断 7）
 
 ## 計算
 - [ ] 本計算（run.sh・主 72 セル ＋ 感度 s1・s2 ＋ cons）・provenance

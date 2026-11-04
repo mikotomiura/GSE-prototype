@@ -17,7 +17,7 @@ GATES = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"]
 
 
 def g1(seed):
-    rng = np.random.default_rng([seed, 1])
+    rng = np.random.default_rng([seed, 901, 1])  # 主のセルの流れと重ならない
     n = 60
     Z = rng.standard_normal((n, sim.P))
     y = (rng.random(n) < sim.sigmoid(Z @ sim.BETA - 0.5)).astype(float)
@@ -48,14 +48,21 @@ def g1(seed):
     Xd2 = np.hstack([np.ones((n2, 1)), Z2])
     out["d_mle_grad_max"] = float(np.max(np.abs(Xd2.T @ (y2 - sim.sigmoid(Xd2 @ th2)))))
     out["d_conv"] = bool(conv)
+    b3, be3, conv3 = sim.fit_tau(Z2, y2, math.inf)  # 本計算の τ = ∞ と同じ経路（擬似観測あり）
+    th3 = np.concatenate([[b3], be3])
+    Xd3 = np.vstack([Xd2, np.hstack([np.ones((2, 1)), np.zeros((2, sim.P))])])
+    y3 = np.concatenate([y2, [1.0, 0.0]])
+    w3 = np.concatenate([np.ones(n2), [0.5, 0.5]])
+    out["d_fit_tau_grad_max"] = float(np.max(np.abs(Xd3.T @ (w3 * (y3 - sim.sigmoid(Xd3 @ th3))))))
     ok = (out["a_grad_max"] < 1e-6 and out["b_intercept_only_diff"] < 1e-8 and out["c_big_lam_intercept_diff"] < 1e-4
-          and out["c_big_lam_beta_max"] < 1e-6 and out["d_mle_grad_max"] < 1e-6)
+          and out["c_big_lam_beta_max"] < 1e-6 and out["d_mle_grad_max"] < 1e-6
+          and out["d_fit_tau_grad_max"] < 1e-6)
     return ok, out
 
 
 def g2(seed):
     """one_rep と同じ経路で作った標準化が学習の側だけの値と一致し、評価の側を混ぜた値と一致しない。"""
-    rng = np.random.default_rng([seed, 2])
+    rng = np.random.default_rng([seed, 902, 1])  # 主のセルの流れと重ならない
     a = 0.0
     Xtr, ytr, dtr, _ = sim.gen(rng, 50, 0.5, a, sim.BETA, "main", False)
     Xev, _, _, _ = sim.gen(rng, 500, 0.5, a, sim.BETA, "main", False, day0=int(dtr.max()) + 1)
@@ -64,12 +71,21 @@ def g2(seed):
     allx = np.vstack([Xtr, Xev])
     out = dict(mu_diff=float(np.max(np.abs(std.mu - mu_tr))), sd_diff=float(np.max(np.abs(std.sd - sd_tr))),
                mu_diff_vs_all=float(np.max(np.abs(std.mu - allx.mean(0)))))
-    ok = out["mu_diff"] < 1e-12 and out["sd_diff"] < 1e-12 and out["mu_diff_vs_all"] > 1e-6
+    D = int(dtr.max()) + 1
+    fold_bad = 0
+    for tr_days, va_days in sim.fwd_folds(D) + sim.loo_folds(D):
+        mt, mv = np.isin(dtr, tr_days), np.isin(dtr, va_days)
+        fs = sim.fold_std(Xtr, mt, mv)  # cv_matrix と同じ関数
+        sd_t = Xtr[mt].std(0)
+        sd_t[sd_t == 0] = 1.0
+        fold_bad += not (np.max(np.abs(fs.mu - Xtr[mt].mean(0))) < 1e-12 and np.max(np.abs(fs.sd - sd_t)) < 1e-12)
+    out["fold_bad"] = int(fold_bad)
+    ok = out["mu_diff"] < 1e-12 and out["sd_diff"] < 1e-12 and out["mu_diff_vs_all"] > 1e-6 and fold_bad == 0
     return ok, out
 
 
 def g3(seed):
-    rng = np.random.default_rng([seed, 3])
+    rng = np.random.default_rng([seed, 903, 1])  # 主のセルの流れと重ならない
     bad = 0
     for D in [2, 3, 5, 7, 23, 60]:
         for tr, va in sim.fwd_folds(D, rng):

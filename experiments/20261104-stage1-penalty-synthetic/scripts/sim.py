@@ -112,6 +112,11 @@ def make_std(Xtr, Xev):
     return Std(np.vstack([Xtr, Xev])) if "m1" in MUT else Std(Xtr)
 
 
+def fold_std(Xtr, mt, mv):
+    """CV の折の標準化。折の学習の件だけ（m1 は検証の件も混ぜる）。"""
+    return Std(Xtr[mt | mv]) if "m1" in MUT else Std(Xtr[mt])
+
+
 # ---------- 評価の量 ----------
 
 def logloss_sum(y, p):
@@ -137,7 +142,8 @@ def auc(y, p):
 
 
 def evaluate(y, p):
-    """(対数損失の平均, Brier, C, 較正の切片, 較正の傾き)。p̂ の logit の SD < 1e-8 なら C と傾きは nan。"""
+    """(対数損失の平均, Brier, C, 較正の切片, 較正の傾き, 傾きの当てはめが収束しなかったか 0/1)。
+    p̂ の logit の SD < 1e-8 なら C と傾きは nan（収束の列は 0）。"""
     y = np.asarray(y, dtype=float)
     ll = logloss_sum(y, p) / len(y)
     br = float(np.mean((p - y) ** 2))
@@ -145,9 +151,9 @@ def evaluate(y, p):
     th, _ = fit_logistic(None, y, offset=lp, pseudo=False)
     citl = float(th[0])
     if np.std(lp) < 1e-8:
-        return ll, br, math.nan, citl, math.nan
-    th2, _ = fit_logistic(lp[:, None], y, pseudo=False)
-    return ll, br, auc(y, p), citl, float(th2[1])
+        return ll, br, math.nan, citl, math.nan, 0.0
+    th2, conv2 = fit_logistic(lp[:, None], y, pseudo=False)
+    return ll, br, auc(y, p), citl, float(th2[1]), float(not conv2)
 
 
 # ---------- 生成器 ----------
@@ -250,7 +256,7 @@ def cv_matrix(Xtr, ytr, dtr, folds):
     for k, (tr_days, va_days) in enumerate(folds):
         mt = np.isin(dtr, tr_days)
         mv = np.isin(dtr, va_days)
-        std = Std(Xtr[mt])
+        std = fold_std(Xtr, mt, mv)
         Zt, Zv = std(Xtr[mt]), std(Xtr[mv])
         for t, tau in enumerate(TAUS):
             b, be, conv = fit_tau(Zt, ytr[mt], tau)
@@ -283,7 +289,7 @@ def one_rep(cell, rep, seed):
         Xev, yev, pev = Xtr, ytr, ptr
     std = make_std(Xtr, Xev)
     Ztr, Zev = std(Xtr), std(Xev)
-    met = np.full((NT, 5), np.nan)
+    met = np.full((NT, 6), np.nan)
     nc_full = np.zeros(NT, dtype=int)
     for t, tau in enumerate(TAUS):
         b, be, conv = fit_tau(Ztr, ytr, tau)

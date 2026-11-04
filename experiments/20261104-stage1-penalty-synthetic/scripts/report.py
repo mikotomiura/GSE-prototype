@@ -71,6 +71,8 @@ def cell_summary(c, arr):
                        cv_not_ok=int(np.sum(arr["cv_ok"] == 0)),
                        nonconv_full={tau_s(t): int(arr["nc_full"][:, t].sum()) for t in range(sim.NT)},
                        nonconv_fwd={tau_s(t): int(arr["nc_fwd"][:, t].sum()) for t in range(sim.NT)},
+                       nonconv_loo={tau_s(t): int(arr["nc_loo"][:, t].sum()) for t in range(sim.NT)},
+                       nonconv_slope={tau_s(t): int(np.nansum(arr["met"][:, t, 5])) for t in range(sim.NT)},
                        days=quart(arr["D"]), npos=quart(arr["npos"]))
     return out
 
@@ -153,7 +155,7 @@ def tables(summ, pr, desc):
               "| τ | n ≤ 30 の平均の後悔の最大 |", "|---|---|"]
         L += [f"| {k} | {v:.4f} |" for k, v in pr["tau_f_max_regret"].items()]
         for q in ("n", "min_class"):
-            L += ["", f"| L（{q}） | 超過の最大 |", "|---|---|"]
+            L += ["", f"| L（{q}・q < L なら固定） | 超過の最大 |", "|---|---|"]
             L += [f"| {k} | {v:.4f} |" for k, v in pr["L"][q]["max_excess"].items()]
         if pr.get("excl"):
             e = pr["excl"]
@@ -226,7 +228,11 @@ def main(argv):
     json.dump(dict(run_id=rid, proposal=pr, gates=gates, described=desc),
               open(os.path.join(res_dir, "proposal.json"), "w"), ensure_ascii=False, indent=1)
     open(os.path.join(res_dir, "tables.md"), "w").write(tables(summ, pr, desc))
-    sys.exit(0 if all(v["ok"] for v in gates.values()) else 3)
+    # 門が欠けたら通さない（「落ちていない」を「通った」と読まない）
+    complete = len(main_cells) == 72 and set(gates) == {"G7", "G8"}
+    if not complete:
+        print("G7・G8 が揃わない（主のセルが 72 でないか、対照のセルが無い）", flush=True)
+    sys.exit(0 if complete and all(v["ok"] for v in gates.values()) else 3)
 
 
 if __name__ == "__main__":
