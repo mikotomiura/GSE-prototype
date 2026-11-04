@@ -101,44 +101,62 @@ def rule(rows):
     return out
 
 
+def abs_log(m):
+    """傾きの中央値の 1 からの外れ（|log|）。中央値が無いか 0 以下なら inf（最も外れたものとして数える）。"""
+    return math.inf if m is None or m <= 0 else abs(math.log(m))
+
+
 def posthoc(rows, cl):
-    """記述だけ（W2 の規則の外・結果を見た後に足した・本タスクの decisions 判断 3）。
-    1) 固定の τ ごとに、3 倍率 × n ≥ 50 の 54 セルの傾きの中央値の最小・最大と |log 中央値| の最大。
+    """記述だけ（W2 の規則の外・結果を見た後に足した・本タスクの decisions 判断 3・4）。
+    1) 固定の τ ごとに、3 倍率 × n ≥ 50 の 54 セルの傾きの中央値の最小・最大と |log 中央値| の最大
+       （中央値が無いか 0 以下のセルは inf に数え、その数を invalid に書く）。
     2) 倍率ごとに、n ≥ 50 の 18 セルで傾きの中央値が 1 に最も近い固定の τ（|log| で比べる）の数。
-    3) 倍率ごとに、n ≥ 50 の 18 セルで前向きの CV と 1-SE が切片だけ（τ = 0・傾きが無い）を選んだ反復の割合。"""
+    3) 倍率ごとに、信号ありの 36 セルでの固定の τ ごとの後悔の平均の最大。
+    4) 倍率ごとに、n ≥ 50 の 18 セルで前向きの CV と 1-SE が切片だけ（τ = 0・傾きが無い）を選んだ反復の割合。"""
     taus = [report.tau_s(t) for t in range(1, sim.NT)]
     big = [r for r in rows if r["cell"]["n"] >= RULE_N]
     per_tau = {}
     for t in taus:
         ms = [r["fixed"][t]["slope"]["med"] for r in big]
-        ms = [m for m in ms if m is not None and m > 0]
-        per_tau[t] = dict(n=len(ms), med_min=min(ms), med_max=max(ms), max_abs_log=max(abs(math.log(m)) for m in ms))
+        ok = [m for m in ms if m is not None and m > 0]
+        per_tau[t] = dict(n=len(ms), invalid=len(ms) - len(ok), med_min=min(ok) if ok else None,
+                          med_max=max(ok) if ok else None, max_abs_log=max(abs_log(m) for m in ms))
     closest = {}
     for k in weak.SCALES:
         cnt = {t: 0 for t in taus}
         for r in big:
             if r["cell"]["scale"] != k:
                 continue
-            best = min(taus, key=lambda t: abs(math.log(r["fixed"][t]["slope"]["med"])))
+            best = min(taus, key=lambda t: abs_log(r["fixed"][t]["slope"]["med"]))
             cnt[best] += 1
         closest[str(k)] = cnt
+    regret_max = {}
+    for k in weak.SCALES:
+        sub = [r for r in rows if r["cell"]["scale"] == k]
+        regret_max[str(k)] = {report.tau_s(t): max(r["fixed"][report.tau_s(t)]["regret"]["mean"] for r in sub)
+                              for t in range(sim.NT)}
     icpt = {}
     for k in weak.SCALES:
         sel = [a for c, a in cl if c["scale"] == k and c["n"] >= RULE_N]
         icpt[str(k)] = {key: float(np.mean(np.concatenate([a[key] for a in sel]) == 0)) for key in ("c_fwd", "c_1se")}
-    return dict(per_tau=per_tau, closest_to_1=closest, intercept_only_frac=icpt)
+    return dict(per_tau=per_tau, closest_to_1=closest, fixed_regret_max=regret_max, intercept_only_frac=icpt)
 
 
 def posthoc_md(ph):
     L = ["", "## 記述（規則の外・結果を見た後に足した）: 固定の τ ごとの傾きの中央値（3 倍率 × n ≥ 50 の 54 セル）", "",
-         "| τ | 中央値の最小 | 最大 | 1 からの外れの最大（|log|） |", "|---|---|---|---|"]
+         "| τ | 中央値の最小 | 最大 | 1 からの外れの最大（|log|） | 中央値が無いか 0 以下のセル |", "|---|---|---|---|---|"]
     for t, v in ph["per_tau"].items():
-        L.append(f"| {t} | {f3(v['med_min'])} | {f3(v['med_max'])} | {f3(v['max_abs_log'])} |")
+        L.append(f"| {t} | {f3(v['med_min'])} | {f3(v['med_max'])} | {f3(v['max_abs_log'])} | {v['invalid']} |")
     taus = list(ph["per_tau"])
     L += ["", "## 記述: 傾きの中央値が 1 に最も近い固定の τ（n ≥ 50 の 18 セルのうちの数）", "",
           "| 係数の倍率 | " + " | ".join(f"τ={t}" for t in taus) + " |", "|---|" + "---|" * len(taus)]
     for k, cnt in ph["closest_to_1"].items():
         L.append(f"| {k} | " + " | ".join(str(cnt[t]) for t in taus) + " |")
+    tall = [report.tau_s(t) for t in range(sim.NT)]
+    L += ["", "## 記述: 固定の τ ごとの後悔の平均の最大（信号ありの 36 セル・倍率ごと）", "",
+          "| 係数の倍率 | " + " | ".join(f"τ={t}" for t in tall) + " |", "|---|" + "---|" * len(tall)]
+    for k, v in ph["fixed_regret_max"].items():
+        L.append(f"| {k} | " + " | ".join(f4(v[t]) for t in tall) + " |")
     L += ["", "## 記述: CV が切片だけ（τ = 0・傾きが無く傾きの要約から抜ける）を選んだ反復の割合（n ≥ 50）", "",
           "| 係数の倍率 | 前向きの CV | 1-SE |", "|---|---|---|"]
     for k, v in ph["intercept_only_frac"].items():
@@ -160,8 +178,8 @@ def tables(rows, rl, w4, meta):
          f"## 読みの規則（W2）: n ≥ {RULE_N}・信号ありで τ = 0.5 の傾きの中央値が [{RULE_LO}, {RULE_HI}]", "",
          "| 係数の倍率 | セル | 中央値の最小 | 最大 | 外れたセル | 規則の答え |", "|---|---|---|---|---|---|"]
     for k, v in rl.items():
-        L.append(f"| {k} | {v['n_cells']} | {f3(v['med_min'])} | {f3(v['med_max'])} | {len(v['outside'])} | "
-                 + ("案 B を保つ" if v["verdict"] == "keep_B" else "見直しの候補") + " |")
+        ans = "W4 FAIL のため無効" if not w4["ok"] else ("案 B を保つ" if v["verdict"] == "keep_B" else "見直しの候補")
+        L.append(f"| {k} | {v['n_cells']} | {f3(v['med_min'])} | {f3(v['med_max'])} | {len(v['outside'])} | {ans} |")
     taus = [report.tau_s(t) for t in range(sim.NT)]
     for k in weak.SCALES:
         sub = [r for r in rows if r["cell"]["scale"] == k]
@@ -196,6 +214,9 @@ def main(argv):
     rows = cell_rows(cl)
     w4 = g_w4(rows)
     rl = rule(rows)
+    if not w4["ok"]:
+        for v in rl.values():
+            v["verdict"] = "invalid_w4_fail"
     ph = posthoc(rows, cl)
     json.dump(dict(run_id=meta["run_id"], seed=meta["seed"], reps=meta["reps"], w4=w4, rule=rl, posthoc=ph,
                    cells=rows),

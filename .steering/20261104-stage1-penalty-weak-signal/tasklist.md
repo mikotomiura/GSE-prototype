@@ -14,9 +14,11 @@
 ## 計算
 - [x] 本計算（run.sh・108 セル × 400 反復）・W4 緑
 - [x] report（規則の答え）・記述の節を足した（判断 3）
+- [x] 完了時の code-reviewer ＋ Codex（1 巡目）・指摘を直した（判断 4）
+- [ ] run.sh で全部やり直し、W4 緑・規則の答えが同じことを確かめる
 
 ## 記録
 - [x] notes.md（結果・規則の答え・読まないこと）
-- [ ] 完了時の code-reviewer ＋ /cross-review・指摘の直し
+- [ ] 2 巡目のレビュー（直した差分）
 - [ ] 研究者が規則の答えを見て S1-E8 の値を決める
 - [ ] push（PR は exp/gse-coauthor-ml-improve が main に入った後・研究者に確かめてから）

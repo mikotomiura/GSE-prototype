@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-EXPECT = {"w1": "W1", "w2": "W2"}
+EXPECT = {"w1": "W1", "w2": "W2", "w3": "W5", "w4": "W1"}
 
 
 def main(d, run_id):

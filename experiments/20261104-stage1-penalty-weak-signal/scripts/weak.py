@@ -9,6 +9,8 @@ sim.BETA を倍率つきで置いてから sim.calib_a・sim.one_rep を呼ぶ�
 変異（conditions W3・MUT_W に入る）:
   w1: 係数 1 倍のセルの乱数の流れの番号をずらす（前の主のセルと別の流れになる）
   w2: 倍率を sim.BETA に入れない（どの強さも 1 倍になる）
+  w3: ワーカーの _job で倍率を置かない（親で置いた値のまま・spawn のワーカーでは 1 倍）
+  w4: ワーカーの _job で係数 1 倍のときだけ係数を 1.0001 倍にする（番号と切片は同じで値だけがずれる）
 """
 import hashlib
 import json
@@ -31,7 +33,9 @@ MUT_W = set()
 
 def set_scale(k):
     """sim の大域の係数を倍率 k にする（w2 は倍率を入れない）。"""
-    sim.BETA = BASE_BETA * (1.0 if "w2" in MUT_W else k)
+    if "w2" in MUT_W:
+        k = 1.0
+    sim.BETA = BASE_BETA * k
 
 
 def cell_id(main_id, k):
@@ -66,7 +70,10 @@ def _job(args):
     MUT_W.clear()
     MUT_W.update(mut)
     sim.MUT.clear()
-    set_scale(cell["scale"])
+    if "w3" not in MUT_W:
+        set_scale(cell["scale"])
+    if "w4" in MUT_W and cell["scale"] == 1.0:
+        sim.BETA = BASE_BETA * 1.0001  # 切片とセルの番号は変えず、ワーカーの係数だけをずらす
     return sim.one_rep(cell, rep, seed)
 
 
