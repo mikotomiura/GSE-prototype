@@ -5,8 +5,8 @@
 - [x] Dataverse API でファイル一覧 → `keystrokes.csv`・`readme.txt` だけ取得 → `data.md`
 - [x] 列名・EventType の種類と件数・人と課題の単位を確かめる（中身は出さない）
 - [x] `conditions.md`（変換の対応表・holdout・L1〜L6 の当て方）をコミット
-- [ ] 変換スクリプト → replay → 集計（中間は 1 本ずつ消す）
-- [ ] `notes.md`（課題の数・1 単位の長さの四分位・言える範囲）
+- [x] 変換スクリプト → replay → 集計（中間は 1 本ずつ消す）
+- [x] `notes.md`（課題の数・1 単位の長さの四分位・言える範囲）
 - [ ] code-reviewer ＋ /cross-review（並列）
 - [ ] main へ `--no-ff`・`[skip ci]`（コードと CI 設定が無いことを確かめる）
 
