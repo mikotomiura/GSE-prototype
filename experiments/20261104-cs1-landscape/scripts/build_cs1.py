@@ -136,8 +136,11 @@ def read_units(year, path, hold):
                     cnt["posthoc:multi-insert-whitespace-only" + ("-with-newline" if "\n" in it else "")] += 1
             if kind == "count":
                 continue
-            units[(sid, row["AssignmentID"])].append((int(float(row["ClientTimestamp"])), int(row["EventID"]),
-                                                      kind, val))
+            t, eid = int(float(row["ClientTimestamp"])), int(row["EventID"])
+            units[(sid, row["AssignmentID"])].append((t, eid, kind, val))
+            if kind == "ev" and val == "multi-insert" and row["InsertText"].strip() == "":
+                # 事後の印（判定に使わない）: 同じ時刻に「空白だけの挿入」の印を足す。主の集計は読まない
+                units[(sid, row["AssignmentID"])].append((t, eid, "ev", "posthoc-ws"))
     return units, cnt, len(held)
 
 

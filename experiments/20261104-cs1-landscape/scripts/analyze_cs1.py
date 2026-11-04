@@ -7,7 +7,9 @@
 元の俯瞰の analyze_landscape.py の Session と集計をそのまま使い、CS1 で変えるところ（D5）だけを上書きする。
 """
 import bisect
+import copy
 import csv
+from collections import Counter
 import glob
 import hashlib
 import json
@@ -51,6 +53,7 @@ class Unit(al.Session):
         self.ev = {n: sorted(t for t, m in ev if m == n) for n in L3_EVENTS}
         self.ai_cover = prompt_cover(ev)
         self.n_prompt = sum(1 for _, n in ev if n == "prompt")
+        self.ws_times = sorted(t for t, n in ev if n == "posthoc-ws")  # 事後の印（主の集計は読まない）
         self.first_event, self.last_event = d["span"]
 
     def span_ms(self):
@@ -204,6 +207,21 @@ def n_not_held(path, hold_ids):
     return len(subj - hold_ids)
 
 
+def posthoc_l4_nonws(writers):
+    """事後（レビューの後・判定に使わない）: 空白と改行だけの複数の文字の挿入を受領から外した L4。"""
+    alt = []
+    for w in writers:
+        aw = []
+        for s in w:
+            u = copy.copy(s)
+            nonws = sorted((Counter(s.receipt_kinds["multi-insert"]) - Counter(s.ws_times)).elements())
+            u.receipt_kinds = {"paste": s.receipt_kinds["paste"], "multi-insert-nonws": nonws}
+            u.receipts = sorted(s.receipt_kinds["paste"] + nonws)
+            aw.append(u)
+        alt.append(aw)
+    return al.summarize_l4(alt)
+
+
 def posthoc_resume(writers):
     """事後（レビューの後・判定に使わない）: 再開が t0 と別の作業のまとまりにある停滞の数。
     t の属するまとまり = 始まりが t 以下の最後のまとまり。"""
@@ -249,6 +267,7 @@ def run(w19, w21, hold_p, csv19, csv21, out_dir):
         res[year] = summarize_year(el, has_prompt, has_nav)
         res[year]["units"] = describe_units(el)
         posthoc[year] = {"resume": posthoc_resume(el),
+                         "L4_nonws": posthoc_l4_nonws(el) if has_prompt else None,
                          "row_kinds_posthoc": {k: v for k, v in json.load(open(os.path.join(
                              work, "build_summary.json")))["row_kinds"].items() if k.startswith(("posthoc:", "ev:multi"))}}
     os.makedirs(out_dir, exist_ok=True)
@@ -285,6 +304,12 @@ def selftest():
     du = describe_units([[u]])
     assert du["units"] == 1 and du["unit_blocks"]["median"] == 2
     assert posthoc_resume([[u]]) == {"stalls": 1, "resume_in_other_block": 0, "unresumed": 0}
+    d2 = dict(d, events=d["events"] + [[259_000, "multi-insert"], [259_000, "posthoc-ws"], [260_000, "multi-insert"]])
+    u2 = Unit(d2)
+    assert len(u2.receipts) == 3  # 主の受領は印を読まない
+    p4 = posthoc_l4_nonws([[u2]])
+    assert p4["receipt_per_h_by_kind"]["multi-insert-nonws"]["median"] > 0
+    assert set(p4["receipt_per_h_by_kind"]) == {"paste", "multi-insert-nonws"}
     # D4 の照合: 陽性対照（取っておく書き手が混ざる・一覧が違う・部分実行）で止まり、正常で通る
     with tempfile.TemporaryDirectory() as td:
         hp = os.path.join(td, "hold.json")
