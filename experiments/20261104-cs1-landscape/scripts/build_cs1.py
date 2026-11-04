@@ -4,17 +4,19 @@
   python3 -I build_cs1.py <year:2019|2021> <keystrokes.csv> <gse-replay> <holdout.json> <work_dir> <jobs> [--limit N]
   python3 -I build_cs1.py --selftest
 出力（repo の外）: <work_dir>/u<番号>.json（番号は (SubjectID, AssignmentID) の昇順の通し番号）と
-<work_dir>/units.json（番号 → 書き手の通し番号。ID は書かない）・build_summary.json。各 u*.json は
+<work_dir>/units.json（番号 → 書き手の通し番号。ID は書かない）・writers.json（書き手の通し番号 →
+SubjectID の SHA-256。解析が取っておく書き手と照らす）・build_summary.json。各 u*.json は
   keys:   [[t_press, category], ...]
   feat:   [[t, p_stuck, ewma_x], ...]
   onsets: [[s_ms, t0_ms, theta_person_ms, theta_sample_n], ...]
   observed_intervals: [[a_ms, b_ms], ...]
   blocks: [[first_press, last_press], ...]（作業のまとまり）
-  events: [[t, name], ...]（D3 の出来事の表。時刻と名前だけ）
+  events: [[t, name], ...]（D3 の出来事の表。時刻と名前だけ。残したまとまりの出来事だけ）
 キーの文字・挿入と削除の文字・貼り付けた文字は書き出さない。取っておく書き手の行は読み飛ばす。
 中間の NDJSON と replay の出力は課題ごとに消す。
 """
 import csv
+import hashlib
 import json
 import os
 import subprocess
@@ -90,7 +92,8 @@ def map_2021(row):
             return ("ev", "switch")
         return ("ev", "ide-action")
     if et == "File.Edit":
-        if row["EditType"] == "Insert" and len(row["InsertText"]) >= 2 and not nanv(row["InsertText"]):
+        # 長さだけで決める（"nan" ちょうどの挿入は 2019・2021 とも 0 件だったが、欠損の印と取り違えないため nanv は当てない）
+        if row["EditType"] == "Insert" and len(row["InsertText"]) >= 2:
             return ("ev", "multi-insert")
         return ("count", "file-edit-other")
     if et == "X-Paste":
@@ -126,6 +129,11 @@ def read_units(year, path, hold):
                 continue
             kind, val = fn(row)
             cnt[kind + ":" + val if kind != "key" else "key"] += 1
+            if kind == "ev" and val == "multi-insert":
+                # 事後（レビューの後・判定に使わない）: 空白と改行だけの挿入（Enter の自動インデントの候補）。数だけ
+                it = row["InsertText"]
+                if it.strip() == "":
+                    cnt["posthoc:multi-insert-whitespace-only" + ("-with-newline" if "\n" in it else "")] += 1
             if kind == "count":
                 continue
             units[(sid, row["AssignmentID"])].append((int(float(row["ClientTimestamp"])), int(row["EventID"]),
@@ -171,7 +179,7 @@ def one(args):
     out = os.path.join(work, "u%05d.json" % idx)
     items.sort(key=lambda x: (x[0], x[1]))
     blocks_raw = split_blocks(items)
-    all_keys, all_feat, blocks, few = [], [], [], 0
+    all_keys, all_feat, blocks, few, kept_ev = [], [], [], 0, []
     with tempfile.TemporaryDirectory(dir=work) as td:
         for b in blocks_raw:
             presses = [(t, v) for t, _, k, v in b if k == "key"]
@@ -186,6 +194,7 @@ def one(args):
                 return {"status": "replay_failed"}
             all_feat += json.load(open(fp))
             all_keys += presses
+            kept_ev += [[t, v] for t, _, k, v in b if k == "ev"]  # 捨てたまとまりの出来事は入れない（レビューの後）
             blocks.append([presses[0][0], presses[-1][0]])
             os.remove(nd)
             os.remove(fp)
@@ -213,7 +222,8 @@ def one(args):
            "onsets": onsets,
            "observed_intervals": [[iv["a_ms"], iv["b_ms"]] for iv in d["provenance"]["observed_intervals"]],
            "blocks": blocks,
-           "events": [[t, v] for t, _, k, v in items if k == "ev"],
+           "events": kept_ev,
+           "span": [items[0][0], items[-1][0]],  # 課題の span（D6・最初から最後の出来事まで・捨てたまとまりも含む）
            "replay_stderr_bytes": len(ft.stderr)}
     with open(out + ".tmp", "w") as f:
         json.dump(rec, f, separators=(",", ":"))
@@ -251,8 +261,12 @@ def main():
                 too_long.append(round(res["span_days"], 1))
     ok = {k: v for k, v in unit_w.items() if os.path.exists(os.path.join(work, "u%s.json" % k))}
     json.dump(ok, open(os.path.join(work, "units.json"), "w"))
+    # 書き手の通し番号 → SubjectID の SHA-256（repo の外）。解析が取っておく書き手と照らす（D4・レビューの後）
+    json.dump({str(s_idx[s]): hashlib.sha256(s.encode()).hexdigest() for s in subj},
+              open(os.path.join(work, "writers.json"), "w"))
     summ = {"year": year, "writers_read": len(subj), "holdout_writers_skipped": held, "units": len(keys),
-            "attempted": len(tasks), "status": status, "blocks_kept": blocks, "blocks_few_presses": few,
+            "attempted": len(tasks), "holdout_sha256": hashlib.sha256(open(hold_p, "rb").read()).hexdigest(),
+            "status": status, "blocks_kept": blocks, "blocks_few_presses": few,
             "span_too_long_days": sorted(too_long), "row_kinds": dict(sorted(cnt.items()))}
     json.dump(summ, open(os.path.join(work, "build_summary.json"), "w"), indent=1)
     print(json.dumps({k: v for k, v in summ.items() if k != "row_kinds"}))
@@ -279,6 +293,7 @@ def selftest():
     assert map_2021(r(EventType="X-Action", **{"X-Metadata": "Comment Line"})) == ("ev", "ide-action")
     assert map_2021(r(EditType="Insert", InsertText="()")) == ("ev", "multi-insert")
     assert map_2021(r(EditType="Insert", InsertText="a"))[0] == "count"
+    assert map_2021(r(EditType="Insert", InsertText="nan")) == ("ev", "multi-insert")
     assert map_2021(r(EventType="X-Paste", **{"X-Metadata": "should-not-matter"})) == ("ev", "paste")
     assert map_2021(r(EventType="Run.Program", **{"X-Metadata": "Start"})) == ("ev", "run")
     assert map_2021(r(EventType="Run.Program", **{"X-Metadata": "0"}))[0] == "count"

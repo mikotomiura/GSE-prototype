@@ -3,13 +3,15 @@
 使い方:
   python3 -I analyze_cs1.py <work2019> <work2021> <holdout.json> <keystrokes_2019.csv> <keystrokes_2021.csv> <out_dir>
   python3 -I analyze_cs1.py --selftest
-出力は集計値だけ（書き手・課題の ID も番号も出さない）: <out_dir>/cs1_landscape.json・counts.json。
+出力は集計値だけ（書き手・課題の ID も番号も出さない）: <out_dir>/cs1_landscape.json・counts.json・posthoc.json（事後・判定に使わない）。
 元の俯瞰の analyze_landscape.py の Session と集計をそのまま使い、CS1 で変えるところ（D5）だけを上書きする。
 """
 import bisect
 import csv
 import glob
+import hashlib
 import json
+import tempfile
 import math
 import os
 import statistics
@@ -49,8 +51,7 @@ class Unit(al.Session):
         self.ev = {n: sorted(t for t, m in ev if m == n) for n in L3_EVENTS}
         self.ai_cover = prompt_cover(ev)
         self.n_prompt = sum(1 for _, n in ev if n == "prompt")
-        self.first_event = min([t for t, _ in ev] + [self.t_start])
-        self.last_event = max([t for t, _ in ev] + [self.t_end])
+        self.first_event, self.last_event = d["span"]
 
     def span_ms(self):
         return sum(b - a for a, b in self.blocks)
@@ -165,31 +166,58 @@ def describe_units(writers):
             "prompts": sum(s.n_prompt for s in us)}
 
 
-def load(work, hold_idx):
+def load(work):
     uw = json.load(open(os.path.join(work, "units.json")))
     by_w = {}
     for p in sorted(glob.glob(os.path.join(work, "u*.json"))):
         k = os.path.basename(p)[1:-5]
         if k not in uw:
             continue
-        if uw[k] in hold_idx:
-            sys.exit("取っておく書き手が中間に入っている")
         by_w.setdefault(uw[k], []).append(Unit(json.load(open(p))))
     return [by_w[w] for w in sorted(by_w)]
 
 
-def hold_idx(path, hold_ids):
-    """build_cs1.py と同じ並べ方（取っておく書き手を除いた SubjectID の昇順）で、一覧の書き手が通し番号に入っていないかを確かめる。
-    build は取っておく書き手を読まないので、入っていれば番号が衝突する。ここでは CSV の SubjectID の集合と照らす。"""
+def check_build(work, hold_ids, hold_path):
+    """D4 の照合（レビューの後に、働く形へ直した）。止める条件:
+    - 中間の書き手（writers.json の SubjectID の SHA-256）に、取っておく書き手が 1 人でもいる
+    - build が使った取っておく一覧が、いま渡された一覧と違う（SHA-256）
+    - 部分実行（--limit）の中間である"""
+    wh = set(json.load(open(os.path.join(work, "writers.json"))).values())
+    hh = {hashlib.sha256(h.encode()).hexdigest() for h in hold_ids}
+    if wh & hh:
+        sys.exit("取っておく書き手が中間に入っている")
+    bs = json.load(open(os.path.join(work, "build_summary.json")))
+    if bs["holdout_sha256"] != hashlib.sha256(open(hold_path, "rb").read()).hexdigest():
+        sys.exit("中間を作ったときの取っておく一覧が違う")
+    if bs["attempted"] != bs["units"]:
+        sys.exit("部分実行の中間は正式の集計に使わない")
+    return len(wh)
+
+
+def n_not_held(path, hold_ids):
+    """CSV の書き手のうち、取っておく一覧に無い人数（標本の表の数）。"""
     csv.field_size_limit(10**9)
     with open(path, newline="") as f:
         r = csv.reader(f)
         i = next(r).index("SubjectID")
-        subj = sorted({row[i] for row in r})
-    kept = [s for s in subj if s not in hold_ids]
-    if len(kept) + len(hold_ids & set(subj)) != len(subj):
-        sys.exit("書き手の数が合わない")
-    return len(kept)
+        subj = {row[i] for row in r}
+    return len(subj - hold_ids)
+
+
+def posthoc_resume(writers):
+    """事後（レビューの後・判定に使わない）: 再開が t0 と別の作業のまとまりにある停滞の数。
+    t の属するまとまり = 始まりが t 以下の最後のまとまり。"""
+    n = cross = unresumed = 0
+    for w in writers:
+        for s in w:
+            starts = [b[0] for b in s.blocks]
+            for _, t0, r, _ in s.stalls():
+                n += 1
+                if r is None:
+                    unresumed += 1
+                elif bisect.bisect_right(starts, r) != bisect.bisect_right(starts, t0):
+                    cross += 1
+    return {"stalls": n, "resume_in_other_block": cross, "unresumed": unresumed}
 
 
 def summarize_year(writers, has_prompt, has_nav):
@@ -206,21 +234,27 @@ def summarize_year(writers, has_prompt, has_nav):
 
 def run(w19, w21, hold_p, csv19, csv21, out_dir):
     hold = json.load(open(hold_p))
-    res, counts = {}, {}
+    res, counts, posthoc = {}, {}, {}
     for year, work, path, has_prompt, has_nav in (("2019", w19, csv19, False, False),
                                                   ("2021", w21, csv21, True, True)):
-        n_kept = hold_idx(path, set(hold[year]))
-        ws = load(work, frozenset())
-        if len(ws) > n_kept:
-            sys.exit("中間の書き手が、取っておく書き手を除いた数より多い")
+        hold_ids = set(hold[year])
+        n_kept = n_not_held(path, hold_ids)
+        n_built = check_build(work, hold_ids, hold_p)
+        if n_built != n_kept:
+            sys.exit("中間の書き手の数が、取っておく書き手を除いた数と違う")
+        ws = load(work)
         el = [w for w in ws if sum(s.obs_ms() for s in w) >= al.MIN_WRITER_OBS]
         counts[year] = {"writers_not_held": n_kept, "writers_loaded": len(ws), "units_loaded": sum(len(w) for w in ws),
                         "excluded_obs_lt_10min": len(ws) - len(el), "units_eligible": sum(len(w) for w in el)}
         res[year] = summarize_year(el, has_prompt, has_nav)
         res[year]["units"] = describe_units(el)
+        posthoc[year] = {"resume": posthoc_resume(el),
+                         "row_kinds_posthoc": {k: v for k, v in json.load(open(os.path.join(
+                             work, "build_summary.json")))["row_kinds"].items() if k.startswith(("posthoc:", "ev:multi"))}}
     os.makedirs(out_dir, exist_ok=True)
     json.dump(res, open(os.path.join(out_dir, "cs1_landscape.json"), "w"), indent=1)
     json.dump(counts, open(os.path.join(out_dir, "counts.json"), "w"), indent=1)
+    json.dump(posthoc, open(os.path.join(out_dir, "posthoc.json"), "w"), indent=1)
     print(json.dumps(counts))
 
 
@@ -233,7 +267,8 @@ def selftest():
          "onsets": [[229_000, 235_000, 1000, 199]],
          "observed_intervals": [[0, 199_000], [259_000, 308_000], [10_000_000, 10_029_000]],
          "blocks": [[0, 308_000], [10_000_000, 10_029_000]],
-         "events": [[230_000, "run"], [240_000, "prompt"], [250_000, "prompt-answer"], [259_000, "paste"]]}
+         "events": [[230_000, "run"], [240_000, "prompt"], [250_000, "prompt-answer"], [259_000, "paste"]],
+         "span": [0, 10_029_000]}
     u = Unit(d)
     assert u.span_ms() == 308_000 + 29_000
     g = u.gaps()
@@ -249,6 +284,28 @@ def selftest():
     assert l6 is not None and sum(1 for k in range(3) if l6[k]["stall_per_h"]) == 1
     du = describe_units([[u]])
     assert du["units"] == 1 and du["unit_blocks"]["median"] == 2
+    assert posthoc_resume([[u]]) == {"stalls": 1, "resume_in_other_block": 0, "unresumed": 0}
+    # D4 の照合: 陽性対照（取っておく書き手が混ざる・一覧が違う・部分実行）で止まり、正常で通る
+    with tempfile.TemporaryDirectory() as td:
+        hp = os.path.join(td, "hold.json")
+        json.dump({"2019": ["B"]}, open(hp, "w"))
+        hs = hashlib.sha256(open(hp, "rb").read()).hexdigest()
+        sha = lambda x: hashlib.sha256(x.encode()).hexdigest()  # noqa: E731
+
+        def put(writers, bs):
+            json.dump(writers, open(os.path.join(td, "writers.json"), "w"))
+            json.dump(bs, open(os.path.join(td, "build_summary.json"), "w"))
+        put({"0": sha("A"), "1": sha("C")}, {"holdout_sha256": hs, "attempted": 3, "units": 3})
+        assert check_build(td, {"B"}, hp) == 2
+        for writers, bs in (({"0": sha("A"), "1": sha("B")}, {"holdout_sha256": hs, "attempted": 3, "units": 3}),
+                            ({"0": sha("A")}, {"holdout_sha256": "0" * 64, "attempted": 3, "units": 3}),
+                            ({"0": sha("A")}, {"holdout_sha256": hs, "attempted": 2, "units": 3})):
+            put(writers, bs)
+            try:
+                check_build(td, {"B"}, hp)
+                raise AssertionError("止まらなかった")
+            except SystemExit:
+                pass
     print("selftest ok")
 
 

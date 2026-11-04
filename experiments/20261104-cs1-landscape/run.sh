@@ -10,6 +10,8 @@ K19="$CS1/raw/2019/keystrokes.csv"
 K21="$CS1/raw/2021/keystrokes.csv"
 BIN="${GSE_REPLAY:-$DATA_DIR/klicke/bin/gse-replay}"
 OUT="${OUT:-$EXP_DIR/results}"
+# 部分実行（LIMIT）は正式の results に書かない（レビューの後）。解析の側も部分実行の中間を拒む
+if [ -n "${LIMIT:-}" ] && [ "$OUT" = "$EXP_DIR/results" ]; then echo "LIMIT のときは OUT を results 以外に指定する" >&2; exit 1; fi
 SC="$EXP_DIR/scripts"
 SEED="$(cat "$EXP_DIR/SEED")"
 sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
