@@ -105,3 +105,11 @@
 | LOW 書き手ごとの値の行き先を確かめない | repo の中を指していれば止める |
 | LOW CS1 の obs を独立の参照と照らしていない | 参照の中間に obs が無いので照らせない。notes の但し書きにする |
 | LOW 変換が標準出力に課題ごとの期間の日数を出す | run.sh は変換を呼ばない。対応しない |
+
+## 判断 13: 本計算を職場の HP Z2 で回す・変異の門の直し（研究者とメイン・2026-11-04・実データを見る前）
+
+- **計算の場所（研究者・AskUserQuestion）**: HP Z2（Windows 11・24 コア・64 GB）で回す。却下: この Mac（約 9〜10 時間）・ZBook Firefly（i7-1355U のノート・推定 12〜20 時間）。JOBS = 16 で約 4 時間前後と推す（実測ではない）。
+- **移すための変更（メイン）**: 生データ（coauthor.zip・CS1 2021・replay・holdout）は移さない。Mac でその SHA-256 を照らし直し（`raw_checked_on_mac`）、4 つの中間（2,678 ファイル）の SHA-256 の一覧 `input_manifest.json`（SHA-256 `e0163f1b…3d74406`・ファイル名に番号が入るので repo に入れない）を作った。run.sh は `INPUT_MANIFEST` があれば一覧で照らす。Python の名前（`PYTHON`）・`-X utf8`（Windows の cp932 対策・`-I` では `PYTHONUTF8` が効かない）・BLAS を 1 スレッド・`.gitattributes` で LF 固定。provenance に manifest の SHA・JOBS・platform を足した。データの束 `coauthor_ml_inputs.tar.gz`（SHA-256 `6efc58db…fa7272f2`）は repo の外 `~/gse-public-data/transfer_coauthor_ml/` にあり、研究者が Drive の `GSE/GSE_ML_run` に上げる。
+- **変異の門で見つけたこと（メイン）**: (1) m8・m10 が効いていなかった。`ml.py --selftest` は ml.py を `__main__` として動かし、selftest が import する `ml` は別の写しで、変異の切り替え（`ml.MUT`）が空のままだった。selftest の入口で `ml.set_mut` を呼ぶよう直した。門が素通りの形を捕まえた（終了コード 0 で外れと判定）。(2) m2 は P-AR1 を赤にするが P-LEAK は緑のまま（合成の AR の列では、今の記号を前の記号として使うと尤度が下がる側に働き、上振れを見る P-LEAK には当たらない）。m2 の名指しを P-AR1 だけにした（design の「P-AR1・P-LEAK」から）。合成の門の変更で、実データは見ていない。
+- 1 回目の変異の門（直す前）: m1・m3〜m7・m9 が当たり、m2・m8・m10 が外れた。走っている間に mutate.sh を書き換えて壊した回（m1 の後に EOF の誤り）は数えない。
+- 2 回目の変異の門（直した後・Mac・Python 3.14.4・numpy 2.5.2）: selftest の 18 対照すべて緑、変異 10 個すべてが名指しの対照を赤にした（終了コード 3・run_id と mutate 欄も一致）。

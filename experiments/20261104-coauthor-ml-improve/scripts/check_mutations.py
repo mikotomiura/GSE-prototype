@@ -9,7 +9,7 @@ import json
 import os
 import sys
 
-NAMED = {"m1": ["P-LEAK"], "m2": ["P-AR1", "P-LEAK"], "m3": ["P-PRIOR"], "m4": ["P-LINF"], "m5": ["P-C1", "P-SIMP"],
+NAMED = {"m1": ["P-LEAK"], "m2": ["P-AR1"], "m3": ["P-PRIOR"], "m4": ["P-LINF"], "m5": ["P-C1", "P-SIMP"],
          "m6": ["P-S"], "m7": ["P-S"], "m8": ["P-OTH"], "m9": ["P-PROBE"], "m10": ["P-LINF"]}
 
 

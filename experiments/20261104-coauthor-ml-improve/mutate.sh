@@ -7,13 +7,14 @@ SC="$EXP_DIR/scripts"; OUT="${OUT:-$EXP_DIR/results}/mutations"; SEED="$(cat "$E
 RUN_ID="${RUN_ID:?RUN_ID が要る（run.sh が渡す）}"
 rm -rf "$OUT"
 mkdir -p "$OUT"
+PY="${PYTHON:-python3}"
 run() {
   local m="$1" ctl="$2"
-  python3 -I "$SC/ml.py" --selftest "$SEED" "$OUT/$m.json" --mutate "$m" --only "$ctl" --run-id "$RUN_ID" > "$OUT/$m.log" 2>&1
+  "$PY" -I -X utf8 "$SC/ml.py" --selftest "$SEED" "$OUT/$m.json" --mutate "$m" --only "$ctl" --run-id "$RUN_ID" > "$OUT/$m.log" 2>&1
   echo $? > "$OUT/$m.exit"
 }
 run m1 P-LEAK
-run m2 P-AR1,P-LEAK
+run m2 P-AR1
 run m3 P-PRIOR
 run m4 P-LINF
 run m5 P-C1,P-SIMP

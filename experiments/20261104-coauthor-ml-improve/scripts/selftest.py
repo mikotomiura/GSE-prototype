@@ -438,6 +438,8 @@ def p_probe(seed):
 
 # ---------------------------------------------------------------- 入口
 def main(seed, out, only, mut, run_id):
+    # ml.py を __main__ として起動すると、ここで import した ml は別の写しで、切り替えが入っていない（m8・m10 が効かなかった・判断 13）
+    ml.set_mut(mut)
     t0 = time.time()
     want = set(only) if only else set(NAMES)
     R = dict(run_id=run_id, mutate=mut)
