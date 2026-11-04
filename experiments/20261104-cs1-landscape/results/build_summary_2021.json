@@ -4,6 +4,7 @@
  "holdout_writers_skipped": 13,
  "units": 179,
  "attempted": 179,
+ "holdout_sha256": "a5a32fcefeb97b038afd170e2672262fd5a71230d5e851319eaa076b606bdc47",
  "status": {
   "ok": 177,
   "few_presses": 2
@@ -23,6 +24,8 @@
   "ev:prompt-answer": 854,
   "ev:run": 20084,
   "ev:switch": 13235,
-  "key": 739136
+  "key": 739136,
+  "posthoc:multi-insert-whitespace-only": 12539,
+  "posthoc:multi-insert-whitespace-only-with-newline": 15364
  }
 }

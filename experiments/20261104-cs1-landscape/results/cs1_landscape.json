@@ -303,9 +303,9 @@
      },
      "paste": {
       "n": 319,
-      "q1": 3.291,
-      "median": 5.9409,
-      "q3": 11.6176
+      "q1": 3.2516,
+      "median": 5.8952,
+      "q3": 11.4966
      }
     },
     "receipt_writers_with_zero_by_kind": {
@@ -592,12 +592,12 @@
      "median": 8.2071,
      "q3": 10.3353
     },
-    "stalls": 5955,
+    "stalls": 5956,
     "stall_duration_s": {
-     "n": 5940,
-     "q1": 18.975,
-     "median": 61.934,
-     "q3": 173.4905
+     "n": 5941,
+     "q1": 18.977,
+     "median": 61.958,
+     "q3": 173.81
     },
     "stall_censored": 15
    },
@@ -645,8 +645,8 @@
     "pre_nontext": {
      "pooled": {
       "num": 2872,
-      "den": 5955,
-      "ratio": 0.4823
+      "den": 5956,
+      "ratio": 0.4822
      },
      "writer_median": {
       "n": 31,
@@ -658,8 +658,8 @@
     "pre_delete": {
      "pooled": {
       "num": 2576,
-      "den": 5955,
-      "ratio": 0.4326
+      "den": 5956,
+      "ratio": 0.4325
      },
      "writer_median": {
       "n": 31,
@@ -671,12 +671,12 @@
     "pre_other_nontext": {
      "pooled": {
       "num": 1100,
-      "den": 5955,
+      "den": 5956,
       "ratio": 0.1847
      },
      "writer_median": {
       "n": 31,
-      "q1": 0.1238,
+      "q1": 0.1236,
       "median": 0.171,
       "q3": 0.2217
      }
@@ -684,7 +684,7 @@
     "pre_nav": {
      "pooled": {
       "num": 692,
-      "den": 5955,
+      "den": 5956,
       "ratio": 0.1162
      },
      "writer_median": {
@@ -697,8 +697,8 @@
     "pre_run": {
      "pooled": {
       "num": 3180,
-      "den": 5955,
-      "ratio": 0.534
+      "den": 5956,
+      "ratio": 0.5339
      },
      "writer_median": {
       "n": 31,
@@ -710,8 +710,8 @@
     "pre_switch": {
      "pooled": {
       "num": 1254,
-      "den": 5955,
-      "ratio": 0.2106
+      "den": 5956,
+      "ratio": 0.2105
      },
      "writer_median": {
       "n": 31,
@@ -723,7 +723,7 @@
     "pre_paste": {
      "pooled": {
       "num": 415,
-      "den": 5955,
+      "den": 5956,
       "ratio": 0.0697
      },
      "writer_median": {
@@ -735,9 +735,9 @@
     },
     "post_nontext": {
      "pooled": {
-      "num": 2743,
-      "den": 5955,
-      "ratio": 0.4606
+      "num": 2744,
+      "den": 5956,
+      "ratio": 0.4607
      },
      "writer_median": {
       "n": 31,
@@ -748,9 +748,9 @@
     },
     "post_delete": {
      "pooled": {
-      "num": 2407,
-      "den": 5955,
-      "ratio": 0.4042
+      "num": 2408,
+      "den": 5956,
+      "ratio": 0.4043
      },
      "writer_median": {
       "n": 31,
@@ -761,9 +761,9 @@
     },
     "post_other_nontext": {
      "pooled": {
-      "num": 824,
-      "den": 5955,
-      "ratio": 0.1384
+      "num": 825,
+      "den": 5956,
+      "ratio": 0.1385
      },
      "writer_median": {
       "n": 31,
@@ -775,8 +775,8 @@
     "post_nav": {
      "pooled": {
       "num": 419,
-      "den": 5955,
-      "ratio": 0.0704
+      "den": 5956,
+      "ratio": 0.0703
      },
      "writer_median": {
       "n": 31,
@@ -788,21 +788,21 @@
     "post_run": {
      "pooled": {
       "num": 1079,
-      "den": 5955,
+      "den": 5956,
       "ratio": 0.1812
      },
      "writer_median": {
       "n": 31,
       "q1": 0.1656,
       "median": 0.1839,
-      "q3": 0.201
+      "q3": 0.2007
      }
     },
     "post_switch": {
      "pooled": {
-      "num": 1151,
-      "den": 5955,
-      "ratio": 0.1933
+      "num": 1152,
+      "den": 5956,
+      "ratio": 0.1934
      },
      "writer_median": {
       "n": 31,
@@ -813,9 +813,9 @@
     },
     "post_paste": {
      "pooled": {
-      "num": 203,
-      "den": 5955,
-      "ratio": 0.0341
+      "num": 204,
+      "den": 5956,
+      "ratio": 0.0343
      },
      "writer_median": {
       "n": 31,
@@ -1106,15 +1106,15 @@
     },
     "post_run": {
      "pooled": {
-      "num": 1133,
+      "num": 1132,
       "den": 6217,
-      "ratio": 0.1822
+      "ratio": 0.1821
      },
      "writer_median": {
       "n": 31,
       "q1": 0.1682,
       "median": 0.1818,
-      "q3": 0.2048
+      "q3": 0.2035
      }
     },
     "post_switch": {
@@ -1149,13 +1149,13 @@
     "receipt_per_h_by_kind": {
      "multi-insert": {
       "n": 31,
-      "q1": 47.577,
+      "q1": 47.2282,
       "median": 55.4955,
-      "q3": 70.4977
+      "q3": 70.1384
      },
      "paste": {
       "n": 31,
-      "q1": 2.2938,
+      "q1": 2.2807,
       "median": 3.6421,
       "q3": 4.4571
      }
@@ -1355,7 +1355,7 @@
     "q3": 32.3318
    },
    "units_theta_defined_obs_ge_5min": 163,
-   "prompts": 852
+   "prompts": 723
   }
  }
 }
