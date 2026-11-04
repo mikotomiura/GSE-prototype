@@ -7,7 +7,7 @@
 - [x] `conditions.md`（変換の対応表・holdout・L1〜L6 の当て方）をコミット
 - [x] 変換スクリプト → replay → 集計（中間は 1 本ずつ消す）
 - [x] `notes.md`（課題の数・1 単位の長さの四分位・言える範囲）
-- [ ] code-reviewer ＋ /cross-review（並列）
+- [x] code-reviewer ＋ /cross-review（並列・2 巡。判断 3・4）
 - [ ] main へ `--no-ff`・`[skip ci]`（コードと CI 設定が無いことを確かめる）
 
 ## 場面ごとの道具
