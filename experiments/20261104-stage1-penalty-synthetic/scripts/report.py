@@ -3,6 +3,7 @@
 使い方: python3 -I -X utf8 report.py RESULTS_DIR [--run-id ID]
 RESULTS_DIR/raw/ を読み、summary.json・proposal.json・tables.md を書く。G7・G8 が落ちたら終了コード 3。
 """
+import hashlib
 import json
 import math
 import os
@@ -36,7 +37,7 @@ def mci(v):
 
 def quart(v):
     v = np.asarray(v, dtype=float)
-    v = v[~np.isnan(v)]
+    v = v[np.isfinite(v)]
     if not len(v):
         return dict(q1=None, med=None, q3=None, n=0)
     q = np.percentile(v, [25, 50, 75])
@@ -116,16 +117,33 @@ def rules(main):
 def posthoc(main, tf):
     """記述だけ（C4 の外・判断 8）: CV の版を前向きにした組み合わせの超過の最大と、
     n = 10 のセルの前向きの CV の後悔のうち τ = ∞ を選んだ反復の寄与。"""
-    out = dict(combo_fwd={})
+    out = dict(combo_fwd={}, combo_fwd_argmax={}, switch_and_diff={})
     for q, cands in (("n", L_N), ("min_class", L_MIN)):
-        rows = {}
+        rows, arg = {}, {}
         for L in cands:
             ex = []
-            for _, a in main:
+            for c, a in main:
                 base = min(mean_regret(a, np.full(len(a["D"]), tf)), mean_regret(a, a["c_fwd"]))
                 ex.append(mean_regret(a, combo_choice(a, q, L, tf, "c_fwd")) - base)
-            rows["inf" if math.isinf(L) else str(L)] = max(ex)
+            key = "inf" if math.isinf(L) else str(L)
+            rows[key] = max(ex)
+            c = main[int(np.argmax(ex))][0]
+            arg[key] = {k: c[k] for k in ("n", "rate", "sd", "signal")}
         out["combo_fwd"][q] = rows
+        out["combo_fwd_argmax"][q] = arg
+    # 少ない方の類 L = 30 の組み合わせ: セルごとの切り替えの割合と、固定との対の差（反復の平均と SE）
+    rows = []
+    for c, a in main:
+        ll = a["met"][:, :, 0]
+        idx = np.arange(len(ll))
+        ch = combo_choice(a, "min_class", 30, tf, "c_fwd")
+        sw = float(np.mean(np.minimum(a["npos"], a["nneg"]) >= 30))
+        if sw == 0:
+            continue
+        d = ll[idx, ch] - ll[:, tf]
+        rows.append(dict(cell={k: c[k] for k in ("n", "rate", "sd", "signal")}, switch=sw,
+                         diff_mean=float(d.mean()), diff_se=float(d.std(ddof=1) / math.sqrt(len(d)))))
+    out["switch_and_diff"]["min_class_30"] = rows
     contrib = []
     for c, a in main:
         if c["n"] != 10:
@@ -157,16 +175,20 @@ def describe_proposal(cells_arr, pr):
     return out
 
 
-def load(res_dir, run_id=None):
-    """raw を読み、来歴を照らす（判断 8）: run_id が一致・変異なし・セルの id と条件が期待の集合と一致・
-    反復の数が揃う。違えば ValueError。"""
+ALL_SETS = ["main", "s1", "s2", "cons"]
+
+
+def load(res_dir, run_id=None, sets=None):
+    """raw を読み、来歴を照らす（判断 8・9）: run_id が一致・変異なし・セルの id と条件が期待の集合
+    （既定は 4 つの集合すべて）と一致・反復の数が揃う・各 npz の SHA-256 が cells.json の記録と一致。
+    違えば ValueError。"""
     raw = os.path.join(res_dir, "raw")
     meta = json.load(open(os.path.join(raw, "cells.json")))
     if run_id is not None and meta.get("run_id") != run_id:
         raise ValueError(f"raw の run_id {meta.get('run_id')} が指定 {run_id} と違う")
     if meta.get("mutate"):
         raise ValueError(f"raw が変異つきの計算 {meta['mutate']}")
-    expect = {c["id"]: c for c in sim.cells(meta["seed"], sorted({c["set"] for c in meta["cells"]}))}
+    expect = {c["id"]: c for c in sim.cells(meta["seed"], sets or ALL_SETS)}
     got = {c["id"]: c for c in meta["cells"]}
     if len(got) != len(meta["cells"]) or set(got) != set(expect):
         raise ValueError("セルの id が期待の集合と違う（重複か欠け）")
@@ -176,7 +198,10 @@ def load(res_dir, run_id=None):
             raise ValueError(f"セル {i} の条件が期待と違う")
     cl = []
     for c in meta["cells"]:
-        z = np.load(os.path.join(raw, f"cell{c['id']:03d}.npz"))
+        fn = os.path.join(raw, f"cell{c['id']:03d}.npz")
+        if hashlib.sha256(open(fn, "rb").read()).hexdigest() != meta.get("sha256", {}).get(os.path.basename(fn)):
+            raise ValueError(f"{os.path.basename(fn)} の SHA-256 が cells.json の記録と違う")
+        z = np.load(fn)
         arr = {k: z[k] for k in z.files}
         want = meta["reps"] if c["set"] != "cons" else min(meta["reps"], 100)
         if len(arr["D"]) != want:
@@ -213,6 +238,15 @@ def tables(summ, pr, desc):
         for q in ("n", "min_class"):
             L += ["", f"| L（{q}・q < L なら固定） | 超過の最大 |", "|---|---|"]
             L += [f"| {k} | {v:.4f} |" for k, v in ph["combo_fwd"][q].items()]
+        L += ["", "最大を出したセル（q = min_class）: " + "・".join(
+            f"L={k}: n{v['n']} r{v['rate']} σ{v['sd']} {'あり' if v['signal'] else 'なし'}"
+            for k, v in ph["combo_fwd_argmax"]["min_class"].items())]
+        L += ["", "## 記述: 少ない方の類 L = 30 の組み合わせ（前向き）が CV に切り替わったセルと、τ_f の固定との対の差", "",
+              "| n | r | σ_d | 信号 | 切り替えた反復の割合 | 対数損失の差（組み合わせ − 固定）の平均 | SE |", "|---|---|---|---|---|---|---|"]
+        for r in ph["switch_and_diff"]["min_class_30"]:
+            c = r["cell"]
+            L.append(f"| {c['n']} | {c['rate']} | {c['sd']} | {'あり' if c['signal'] else 'なし'} | {r['switch']:.3f} | "
+                     f"{r['diff_mean']:+.4f} | {r['diff_se']:.4f} |")
         L += ["", "## 記述: n = 10 の前向きの CV の後悔のうち τ = ∞ を選んだ反復の寄与", "",
               "| r | σ_d | 信号 | τ=∞ を選んだ割合 | その反復の平均の後悔 | 寄与 | 後悔の全体 |", "|---|---|---|---|---|---|---|"]
         for r in ph["inf_contrib_n10"]:

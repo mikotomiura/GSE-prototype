@@ -57,15 +57,21 @@ def g1(seed):
     out["d_fit_tau_conv"] = bool(conv3)
     # (e) 較正の切片: 一定の予測 c なら logit(率) − logit(c)。極端な c でも合う（判断 8）
     ye = (rng.random(5000) < 0.25).astype(float)
-    worst_e = 0.0
+    diffs = []
     for cc in [1e-6, 0.02, 0.5, 0.98, 1 - 1e-6]:
         lp = sim.logit(np.full(5000, cc))
         r = ye.mean()
-        worst_e = max(worst_e, abs(sim.citl_bisect(ye, lp) - (math.log(r / (1 - r)) - lp[0])))
-    out["e_citl_max_diff"] = worst_e
+        diffs.append(sim.citl_bisect(ye, lp) - (math.log(r / (1 - r)) - lp[0]))
+    out["e_citl_max_diff"] = float(np.max(np.abs(diffs))) if np.all(np.isfinite(diffs)) else math.inf
+    lpv = rng.normal(-1.0, 1.5, 5000)  # ばらつきのある予測: 最尤の条件の残差
+    bv = sim.citl_bisect(ye, lpv)
+    out["e_citl_resid"] = float(abs(np.sum(sim.sigmoid(bv + lpv)) - ye.sum()) / len(ye)) if math.isfinite(bv) else math.inf
+    out["e_citl_edges"] = (sim.citl_bisect(np.zeros(10), np.zeros(10)) == -math.inf
+                           and sim.citl_bisect(np.ones(10), np.zeros(10)) == math.inf)
     ok = (out["a_grad_max"] < 1e-6 and out["b_intercept_only_diff"] < 1e-8 and out["c_big_lam_intercept_diff"] < 1e-4
           and out["c_big_lam_beta_max"] < 1e-6 and out["d_mle_grad_max"] < 1e-6
-          and out["d_fit_tau_grad_max"] < 1e-6 and out["d_fit_tau_conv"] and out["e_citl_max_diff"] < 1e-6)
+          and out["d_fit_tau_grad_max"] < 1e-6 and out["d_fit_tau_conv"] and out["e_citl_max_diff"] < 1e-6
+          and out["e_citl_resid"] < 1e-8 and out["e_citl_edges"])
     return ok, out
 
 

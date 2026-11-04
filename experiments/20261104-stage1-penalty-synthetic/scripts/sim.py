@@ -10,6 +10,7 @@
   m4: 評価の量（後悔・後知恵の最良を含む）を学習の側で数える
   m5: 1-SE で最も弱い罰を選ぶ・同点を弱い罰に切る
 """
+import hashlib
 import json
 import math
 import os
@@ -172,7 +173,10 @@ def citl_bisect(y, lp):
             lo = mid
         else:
             hi = mid
-    return (lo + hi) / 2
+    b = (lo + hi) / 2
+    if abs(b) > 49.0:  # 区間の端に張り付いた（logit の切りのもとでは要る幅は ±23 ほど）
+        raise ValueError(f"較正の切片が区間の端 {b}")
+    return b
 
 
 # ---------- 生成器 ----------
@@ -390,12 +394,15 @@ def main(argv):
     cl = cells(seed, sets)
     res = run_cells(seed, cl, reps, jobs, mut)
     index = []
+    sha = {}
     for cid, (c, arr) in res.items():
-        np.savez_compressed(os.path.join(raw, f"cell{cid:03d}.npz"), **arr)
+        fn = os.path.join(raw, f"cell{cid:03d}.npz")
+        np.savez_compressed(fn, **arr)
+        sha[os.path.basename(fn)] = hashlib.sha256(open(fn, "rb").read()).hexdigest()
         index.append(c)
     with open(os.path.join(raw, "cells.json"), "w") as f:
-        json.dump(dict(seed=seed, reps=reps, mutate=mut, run_id=opt.get("--run-id"), taus=[str(t) for t in TAUS],
-                       cells=index), f, ensure_ascii=False, indent=1)
+        json.dump(dict(seed=seed, reps=reps, mutate=mut, run_id=opt.get("--run-id"), sets=sets,
+                       taus=[str(t) for t in TAUS], cells=index, sha256=sha), f, ensure_ascii=False, indent=1)
 
 
 if __name__ == "__main__":
