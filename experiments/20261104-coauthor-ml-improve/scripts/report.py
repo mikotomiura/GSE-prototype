@@ -87,10 +87,11 @@ def em_tables(name, E, panels):
                 def two(r):
                     if r not in St:
                         return "—"
-                    a, b = St[r]["all/self_minus_r1"], St[r]["all/self_minus_pool_same"]
-                    if a is None or a.get("suppressed"):
-                        return "伏せ" if a else "—"
-                    return f"{f(a['median'])} / {f(b['median'])}"
+                    def one(st):
+                        if st is None:
+                            return "—"
+                        return "伏せ" if st.get("suppressed") else f(st["median"])
+                    return f"{one(St[r]['all/self_minus_r1'])} / {one(St[r]['all/self_minus_pool_same'])}"
                 out.append(f"| {k} | {s} | " + " | ".join(two("tau_" + t) for t in TAUS) +
                            f" | {two('tau_other')} | {two('tau_cv')} | {counts(St.get('chosen_tau_cv'))} |")
         # K 本人 CV
@@ -143,7 +144,7 @@ def lg_tables(name, L, panels, sets, cs1):
                     m = X["models"][r]
                     ci = m["C_ci"]
                     s = (f"| {k} | {X['writers']} | {LG_JA[r]} | {f(m['C'])} | {m['writers_with_pairs']} | "
-                         f"{'—' if not ci else '[' + f(ci[0]) + ', ' + f(ci[1]) + ']'} | {cell(m['brier_minus_b0_self'], 4)} |")
+                         f"{'—' if not ci else '[' + f(ci[0]) + ', ' + f(ci[1]) + ']'} | {cell(m['brier_minus_b0_self'], 4, ci=True)} |")
                     if cs1:
                         a = m.get("auc_per_writer")
                         s += (" — |" if not a else (f" 伏せ（{a['n']} 人） |" if a.get("suppressed") else
@@ -151,7 +152,7 @@ def lg_tables(name, L, panels, sets, cs1):
                     out.append(s)
             out.append(f"\n{name} {pn} {key} の付帯（k ごと）\n")
             out.append("| k | 選ばれた λ（主） | 主が本人の CV / 他人 | 選ばれた λ（副） | 学習の問い | 学習の陽性 | 評価の問い | 評価の陽性 |"
-                       " 1 類だけ | |β−β共通|>10 | 収束せず | 共通の合わせた AUC |")
+                       " 1 類だけ | β と β共通 の差 > 10 | 収束せず | 共通の合わせた AUC |")
             out.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
             for k, Pk in L[pn].items():
                 X = Pk[key]
@@ -219,12 +220,12 @@ def main(path):
                 out.append(f"| {k} | {Ek['writers']} | {s} | {cell(row['all/self_minus_r1'])} | {cell(row['all/self_minus_pool_same'])} |")
         L = S["datasets"][ds]["lg"]["secondary"]
         out.append(f"\n## {ds} 副のパネル・ロジスティック（主の問い・V-tab）本人（λ 主）と共通（1 つの切片）の C\n")
-        out.append("| k | 人数 | 本人（λ 主）C | 組のある人数 | 共通（1 つの切片）C | B0-self C |")
-        out.append("|---|---|---|---|---|---|")
+        out.append("| k | 人数 | 本人（λ 主）C | 組のある人数 | 共通（1 つの切片）C |")
+        out.append("|---|---|---|---|---|")
         for k, Pk in L.items():
             X = Pk["main/tab"]
             m, p = X["models"]["self_main"], X["models"]["pooled_single"]
-            out.append(f"| {k} | {X['writers']} | {f(m['C'])} | {m['writers_with_pairs']} | {f(p['C'])} | {f(X['models']['b0_self']['C'])} |")
+            out.append(f"| {k} | {X['writers']} | {f(m['C'])} | {m['writers_with_pairs']} | {f(p['C'])} |")
     print("\n".join(out))
 
 
