@@ -134,7 +134,7 @@ def lg_tables(name, L, panels, sets, cs1):
     for pn in panels:
         for key in sets:
             out.append(f"\n#### {name} ロジスティック {pn} {key}（C = 書き手の中の一致度・区間は書き手の復元抽出・"
-                       "Brier は 本人 − B0-self の書き手ごとの中央値 [四分位] 良 = 負の割合）\n")
+                       "Brier は 本人 − B0-self の書き手ごとの中央値 [四分位] 良 = 負の割合・区間 = 中央値の区間）\n")
             hdr = "| k | 人数 | 行 | C | 組のある人数 | C の区間 | Brier − B0-self |" + (" 書き手ごとの AUC |" if cs1 else "")
             out.append(hdr)
             out.append("|---|---|---|---|---|---|---|" + ("---|" if cs1 else ""))
@@ -152,7 +152,7 @@ def lg_tables(name, L, panels, sets, cs1):
                     out.append(s)
             out.append(f"\n{name} {pn} {key} の付帯（k ごと）\n")
             out.append("| k | 選ばれた λ（主） | 主が本人の CV / 他人 | 選ばれた λ（副） | 学習の問い | 学習の陽性 | 評価の問い | 評価の陽性 |"
-                       " 1 類だけ | β と β共通 の差 > 10 | 収束せず | 共通の合わせた AUC |")
+                       " 1 類だけ | β と β共通 の成分の差の絶対値 > 10 | 収束せず | 共通の合わせた AUC |")
             out.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
             for k, Pk in L[pn].items():
                 X = Pk[key]

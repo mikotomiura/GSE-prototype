@@ -19,5 +19,5 @@
 - [x] 陽性対照と変異の門（Mac・判断 9〜13。職場の PC の run.sh でも回る）
 - [x] 本計算（職場の HP Z2・`.steering/_handoff/next-session-gse-coauthor-ml-run-on-hp-z2.md`）
 - [x] notes.md（4 つ組・各表・言える範囲・逸脱）（Mac・`.steering/_handoff/next-session-gse-coauthor-ml-after-run.md`）
-- [ ] code-reviewer・/cross-review
-- [ ] 引き継ぎの更新・コミット・push（PR は研究者が確かめてから）
+- [x] code-reviewer・/cross-review（2 巡・判断 14）
+- [x] 引き継ぎの更新・コミット・push（PR は研究者が確かめてから）
