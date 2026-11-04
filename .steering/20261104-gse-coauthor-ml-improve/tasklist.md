@@ -17,7 +17,7 @@
 - [x] 解析のスクリプト・`--selftest`・変異（B の判断 11 の直しを含む）
 - [x] 計算の前のレビュー（code-reviewer・security-checker・判断 12）
 - [x] 陽性対照と変異の門（Mac・判断 9〜13。職場の PC の run.sh でも回る）
-- [ ] 本計算（職場の HP Z2・`.steering/_handoff/next-session-gse-coauthor-ml-run-on-hp-z2.md`）
-- [ ] notes.md（4 つ組・各表・言える範囲・逸脱）（Mac・`.steering/_handoff/next-session-gse-coauthor-ml-after-run.md`）
+- [x] 本計算（職場の HP Z2・`.steering/_handoff/next-session-gse-coauthor-ml-run-on-hp-z2.md`）
+- [x] notes.md（4 つ組・各表・言える範囲・逸脱）（Mac・`.steering/_handoff/next-session-gse-coauthor-ml-after-run.md`）
 - [ ] code-reviewer・/cross-review
 - [ ] 引き継ぎの更新・コミット・push（PR は研究者が確かめてから）
