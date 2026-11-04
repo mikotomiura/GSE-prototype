@@ -54,9 +54,18 @@ def g1(seed):
     y3 = np.concatenate([y2, [1.0, 0.0]])
     w3 = np.concatenate([np.ones(n2), [0.5, 0.5]])
     out["d_fit_tau_grad_max"] = float(np.max(np.abs(Xd3.T @ (w3 * (y3 - sim.sigmoid(Xd3 @ th3))))))
+    out["d_fit_tau_conv"] = bool(conv3)
+    # (e) 較正の切片: 一定の予測 c なら logit(率) − logit(c)。極端な c でも合う（判断 8）
+    ye = (rng.random(5000) < 0.25).astype(float)
+    worst_e = 0.0
+    for cc in [1e-6, 0.02, 0.5, 0.98, 1 - 1e-6]:
+        lp = sim.logit(np.full(5000, cc))
+        r = ye.mean()
+        worst_e = max(worst_e, abs(sim.citl_bisect(ye, lp) - (math.log(r / (1 - r)) - lp[0])))
+    out["e_citl_max_diff"] = worst_e
     ok = (out["a_grad_max"] < 1e-6 and out["b_intercept_only_diff"] < 1e-8 and out["c_big_lam_intercept_diff"] < 1e-4
           and out["c_big_lam_beta_max"] < 1e-6 and out["d_mle_grad_max"] < 1e-6
-          and out["d_fit_tau_grad_max"] < 1e-6)
+          and out["d_fit_tau_grad_max"] < 1e-6 and out["d_fit_tau_conv"] and out["e_citl_max_diff"] < 1e-6)
     return ok, out
 
 

@@ -148,12 +148,31 @@ def evaluate(y, p):
     ll = logloss_sum(y, p) / len(y)
     br = float(np.mean((p - y) ** 2))
     lp = logit(p)
-    th, _ = fit_logistic(None, y, offset=lp, pseudo=False)
-    citl = float(th[0])
+    citl = citl_bisect(y, lp)
     if np.std(lp) < 1e-8:
         return ll, br, math.nan, citl, math.nan, 0.0
     th2, conv2 = fit_logistic(lp[:, None], y, pseudo=False)
-    return ll, br, auc(y, p), citl, float(th2[1]), float(not conv2)
+    slope = float(th2[1]) if conv2 else math.nan  # 収束しなかった傾きは値として使わない（判断 8）
+    return ll, br, auc(y, p), citl, slope, float(not conv2)
+
+
+def citl_bisect(y, lp):
+    """較正の切片（傾き 1 に固定・logit(p̂) をオフセット）。最尤の条件 Σ σ(b + lp) = Σ y は b に単調なので
+    2 分法（[-50, 50]・許容 1e-10）で解く。Newton 法は予測が率から離れると発散した（判断 8）。
+    y が全部 0 か全部 1 なら ∓inf。"""
+    s = float(np.sum(y))
+    if s == 0:
+        return -math.inf
+    if s == len(y):
+        return math.inf
+    lo, hi = -50.0, 50.0
+    while hi - lo > 1e-10:
+        mid = (lo + hi) / 2
+        if np.sum(sigmoid(mid + lp)) < s:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
 
 
 # ---------- 生成器 ----------

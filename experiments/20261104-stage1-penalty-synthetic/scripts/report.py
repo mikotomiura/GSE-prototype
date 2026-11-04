@@ -113,6 +113,33 @@ def rules(main):
     return out
 
 
+def posthoc(main, tf):
+    """記述だけ（C4 の外・判断 8）: CV の版を前向きにした組み合わせの超過の最大と、
+    n = 10 のセルの前向きの CV の後悔のうち τ = ∞ を選んだ反復の寄与。"""
+    out = dict(combo_fwd={})
+    for q, cands in (("n", L_N), ("min_class", L_MIN)):
+        rows = {}
+        for L in cands:
+            ex = []
+            for _, a in main:
+                base = min(mean_regret(a, np.full(len(a["D"]), tf)), mean_regret(a, a["c_fwd"]))
+                ex.append(mean_regret(a, combo_choice(a, q, L, tf, "c_fwd")) - base)
+            rows["inf" if math.isinf(L) else str(L)] = max(ex)
+        out["combo_fwd"][q] = rows
+    contrib = []
+    for c, a in main:
+        if c["n"] != 10:
+            continue
+        ll = a["met"][:, :, 0]
+        reg = ll[np.arange(len(ll)), a["c_fwd"]] - ll.min(1)
+        m = a["c_fwd"] == sim.NT - 1
+        contrib.append(dict(cell={k: c[k] for k in ("rate", "sd", "signal")}, frac_inf=float(m.mean()),
+                            cond_regret_inf=(float(reg[m].mean()) if m.any() else None),
+                            contrib_inf=float(reg[m].sum() / len(reg)), total=float(reg.mean())))
+    out["inf_contrib_n10"] = contrib
+    return out
+
+
 def describe_proposal(cells_arr, pr):
     tf, cvk = pr["tau_f_idx"], pr["cv_version"]
     out = {}
@@ -130,13 +157,31 @@ def describe_proposal(cells_arr, pr):
     return out
 
 
-def load(res_dir):
+def load(res_dir, run_id=None):
+    """raw を読み、来歴を照らす（判断 8）: run_id が一致・変異なし・セルの id と条件が期待の集合と一致・
+    反復の数が揃う。違えば ValueError。"""
     raw = os.path.join(res_dir, "raw")
     meta = json.load(open(os.path.join(raw, "cells.json")))
+    if run_id is not None and meta.get("run_id") != run_id:
+        raise ValueError(f"raw の run_id {meta.get('run_id')} が指定 {run_id} と違う")
+    if meta.get("mutate"):
+        raise ValueError(f"raw が変異つきの計算 {meta['mutate']}")
+    expect = {c["id"]: c for c in sim.cells(meta["seed"], sorted({c["set"] for c in meta["cells"]}))}
+    got = {c["id"]: c for c in meta["cells"]}
+    if len(got) != len(meta["cells"]) or set(got) != set(expect):
+        raise ValueError("セルの id が期待の集合と違う（重複か欠け）")
+    for i, c in got.items():
+        e = expect[i]
+        if any(c[k] != e[k] for k in ("set", "n", "rate", "sd", "signal", "kind")) or abs(c["a"] - e["a"]) > 1e-12:
+            raise ValueError(f"セル {i} の条件が期待と違う")
     cl = []
     for c in meta["cells"]:
         z = np.load(os.path.join(raw, f"cell{c['id']:03d}.npz"))
-        cl.append((c, {k: z[k] for k in z.files}))
+        arr = {k: z[k] for k in z.files}
+        want = meta["reps"] if c["set"] != "cons" else min(meta["reps"], 100)
+        if len(arr["D"]) != want:
+            raise ValueError(f"セル {c['id']} の反復の数 {len(arr['D'])} が {want} でない")
+        cl.append((c, arr))
     return meta, cl
 
 
@@ -161,6 +206,19 @@ def tables(summ, pr, desc):
             e = pr["excl"]
             L += ["", f"- n = 10・r = 0.10 の 4 セルを除いた版: τ_f = {e['tau_f']}・CV の版 = {e['cv_version']}・"
                   f"L（総件数）= {e['L']['n']['L']}・L（少ない方の類）= {e['L']['min_class']['L']}"]
+    if pr and pr.get("posthoc"):
+        ph = pr["posthoc"]
+        L += ["", "## 記述（C4 の外・判断 8）: CV の版を前向きにした組み合わせの超過の最大", "",
+              "基準はセルごとの「τ_f の固定と前向きの CV の良い方」。C4 の表（1-SE が基準）とは基準が違う。"]
+        for q in ("n", "min_class"):
+            L += ["", f"| L（{q}・q < L なら固定） | 超過の最大 |", "|---|---|"]
+            L += [f"| {k} | {v:.4f} |" for k, v in ph["combo_fwd"][q].items()]
+        L += ["", "## 記述: n = 10 の前向きの CV の後悔のうち τ = ∞ を選んだ反復の寄与", "",
+              "| r | σ_d | 信号 | τ=∞ を選んだ割合 | その反復の平均の後悔 | 寄与 | 後悔の全体 |", "|---|---|---|---|---|---|---|"]
+        for r in ph["inf_contrib_n10"]:
+            c = r["cell"]
+            L.append(f"| {c['rate']} | {c['sd']} | {'あり' if c['signal'] else 'なし'} | {r['frac_inf']:.3f} | "
+                     f"{f3(r['cond_regret_inf'])} | {r['contrib_inf']:.4f} | {r['total']:.4f} |")
     for st in ("main", "s1", "s2", "cons"):
         rows = [s for s in summ if s["cell"]["set"] == st]
         if not rows:
@@ -199,7 +257,7 @@ def tables(summ, pr, desc):
 def main(argv):
     res_dir = argv[0]
     opt = dict(zip(argv[1::2], argv[2::2]))
-    meta, cl = load(res_dir)
+    meta, cl = load(res_dir, opt.get("--run-id"))
     summ = [cell_summary(c, a) for c, a in cl]
     main_cells = [(c, a) for c, a in cl if c["set"] == "main"]
     pr = rules(main_cells) if len(main_cells) == 72 else None
@@ -207,6 +265,7 @@ def main(argv):
     if pr:
         excl = [(c, a) for c, a in main_cells if not (c["n"] == 10 and c["rate"] == 0.10)]
         pr["excl"] = rules(excl)
+        pr["posthoc"] = posthoc(main_cells, pr["tau_f_idx"])
         desc = describe_proposal(cl, pr)
     gates = {}
 
