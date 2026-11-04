@@ -22,7 +22,7 @@
 - [x] code-reviewer（計算の前）: HIGH 1 件（m11 で `full=None` を引いて落ち、変異の門が「当たらない」で止まる）→ 直した。MEDIUM 2・LOW 3 のうち K 本人 CV の None を直した。残り（P-PR1 の pflag がすべて True・「構造は他人・τ は本人 CV」の行に名指しの対照がない（select_other は P-OTH が守る）・学習の記号の四分位は書き手の値そのもの（前回と同じ方針））は直していない
 - [x] 合成の selftest・変異の門を Mac で通す（2026-11-05・Python 3.14.4・numpy 2.5.2）: 17 対照すべて緑（678 秒）、変異 11 個すべて名指しの対照が赤・終了コード 3（1,055 秒）
 - [x] 時間を測り直す（timing.py・results/timing.json・合成・Mac）: 前回の HP Z2 の実測に「今回 / 前回」の比を掛けて本計算 約 1.0 時間（共通 約 2,390 秒・書き手 約 1,180 秒・書き手は前回のロジスティックを含むので上側）。合成の絶対の見積もり（16 プロセス）は 約 1.4 時間。条件の見積もり（約 1 時間 40 分）以内。大きい τ は反復が 7〜11 回で収まる
-- [ ] 職場の PC 向けの引き継ぎ（manifest・`-X utf8`・JOBS・P-REPRO）
+- [x] 職場の PC 向けの引き継ぎ（`.steering/_handoff/next-session-gse-timeseries-tau-extend-run-on-hp-z2.md`・manifest・`-X utf8`・JOBS = 16・P-REPRO）
 
 ## 本計算の後
 
