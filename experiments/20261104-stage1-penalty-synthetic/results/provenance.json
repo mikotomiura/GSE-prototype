@@ -1,0 +1,22 @@
+{
+ "run_id": "20261104T191740-47926",
+ "git_head": "5834901785d6223a6e416c46843a93e2cd79269a",
+ "dirty": [],
+ "reps": 400,
+ "jobs": 9,
+ "last_stage": "done",
+ "exit_code": 0,
+ "python": "3.14.4",
+ "numpy": "2.5.2",
+ "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+ "sha256": {
+  "scripts/check_mutations.py": "14f5bb7202bc5e86be6335a543924bf83f1c3f6415457642138048a57b2a587f",
+  "scripts/report.py": "b1c6bea78b10c74e6dfcd34908a1662417c55c4ccca6002d8fb21344d1dab063",
+  "scripts/selftest.py": "9f81a60d83f6d125f03df2b382ace45e183218a3451fa4c26f1a3b676eae5aac",
+  "scripts/sim.py": "2285c5d3fb607f354d1962b8487b8cc4286fa495786e4b9cba6f4c5187696377",
+  "run.sh": "86096267276ba93b37c19a5d6dc2ad2c90abe111651891a4f3f4e9f388411c0b",
+  "mutate.sh": "8c579c9e0b361920a021c5bc78e80ca99a07f7147783af573cedef937374bc49",
+  "conditions.md": "ac347264f1e215739d98f1d8298fa27cadf972a11410e0be5166cf7f6f50a308",
+  "SEED": "2961e762519b41fe994e946866ae3f81799dfc5cfd421872827141ce8ba96a98"
+ }
+}

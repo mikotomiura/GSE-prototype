@@ -1,0 +1,19 @@
+{
+ "seed": 2026110402,
+ "run_id": "20261104T191740-47926",
+ "mutate": [
+  "m3"
+ ],
+ "gates": {
+  "G1": {
+   "ok": false,
+   "a_grad_max": 1.42570202703061,
+   "b_intercept_only_diff": 5.551115123125783e-17,
+   "c_big_lam_intercept_diff": 0.131336001861087,
+   "c_big_lam_beta_max": 1.0602562063703584e-09,
+   "d_mle_grad_max": 1.7763568394002505e-14,
+   "d_conv": true,
+   "d_fit_tau_grad_max": 2.4868995751603507e-14
+  }
+ }
+}

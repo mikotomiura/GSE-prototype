@@ -21,11 +21,11 @@
 - [x] 計算の前の code-reviewer・指摘の直し・再コミット（判断 7）
 
 ## 計算
-- [ ] 本計算（run.sh・主 72 セル ＋ 感度 s1・s2 ＋ cons）・provenance
-- [ ] report（表・C4 の規則を当てた案の値・G7・G8）
+- [x] 本計算（run.sh・主 72 セル ＋ 感度 s1・s2 ＋ cons）・provenance
+- [x] report（表・C4 の規則を当てた案の値・G7・G8）
 
 ## 記録
-- [ ] notes.md（結果・案の文・読まないこと）
-- [ ] 1-SE 規則の出典を references に（citation-ssot）
+- [x] notes.md（結果・案の文・読まないこと）
+- [x] 1-SE 規則の出典を references に（citation-ssot・[V370] provisional）
 - [ ] 完了時の code-reviewer ＋ /cross-review・指摘の直し
 - [ ] tasklist を閉じる・push（PR は研究者に確かめてから）
