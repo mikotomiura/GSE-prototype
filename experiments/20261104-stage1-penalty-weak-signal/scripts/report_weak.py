@@ -103,7 +103,12 @@ def rule(rows):
 
 def abs_log(m):
     """傾きの中央値の 1 からの外れ（|log|）。中央値が無いか 0 以下なら inf（最も外れたものとして数える）。"""
-    return math.inf if m is None or m <= 0 else abs(math.log(m))
+    return math.inf if m is None or not math.isfinite(m) or m <= 0 else abs(math.log(m))
+
+
+def json_num(x):
+    """JSON に書けない inf・nan は None にする（invalid の数で欠けが分かる）。"""
+    return x if x is None or math.isfinite(x) else None
 
 
 def posthoc(rows, cl):
@@ -111,30 +116,38 @@ def posthoc(rows, cl):
     1) 固定の τ ごとに、3 倍率 × n ≥ 50 の 54 セルの傾きの中央値の最小・最大と |log 中央値| の最大
        （中央値が無いか 0 以下のセルは inf に数え、その数を invalid に書く）。
     2) 倍率ごとに、n ≥ 50 の 18 セルで傾きの中央値が 1 に最も近い固定の τ（|log| で比べる）の数。
-    3) 倍率ごとに、信号ありの 36 セルでの固定の τ ごとの後悔の平均の最大。
+    3) 倍率ごとに、信号ありの 36 セルでの固定の τ ごとの後悔の平均の最大（後悔の無いセルは除いて数を書く）。
     4) 倍率ごとに、n ≥ 50 の 18 セルで前向きの CV と 1-SE が切片だけ（τ = 0・傾きが無い）を選んだ反復の割合。"""
     taus = [report.tau_s(t) for t in range(1, sim.NT)]
     big = [r for r in rows if r["cell"]["n"] >= RULE_N]
     per_tau = {}
     for t in taus:
         ms = [r["fixed"][t]["slope"]["med"] for r in big]
-        ok = [m for m in ms if m is not None and m > 0]
+        ok = [m for m in ms if m is not None and math.isfinite(m) and m > 0]
         per_tau[t] = dict(n=len(ms), invalid=len(ms) - len(ok), med_min=min(ok) if ok else None,
-                          med_max=max(ok) if ok else None, max_abs_log=max(abs_log(m) for m in ms))
+                          med_max=max(ok) if ok else None, max_abs_log=json_num(max(abs_log(m) for m in ms)))
     closest = {}
     for k in weak.SCALES:
         cnt = {t: 0 for t in taus}
+        cnt["none"] = 0  # どの τ の中央値も無いか 0 以下のセル（選べないので別に数える）
         for r in big:
             if r["cell"]["scale"] != k:
                 continue
-            best = min(taus, key=lambda t: abs_log(r["fixed"][t]["slope"]["med"]))
-            cnt[best] += 1
+            dev = {t: abs_log(r["fixed"][t]["slope"]["med"]) for t in taus}
+            if all(math.isinf(v) for v in dev.values()):
+                cnt["none"] += 1
+                continue
+            cnt[min(taus, key=lambda t: dev[t])] += 1
         closest[str(k)] = cnt
     regret_max = {}
     for k in weak.SCALES:
         sub = [r for r in rows if r["cell"]["scale"] == k]
-        regret_max[str(k)] = {report.tau_s(t): max(r["fixed"][report.tau_s(t)]["regret"]["mean"] for r in sub)
-                              for t in range(sim.NT)}
+        rm = {}
+        for t in range(sim.NT):
+            v = [r["fixed"][report.tau_s(t)]["regret"]["mean"] for r in sub]
+            ok = [x for x in v if x is not None]
+            rm[report.tau_s(t)] = dict(max=max(ok) if ok else None, missing=len(v) - len(ok))
+        regret_max[str(k)] = rm
     icpt = {}
     for k in weak.SCALES:
         sel = [a for c, a in cl if c["scale"] == k and c["n"] >= RULE_N]
@@ -149,14 +162,14 @@ def posthoc_md(ph):
         L.append(f"| {t} | {f3(v['med_min'])} | {f3(v['med_max'])} | {f3(v['max_abs_log'])} | {v['invalid']} |")
     taus = list(ph["per_tau"])
     L += ["", "## 記述: 傾きの中央値が 1 に最も近い固定の τ（n ≥ 50 の 18 セルのうちの数）", "",
-          "| 係数の倍率 | " + " | ".join(f"τ={t}" for t in taus) + " |", "|---|" + "---|" * len(taus)]
+          "| 係数の倍率 | " + " | ".join(f"τ={t}" for t in taus) + " | 選べないセル |", "|---|" + "---|" * (len(taus) + 1)]
     for k, cnt in ph["closest_to_1"].items():
-        L.append(f"| {k} | " + " | ".join(str(cnt[t]) for t in taus) + " |")
+        L.append(f"| {k} | " + " | ".join(str(cnt[t]) for t in taus) + f" | {cnt['none']} |")
     tall = [report.tau_s(t) for t in range(sim.NT)]
     L += ["", "## 記述: 固定の τ ごとの後悔の平均の最大（信号ありの 36 セル・倍率ごと）", "",
-          "| 係数の倍率 | " + " | ".join(f"τ={t}" for t in tall) + " |", "|---|" + "---|" * len(tall)]
+          "| 係数の倍率 | " + " | ".join(f"τ={t}" for t in tall) + " | 後悔の無いセル |", "|---|" + "---|" * (len(tall) + 1)]
     for k, v in ph["fixed_regret_max"].items():
-        L.append(f"| {k} | " + " | ".join(f4(v[t]) for t in tall) + " |")
+        L.append(f"| {k} | " + " | ".join(f4(v[t]["max"]) for t in tall) + f" | {sum(v[t]['missing'] for t in tall)} |")
     L += ["", "## 記述: CV が切片だけ（τ = 0・傾きが無く傾きの要約から抜ける）を選んだ反復の割合（n ≥ 50）", "",
           "| 係数の倍率 | 前向きの CV | 1-SE |", "|---|---|---|"]
     for k, v in ph["intercept_only_frac"].items():

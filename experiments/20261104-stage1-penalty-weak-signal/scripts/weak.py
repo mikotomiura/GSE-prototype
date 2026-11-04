@@ -11,12 +11,13 @@ sim.BETA を倍率つきで置いてから sim.calib_a・sim.one_rep を呼ぶ�
   w2: 倍率を sim.BETA に入れない（どの強さも 1 倍になる）
   w3: ワーカーの _job で倍率を置かない（親で置いた値のまま・spawn のワーカーでは 1 倍）
   w4: ワーカーの _job で係数 1 倍のときだけ係数を 1.0001 倍にする（番号と切片は同じで値だけがずれる）
+  w5: ワーカーの _job で倍率を最初の 1 回だけ置く（同じワーカーの次の倍率に前の倍率が持ち越される）
 """
 import hashlib
 import json
 import os
 import sys
-from multiprocessing import Pool
+import multiprocessing as mp
 
 import numpy as np
 
@@ -29,6 +30,7 @@ BASE_BETA = sim.BETA.copy()
 SCALES = [1.0, 0.5, 0.25]
 ID_BASE = {1.0: 0, 0.5: 400, 0.25: 500}  # 1 倍は前の主のセルと同じ番号（再現の門 W1・W4）
 MUT_W = set()
+_SCALE_SET = []  # w5 の持ち越しの印（ワーカーの中だけで使う）
 
 
 def set_scale(k):
@@ -70,8 +72,9 @@ def _job(args):
     MUT_W.clear()
     MUT_W.update(mut)
     sim.MUT.clear()
-    if "w3" not in MUT_W:
+    if "w3" not in MUT_W and not ("w5" in MUT_W and _SCALE_SET):
         set_scale(cell["scale"])
+        _SCALE_SET.append(cell["scale"])
     if "w4" in MUT_W and cell["scale"] == 1.0:
         sim.BETA = BASE_BETA * 1.0001  # 切片とセルの番号は変えず、ワーカーの係数だけをずらす
     return sim.one_rep(cell, rep, seed)
@@ -79,7 +82,7 @@ def _job(args):
 
 def run_cells(seed, cl, reps, jobs, mut=()):
     out = {}
-    with Pool(jobs) as pool:
+    with mp.get_context("spawn").Pool(jobs) as pool:  # 起動方式を spawn に固定（ワーカーは sim を読み直す）
         for c in cl:
             res = pool.map(_job, [(c, r, seed, tuple(mut)) for r in range(reps)], chunksize=8)
             out[c["id"]] = (c, sim.stack(res))

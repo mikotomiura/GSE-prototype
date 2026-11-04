@@ -3,8 +3,9 @@
 W1: 係数 1 倍の外側の層が、前の sim の主のセル（同じ条件・同じ乱数）と同じ値を返す。
 W2: 倍率が生成に効いている（真のモデルの C が倍率ごとに見込みの値に入り、陽性の率が合う）。
     陽性の率は、倍率 3 × 率 3 × σ_d 2 の 18 組の切片で確かめる。
-W5: 本計算と同じ Pool（spawn のワーカー）の経路で、倍率 0.5・0.25 のセルが、親のプロセスで
-    係数を k 倍に置いて前の sim.one_rep を呼んだ値と全部一致する（2 つの倍率を同じ Pool に続けて流す）。
+W5: 本計算と同じ Pool（spawn のワーカー）の経路で、倍率 0.5・1・0.25 のセルを 1 つのワーカーに
+    この順で続けて流し（各 10 反復・チャンク 8 なので 1 セルが 2 チャンク）、親のプロセスで係数を k 倍に
+    置いて前の sim.one_rep を呼んだ値と全部一致する。ワーカーの中の倍率の持ち越しを捕まえる。
 
 使い方: python3 -I -X utf8 selftest_weak.py SEED OUT_JSON [--only W1] [--mutate w1] [--run-id ID]
 どれかの門が落ちたら終了コード 3。
@@ -23,6 +24,7 @@ W2_EXPECT = {1.0: 0.723, 0.5: 0.623, 0.25: 0.561}  # 率 0.25・σ_d 0・20 万�
 W2_TOL = 0.015
 W2_N = 200_000
 W2_RATE_N = 50_000
+W5_REPS = 10
 
 
 def g_w1(seed):
@@ -80,12 +82,13 @@ def g_w2(seed):
 
 
 def g_w5(seed):
-    pick = [c for c in weak.cells(seed) if c["scale"] in (0.5, 0.25) and c["n"] == 20 and c["rate"] == 0.25 and c["sd"] == 0.5]
-    got = weak.run_cells(seed, pick, 3, 2, tuple(weak.MUT_W))
+    same = {c["scale"]: c for c in weak.cells(seed) if c["n"] == 20 and c["rate"] == 0.25 and c["sd"] == 0.5}
+    pick = [same[0.5], same[1.0], same[0.25]]
+    got = weak.run_cells(seed, pick, W5_REPS, 1, tuple(weak.MUT_W))
     bad = []
     for c in pick:
         _, arr = got[c["id"]]
-        for rep in range(3):
+        for rep in range(W5_REPS):
             sim.MUT.clear()
             sim.BETA = weak.BASE_BETA * c["scale"]
             exp = sim.one_rep(c, rep, seed)
@@ -93,7 +96,7 @@ def g_w5(seed):
                 if not np.array_equal(np.asarray(arr[k][rep]), np.asarray(v), equal_nan=True):
                     bad.append(f"倍率 {c['scale']} 反復 {rep} の {k} が違う")
     sim.BETA = weak.BASE_BETA.copy()
-    return dict(ok=not bad and len(pick) == 2, bad=bad[:10], n_cells=len(pick))
+    return dict(ok=not bad and len(got) == 3, bad=bad[:10], n_cells=len(pick), reps=W5_REPS)
 
 
 GATES = {"W1": g_w1, "W2": g_w2, "W5": g_w5}

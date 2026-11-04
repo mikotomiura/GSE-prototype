@@ -10,7 +10,7 @@ JOBS="${JOBS:-8}"; REPS="${REPS:-400}"; PY="${PYTHON:-python3}"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 RUN_ID="$(date +%Y%m%dT%H%M%S)-$$"
 mkdir -p "$OUT"
-# 来歴は計算の前に取り、途中で落ちても書く（trap）。前の実験の sim.py・report.py・selftest.py・summary.json も刻む
+# 来歴は計算の前に取り、SHA_START を取った後に落ちても書く（trap）。前の実験の sim.py・report.py・selftest.py・summary.json も刻む
 HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 DIRTY="$(cd "$REPO_ROOT" && git status --porcelain -- experiments/20261104-stage1-penalty-weak-signal/scripts experiments/20261104-stage1-penalty-weak-signal/run.sh experiments/20261104-stage1-penalty-weak-signal/mutate.sh experiments/20261104-stage1-penalty-weak-signal/conditions.md experiments/20261104-stage1-penalty-weak-signal/SEED experiments/20261104-stage1-penalty-synthetic/scripts experiments/20261104-stage1-penalty-synthetic/results/summary.json)"
 STAGE="start"
@@ -29,17 +29,18 @@ SHA_START="$(hash_inputs)"
 write_prov() {
   local rc=$?
   local sha_end
-  sha_end="$(hash_inputs || echo '{}')"
+  sha_end="$(hash_inputs || echo '{"__hash_failed__": "1"}')"
   "$PY" -I -X utf8 - "$HEAD" "$DIRTY" "$RUN_ID" "$REPS" "$JOBS" "$OUT/provenance.json" "$STAGE" "$rc" "$SHA_START" "$sha_end" <<'PY' || true
 import json, platform, sys
 import numpy
 head, dirty, run_id, reps, jobs, out, stage, rc, s0, s1 = sys.argv[1:11]
 s0, s1 = json.loads(s0), json.loads(s1)
-changed = sorted(k for k in set(s0) | set(s1) if s0.get(k) != s1.get(k))
+failed = "__hash_failed__" in s1
+changed = [] if failed else sorted(k for k in set(s0) | set(s1) if s0.get(k) != s1.get(k))
 json.dump(dict(run_id=run_id, git_head=head, dirty=dirty.splitlines(), reps=int(reps), jobs=int(jobs),
                last_stage=stage, exit_code=int(rc),
                python=platform.python_version(), numpy=numpy.__version__, machine=platform.platform(),
-               sha256=s0, changed_during_run=changed),
+               sha256=s0, changed_during_run=changed, end_hash_failed=failed),
           open(out, "w"), ensure_ascii=False, indent=1)
 PY
 }
