@@ -1,5 +1,7 @@
 # 段 1 のロジスティックの罰の強さの決め方を合成で比べた結果（2026-11-04）
 
+> 追記（2026-11-04・後のタスク）: §4 の案 B（τ = 0.5）は、弱い信号での確かめ（`../20261104-stage1-penalty-weak-signal/notes.md`）の後に、研究者が τ = 0.25 に戻した（`.steering/20261104-stage1-penalty-weak-signal/decisions.md` 判断 6・本タスクの判断 11）。以下の本文は書き換えていない。
+
 条件は `conditions.md`（計算の前にコミット: 1dd2d082・計算の前のレビューの直し 58349017）。作業記録は `.steering/20261104-stage1-penalty-synthetic/`（判断 1〜9）。
 
 - 本計算は run_id 20261104T194332-50681・HEAD 4584cae2・未コミットの変更なし（`results/provenance.json`）。Mac で約 10 分。

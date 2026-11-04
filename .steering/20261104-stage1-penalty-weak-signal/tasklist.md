@@ -22,5 +22,6 @@
 - [x] 2 巡目のレビュー（code-reviewer は HIGH・MEDIUM なし・LOW 4、Codex は P2 2・P3 1）・直した（判断 5）・run.sh で 3 回目（20261104T222554-56670・表の値は同じ）。直した差分は 3 巡目のレビューにかけていない
 - [x] 研究者が規則の答えを見て S1-E8 の値を決める（τ = 0.25・判断 6）
 - [x] S1-E8 に罰の強さを入れ、S1-E3 の決め方に信号の強さの注を足す（判断 7）
-- [ ] 事前登録の直しの code-reviewer ＋ Codex
-- [ ] push（PR は exp/gse-coauthor-ml-improve が main に入った後・研究者に確かめてから）
+- [x] 事前登録の直しの code-reviewer ＋ Codex・指摘を直した（判断 8）。直した文は 2 巡目のレビューにかけていない
+- [ ] push（研究者の手元で）
+- PR は exp/gse-coauthor-ml-improve が main に入った後・研究者に確かめてから
