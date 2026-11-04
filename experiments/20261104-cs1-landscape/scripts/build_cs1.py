@@ -199,6 +199,11 @@ def one(args):
         ft = subprocess.run([replay, wf, "--features"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             stdin=subprocess.DEVNULL)
         if ft.returncode != 0:
+            # replay の --features は時間の幅に上限がある（ADR-030 D9・100 万 tick ≈ 11.6 日）。何日にもまたがる
+            # 課題は上限に当たる。条件（D2）は想定していなかったので、除いて数を報告する（notes の逸脱）。
+            if b"time span too large" in ft.stderr:
+                return {"status": "span_too_long",
+                        "span_days": (all_keys[-1][0] - all_keys[0][0]) / 86_400_000}
             return {"status": "features_failed"}
         d = json.loads(ft.stdout)
     onsets = [[x["stall_onset"]["s_ms"], x["stall_onset"]["t0_ms"], x["stall_onset"]["theta_person_ms"],
@@ -236,20 +241,22 @@ def main():
     unit_w = {"%05d" % i: s_idx[k[0]] for i, k in enumerate(keys)}
     if limit:
         tasks = tasks[:limit]
-    status, blocks, few = Counter(), 0, 0
+    status, blocks, few, too_long = Counter(), 0, 0, []
     with ProcessPoolExecutor(int(jobs)) as ex:
         for res in ex.map(one, tasks, chunksize=1):
             status[res["status"]] += 1
             blocks += res.get("blocks", 0)
             few += res.get("blocks_few", 0)
+            if "span_days" in res:
+                too_long.append(round(res["span_days"], 1))
     ok = {k: v for k, v in unit_w.items() if os.path.exists(os.path.join(work, "u%s.json" % k))}
     json.dump(ok, open(os.path.join(work, "units.json"), "w"))
     summ = {"year": year, "writers_read": len(subj), "holdout_writers_skipped": held, "units": len(keys),
             "attempted": len(tasks), "status": status, "blocks_kept": blocks, "blocks_few_presses": few,
-            "row_kinds": dict(sorted(cnt.items()))}
+            "span_too_long_days": sorted(too_long), "row_kinds": dict(sorted(cnt.items()))}
     json.dump(summ, open(os.path.join(work, "build_summary.json"), "w"), indent=1)
     print(json.dumps({k: v for k, v in summ.items() if k != "row_kinds"}))
-    if status["ok"] + status["few_presses"] != len(tasks):
+    if status["ok"] + status["few_presses"] + status["span_too_long"] != len(tasks):
         sys.exit("失敗した課題がある")
 
 
