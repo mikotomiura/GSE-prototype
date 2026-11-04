@@ -24,6 +24,11 @@ sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
 [ "$(sha "$BIN")" = 26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3 ] || { echo "gse-replay の SHA-256 が違う" >&2; exit 1; }
 [ "$(sha "$HOLD")" = a5a32fcefeb97b038afd170e2672262fd5a71230d5e851319eaa076b606bdc47 ] || { echo "CS1 の holdout の SHA-256 が違う" >&2; exit 1; }
 mkdir -p "$OUT"
+RAW="$DATA_DIR/landscape/coauthor_ml_improve_writer_values"
+rm -f "$OUT/summary.json" "$OUT/provenance.json" "$RAW".*.json
+# 変換と門の単体（陰性対照を含む・1 秒以内）
+python3 -I "$SC/build_cs1_obs.py" --selftest
+python3 -I "$SC/check_same_cs1.py" --selftest
 # V1 P-D1: 中間の門（CoAuthor は B と同じ・CS1 は判断 6）
 python3 -I "$EXP_DIR/../20261103-coauthor-per-person/scripts/check_same.py" "$COA_OLD" "$COA" > "$OUT/check_same_coauthor.json"
 python3 -I "$SC/check_same_cs1.py" "$CS1_REF" "$CS1" "$EXP_DIR/../20261104-cs1-landscape/results/build_summary_2021.json" > "$OUT/check_same_cs1.json"
@@ -33,7 +38,7 @@ python3 -I "$SC/ml.py" --selftest "$SEED" "$OUT/selftest.json" --run-id "$RUN_ID
 OUT="$OUT" RUN_ID="$RUN_ID" bash "$EXP_DIR/mutate.sh"
 python3 -I "$SC/check_mutations.py" "$OUT/mutations" "$OUT/selftest.json" "$RUN_ID"
 # 本計算（書き手ごとの値は repo の外に残す・人が開いて読まない）
-GSE_ML_RAW="$DATA_DIR/landscape/coauthor_ml_improve_writer_values" python3 -I "$SC/ml.py" "$COA" "$CS1" "$SEED" "$OUT" "$JOBS"
+GSE_ML_RAW="$RAW" python3 -I "$SC/ml.py" "$COA" "$CS1" "$SEED" "$OUT" "$JOBS" --run-id "$RUN_ID"
 # provenance（git の HEAD・実験のディレクトリ全体の未コミットの変更・スクリプトの SHA-256・入力の SHA-256 の一覧のハッシュ・版）
 python3 -I - "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$(cd "$REPO_ROOT" && git status --porcelain -- experiments/20261104-coauthor-ml-improve/scripts experiments/20261104-coauthor-ml-improve/run.sh experiments/20261104-coauthor-ml-improve/mutate.sh experiments/20261104-coauthor-ml-improve/conditions.md experiments/20261104-coauthor-ml-improve/SEED)" \
   "$EXP_DIR" "$COA" "$CS1" "$HOLD" "$BIN" "$RUN_ID" "$OUT/provenance.json" <<'PY'

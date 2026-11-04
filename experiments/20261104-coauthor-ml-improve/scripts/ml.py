@@ -338,10 +338,15 @@ def select_cv(fold, cands, maximize=True):
 
 
 # ---------------------------------------------------------------- 集計の部品
+N_MIN = LG.N_MIN  # これより少ない人数の四分位・区間・割合・選ばれた値の人数は伏せて人数だけを出す（conditions D5）
+
+
 def q(xs):
     xs = [x for x in xs if x is not None]
     if not xs:
         return None
+    if len(xs) < N_MIN:
+        return dict(n=len(xs), suppressed=True)
     a = np.array(xs, dtype=float)
     qs = np.quantile(a, [0.25, 0.5, 0.75], method="inverted_cdf")
     return dict(median=float(qs[1]), q25=float(qs[0]), q75=float(qs[2]), n=len(xs))
@@ -349,7 +354,7 @@ def q(xs):
 
 def boot_median(vals, rng):
     a = np.array([v for v in vals if v is not None], dtype=float)
-    if len(a) < 2:
+    if len(a) < N_MIN:
         return None
     idx = rng.integers(0, len(a), (B_BOOT, len(a)))
     meds = np.median(a[idx], axis=1)
@@ -360,6 +365,8 @@ def delta_stats(d, rng, better_pos=True):
     d = [x for x in d if x is not None]
     if not d:
         return None
+    if len(d) < N_MIN:
+        return dict(n=len(d), suppressed=True)
     r = q(d)
     r["better_share"] = float(np.mean([(x > 0) if better_pos else (x < 0) for x in d]))
     r["ci"] = boot_median(d, rng)
@@ -368,8 +375,8 @@ def delta_stats(d, rng, better_pos=True):
 
 def boot_c(cn, rng):
     """cn: 書き手ごとの (一致の数, 組の数)。書き手の復元抽出でパーセンタイル区間。組が 0 の再標本は捨てる。"""
-    a = np.array(cn, dtype=float)
-    if len(a) < 2:
+    a = np.array(cn, dtype=float).reshape(-1, 2)
+    if int((a[:, 1] > 0).sum()) < N_MIN:
         return None, 0
     idx = rng.integers(0, len(a), (B_BOOT, len(a)))
     c, n = a[idx, 0].sum(1), a[idx, 1].sum(1)
@@ -433,7 +440,7 @@ def summarize_em(results, cfg, ns, rng):
                         fold = results[w]["em"]["k"][str(k)]["fold"]
                         cand = {sname(s): fold[sname(s)][chosen_other[sname(s)][w]] for s in ss}
                         nm = select_cv(cand, [sname(s) for s in ss])
-                        pick[w] = (nm, chosen_other[nm][w])
+                        pick[w] = (nm, chosen_other[nm][w]) if nm is not None else (sname(ss[0]), None)
                     E["kcv"][fam] = em_rows(results, ws, k, {"k_cv": pick}, rng)
                     E["kcv"][fam]["chosen_struct"] = count_vals(p[0] for p in pick.values())
             P[str(k)] = E
@@ -445,7 +452,8 @@ def count_vals(vs):
     out = {}
     for v in vs:
         out[str(v)] = out.get(str(v), 0) + 1
-    return out
+    n = sum(out.values())
+    return out if n >= N_MIN else dict(n=n, suppressed=True)
 
 
 def em_rows(results, ws, k, rows, rng):
@@ -591,8 +599,12 @@ def coef_split(writers, H_, ps, ver, results):
 
 
 # ---------------------------------------------------------------- 本計算
-def run(paths, seed, out, jobs, only_ds=None):
-    S = dict(datasets={})
+def run(paths, seed, out, jobs, only_ds=None, run_id=None):
+    raw = os.environ.get("GSE_ML_RAW")
+    repo = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
+    if raw and os.path.realpath(raw).startswith(repo + os.sep):
+        sys.exit("GSE_ML_RAW が repo の中を指している（書き手ごとの値は repo の外だけ）")
+    S = dict(run_id=run_id, datasets={})
     for ds in ([only_ds] if only_ds else ["coauthor", "cs1"]):
         cfg = DATASETS[ds]
         H_ = cfg["H"]
@@ -624,7 +636,6 @@ def run(paths, seed, out, jobs, only_ds=None):
         res = list(ex.map(eval_writer, jl, chunksize=1))
         ex.shutdown()
         results = {w: r for w, r in zip(elig, res)}
-        raw = os.environ.get("GSE_ML_RAW")
         if raw:
             json.dump({ds: {str(k): v for k, v in results.items()}}, open(raw + "." + ds + ".json", "w"))
         rng = np.random.default_rng(seed + 4)
@@ -667,9 +678,13 @@ if __name__ == "__main__":
             run_id = argv[i + 1]
             argv = argv[:i] + argv[i + 2:]
         sys.exit(selftest.main(int(argv[1]), argv[2], only, sorted(mut), run_id))
-    only_ds = None
+    only_ds, run_id = None, None
+    if "--run-id" in argv:
+        i = argv.index("--run-id")
+        run_id = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
     if "--only-dataset" in argv:
         i = argv.index("--only-dataset")
         only_ds = argv[i + 1]
         argv = argv[:i] + argv[i + 2:]
-    run({"coauthor": argv[0], "cs1": argv[1]}, int(argv[2]), argv[3], int(argv[4]), only_ds)
+    run({"coauthor": argv[0], "cs1": argv[1]}, int(argv[2]), argv[3], int(argv[4]), only_ds, run_id)

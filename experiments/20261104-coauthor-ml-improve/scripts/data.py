@@ -118,6 +118,9 @@ def load_coauthor(work, seed):
         if len(d["observed_intervals"]) != 1:
             continue
         a, b = d["observed_intervals"][0]
+        if not d["feat"]:
+            stats["units_without_feat"] = stats.get("units_without_feat", 0) + 1
+            continue
         F = np.array([r[:7] for r in d["feat"]], dtype=np.float64)
         keys = np.sort(np.array([k[0] for k in d["keys"]], dtype=np.int64))
         bs = np.sort(np.array([k[0] for k in d["keys"] if k[1] == "backspace"], dtype=np.int64))
@@ -134,6 +137,7 @@ def load_coauthor(work, seed):
         by_w.setdefault(s2w[sid], []).append(dict(start=a, seqs=[obs], pflag=[press_flags(ft, keys)],
                                                   probes=probes, probes_all=probes))
     writers = [sorted(by_w[w], key=lambda u: u["start"]) for w in sorted(by_w)]
+    check_units(writers, stats)
     return writers, stats
 
 
@@ -145,6 +149,9 @@ def load_cs1(work, seed, probe_unit):
     stats = dict(probes_dropped=0, probes_dropped_all=0)
     for uid in sorted(u2w):
         d = json.load(open(os.path.join(work, "u%s.json" % uid)))
+        if not d["feat"]:
+            stats["units_without_feat"] = stats.get("units_without_feat", 0) + 1
+            continue
         F = np.array([r[:7] for r in d["feat"]], dtype=np.float64)
         keys = np.sort(np.array([k[0] for k in d["keys"]], dtype=np.int64))
         bs = np.sort(np.array([k[0] for k in d["keys"] if k[1] == "backspace"], dtype=np.int64))
@@ -175,7 +182,15 @@ def load_cs1(work, seed, probe_unit):
         by_w.setdefault(u2w[uid], []).append(dict(start=int(keys[0]), seqs=seqs, pflag=pflag,
                                                  probes=probes, probes_all=probes_all))
     writers = [sorted(by_w[w], key=lambda u: u["start"]) for w in sorted(by_w)]
+    check_units(writers, stats)
     return writers, stats
+
+
+def check_units(writers, stats):
+    """feat 行の無い単位・空の系列の単位があれば、件数だけを出して先に止める（本計算の途中で落ちないように）。"""
+    empty = sum(1 for ss in writers for u in ss if not any(len(s) for s in u["seqs"]))
+    if stats.get("units_without_feat") or empty:
+        raise SystemExit("feat 行の無い単位 %d 件・系列が空の単位 %d 件" % (stats.get("units_without_feat", 0), empty))
 
 
 # ---------------------------------------------------------------- 分け方（design §2）

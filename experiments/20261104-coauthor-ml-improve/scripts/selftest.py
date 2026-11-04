@@ -15,7 +15,7 @@ import logit as LG
 import ml
 
 NAMES = ["P-XI", "P-BATCH", "P-EM3", "P-AR1", "P-PRIOR", "P-CH", "P-POOL", "P-AR", "P-LEAK", "P-EM2",
-         "P-LAM", "P-LINF", "P-C1", "P-SIMP", "P-S", "P-OTH", "P-PROBE"]
+         "P-LAM", "P-LINF", "P-C1", "P-SIMP", "P-S", "P-OTH", "P-PROBE", "P-EMPTY"]
 STICKY = 0.9
 
 
@@ -182,14 +182,16 @@ def synth_writers(rng, cm, n_w=17, n_u=20, L=650, perturbed=True):
 
 
 def pools_for(writers, Hh, structs, start):
-    out = []
+    """w を除く共通。返り値: (書き手ごとの {構造名: (母数, S̄)}, 目的が減った回の和)。"""
+    out, decs = [], 0
     for w in range(len(writers)):
         P = {}
         for s in structs:
             m, sb, d = ml.fit_pool_excl(dict(ds="coauthor", writers=writers, w=w, start=start[ml.sname(s)]))
             P[ml.sname(s)] = (m, sb)
+            decs += d["decreases"]
         out.append(P)
-    return out
+    return out, decs
 
 
 def p_pool_leak(seed, mut, ex):
@@ -198,7 +200,7 @@ def p_pool_leak(seed, mut, ex):
     cm = common_model(rng)
     truths, writers = synth_writers(rng, cm)
     Hh, ks, s = 5, [1, 15], ("hmm", 3)
-    pools = pools_for(writers, Hh, [s], {"hmm3": cm})
+    pools, pdecs = pools_for(writers, Hh, [s], {"hmm3": cm})
     res = list(ex.map(em_job, [(mut, w_units, Hh, ks, pools[w], seed, w, [s]) for w, w_units in enumerate(writers)]))
     results = {w: dict(em=r) for w, r in enumerate(res)}
     taus = [str(t) for t in ml.TAUS]
@@ -221,7 +223,7 @@ def p_pool_leak(seed, mut, ex):
                 tl, tn = honest_ll(truths[w], te)
                 d.append(results[w]["em"]["k"][str(k)]["self"]["hmm3"][t][0] - tl / tn)
             leak["k%d_tau%s" % (k, t)] = float(np.median(d))
-    decs = sum(dd["decreases"] for r in res for rk in r["k"].values() for v in rk["diag"].values() for dd in v.values())
+    decs = pdecs + sum(dd["decreases"] for r in res for rk in r["k"].values() for v in rk["diag"].values() for dd in v.values())
     return (dict(passed=pool_ok, median_other_minus_tau0=med),
             dict(leak_medians=leak, worst=max(leak.values())), decs)
 
@@ -329,6 +331,22 @@ def p_lam_linf(seed):
             dict(passed=linf_ok, **linf))
 
 
+def p_empty(seed):
+    """学習の単位に問いが 1 つも無い書き手（k = 1）と、折り目の当てはめの単位に問いが無い書き手で、例外にならず、
+    k = 1 の B0-self が 0.5・予測が有限であること（計算の前のレビューの HIGH-1 の回帰）。"""
+    rng = np.random.default_rng([seed, 13])
+    writers = lam_writers(rng, True, n_w=8, n_u=10, per=3)
+    w = 0
+    for i in (3, 4):  # 評価は後ろの 5 単位（5〜9）、k = 1 の学習は 4、k = 3 の折り目 F2 の当てはめは 2・3
+        writers[w][i] = dict(writers[w][i], probes=[], probes_all=[])
+    P = ml.pool_logistic(writers, 5, w, "tab", "main")
+    r = ml.logistic_writer(writers[w], 5, [1, 3], P, "tab", "main")
+    k1 = r["k"]["1"]
+    finite = all(np.isfinite(v).all() for k in ("1", "3") for v in r["k"][k]["pred"].values())
+    ok = k1["train_n"] == 0 and abs(k1["b0_self"] - 0.5) < 1e-12 and finite
+    return dict(passed=bool(ok), train_n_k1=k1["train_n"], b0_self_k1=k1["b0_self"], finite=bool(finite))
+
+
 def p_c1(seed):
     rng = np.random.default_rng([seed, 9])
     ys, ps = [], []
@@ -424,7 +442,7 @@ def main(seed, out, only, mut, run_id):
     want = set(only) if only else set(NAMES)
     R = dict(run_id=run_id, mutate=mut)
     simple = {"P-XI": p_xi, "P-BATCH": p_batch, "P-EM3": p_em3, "P-AR1": p_ar1, "P-PRIOR": p_prior,
-              "P-C1": p_c1, "P-SIMP": p_simp, "P-OTH": p_oth, "P-PROBE": p_probe}
+              "P-C1": p_c1, "P-SIMP": p_simp, "P-OTH": p_oth, "P-PROBE": p_probe, "P-EMPTY": p_empty}
     for nm, f in simple.items():
         if nm in want:
             R[nm] = f(seed)

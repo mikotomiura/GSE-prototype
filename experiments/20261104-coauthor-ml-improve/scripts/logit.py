@@ -8,6 +8,7 @@ import numpy as np
 
 LAM0 = 1.0          # 共通（1 つの切片・固定効果）の罰（B の λ と同じ）
 LAMS = [0.1, 1.0, 10.0, 100.0, float("inf")]
+N_MIN = 6           # これより少ない書き手の C・合わせた AUC は出さない（1〜5 人では個人の値に近づく・conditions D5）
 MUT = set()
 
 
@@ -101,7 +102,8 @@ def fit_self(Z, y, beta_c, lam):
     """本人: 切片 b（罰さない・擬似観測 2 つ）と β。目的は対数尤度 − λ/2‖β − β_c‖²。
     δ = β − β_c をオフセット Z β_c の上で罰 λ で当てる。λ = ∞ は δ = 0（切片だけ）。
     返り値: (切片, β, 収束したか)。m4 は 0 へ寄せる（β_c を使わない）。"""
-    Z = np.asarray(Z, dtype=float).reshape(len(y), -1)
+    y = np.asarray(y, dtype=float)
+    Z = np.asarray(Z, dtype=float).reshape(len(y), len(beta_c))  # 問いが 0 件でも形が決まる（擬似観測だけの当てはめ）
     bc = np.zeros(Z.shape[1]) if "m4" in MUT else np.asarray(beta_c, dtype=float)
     off = Z @ bc
     if np.isinf(lam):
@@ -177,7 +179,8 @@ def within_c(ys, ps):
         y = np.concatenate([np.asarray(v) for v in ys]) if ys else np.zeros(0)
         p = np.concatenate([np.asarray(v, dtype=float) for v in ps]) if ps else np.zeros(0)
         c, n = conc_counts(y, p)
-        return (c / n if n else None), int(sum(1 for v in ys if 0 < np.sum(v) < len(v)))
+        nw = int(sum(1 for v in ys if 0 < np.sum(v) < len(v)))
+        return (c / n if (n and nw >= N_MIN) else None), nw
     c = n = 0.0
     nw = 0
     for y, p in zip(ys, ps):
@@ -185,10 +188,12 @@ def within_c(ys, ps):
         c += cw
         n += nn
         nw += nn > 0
-    return (c / n if n else None), nw
+    return (c / n if (n and nw >= N_MIN) else None), nw
 
 
 def pooled_auc(ys, ps):
+    if sum(1 for v in ys if 0 < np.sum(v) < len(v)) < N_MIN:
+        return None
     y = np.concatenate([np.asarray(v) for v in ys]) if ys else np.zeros(0)
     p = np.concatenate([np.asarray(v, dtype=float) for v in ps]) if ps else np.zeros(0)
     return auc(y, p)
