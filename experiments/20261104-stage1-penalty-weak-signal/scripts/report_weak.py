@@ -101,6 +101,51 @@ def rule(rows):
     return out
 
 
+def posthoc(rows, cl):
+    """記述だけ（W2 の規則の外・結果を見た後に足した・本タスクの decisions 判断 3）。
+    1) 固定の τ ごとに、3 倍率 × n ≥ 50 の 54 セルの傾きの中央値の最小・最大と |log 中央値| の最大。
+    2) 倍率ごとに、n ≥ 50 の 18 セルで傾きの中央値が 1 に最も近い固定の τ（|log| で比べる）の数。
+    3) 倍率ごとに、n ≥ 50 の 18 セルで前向きの CV と 1-SE が切片だけ（τ = 0・傾きが無い）を選んだ反復の割合。"""
+    taus = [report.tau_s(t) for t in range(1, sim.NT)]
+    big = [r for r in rows if r["cell"]["n"] >= RULE_N]
+    per_tau = {}
+    for t in taus:
+        ms = [r["fixed"][t]["slope"]["med"] for r in big]
+        ms = [m for m in ms if m is not None and m > 0]
+        per_tau[t] = dict(n=len(ms), med_min=min(ms), med_max=max(ms), max_abs_log=max(abs(math.log(m)) for m in ms))
+    closest = {}
+    for k in weak.SCALES:
+        cnt = {t: 0 for t in taus}
+        for r in big:
+            if r["cell"]["scale"] != k:
+                continue
+            best = min(taus, key=lambda t: abs(math.log(r["fixed"][t]["slope"]["med"])))
+            cnt[best] += 1
+        closest[str(k)] = cnt
+    icpt = {}
+    for k in weak.SCALES:
+        sel = [a for c, a in cl if c["scale"] == k and c["n"] >= RULE_N]
+        icpt[str(k)] = {key: float(np.mean(np.concatenate([a[key] for a in sel]) == 0)) for key in ("c_fwd", "c_1se")}
+    return dict(per_tau=per_tau, closest_to_1=closest, intercept_only_frac=icpt)
+
+
+def posthoc_md(ph):
+    L = ["", "## 記述（規則の外・結果を見た後に足した）: 固定の τ ごとの傾きの中央値（3 倍率 × n ≥ 50 の 54 セル）", "",
+         "| τ | 中央値の最小 | 最大 | 1 からの外れの最大（|log|） |", "|---|---|---|---|"]
+    for t, v in ph["per_tau"].items():
+        L.append(f"| {t} | {f3(v['med_min'])} | {f3(v['med_max'])} | {f3(v['max_abs_log'])} |")
+    taus = list(ph["per_tau"])
+    L += ["", "## 記述: 傾きの中央値が 1 に最も近い固定の τ（n ≥ 50 の 18 セルのうちの数）", "",
+          "| 係数の倍率 | " + " | ".join(f"τ={t}" for t in taus) + " |", "|---|" + "---|" * len(taus)]
+    for k, cnt in ph["closest_to_1"].items():
+        L.append(f"| {k} | " + " | ".join(str(cnt[t]) for t in taus) + " |")
+    L += ["", "## 記述: CV が切片だけ（τ = 0・傾きが無く傾きの要約から抜ける）を選んだ反復の割合（n ≥ 50）", "",
+          "| 係数の倍率 | 前向きの CV | 1-SE |", "|---|---|---|"]
+    for k, v in ph["intercept_only_frac"].items():
+        L.append(f"| {k} | {f3(v['c_fwd'])} | {f3(v['c_1se'])} |")
+    return "\n".join(L) + "\n"
+
+
 def f3(x):
     return "—" if x is None else f"{x:.3f}"
 
@@ -151,9 +196,11 @@ def main(argv):
     rows = cell_rows(cl)
     w4 = g_w4(rows)
     rl = rule(rows)
-    json.dump(dict(run_id=meta["run_id"], seed=meta["seed"], reps=meta["reps"], w4=w4, rule=rl, cells=rows),
+    ph = posthoc(rows, cl)
+    json.dump(dict(run_id=meta["run_id"], seed=meta["seed"], reps=meta["reps"], w4=w4, rule=rl, posthoc=ph,
+                   cells=rows),
               open(os.path.join(res_dir, "summary.json"), "w"), ensure_ascii=False, indent=1)
-    open(os.path.join(res_dir, "tables.md"), "w").write(tables(rows, rl, w4, meta))
+    open(os.path.join(res_dir, "tables.md"), "w").write(tables(rows, rl, w4, meta) + posthoc_md(ph))
     print("W4", "OK" if w4["ok"] else "FAIL", w4["bad"][:3])
     print({k: v["verdict"] for k, v in rl.items()})
     sys.exit(0 if w4["ok"] else 3)
