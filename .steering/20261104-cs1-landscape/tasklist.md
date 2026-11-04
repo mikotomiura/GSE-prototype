@@ -8,7 +8,7 @@
 - [x] 変換スクリプト → replay → 集計（中間は 1 本ずつ消す）
 - [x] `notes.md`（課題の数・1 単位の長さの四分位・言える範囲）
 - [x] code-reviewer ＋ /cross-review（並列・2 巡。判断 3・4）
-- [ ] main へ `--no-ff`・`[skip ci]`（コードと CI 設定が無いことを確かめる）
+- [x] main へ `--no-ff`・`[skip ci]`（コードと CI 設定が無いことを確かめる・08ab4cf7）
 
 ## 場面ごとの道具
 - コード（変換・集計の python）→ code-reviewer ＋ /cross-review
