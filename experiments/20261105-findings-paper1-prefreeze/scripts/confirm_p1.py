@@ -53,6 +53,7 @@ SEP_SYM = {"space", "enter", "tab", "punctuation", "sentence_punctuation"}  # �
 H = 3_600_000
 NAN = float("nan")
 FLOOR = 0.02  # 推定の水準の床（判断 17）
+CAL_TOL = 0.002  # 仮の信号が目標の AUC に届いたとみなす差の上限（届かなければ較正できない）
 
 # 主の設定（P3〜P6）。感度（P8）はこの 1 つの値だけを変える
 MAIN = {"d_win": 30_000, "ctrl_hi": 30_000, "ctrl_condA": True, "stall_condA": True, "align": "newline", "layer": "past30",
@@ -169,6 +170,23 @@ def h2_branch(ciu, cir):
     if cir[1] < 0.5:
         return 2
     return 3
+
+
+def r_for_branch(cir, rbad, n_boot=N_BOOT):
+    """R の再標本で数値にならない回が 5% を超えたら、R の区間を使わない（分岐 3・P7）。"""
+    return None if rbad > FAIL_MAX * n_boot else cir
+
+
+def off_floor_rows(rows):
+    """床にない対だけ（判断 17）: 停滞の u で p_stuck < 0.02 の行を落とし、対照も p_stuck ≥ 0.02 だけを残す（引き直さない）。"""
+    out = []
+    for cell, sv, fv, ctrl in rows:
+        if sv["p_stuck"] < FLOOR:
+            continue
+        cf = [x for x in ctrl if x[1]["p_stuck"] >= FLOOR]
+        if cf:
+            out.append((cell, sv, fv, cf))
+    return out
 
 
 def weight_concentration(pairs):
@@ -504,7 +522,7 @@ def h2_summary(writer_h2, seed, hide=True):
            "positives": sum(sum(1 for x in w if x["pos"]) for w, _, _ in writer_h2),
            "matched_positives": sum(len(m["dec"]) for _, m, _ in writer_h2),
            "targets": tg, "targets_with_positive_window": gt, "share_targets_with_positive": gt / tg if tg else None,
-           "windows_excluded": sum(x[2][2] for x in writer_h2)}
+           "windows_excluded_long_pause": sum(x[2][2] for x in writer_h2)}
     for sig in SIGS:
         U3 = np.array([h2_pairs(w, m, sig) for w, m, _ in writer_h2], dtype=float)
         M3 = np.array([h2_pairs(w, m, sig, "dec") for w, m, _ in writer_h2], dtype=float)
@@ -525,7 +543,7 @@ def h2_summary(writer_h2, seed, hide=True):
             R = (AU - AM) / (AU - 0.5) if AU != 0.5 else None
             e |= {"unmatched_auc": AU, "unmatched_ci95": ciu, "matched_auc": AM, "matched_ci95": cim,
                   "matched_dec_q5_auc": M2[:, 0].sum() / M2[:, 1].sum(), "R": R, "R_ci95": cir,
-                  "branch": h2_branch(ciu, None if rbad > FAIL_MAX * N_BOOT else cir)}  # 数値でない R が 5% を超えたら R は判定できない
+                  "branch": h2_branch(ciu, r_for_branch(cir, rbad))}
         out[sig] = e
     if not hide:
         out["H2_supported"] = all(out[s]["branch"] == 1 for s in SIGS)
@@ -726,19 +744,31 @@ def h3_recovery(writer_rows, seed, target=0.58, n_rep=50):
     X, y, wt, g, cells, cids, _ = ml_rows(writer_rows)
     col = RATE_DIFF_COL
     keys = [(g[i], cells[i]) for i in range(len(y))]
+    # この量は偶数の整数しか取らず AUC が d について階段になるので、先に [0, 1) の一様の揺らぎを全ての行に足して
+    # 同値を崩す（同じ揺らぎは cid ごとに 1 つ・SEED + 9）。仮のデータの作り方で、実のデータの判定には入らない
+    jit = np.random.default_rng(seed + 9)
+    jmap = {}
+    base = X[:, col].copy()
+    for i in range(len(y)):
+        jmap.setdefault(cids[i], jit.random())
+        base[i] += jmap[cids[i]]
 
     def feat_auc(d):
-        return paired_auc(X[:, col] + np.where(y == 1, d, 0.0), y, keys, cids)
+        return paired_auc(base + np.where(y == 1, d, 0.0), y, keys, cids)
     lo, hi = -50.0, 50.0
-    for _ in range(40):
+    for _ in range(50):
         mid = (lo + hi) / 2
         lo, hi = (mid, hi) if feat_auc(mid) < target else (lo, mid)
+    d = (lo + hi) / 2
+    reached = feat_auc(d)
+    ok_cal = abs(reached - target) <= CAL_TOL
     Xs = X.copy()
-    Xs[y == 1, col] += (lo + hi) / 2
-    res = {}
+    Xs[:, col] = base
+    Xs[y == 1, col] += d
+    res = {"target": target, "reached_auc": reached, "calibrated": bool(ok_cal)}
     for name, spec in models(seed).items():
         ci, fails = boot_oof(Xs, y, wt, g, cells, cids, spec, seed, n_rep)
-        res[name] = {"recovered_lower_gt_055": bool(ci and ci[0] > BAND_HI), "boot_failures": fails}
+        res[name] = {"recovered_lower_gt_055": bool(ok_cal and ci and ci[0] > BAND_HI), "boot_failures": fails}
     return res
 
 
@@ -962,16 +992,7 @@ def sensitivities(writers, seed, hide, main_rows, main_h2, replay_dirs, hold_p, 
                      ("neither_condA", {"stall_condA": False, "ctrl_condA": False})):
         S[name] = h1_run(writers, cfg_of(**kw), seed, hide)[1]
     # 床にない対だけ（判断 17）: 主の行から、停滞の u と対照の u の両方で p_stuck ≥ 0.02 の対だけを残す（引き直さない）
-    off = []
-    for r in main_rows:
-        rr = []
-        for cell, sv, fv, ctrl in r:
-            if sv["p_stuck"] < FLOOR:
-                continue
-            cf = [x for x in ctrl if x[1]["p_stuck"] >= FLOOR]
-            if cf:
-                rr.append((cell, sv, fv, cf))
-        off.append(rr)
+    off = [off_floor_rows(r) for r in main_rows]
     S["h1_off_floor"] = {"stall_rows_main_layer": sum(1 for r in off for c, _, _, _ in r if c[1] == "none"),
                          "H1": h1_summary(off, seed, "none", hide, SIGS, True)}
     # H2 だけが変わるもの
@@ -1100,11 +1121,11 @@ def shifted_pairs(rows, sig, d, eps):
         x["pos"].append(sv[sig] + d)
         for cid, cs, _ in ctrl:
             x["neg"][cid] = cs[sig]
-    w = n = 0
+    w = n = t = 0
     for x in by.values():
-        a, b, _ = wins_ties(x["pos"], list(x["neg"].values()), eps)
-        w, n = w + a, n + b
-    return w, n
+        a, b, c = wins_ties(x["pos"], list(x["neg"].values()), eps)
+        w, n, t = w + a, n + b, t + c
+    return w, n, t
 
 
 def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
@@ -1121,29 +1142,34 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
             for _ in range(50):
                 mid = (lo + hi) / 2
                 a = [shifted_pairs(r, sig, mid, EPS) for r in rows]
-                auc = sum(x for x, _ in a) / sum(y for _, y in a)
+                auc = sum(x[0] for x in a) / sum(x[1] for x in a)
                 lo, hi = (mid, hi) if auc < tgt else (lo, mid)
             d = (lo + hi) / 2
-            wp = {eps: np.array([shifted_pairs(r, sig, d, eps) for r in rows], dtype=float) for eps in EPS_SET}
+            full = {eps: np.array([shifted_pairs(r, sig, d, eps) for r in rows], dtype=float) for eps in EPS_SET}
+            reached = full[EPS][:, 0].sum() / full[EPS][:, 1].sum()
+            wp = {eps: full[eps][:, :2] for eps in EPS_SET}
             rng = np.random.default_rng(seed + 8)
             res = {"eq_eps_0.001": 0, "eq_both_eps": 0, "precision_insufficient": 0}
             for _ in range(n_draw):
                 sel = rng.choice(len(rows), n_hold, replace=False)
+                ts = full[EPS][sel, 2].sum() / full[EPS][sel, 1].sum()
                 br = {}
                 for eps in EPS_SET:
                     ci = boot_ratio(wp[eps][sel], np.random.default_rng(int(rng.integers(1 << 31))))
-                    br[eps] = branch(ci)
+                    br[eps] = h1_branch(ts, ci)  # 本番と同じ関数（退化と区間なしの扱いを含む）
                 res["eq_eps_0.001"] += br[0.001] == 1
                 res["eq_both_eps"] += br[0.001] == 1 and br[0.0] == 1
                 res["precision_insufficient"] += br[0.001] == "precision_insufficient"
-            out[sig]["target_%.2f" % tgt] = {k: v / n_draw for k, v in res.items()}
+            out[sig]["target_%.2f" % tgt] = {k: v / n_draw for k, v in res.items()} | {
+                "reached_auc": float(reached), "calibrated": bool(abs(reached - tgt) <= CAL_TOL)}
     return out
 
 
 def level_floor_share(rows, layer="none"):
     """推定の水準の床と天井（p_stuck が 0.02 未満か 0.98 を超える）にある、主の層の停滞と引かれた対照（重複は 1 回）の割合。"""
     st = [sv["p_stuck"] for r in rows for cell, sv, _, _ in r if cell[1] == layer]
-    ct = list({cid: cs["p_stuck"] for r in rows for cell, _, _, ctrl in r if cell[1] == layer for cid, cs, _ in ctrl}.values())
+    ct = list({(wi, cid): cs["p_stuck"] for wi, r in enumerate(rows) for cell, _, _, ctrl in r if cell[1] == layer
+               for cid, cs, _ in ctrl}.values())  # 対照の id は書き手の中でだけ一意なので、書き手の番号を添える
     f = lambda v: {"floor_lt_002": float(np.mean(np.array(v) < FLOOR)), "ceiling_gt_098": float(np.mean(np.array(v) > 1 - FLOOR)), "n": len(v)} if v else None  # noqa: E731
     return {"stall": f(st), "control": f(ct)}
 
@@ -1193,6 +1219,21 @@ def selftest():
     # H2 の分岐（R の下限）
     assert h2_branch([0.56, 0.60], [0.5, 0.9]) == 1 and h2_branch([0.56, 0.60], [0.1, 0.4]) == 2
     assert h2_branch([0.56, 0.60], [0.3, 0.8]) == 3 and h2_branch([0.54, 0.60], [0.6, 0.9]) == 4
+    # R の 5% の規則・H3 の門と失敗の上限
+    assert r_for_branch([0.5, 0.9], 100) == [0.5, 0.9] and r_for_branch([0.5, 0.9], 101) is None
+    assert h2_branch([0.56, 0.60], r_for_branch([0.6, 0.9], 101)) == 3
+    assert h3_branch([0.46, 0.54], 10, 200) == 1 and h3_branch([0.46, 0.54], 11, 200) == "undeterminable_fit_failures"
+    assert h3_branch([0.46, 0.54], 0, 200, False) == "undeterminable"
+    # 床にない対: 停滞が床なら行ごと落とし、対照は床にないものだけ残す
+    sv_hi, sv_lo = {"p_stuck": 0.5}, {"p_stuck": 0.01}
+    rows_f = [(("other", "none"), sv_hi, None, [((0, 1), sv_lo, None), ((0, 2), sv_hi, None)]),
+              (("other", "none"), sv_lo, None, [((0, 3), sv_hi, None)]),
+              (("other", "none"), sv_hi, None, [((0, 4), sv_lo, None)])]
+    of = off_floor_rows(rows_f)
+    assert len(of) == 1 and [c[0] for c in of[0][3]] == [(0, 2)], of
+    # 床の割合: 別の書き手の同じ対照の id を別に数える
+    lf = level_floor_share([[rows_f[0]], [rows_f[0]]])
+    assert lf["control"]["n"] == 4 and lf["stall"]["n"] == 2, lf
     # パーセンタイルの添字
     assert pct_ci(list(range(100)) + [float("nan")]) == ([2.0, 97.0], 1)
     # 量: 押下 3 つ未満は旧い欠測の印・取れない量は NaN・押下の数を量に持つ

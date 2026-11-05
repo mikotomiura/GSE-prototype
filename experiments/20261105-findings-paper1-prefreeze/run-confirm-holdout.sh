@@ -35,7 +35,9 @@ die() { echo "$1" >&2; exit 1; }
 [ -z "$(git -C "$REPO_ROOT" status --porcelain)" ] || die "作業ツリーがきれいでない（コミットしてから走らせる）"
 # パイプにしない（pipefail の下では grep -q が先に抜けると git log が SIGPIPE で終わり、一致があっても偽になる）
 # 完走の記録があれば、理由があっても止める（結果は最初の完走だけ・P10）
-[ -z "$(git -C "$REPO_ROOT" log --all --format=%H --grep='^取り置きの確認の完走' -n 1)" ] || die "完走の記録がある（2 回目は回さない・P10）"
+[ -z "$(git -C "$REPO_ROOT" log --all --format=%H --grep='^取り置きの確認の完走' -n 1)" ] || die "完走の記録がある（2 回目は回さない・P11）"
+# 結果のファイルを含むコミットがあれば（中断の件名でも）、それが最初の完走に当たるので止める（P11）
+[ -z "$(git -C "$REPO_ROOT" log --all --format=%H -n 1 -- "$EXP_REL/results_holdout/confirm_holdout.json")" ] || die "結果のファイルがコミットされている（それを最初の完走として扱う・P11）"
 if [ -n "$(git -C "$REPO_ROOT" log --all --format=%H --grep='^取り置きの確認の開始' -n 1)" ]; then
   [ -n "${CONFIRM_RERUN_REASON:-}" ] || die "前の開始の記録がある（最初の完走だけを使う・P10。再実行は CONFIRM_RERUN_REASON に理由を書いて逸脱として）"
 fi
@@ -87,8 +89,9 @@ for v in q995 w15 w60; do cp "${WORK}_$v/rebuild_summary.json" "$OUT/rebuild_sum
 STEP=confirm
 "$PY" -I "$EXP_DIR/scripts/confirm_p1.py" holdout "$WORK" "$CS1/holdout.json" 20261106 "$OUT"
 STEP=provenance
+HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 "$PY" -I -c "import json,sys,datetime,hashlib;h=lambda p:hashlib.sha256(open(p,'rb').read()).hexdigest();json.dump({'git_head':sys.argv[1],'finished_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'confirm_holdout_sha256':h(sys.argv[2]),'manifest_sha256':h(sys.argv[3])},open(sys.argv[4],'w'),indent=1)" \
-  "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$OUT/confirm_holdout.json" "$EXP_DIR/confirm-manifest.sha256" "$OUT/provenance_holdout.json"
+  "$HEAD_SHA" "$OUT/confirm_holdout.json" "$EXP_DIR/confirm-manifest.sha256" "$OUT/provenance_holdout.json"
 # 完走の記録（手順がコミットする。結果は集計値だけで、書き手ごとの値を含まない）
 STEP=commit
 git -C "$REPO_ROOT" add "$EXP_REL/results_holdout"
