@@ -126,6 +126,7 @@ R Shiny で設計を引ける。
 
 ### 5. 議論はあるか?
 - 著者フルバイラインは Springer 原本で要確認（**provisional**: Lafit 以外の著者順）。
+  - 2026-11-05 訂正: 全文 PDF と Crossref では著者は Yang, L.-Q., Wang, W., Huang, P.-H. & Nguyen, A. で、Lafit は著者に含まれない。本カードの「Lafit et al.」は [V27]（Yang ら 2022）と読む（`docs/literature/20261105-daily-end-of-day-items.md` の「既存の行の訂正」）。なお同論文は 1 項目の条件を模擬に含めず、推奨もしない。
 - 「reliability」と GSE の **C-index（方向付き順序一致）** は指標が異なる。GSE が必要とするのは
   高精度な点推定ではなく **順序の方向性の検出力**なので、信頼性の閾値より少ない機会数でも一次判定は可能。
 
