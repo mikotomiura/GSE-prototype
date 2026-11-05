@@ -113,8 +113,20 @@ record_failure() {
   git -C "$REPO_ROOT" commit -q -m "取り置きの確認の中断（段: ${STEP}・${1}）[skip ci]" -- "$OUT_REL" || echo "中断の記録をコミットできなかった。手で記録してから研究者に聞く" >&2
   echo "途中で止まった（${STEP}）。直さずに記録し、研究者に聞く（P11）" >&2
 }
-trap 'record_failure error' ERR
-trap 'record_failure interrupted; exit 130' INT TERM
+# ERR の罠は未定義の変数（set -u）などで落ちたときに呼ばれないので、EXIT の罠で記録する（2026-11-06 の予行で、
+# 完走のコミットの段で落ちて中断の記録が残らなかった）。完走のコミットの後に DONE=1 にする
+on_exit() {
+  rc=$?
+  trap - EXIT INT TERM
+  if [ "${DONE:-0}" != 1 ]; then
+    # bash 3.2 は未定義の変数で落ちたとき EXIT の罠の中の $? が 0 になる（2026-11-06 に実測）。完走の印が無ければ 1 にする
+    [ "$rc" != 0 ] || rc=1
+    if [ "$rc" = 130 ]; then record_failure interrupted; else record_failure "error_rc${rc}"; fi
+  fi
+  exit "$rc"
+}
+trap on_exit EXIT
+trap 'exit 130' INT TERM
 
 STEP=selftest
 "$PY" -I "$EXP_DIR/scripts/confirm_p1.py" --selftest
@@ -142,7 +154,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 # 完走の記録（手順がコミットする。結果は集計値だけで、書き手ごとの値を含まない）
 STEP=commit
 git -C "$REPO_ROOT" add "$OUT_REL"
-git -C "$REPO_ROOT" commit -q -m "取り置きの確認の完走（$OUT_REL）[skip ci]" -- "$OUT_REL"
-trap - ERR INT TERM
+git -C "$REPO_ROOT" commit -q -m "取り置きの確認の完走（${OUT_REL}）[skip ci]" -- "$OUT_REL"
+DONE=1
 echo "完走した。results_holdout/ をコミットした。"
 echo "次: confirm_holdout.json と provenance_holdout.json を OSF の登録に添える（P11）。"
