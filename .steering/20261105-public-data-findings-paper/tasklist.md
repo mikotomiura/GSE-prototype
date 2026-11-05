@@ -39,5 +39,7 @@
 - [x] JEDM の最近の論文 3〜5 本の長さと節の並び・テンプレートの確認（Step 0 の残り・6 本・中央値約 10,200 語・上限の規定なし・予算は `paper-write/length-log.md`）
 - [x] 主張と新規性の初回案（Step 1）→ /reimagine → 比べて確定（判断 9・`paper-write/outline.md`）
 - [x] 事前登録の草案（判断 10・`paper-write/prereg-draft.md`）
-- [ ] attack-me（Codex を加えるかを先に聞く）→ OSF で凍結
+- [x] attack-me round 1（Codex あり・major・判断 11）→ 草案 v2
+- [ ] 凍結の前の計算 2 つ（幅の換算・CS1 2019 の見た 319 人での精度の見積もり）→ 草案に値を入れる
+- [ ] attack-me round 2 → OSF で凍結
 - [ ] 計算（Mac）
