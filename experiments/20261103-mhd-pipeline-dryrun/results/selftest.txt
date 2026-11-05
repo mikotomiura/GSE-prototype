@@ -1,0 +1,26 @@
+# 陽性対照の記録（2026-11-03・計算の後に記録として走らせ直した。コードは 42d2711d のまま）
+## --selftest
+C3 logistic recovery [-0.321, 0.805, -1.194] True
+C4 rocket deterministic/constant True True
+C1 oracle coverage slope 0.995 intercept 0.990 True
+C2 overconfident slope 0.514 ci [0.37949797688784187, 0.6553631104862397] True
+SELFTEST PASS
+rc=0
+## --selftest --mutate（実装の変異: 傾きの計算で y を p>0.5 に置き換える。条件の文と違う）
+C3 logistic recovery [-0.321, 0.805, -1.194] True
+C4 rocket deterministic/constant True True
+C1 oracle coverage slope 0.000 intercept 0.990 False
+C2 overconfident slope 5475.519 ci [502.0086926612036, 5803.827946656483] False
+SELFTEST FAIL
+rc=1
+## 条件どおりの変異（傾きの計算で y と p を取り違える・事後・scripts/posthoc/mutate_swap.py）
+C3 logistic recovery [-0.321, 0.805, -1.194] True
+C4 rocket deterministic/constant True True
+C1 oracle coverage slope 0.000 intercept 0.990 False
+C2 overconfident slope 0.043 ci [0.03137575933257944, 0.05586163670642474] False
+SELFTEST FAIL
+rc=1
+## 事後の確かめ（scripts/posthoc/posthoc_check.py）
+probes 1494 feat の最初の行が窓の右端より後 0
+B1 logit(p) の SD 0.059 推定 1001 収束しない 0
+M1 logit(p) の SD 0.177 推定 1001 収束しない 0

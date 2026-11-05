@@ -1,0 +1,19 @@
+probes 1494 feat の最初の行が窓の右端より後 0
+y_real primary B1 True M1 True M2 True
+y_real subject_holdout B1 True M1 True M2 True
+y_real rolling 3 B1 True M1 True M2 True
+y_real rolling 4 B1 True M1 True M2 True
+y_real rolling 5 B1 True M1 True M2 True
+y_real rolling 6 B1 True M1 True M2 True
+y_real rolling 7 B1 True M1 True M2 True
+y_real rolling 8 B1 True M1 True M2 True
+y_real rolling 9 B1 True M1 True M2 True
+y_syn primary B1 True M1 True M2 True
+y_syn subject_holdout B1 True M1 True M2 True
+y_syn rolling 3 B1 True M1 True M2 True
+y_syn rolling 4 B1 True M1 True M2 True
+y_syn rolling 5 B1 True M1 True M2 True
+y_syn rolling 6 B1 True M1 True M2 True
+y_syn rolling 7 B1 True M1 True M2 True
+y_syn rolling 8 B1 True M1 True M2 True
+y_syn rolling 9 B1 True M1 True M2 True

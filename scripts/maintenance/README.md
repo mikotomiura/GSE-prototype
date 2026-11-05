@@ -19,7 +19,7 @@
 
 | ファイル | 何 |
 |---|---|
-| `gse-cargo-sweep.sh` | ★ 週次掃除の**正本**。`~/.local/bin/` の同名ファイルはここからの複製 |
+| `gse-cargo-sweep.sh` | ★ 定期掃除 (毎日・3 日より古い成果物) の**正本**。`~/.local/bin/` の同名ファイルはここからの複製 |
 | `install-cargo-sweep-launchd.sh` | 導入 / 再導入 / `--verify` 検査。★ **冪等** |
 
 ## 使い方
@@ -44,7 +44,7 @@ bash scripts/maintenance/install-cargo-sweep-launchd.sh
 
 | 何が起きたか | どう見えたか |
 |---|---|
-| `cargo-sweep` が実機から失われた | 週次ジョブは毎回 `exit 1`。★ ログを開くまで無症状。⚠️ CI 側のガードも「未導入のためスキップ」と echo して**素通り**していた |
+| `cargo-sweep` が実機から失われた | 定期ジョブは毎回 `exit 1`。★ ログを開くまで無症状。⚠️ CI 側のガードも「未導入のためスキップ」と echo して**素通り**していた |
 | `~/.cargo/bin/*` の 13 個が全部 `rustup` への symlink で、**`rustup` 本体だけが消えた** | `ls ~/.cargo/bin/` には `cargo` が**見える**のに、実行すると `no such file or directory`。★ `file ~/.cargo/bin/cargo` が `broken symbolic link` と言って初めて分かる。⚠️ toolchain 実体 (`~/.rustup/toolchains/*/bin/cargo`) は無事だった |
 
 ★ 教訓: **「ファイルがある」と「動く」は別**。検査は必ず*実行できるか*まで見る。
@@ -53,8 +53,8 @@ bash scripts/maintenance/install-cargo-sweep-launchd.sh
 
 | | いつ | 範囲 | 目的 |
 |---|---|---|---|
-| `scripts/maintenance/` (launchd) | 週次 | 実機全体 (ローカルクローン ＋ ランナー workspace) | **予防** |
+| `scripts/maintenance/` (launchd) | 毎日 | 実機全体 (ローカルクローン ＋ 全ワークツリー ＋ ランナー workspace) | **予防** |
 | `.github/actions/disk-guard` | ジョブごと | その run の workspace のみ | **直前の救命** |
 
-⚠️ 片方だけでは足りない。週次は「CI が動いていない時間」にしか走れず、
+⚠️ 片方だけでは足りない。定期掃除は「CI が動いていない時間」にしか走れず、
 ジョブ内ガードは「他のディレクトリ」を掃除できない。

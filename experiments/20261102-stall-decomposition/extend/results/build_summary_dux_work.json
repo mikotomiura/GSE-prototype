@@ -1,0 +1,29 @@
+{
+ "sessions": 32,
+ "held_rows_skipped": 224220,
+ "tab_as_nav": false,
+ "inputs_sha256": [
+  "8909dc6286cbfba32f615688d11e73c8873b97b0f7efad8d3cdf56e5096c63bf",
+  "5879bea5977903a772393bee2d85e8879df871912d8105ff786823529e87a22b"
+ ],
+ "attempted": 32,
+ "status": {
+  "ok": 32
+ },
+ "stats_sum_ok": {
+  "presses": 35179,
+  "repeat_excluded": 3377,
+  "anonymized": 77,
+  "other": 91,
+  "modified_to_other": 32,
+  "release_paired": 35161,
+  "release_synth": 18,
+  "release_orphan": 14
+ },
+ "excluded_by_condition": {},
+ "replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+ "holdout_sha256": "0caa29e88d3bf056df55f2c0da0a78a011cafbae46809ec3e35e565633c86e00",
+ "add_feat_sha256": "f8d402dd1ecd5400e9c7700cd6385d59198023ae025b4390d6494d66e01ec2a7",
+ "converter_sha256": "60a29d285a2de6be58194c8745ffae661206e8395a11dd482290d4a3631608a7",
+ "build_sha256": "2f93243ba2fccb087d80828bea59d5825fd4b030f496aac84c38d1f97e4a98c3"
+}

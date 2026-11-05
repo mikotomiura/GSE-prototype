@@ -1,0 +1,13 @@
+{
+ "klicke": {
+  "writers_loaded": 3494,
+  "holdout_skipped_in_tar": 1498,
+  "excluded_obs_lt_10min": 60
+ },
+ "coauthor": {
+  "writers_loaded": 43,
+  "sessions_loaded": 1157,
+  "excluded_obs_lt_10min": 2,
+  "sessions_eligible": 1155
+ }
+}

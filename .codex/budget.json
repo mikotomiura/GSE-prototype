@@ -15,7 +15,8 @@
   "_comment_2026_10_11_eh3_impl_raise": "2026-10-11: daily_token_budget を 450000 → 600000 へ引き上げた。理由: EH3 の実装タスク (.steering/20261011-portrait-eh3-impl/) の /cross-review が約 6000 行のコードで、3 分割 × 2 巡が要る。当日は他のセッションで 397928 を使っていた（origin/main の台帳）。研究者の許可（memory: 上限は必要に応じて上げてよい・2026-10-01）に従う。today.tokens_used は触っていない。恒久化ではなく、この日の 2 巡の後に 450000 に戻すかは研究者が決める。",
   "_comment_merge_2026_10_11_o1_awake_idle": "2026-10-11: feature/o1-awake-idle-trim に origin/main（PR #348 の後）を merge した際、today が衝突した。共通の起点の today は 10-11 の 221461 / 6 回。origin/main は起点 ＋ 73198 / 2 回 = 294659 / 8、本ブランチは起点 ＋ /cross-review の Codex 3 回（103269 / 3 回）= 324730 / 9 → 和を採った: 221461 ＋ 73198 ＋ 103269 = 397928 / 11 回。",
   "_comment_merge_2026_10_11_eh3_impl": "2026-10-11: docs/portrait-eh3-distribution に origin/main（PR #352 と o1-awake-idle の merge の後）を merge した際に today が衝突した。origin/main の today は 397928 / 11 回で、本ブランチの起点と同じ。本ブランチは起点 ＋ /cross-review の Codex 5 回の記帳（83076 / 2 回）= 481004 / 13 回 → 和は本ブランチの値と同じ。",
-  "daily_token_budget": 600000,
+  "_comment_2026_11_03_mhd_rethink_raise": "2026-11-03: daily_token_budget を 700000 → 800000 へ上げた。理由: ADR-046 の /cross-review 2 巡目の Codex（1 巡目の実消費 49,712・残り 46,879 で足りない）。研究者の明示の選択（AskUserQuestion「上限を上げて両系統で」）。today.tokens_used は触っていない。一次記録: .steering/20261103-gse-mhd-rethink-adr/decisions.md 判断 9。",
+  "daily_token_budget": 800000,
   "_comment_2026_10_10_portrait_round5_raise": "2026-10-10 夜: daily_token_budget を 450000 → 720000 へ一時的に上げた。理由: 肖像の EH1 第 5 回の固定の前の /cross-review 2 巡の Codex 系統を回すため。本ブランチは origin/main（f6bf23ff）から切ったので、today は main に merge された各ブランチの和 561519 / 17 回で、すでに 450000 を超えている。根拠は研究者の既定の指示（上限は必要に応じて上げてよい・memory 10-01）と第 5 回の引き継ぎ §3。today.tokens_used は触っていない。予算ガードの hook が読む main checkout の台帳も同じ理由で 600000 へ上げた。値の根拠: 561519 + 2 回 × 約 4〜8 万 + 30000 ≒ 720000。回した後は 450000 に戻す。一次記録: .steering/20261010-portrait-eh1-round5/decisions.md 判断 3。 → 2 巡を回した後に 450000 へ戻した。実消費は 1 巡目 34,194・2 巡目 35,160（561,519 → 630,873・17 → 19 回）。today は変えていない。",
   "_comment_2026_10_10_portrait_round4_raise": "2026-10-10 夜: daily_token_budget を 450000 → 560000 へ一時的に上げた。理由: 肖像の EH1 第 4 回のまとめの /cross-review 2 巡の Codex 系統を今日回すため。本ブランチの today は 372169 / 11 回（第 3 回までの和を含む）で、1 巡目は通るが 2 巡目の開始時点で 1 回の上限 30000 の残りが足りなくなる見込み。研究者の同日の逐語「上限上げて回していいよ」。today.tokens_used は触っていない。予算ガードの hook が読む main checkout の台帳（434789 / 13 回）も同じ理由で 600000 へ上げた。値の根拠: 372169 + 2 回 × 約 4〜8 万 + 30000 ≒ 560000。回した後は 450000 に戻す。一次記録: .steering/20261010-portrait-eh1-round4/decisions.md 判断 7。 → 2 巡を回した後に 450000 へ戻した。実消費は 1 巡目 30,188・2 巡目 34,169（372,169 → 436,526・11 → 13 回）。today は変えていない。",
   "_comment_merge_2026_10_01_m1_pilot": "2026-10-01: feature/ime-m1-pilot に origin/main（#281 まで）を merge した際、today が衝突した（両側とも同じ日付を共通の起点 199404 / 5 回から別々に記帳）。_comment_merge_2026_09_11 の規則どおり和を採った: 起点 199404 / 5 ＋ 本ブランチ +33557 / +1（M1 の /cross-review の Codex 1 回・_comment_2026_10_01_m1_pr_raise） ＋ origin/main +91770 / +2（docs/ai-fatigue-protocol-cont の /cross-review 2 回） = 324731 / 8 回。一次記録: .steering/20260927-ime-observation-paper-eval-design/decisions.md 判断 83。",
@@ -36,9 +37,9 @@
   "_comment_merge_2026_10_12_public_matching": "2026-10-12: docs/public-keystroke-matching-prereg に origin/main を merge した際、today が衝突した。共通の起点の today は 10-12 の 99497 / 2 回。和を採った: 起点 99497 / 2 ＋ 本ブランチ +101499 / +2（合成の記録の検査の /cross-review 2 巡の Codex） ＋ origin/main +108780 / +4 = 309776 / 8 回。",
   "_comment_merge_2026_10_14_rhythm_stage": "2026-10-14: docs/rhythm-stage-graded-world に origin/main を merge した際、台帳が衝突した。共通の起点（60eb1021）の today は 10-13 の 214879 / 7 回。10-13 は和を採った: 起点 214879 / 7 ＋ 本ブランチ +91960 / +3（背景のステージの第 2 回の /cross-review の Codex） ＋ origin/main +229964 / +4 = 536803 / 14 回を history に入れた。today は本ブランチの 10-14 の 251688 / 8 回（origin/main に 10-14 の記帳は無い）。",
   "today": {
-    "date": "2026-10-14",
-    "tokens_used": 251688,
-    "invocations": 8
+    "date": "2026-11-04",
+    "tokens_used": 74065,
+    "invocations": 2
   },
   "history": [
     {
@@ -290,6 +291,26 @@
       "date": "2026-10-13",
       "tokens_used": 536803,
       "invocations": 14
+    },
+    {
+      "date": "2026-10-14",
+      "tokens_used": 251688,
+      "invocations": 8
+    },
+    {
+      "date": "2026-11-01",
+      "tokens_used": 46255,
+      "invocations": 1
+    },
+    {
+      "date": "2026-11-02",
+      "tokens_used": 188599,
+      "invocations": 5
+    },
+    {
+      "date": "2026-11-03",
+      "tokens_used": 699268,
+      "invocations": 12
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。 ★★★ 2026-09-21 訂正（研究者判断・blockers.md 起票 22）: ⚠️ **上の『実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)』は誤りである。** ★ 回転させるコードは scripts/run-codex-review.sh の `d['history'] = sorted(...)[-30:]` に在った。★ 2026-09-21 に実測: 日付が 09-20 → 09-21 へ変わった最初の記帳で、歴代最古の 2026-08-12 (25290 / 1 回) が実際に消えた。→ ★ 切り捨てを外し、消えた 1 件を実測値で戻した。★ history の件数上限は【置かない】と裁定した（研究者判断 2026-09-21）。⚠️ 本文は当時の記録として残してあるので、この訂正と併せて読むこと。",

@@ -8,9 +8,11 @@ GSE doesn't read your mind. It reads *keystroke dynamics* (key timing and key ty
 whether to offer an invitation to step away from the screen now, or to stay out of the way. The invitation never measures whether you started or finished.
 
 > **Status:** GSE itself shows **no intervention by default**. Nudge remains in the code but is off by default
-> ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)); the invitation glyph runs in the EH3 study mode and in the normal mode's week 2 (session declaration "第2週 (招待)"; not in week 1, O1 or G1). The full-screen Wall and Monk Mode
-> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Physical Anchor
-> is **designed but not implemented** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)).
+> ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). The full-screen Wall and Monk Mode
+> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)). The invitation to physical return
+> (the PC side of Physical Anchor) runs as a glyph in the EH3 study mode and in the normal mode's week 2 (session declaration "第2週 (招待)"; not in week 1, O1 or G1). Walking promotion and its measurement are
+> not pursued (2026-11-03); what follows the invitation is read from work after a candidate away gap (typing resumes, whether
+> an external answer is received, window focus changes, and pointer activity) ([ADR-024](docs/adr/ADR-024-resumption-outcome-without-estimator.md)).
 >
 > **Direction as of 2026-10-31:** Nudge will no longer be shown as an intervention in GSE itself; the core intervention
 > becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). Nudge is now off by default;
@@ -103,7 +105,7 @@ Matrices, β baselines, quantization, and the tuning history live in **[Design H
 | Level | Trigger | Effect | Dismiss |
 |---|---|---|---|
 | **Nudge** | `action == nudge` | Small click-through side card; opacity scales with Need | auto-dismisses |
-| **Physical Anchor** | *not implemented* | An invitation to step away from the screen | — |
+| **Physical Anchor** (invitation) | EH3 study mode (normal mode: separate task) | An invitation to step away from the screen | closes after 60 s |
 | ~~**Wall**~~ | ~~full-screen block~~ | **Removed 2026-08** — see below | — |
 
 **Suppression** (all shipping): `defer` while actively typing (IKI < 2 s), 10-min cooldown,
@@ -115,8 +117,8 @@ suppressing is narrower than that ("taking the answer as-is"), and a screen bloc
 `wall_server.rs`, the QR/phone-unlock path, Monk Mode, the Zen Timer, and early unlock were all
 removed; **HIR (harmful-intervention rate) was kept** — only its target set changed.
 
-**Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is the level that
-actually imposes effort, and it is **not implemented yet**.
+**Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is an invitation
+to step away from the screen. Its PC-side invitation runs in the EH3 study mode; walking promotion and its measurement are not pursued (2026-11-03), and what follows is read from work after a candidate away gap: typing, focus changes, and pointer activity (ADR-024, ADR-023 D4, ADR-016).
 **The system judges neither the start nor the completion of it**
 ([ADR-018](docs/adr/ADR-018-physical-anchor-without-completion.md)): there is no threshold on how
 long you stay away or how you come back, and **no timer, countdown, or remaining-time display**.
