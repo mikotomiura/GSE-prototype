@@ -12,5 +12,6 @@ shasum -a 256 \
   experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py \
   experiments/20261031-coauthor-pre-request-signal/scripts/convert.py \
   experiments/20261031-coauthor-pre-request-signal/scripts/add_feat.py \
-  src-tauri/prereg/p1-episode.json > "$E/confirm-manifest.sha256"
+  src-tauri/prereg/p1-episode.json \
+  .steering/20261105-public-data-findings-paper/paper-write/prereg-draft.md > "$E/confirm-manifest.sha256"
 shasum -a 256 "$E/confirm-manifest.sha256"

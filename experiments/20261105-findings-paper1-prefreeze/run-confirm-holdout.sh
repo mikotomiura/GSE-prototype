@@ -34,13 +34,18 @@ die() { echo "$1" >&2; exit 1; }
 [ "$("$PY" -m pip freeze)" = "$(cat "$EXP_DIR/requirements-confirm.txt")" ] || die "環境が requirements-confirm.txt と違う"
 [ -z "$(git -C "$REPO_ROOT" status --porcelain)" ] || die "作業ツリーがきれいでない（コミットしてから走らせる）"
 # パイプにしない（pipefail の下では grep -q が先に抜けると git log が SIGPIPE で終わり、一致があっても偽になる）
+# 完走の記録があれば、理由があっても止める（結果は最初の完走だけ・P10）
+[ -z "$(git -C "$REPO_ROOT" log --all --format=%H --grep='^取り置きの確認の完走' -n 1)" ] || die "完走の記録がある（2 回目は回さない・P10）"
 if [ -n "$(git -C "$REPO_ROOT" log --all --format=%H --grep='^取り置きの確認の開始' -n 1)" ]; then
   [ -n "${CONFIRM_RERUN_REASON:-}" ] || die "前の開始の記録がある（最初の完走だけを使う・P10。再実行は CONFIRM_RERUN_REASON に理由を書いて逸脱として）"
 fi
 if [ -e "$OUT" ]; then
   [ ! -e "$OUT/confirm_holdout.json" ] || die "取り置きの結果が既にある（最初の完走だけを使う・P10）"
   [ -n "${CONFIRM_RERUN_REASON:-}" ] || die "途中で止まった前の走りがある。直した後の再実行は CONFIRM_RERUN_REASON に理由を書く（逸脱）"
-  mv "$OUT" "$OUT.failed.$(date -u +%Y%m%dT%H%M%SZ)"
+  FAILED_DIR="$OUT.failed.$(date -u +%Y%m%dT%H%M%SZ)"
+  mv "$OUT" "$FAILED_DIR"
+  git -C "$REPO_ROOT" add -A "$EXP_REL/$(basename "$OUT")" "$EXP_REL/$(basename "$FAILED_DIR")"
+  git -C "$REPO_ROOT" commit -q -m "取り置きの確認の前の走りを退避（$EXP_REL/$(basename "$FAILED_DIR")・理由: $CONFIRM_RERUN_REASON）[skip ci]"
 fi
 
 # 2. 開始の記録（コミットしてから計算に入る）
@@ -50,8 +55,15 @@ mkdir -p "$OUT"
 git -C "$REPO_ROOT" add "$EXP_REL/results_holdout/start.json"
 git -C "$REPO_ROOT" commit -q -m "取り置きの確認の開始（$EXP_REL/results_holdout/start.json）[skip ci]" -- "$EXP_REL/results_holdout/start.json"
 STEP=start
-trap '"$PY" -I -c "import json,sys,datetime;json.dump({\"failed_utc\":datetime.datetime.now(datetime.timezone.utc).isoformat(),\"step\":sys.argv[1]},open(sys.argv[2],\"w\"),indent=1)" "$STEP" "$OUT/failed.json"; echo "途中で止まった（$STEP）。直さずに記録し、研究者に聞く（P10）" >&2' ERR
-trap 'echo "中断された（$STEP）" >&2; "$PY" -I -c "import json,sys;json.dump({\"interrupted_step\":sys.argv[1]},open(sys.argv[2],\"w\"))" "$STEP" "$OUT/failed.json"; exit 130' INT TERM
+# 止まったら、止まった段を failed.json に書いて、そのままコミットする（中断の記録・P10）
+record_failure() {
+  "$PY" -I -c "import json,sys,datetime;json.dump({'failed_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'step':sys.argv[1],'kind':sys.argv[2]},open(sys.argv[3],'w'),indent=1)" "$STEP" "$1" "$OUT/failed.json" || true
+  git -C "$REPO_ROOT" add "$EXP_REL/results_holdout" || true
+  git -C "$REPO_ROOT" commit -q -m "取り置きの確認の中断（段: $STEP・$1）[skip ci]" -- "$EXP_REL/results_holdout" || true
+  echo "途中で止まった（$STEP）。直さずに記録し、研究者に聞く（P10）" >&2
+}
+trap 'record_failure error' ERR
+trap 'record_failure interrupted; exit 130' INT TERM
 
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 unset CONFIRM_SMOKE
@@ -64,6 +76,8 @@ SKIP="$CS1/skip_seen_2019.json"
 rm -rf "$WORK"
 "$PY" -I "$REPO_ROOT/experiments/20261104-cs1-landscape/scripts/build_cs1.py" 2019 "$K19" "$BIN" "$SKIP" "$WORK" "${JOBS:-6}"
 cp "$WORK/build_summary.json" "$OUT/build_summary_holdout.json"
+# 取り置きの書き手が全員読まれたか（変換で読んだ書き手の数 = 取り置きの一覧の人数）
+"$PY" -I -c "import json,sys;b=json.load(open(sys.argv[1]));h=json.load(open(sys.argv[2]))['2019'];sys.exit(0 if b['writers_read']==len(h) else '取り置きの書き手の数が合わない: %d / %d'%(b['writers_read'],len(h)))" "$WORK/build_summary.json" "$CS1/holdout.json"
 # 4. 感度の中間（陽性対照つき）
 STEP=build_variants
 bash "$EXP_DIR/build-variants.sh" "$WORK" "$PY" "$BIN" "${JOBS:-6}"
@@ -73,6 +87,11 @@ for v in q995 w15 w60; do cp "${WORK}_$v/rebuild_summary.json" "$OUT/rebuild_sum
 STEP=confirm
 "$PY" -I "$EXP_DIR/scripts/confirm_p1.py" holdout "$WORK" "$CS1/holdout.json" 20261106 "$OUT"
 STEP=provenance
-"$PY" -I -c "import json,sys,datetime;json.dump({'git_head':sys.argv[1],'finished_utc':datetime.datetime.now(datetime.timezone.utc).isoformat()},open(sys.argv[2],'w'),indent=1)" "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$OUT/provenance_holdout.json"
+"$PY" -I -c "import json,sys,datetime,hashlib;h=lambda p:hashlib.sha256(open(p,'rb').read()).hexdigest();json.dump({'git_head':sys.argv[1],'finished_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'confirm_holdout_sha256':h(sys.argv[2]),'manifest_sha256':h(sys.argv[3])},open(sys.argv[4],'w'),indent=1)" \
+  "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$OUT/confirm_holdout.json" "$EXP_DIR/confirm-manifest.sha256" "$OUT/provenance_holdout.json"
+# 完走の記録（手順がコミットする。結果は集計値だけで、書き手ごとの値を含まない）
+STEP=commit
+git -C "$REPO_ROOT" add "$EXP_REL/results_holdout"
+git -C "$REPO_ROOT" commit -q -m "取り置きの確認の完走（$EXP_REL/results_holdout）[skip ci]" -- "$EXP_REL/results_holdout"
 trap - ERR INT TERM
-echo "完走した。results_holdout/ をコミットする（値は書き手ごとのものを含まない）。"
+echo "完走した。results_holdout/ をコミットした。"
