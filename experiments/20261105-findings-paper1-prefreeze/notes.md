@@ -118,3 +118,10 @@
 - 照合は全て通った。較正の外の鍵の値は 1,171 個すべて計算 6 と同じ。変わったのは較正の 19 個（種の作りを変えたため）。
 - 信号ごとの分岐 1（両方の ε）の割合: 非復元で 0.55 のとき `d_p_stuck` 1.2%・`d_ewma_x` 1.4%、0.45 で 0%・0.6%。復元で 0.55 のとき 5.2%・3.0%、0.45 で 2.4%・3.2%。
 - 最も不利な配置（片方が境・片方が 0.50）での H1 の判定の割合は信号ごとの割合と同じ（復元で最大 5.2%・非復元で最大 1.4%）。両方が境の配置は復元で 0.6% 以下。名目の片側 2.5% を超え、通常の TOST（片側 5%）と同じほど。規則は変えず、P10 と付録 C にこの値で書く（判断 21）。
+
+# 凍結（OSF の 1 つ目の登録・2026-11-06）
+
+- 凍結の版: commit 63885bad（草案 v10・英語版を正）。manifest `confirm-manifest.sha256` の SHA-256 `9a1a7f1499a230a1ee89f17c0c8cd346b96b62d83fe3e65858643a378628da9b`（19 行・全行 OK）。
+- OSF: プロジェクト `https://osf.io/cm4ru`（非公開）から Open-Ended Registration `https://osf.io/mrkxt` を作った。`date_registered` 2026-11-05T21:56:19Z（日本時間 11-06 06:56）。管理者の承認のメールのリンクで承認し、公開（`public: true`・承認待ちなし・embargo なし）。ライセンス CC BY 4.0・分野 Educational Assessment, Evaluation, and Research。
+- 添えたファイル（登録に写された版の SHA-256 を API で読み、手元の値と全桁で照合した）: `preregistration-paper1-v10-en.md` 91450ffb…58d7b1・`preregistration-paper1-v10-ja.md` b3a3b36d…cf7ddd・`english-version-check.md` e445394e…de95c2・`confirm-manifest.sha256` 9a1a7f14…28da9b・`frozen-files-63885bad.zip` 3c22b129…7617ac（63885bad から `git archive` で manifest の全ファイルと manifest と文献の記録を切り出したもの。解いて manifest の全行が OK）。
+- 操作は研究者の承諾（2026-11-06「osfはclaude in chromeで自動で操作して.チェックなどもokです」「全てやっといて」）のもとで、Claude in Chrome から OSF の API と Gmail の承認のリンクで行った。
