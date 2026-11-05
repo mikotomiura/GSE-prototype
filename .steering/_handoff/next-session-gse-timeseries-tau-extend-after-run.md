@@ -13,7 +13,7 @@
 ## 1 取り込み
 
 1. `git -C /Users/johnd/GSE-prototype-tau-extend fetch origin` の後、`git -C /Users/johnd/GSE-prototype-tau-extend log --oneline HEAD..origin/exp/gse-timeseries-tau-extend` で、職場の PC の結果のコミット（`docs(experiments): timeseries-tau-extend の本計算の結果（HP Z2） [skip ci]` と、引き継ぎ §7 の追記）が上がっているかを見る。上がっていなければ、研究者に職場の PC の状態を聞いて止まる（推測で進めない）。
-2. Mac にはまだ push していないコミットが 2 つある（`f15d4b2b`・notes.md の骨組み・結果の前に書いた／このメモの追加）。職場の PC のコミットは `results/` と引き継ぎの §7 だけを変えるので、重ならない。`git -C /Users/johnd/GSE-prototype-tau-extend rebase origin/exp/gse-timeseries-tau-extend` で載せ直す。私から rebase が拒否されたら、研究者に `! git -C /Users/johnd/GSE-prototype-tau-extend rebase origin/exp/gse-timeseries-tau-extend` を頼む。
+2. Mac にはまだ push していないコミットが 3 つある（`f15d4b2b`・notes.md の骨組み・結果の前に書いた／このメモの追加／§5 の 6 の追記）。職場の PC のコミットは `results/` と引き継ぎの §7 だけを変えるので、重ならない。`git -C /Users/johnd/GSE-prototype-tau-extend rebase origin/exp/gse-timeseries-tau-extend` で載せ直す。私から rebase が拒否されたら、研究者に `! git -C /Users/johnd/GSE-prototype-tau-extend rebase origin/exp/gse-timeseries-tau-extend` を頼む。
 3. 職場の PC が push できず、Drive の `GSE_ML_run` に results の zip を置いた場合は、研究者から受け取り、`experiments/20261104-timeseries-tau-extend/results/` に展開する（改行コードの違いと `results/mutations/` の有無に注意）。
 
 ## 2 結果を読む前の確かめ（1 つでも外れれば notes に進まず、研究者に報告）
@@ -45,6 +45,7 @@
 3. コミット。push と PR は研究者が確かめてから（`[skip ci]`）。
 4. PR の注意: この枝は前回の試験の枝 `exp/gse-coauthor-ml-improve`（main に未マージ・PR 無し）の上に立っているので、PR を出すと前回の試験も一緒に main に入る。ADR-047 Context 3 は前回の notes を引いているので、入るのは望ましい。ただし枝の差分に `.codex/budget.json` が含まれる（前回の枝のコミット由来）。PR の前に、main の `.codex/budget.json` と食い違わないかを確かめ、食い違えば研究者に扱いを聞く。
 5. 次の問いにつなぐ引き継ぎを書く（時系列の段の組み方の材料・ADR-046 D3・ADR-047 D2）。
+6. 論文にする（2026-11-05 に研究者が決めた）: この試験の結果で「1 人ごとに学ぶ効きは、構造を良くすると小さい」が仮説と同じ向きに出たら、前回の試験（`experiments/20261104-coauthor-ml-improve/`・`20261103-coauthor-per-person/`）と合わせて、方法の短い論文として書く。notes とレビューを閉じた後、別の worktree・別のセッションで始める（`paper-write` Skill の Step 0〜1。誰に読ませて何を変えるかを研究者に聞いてから投稿先を選ぶ・無料の道を既定にする）。結果が仮説と違う向きなら、論文にするかを研究者に聞く。公開データの知見の論文（手前の信号の不在・停滞の形・`/Users/johnd/GSE-prototype/.steering/_handoff/next-session-gse-public-data-findings-paper.md`）とは別の論文で、その論文が「1 人ごとの学習」を扱わないように境を合わせる。
 
 ## 6 守ること
 
