@@ -280,9 +280,9 @@
    "n": 11887
   },
   "control": {
-   "floor_lt_002": 0.6241405341440026,
-   "ceiling_gt_098": 4.080550058147838e-05,
-   "n": 49013
+   "floor_lt_002": 0.6241482025543722,
+   "ceiling_gt_098": 4.080466805402538e-05,
+   "n": 49014
   }
  },
  "H2": {
@@ -292,7 +292,7 @@
   "targets": 16126,
   "targets_with_positive_window": 14475,
   "share_targets_with_positive": 0.8976187523254372,
-  "windows_excluded": 876089,
+  "windows_excluded_long_pause": 876089,
   "d_p_stuck": {
    "unmatched_ci_width": 0.007067673556398313,
    "matched_ci_width": 0.007114342591150569,
@@ -327,6 +327,9 @@
   "n_rep": 200,
   "window_control_rows": 88360,
   "gate_recovery": {
+   "target": 0.58,
+   "reached_auc": 0.5800003870076802,
+   "calibrated": true,
    "logreg": {
     "recovered_lower_gt_055": true,
     "boot_failures": 0
@@ -626,7 +629,7 @@
     "targets": 16126,
     "targets_with_positive_window": 13953,
     "share_targets_with_positive": 0.8652486667493489,
-    "windows_excluded": 883781,
+    "windows_excluded_long_pause": 883781,
     "d_p_stuck": {
      "unmatched_ci_width": 0.009252309919173807,
      "matched_ci_width": 0.00901807656976994,
@@ -653,7 +656,7 @@
     "targets": 16126,
     "targets_with_positive_window": 14917,
     "share_targets_with_positive": 0.9250279052461863,
-    "windows_excluded": 859801,
+    "windows_excluded_long_pause": 859801,
     "d_p_stuck": {
      "unmatched_ci_width": 0.00557211215967135,
      "matched_ci_width": 0.006134586362103733,
@@ -680,7 +683,7 @@
     "targets": 16126,
     "targets_with_positive_window": 9158,
     "share_targets_with_positive": 0.5679027657199553,
-    "windows_excluded": 876089,
+    "windows_excluded_long_pause": 876089,
     "d_p_stuck": {
      "unmatched_ci_width": 0.011324116756592562,
      "matched_ci_width": 0.014622790195125912,
@@ -707,7 +710,7 @@
     "targets": 16126,
     "targets_with_positive_window": 15458,
     "share_targets_with_positive": 0.9585762123279177,
-    "windows_excluded": 183730,
+    "windows_excluded_long_pause": 183730,
     "d_p_stuck": {
      "unmatched_ci_width": 0.007283657098161811,
      "matched_ci_width": 0.006761575512133244,
@@ -734,7 +737,7 @@
     "targets": 16126,
     "targets_with_positive_window": 14832,
     "share_targets_with_positive": 0.9197569142998884,
-    "windows_excluded": 564946,
+    "windows_excluded_long_pause": 564946,
     "d_p_stuck": {
      "unmatched_ci_width": 0.006916859474578041,
      "matched_ci_width": 0.007400919377853421,
@@ -799,7 +802,7 @@
     "targets": 16126,
     "targets_with_positive_window": 14475,
     "share_targets_with_positive": 0.8976187523254372,
-    "windows_excluded": 876089,
+    "windows_excluded_long_pause": 876089,
     "d_p_stuck": {
      "unmatched_ci_width": 0.005284102065339913,
      "matched_ci_width": 0.005343765324621441,
@@ -866,7 +869,7 @@
     "targets": 16126,
     "targets_with_positive_window": 14468,
     "share_targets_with_positive": 0.897184670718095,
-    "windows_excluded": 876089,
+    "windows_excluded_long_pause": 876089,
     "d_p_stuck": {
      "unmatched_ci_width": 0.00879635537878376,
      "matched_ci_width": 0.00925024262043489,
@@ -935,7 +938,7 @@
     "targets": 15899,
     "targets_with_positive_window": 13992,
     "share_targets_with_positive": 0.8800553493930436,
-    "windows_excluded": 876089,
+    "windows_excluded_long_pause": 876089,
     "d_p_stuck": {
      "unmatched_ci_width": 0.006901421206293112,
      "matched_ci_width": 0.00761307110105236,
@@ -1010,7 +1013,7 @@
     "targets": 10338,
     "targets_with_positive_window": 9235,
     "share_targets_with_positive": 0.8933062487908686,
-    "windows_excluded": 876089,
+    "windows_excluded_long_pause": 876089,
     "d_p_stuck": {
      "unmatched_ci_width": 0.008568723342254725,
      "matched_ci_width": 0.008558381545505978,
@@ -1085,7 +1088,7 @@
     "targets": 20816,
     "targets_with_positive_window": 18750,
     "share_targets_with_positive": 0.9007494235203689,
-    "windows_excluded": 876089,
+    "windows_excluded_long_pause": 876089,
     "d_p_stuck": {
      "unmatched_ci_width": 0.006177944102837785,
      "matched_ci_width": 0.0066410735240804986,
@@ -1160,7 +1163,7 @@
     "targets": 11022,
     "targets_with_positive_window": 9792,
     "share_targets_with_positive": 0.8884050081654872,
-    "windows_excluded": 876089,
+    "windows_excluded_long_pause": 876089,
     "d_p_stuck": {
      "unmatched_ci_width": 0.008856916931450742,
      "matched_ci_width": 0.009426742161616042,
@@ -1641,34 +1644,46 @@
    "target_0.45": {
     "eq_eps_0.001": 0.004,
     "eq_both_eps": 0.0,
-    "precision_insufficient": 0.0
+    "precision_insufficient": 0.0,
+    "reached_auc": 0.45000002359802926,
+    "calibrated": true
    },
    "target_0.50": {
     "eq_eps_0.001": 1.0,
     "eq_both_eps": 1.0,
-    "precision_insufficient": 0.0
+    "precision_insufficient": 0.0,
+    "reached_auc": 0.4999997640197072,
+    "calibrated": true
    },
    "target_0.55": {
     "eq_eps_0.001": 0.016,
     "eq_both_eps": 0.016,
-    "precision_insufficient": 0.0
+    "precision_insufficient": 0.0,
+    "reached_auc": 0.5500002123822635,
+    "calibrated": true
    }
   },
   "d_ewma_x": {
    "target_0.45": {
     "eq_eps_0.001": 0.002,
     "eq_both_eps": 0.002,
-    "precision_insufficient": 0.0
+    "precision_insufficient": 0.0,
+    "reached_auc": 0.45000002359802926,
+    "calibrated": true
    },
    "target_0.50": {
     "eq_eps_0.001": 1.0,
     "eq_both_eps": 1.0,
-    "precision_insufficient": 0.0
+    "precision_insufficient": 0.0,
+    "reached_auc": 0.5,
+    "calibrated": true
    },
    "target_0.55": {
     "eq_eps_0.001": 0.002,
     "eq_both_eps": 0.002,
-    "precision_insufficient": 0.0
+    "precision_insufficient": 0.0,
+    "reached_auc": 0.5499999764019707,
+    "calibrated": true
    }
   }
  }

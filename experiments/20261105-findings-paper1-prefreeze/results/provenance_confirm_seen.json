@@ -1,5 +1,5 @@
 {
- "git_head": "b51f3afabf5e1d56a94bc80b71d80e172db305ce",
+ "git_head": "546d132e7428efc9a97ff98313a24de4b9f3ca75",
  "git_dirty_paths": [
   " M experiments/20261105-findings-paper1-prefreeze/results/confirm_seen.json"
  ],
@@ -17,7 +17,6 @@
   "experiments/20261031-coauthor-pre-request-signal/scripts/convert.py: OK",
   "experiments/20261031-coauthor-pre-request-signal/scripts/add_feat.py: OK",
   "src-tauri/prereg/p1-episode.json: OK",
-  ".steering/20261105-public-data-findings-paper/paper-write/prereg-draft.md: FAILED",
-  "shasum: WARNING: 1 computed checksum did NOT match"
+  ".steering/20261105-public-data-findings-paper/paper-write/prereg-draft.md: OK"
  ]
 }
