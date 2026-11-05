@@ -40,6 +40,6 @@
 - [x] 主張と新規性の初回案（Step 1）→ /reimagine → 比べて確定（判断 9・`paper-write/outline.md`）
 - [x] 事前登録の草案（判断 10・`paper-write/prereg-draft.md`）
 - [x] attack-me round 1（Codex あり・major・判断 11）→ 草案 v2
-- [ ] 凍結の前の計算 2 つ（幅の換算・CS1 2019 の見た 319 人での精度の見積もり）→ 草案に値を入れる
+- [x] 凍結の前の計算 2 つ（`experiments/20261105-findings-paper1-prefreeze/`）→ 草案 v3 に値・付録 A・版を入れる（判断 12）
 - [ ] attack-me round 2 → OSF で凍結
 - [ ] 計算（Mac）
