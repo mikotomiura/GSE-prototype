@@ -33,7 +33,8 @@ die() { echo "$1" >&2; exit 1; }
 [ "$("$PY" -I -c 'import sys;print(sys.version.split()[0])')" = 3.14.4 ] || die "Python の版が違う"
 [ "$("$PY" -m pip freeze)" = "$(cat "$EXP_DIR/requirements-confirm.txt")" ] || die "環境が requirements-confirm.txt と違う"
 [ -z "$(git -C "$REPO_ROOT" status --porcelain)" ] || die "作業ツリーがきれいでない（コミットしてから走らせる）"
-if git -C "$REPO_ROOT" log --format=%s | grep -q "^取り置きの確認の開始"; then
+# パイプにしない（pipefail の下では grep -q が先に抜けると git log が SIGPIPE で終わり、一致があっても偽になる）
+if [ -n "$(git -C "$REPO_ROOT" log --all --format=%H --grep='^取り置きの確認の開始' -n 1)" ]; then
   [ -n "${CONFIRM_RERUN_REASON:-}" ] || die "前の開始の記録がある（最初の完走だけを使う・P10。再実行は CONFIRM_RERUN_REASON に理由を書いて逸脱として）"
 fi
 if [ -e "$OUT" ]; then
@@ -50,8 +51,12 @@ git -C "$REPO_ROOT" add "$EXP_REL/results_holdout/start.json"
 git -C "$REPO_ROOT" commit -q -m "取り置きの確認の開始（$EXP_REL/results_holdout/start.json）[skip ci]" -- "$EXP_REL/results_holdout/start.json"
 STEP=start
 trap '"$PY" -I -c "import json,sys,datetime;json.dump({\"failed_utc\":datetime.datetime.now(datetime.timezone.utc).isoformat(),\"step\":sys.argv[1]},open(sys.argv[2],\"w\"),indent=1)" "$STEP" "$OUT/failed.json"; echo "途中で止まった（$STEP）。直さずに記録し、研究者に聞く（P10）" >&2' ERR
+trap 'echo "中断された（$STEP）" >&2; "$PY" -I -c "import json,sys;json.dump({\"interrupted_step\":sys.argv[1]},open(sys.argv[2],\"w\"))" "$STEP" "$OUT/failed.json"; exit 130' INT TERM
 
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+unset CONFIRM_SMOKE
+STEP=selftest
+"$PY" -I "$EXP_DIR/scripts/confirm_p1.py" --selftest
 # 3. 取り置きの書き手だけの中間（見た書き手を読み飛ばす一覧を渡す。ID は repo の外にだけ置く）
 STEP=build
 SKIP="$CS1/skip_seen_2019.json"
@@ -69,5 +74,5 @@ STEP=confirm
 "$PY" -I "$EXP_DIR/scripts/confirm_p1.py" holdout "$WORK" "$CS1/holdout.json" 20261106 "$OUT"
 STEP=provenance
 "$PY" -I -c "import json,sys,datetime;json.dump({'git_head':sys.argv[1],'finished_utc':datetime.datetime.now(datetime.timezone.utc).isoformat()},open(sys.argv[2],'w'),indent=1)" "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$OUT/provenance_holdout.json"
-trap - ERR
+trap - ERR INT TERM
 echo "完走した。results_holdout/ をコミットする（値は書き手ごとのものを含まない）。"

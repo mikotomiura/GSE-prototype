@@ -13,7 +13,7 @@ RB="$HERE/scripts/rebuild_onsets.py"
 CTRL="${WORK}_control"
 rm -rf "$CTRL"
 "$PY" -I "$RB" "$WORK" "$CTRL" "$BIN" "$JOBS"
-"$PY" -I -c "import json,sys;s=json.load(open(sys.argv[1]));sys.exit(0 if s['same_as_input']==s['units']==s['ok'] and s['stderr_nonempty']==0 and not s['overrides'] else '陽性対照が崩れた: '+json.dumps(s))" "$CTRL/rebuild_summary.json"
+"$PY" -I -c "import json,sys;s=json.load(open(sys.argv[1]));sys.exit(0 if s['units']>0 and s['same_as_input']==s['units']==s['ok'] and s['stderr_nonempty']==0 and not s['overrides'] else '陽性対照が崩れた: '+json.dumps(s))" "$CTRL/rebuild_summary.json"
 cp "$CTRL/rebuild_summary.json" "${WORK}_control_summary.json"
 rm -rf "$CTRL"
 build() {

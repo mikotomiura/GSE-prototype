@@ -21,6 +21,7 @@ import math
 import os
 import random
 import statistics
+import subprocess
 import sys
 from collections import Counter
 
@@ -572,7 +573,7 @@ def models(seed, which=("logreg", "hgb")):
         "hgb_grid": (lambda: GridSearchCV(HistGradientBoostingClassifier(random_state=seed + 2, early_stopping=False),
                                           {"learning_rate": [0.05, 0.1], "max_depth": [3, None], "max_iter": [100, 300]},
                                           scoring="roc_auc", cv=GroupKFold(n_splits=3, shuffle=True, random_state=seed + 2),
-                                          n_jobs=1),
+                                          n_jobs=1, error_score="raise"),
                      lambda w, g: {"groups": g, "sample_weight": w}),
     }
     return {k: allm[k] for k in which}
@@ -595,7 +596,8 @@ def paired_auc(pred, y, keys, cids):
 
 
 def oof_pred(X, y, wt, split_groups, spec, seed):
-    """書き手でまとめた 5 分割の予測。学習が失敗したら None。"""
+    """書き手でまとめた 5 分割の予測。学習が失敗したら None（失敗 = fit か predict が ValueError を出した回。
+    収束しない警告は失敗に数えない・P6）。"""
     from sklearn.model_selection import GroupKFold
     make, fkw = spec
     pred = np.full(len(y), np.nan)
@@ -614,10 +616,11 @@ def oof_auc(X, y, wt, groups, cells, cids, spec, seed):
     return None if pred is None else paired_auc(pred, y, [(groups[i], cells[i]) for i in range(len(y))], cids)
 
 
-def boot_oof(X, y, wt, groups, cells, cids, spec, seed, n_rep=N_BOOT_ML):
+def boot_oof(X, y, wt, groups, cells, cids, spec, seed, n_rep=None):
     """書き手を復元で引き直すたびに分割と学習をやり直す。写しは元の書き手の番号でまとめ、同じ分割に入れる。
     対は写しの中で作る（写しごとに別の書き手として数える）。引き直しは先に全部決め、各回を並列に回す。"""
     from joblib import Parallel, delayed
+    n_rep = N_BOOT_ML if n_rep is None else n_rep
     rng = np.random.default_rng(seed + 4)
     ids = np.unique(groups)
     idx_by = {g: np.where(groups == g)[0] for g in ids}
@@ -668,8 +671,9 @@ def h3_branch(ci, fails, n_rep, control_ok=True):
     return branch(ci)
 
 
-def h3_summary(writers, writer_rows, writer_h2, seed, hide=True, n_rep=N_BOOT_ML, exclude_missing=False,
+def h3_summary(writers, writer_rows, writer_h2, seed, hide=True, n_rep=None, exclude_missing=False,
                control=True, which=("logreg", "hgb")):
+    n_rep = N_BOOT_ML if n_rep is None else n_rep
     X, y, wt, g, cells, cids, miss = ml_rows(writer_rows, exclude_missing=exclude_missing)
     out = {"rows": int(len(y)), "stalls": int(y.sum()), "missing": miss, "n_rep": n_rep}
     if control:
@@ -917,7 +921,8 @@ def load_cs1(work, hold_p, mode, variant=None):
 
 def h1_run(writers, cfg, seed, hide, feats=False, burst=None, light=True):
     cnt = Counter()
-    rows = [h1_writer(u, random.Random(seed), cnt, cfg, feats=feats, burst=burst) for u in writers]
+    rng = random.Random(seed)  # 主と同じ 1 本の流れ（書き手の順に引く）。対照の候補が同じなら主と同じ対照になる
+    rows = [h1_writer(u, rng, cnt, cfg, feats=feats, burst=burst) for u in writers]
     return rows, {"counts": dict(cnt), "H1": h1_summary(rows, seed, "none", hide, SIGS, light)}
 
 
@@ -976,6 +981,8 @@ def run(mode, argv):
     smoke = os.environ.get("CONFIRM_SMOKE")
     if smoke and os.path.realpath(out).startswith(os.path.realpath(os.path.join(HERE, ".."))):
         sys.exit("試しの走りは実験の dir の外に出す")
+    if mode == "holdout":
+        holdout_gate(out, smoke)
     # 照合は全部、計算の前に終える（P10）
     replay_dirs, replay_chk = {}, {}
     for name in REPLAY_VARIANTS:
@@ -1025,8 +1032,27 @@ def run(mode, argv):
         res["klicke_H1_described"] = {"counts": dict(kcnt)} | h1_summary(krows, seed, "none", False)
         if not smoke:
             res["precision_projection"] = precision_projection(rows, seed)
-    json.dump(res, open(os.path.join(out, "confirm_%s.json" % mode), "w"), indent=1, default=str)
+    dst = os.path.join(out, "confirm_%s.json" % mode)
+    with open(dst + ".tmp", "w") as f:
+        json.dump(res, f, indent=1, default=str)
+    os.replace(dst + ".tmp", dst)  # 書く途中で落ちても、完成したファイルだけが残る
     print(json.dumps({"checks": chk}))
+
+
+def holdout_gate(out, smoke):
+    """取り置きは run-confirm-holdout.sh からだけ回す（P10）: 試しの走りを拒み、出力先は実験の results_holdout、
+    開始の記録 start.json が HEAD にコミット済みで中身が同じこと。"""
+    if smoke:
+        sys.exit("取り置きでは試しの走り（CONFIRM_SMOKE）をしない")
+    exp = os.path.realpath(os.path.join(HERE, ".."))
+    if os.path.realpath(out) != os.path.join(exp, "results_holdout"):
+        sys.exit("取り置きの出力先は実験の results_holdout だけ")
+    sp = os.path.join(exp, "results_holdout", "start.json")
+    repo = subprocess.run(["git", "-C", exp, "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
+    rel = os.path.relpath(sp, repo)
+    r = subprocess.run(["git", "-C", repo, "show", "HEAD:" + rel], capture_output=True)
+    if r.returncode != 0 or not os.path.exists(sp) or r.stdout != open(sp, "rb").read():
+        sys.exit("開始の記録がコミットされていない（run-confirm-holdout.sh を通す）")
 
 
 def precision_projection(rows, seed, n_draw=500):
@@ -1122,6 +1148,13 @@ def selftest():
     # 課題をまたぐ θ: 1 課題だけなら課題の中の θ と同じ onset
     cw, _ = cross_theta_writers([[u1]])
     assert cw[0][0].onsets == u1.onsets
+    # 取り置きの門: 試しの走り・ほかの出力先は止める
+    for args in (("/tmp/x", "3"), ("/tmp/x", None)):
+        try:
+            holdout_gate(*args)
+            raise AssertionError("holdout_gate が通した")
+        except SystemExit:
+            pass
     print("selftest ok")
 
 
