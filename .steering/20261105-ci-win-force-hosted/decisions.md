@@ -30,3 +30,17 @@ Codex は HIGH 無し。3 件とも採った。
 - LOW「強制のときに probe しないことの検査が弱い」: 呼ばれた回数を記録する偽の `gh` で測った。強制=1 で 0 回（windows-latest）、`0` で 1 回（self-hosted）。
 
 Codex の使用は 1 回。量はメインの台帳へ写した。
+
+## 判断 6: PR の CI の 1 回目で見つかった、main の既存の違反を同じ PR で直す（2026-11-05）
+
+PR #387 の 1 回目の run（41990943684）で、`decide-win-runner` は強制の notice を出して `["windows-latest"]` に決め、`check` の Windows のレグは `GitHub Actions 1000008126`（labels `windows-latest`）で走った（受け入れ条件の本番の確かめ）。
+
+同じ run で frontend-check が赤だった。原因はこの変更ではなく、`experiments/20261102-stall-decomposition/extend/run.sh:43` の `$w（`（bash 3.2 で多バイト文字を変数名に食う・Shell portability gate）。6d468117 で main に入り、以後の main のコミットが skip の印付きだったため、CI で検出されていなかった。origin/main でも手元で同じく未達 1 件を再現した。直すのはエラーの文の 1 行だけで計算の出力は変わらないため、別のコミット（235a8082）で同じ PR に載せた。
+
+## 判断 7: hosted の Windows のときだけ check の上限を 60 分にする（研究者の決定・2026-11-05）
+
+PR #387 の 2 回目の run（41991152937）で、hosted の Windows の check は Rust の段（build 6 分・test 5 分・snapshot・schema・clippy 3 分）が全部通った後、Loop の git-bash のテストが遅く（run guard 13 分）、`timeout-minutes: 30` で job ごと cancel された。G-GEAR では 30 分に収まっていた。
+
+候補は (a) hosted のときだけ上限を 60 分、(b) hosted では Loop の 3 段を飛ばす、(c) 取り消しを許して手で判断する。研究者は (a) を採った。検査の中身は変えない。条件は「matrix が Windows のレグで、`decide-win-runner` の出力が `["self-hosted","gse-win"]` でない」（強制・fallback・出力の欠落はどれも hosted に振られるため）。費用は 1 回につき Windows の約 45 分（分数では約 90 分）。
+
+同じ run の frontend-check（ubuntu）は `loop-spawn-cleanup-test.sh` の 11a（別 id の同時 spawn の 3 ラウンド目で rcb=1）の 1 件で赤だった。手元では 3 回とも 118 件すべて通った。同時起動の競合を見るテストのため、たまに落ちる既存の検査と見て、この PR では直さない。次の run でも落ちたら別に調べる。

@@ -4,8 +4,8 @@
 - [x] probe の step に env と分岐を足す
 - [x] actionlint を前後で比べる（どちらも既存の 3 件・足した行に指摘なし）
 - [x] probe の script を 5 通りに走らせる（下の decisions.md 判断 2）
-- [ ] code-reviewer と /cross-review
-- [ ] コミット
+- [x] code-reviewer と /cross-review
+- [x] コミット
 - [x] レビューの指摘を直す（decisions.md 判断 3）
 - [x] /cross-review の 2 回目（`--ack-filtered`・判断 4）と指摘への対応（判断 5）
 - [ ] 研究者の確かめの後: リポジトリの変数を設定（`gh variable set GSE_WIN_FORCE_HOSTED --body 1`）→ この枝を push → PR → PR の run の `decide-win-runner` のログで notice `vars.GSE_WIN_FORCE_HOSTED=1 -> hosted (forced` を、`check` の Windows のレグのログ冒頭の `Runner name:` で hosted で走ったことを確かめる → マージ。変数を設定する直前に `gh run list --status queued` と `--status in_progress` が 0 件であることを確かめる（判断 5）
