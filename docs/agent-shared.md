@@ -204,7 +204,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜045**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜047**) の根拠を確認したい時 |
 | `docs/theory/README.md` | 理論（生成的返権論ほか・theory candidate）を読む時。⚠️ **SSOT の主張ではない**（RP §1 は問いとして参照するだけ） |
 | `docs/architecture/gse-design-map.md` | 今の設計の地図（層ごとに決まったこと・実装の状態・未決・根拠の ADR）と、段 1 の配布までの道筋・プローブの配線（ADR-031 M5）の設計を確かめる時。状態の文書で、決定の一次は ADR |
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
