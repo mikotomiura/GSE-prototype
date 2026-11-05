@@ -1279,8 +1279,10 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
                     per["sel"].append(hash(sel.tobytes()))
                     ts = full[EPS][sel, 2].sum() / full[EPS][sel, 1].sum()
                     br = {}
+                    # 本番（h1_summary）は 2 つの ε と 2 つの信号に同じ再標本の種を使うので、較正も draw ごとに 1 つの種を共有する（判断 21）
+                    bs = int(rng.integers(1 << 31))
                     for eps in EPS_SET:
-                        ci = boot_ratio(wp[eps][sel], np.random.default_rng(int(rng.integers(1 << 31))))
+                        ci = boot_ratio(wp[eps][sel], np.random.default_rng(bs))
                         br[eps] = h1_branch(ts, ci)  # 本番と同じ関数（退化と区間なしの扱いを含む）
                     res["eq_eps_0.001"] += br[0.001] == 1
                     res["eq_both_eps"] += br[0.001] == 1 and br[0.0] == 1
@@ -1293,6 +1295,16 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
     out["joint_both_signals"] = {}
     for (tgt, how), per in draws.items():
         out["joint_both_signals"].setdefault("target_%.2f" % tgt, {})[how] = joint_share(per)
+    # 交わりの帰無で最も不利な配置（判断 21）: 片方の信号を境（0.45 か 0.55）に、もう片方を 0.50 に置いた組。
+    # draw の i 番目の 138 人は目標と信号をまたいで同じ（版ごとに SEED + 8 から引き直す）ので、既存の draw の分岐を組み合わせる
+    out["joint_one_at_bound_other_at_050"] = {}
+    if all(t in targets for t in (0.45, 0.50, 0.55)):
+        for bound in (0.45, 0.55):
+            for a, b in ((SIGS[0], SIGS[1]), (SIGS[1], SIGS[0])):
+                key = "%s_at_%.2f_%s_at_0.50" % (a, bound, b)
+                out["joint_one_at_bound_other_at_050"][key] = {
+                    how: joint_share({a: draws[(bound, how)][a], b: draws[(0.50, how)][b]})
+                    for how in ("without_replacement", "with_replacement")}
     return out
 
 
