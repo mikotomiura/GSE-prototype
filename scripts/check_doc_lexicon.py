@@ -59,6 +59,87 @@ def missing(paths):
     return [p for p in paths if not os.path.exists(p)]
 
 
+UI_ROOT = 'src'
+JAPANESE = re.compile('[぀-ヿ一-鿿]')
+# 境界は英字・片仮名で取る。`\b` は Python の Unicode の \w で「Flowの」の境界を作らず見逃す
+# (2026-11-05 のレビューで実測)。片仮名の前後を見るのは「ワークフロー」「スタックトレース」を拾わないため。
+KATA = 'ァ-ヶー'
+STATE_NAMES = re.compile(
+    r'(?<![A-Za-z])(Flow|Incubation|Stuck)(?![A-Za-z])'
+    r'|(?<![' + KATA + r'])(フロー|インキュベーション|スタック)(?![' + KATA + r'])'
+    r'|推定状態'
+)
+BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
+LINE_COMMENT = re.compile(r'(?<!:)//[^\n]*')
+
+# 毎回の実行で先に通す対照 (外れたら検査が成立していない)。
+UI_CONTROLS_HIT = [
+    "'推定状態 (Flow / Incubation / Stuck) は表示していません。'",
+    '<p>いまはFlowの状態です</p>',
+    "'状態はStuckです'",
+    "'状態はＳｔｕｃｋです'",
+    "'フロー状態です'",
+]
+UI_CONTROLS_MISS = [
+    "'推定の結果は表示していません。'",
+    '<label>Flow</label>',
+    "return 'Stuck';",
+    "'ワークフローを開始'",
+    "'スタックトレースを送る'",
+    "{/* 推定状態 (Flow) はコメント */}",
+    "// 推定状態 Stuck はコメント",
+]
+
+
+def frontend_sources():
+    paths = []
+    for dirpath, _dirs, files in os.walk(UI_ROOT):
+        for name in files:
+            if name.endswith(('.ts', '.tsx')):
+                paths.append(os.path.join(dirpath, name))
+    return sorted(paths)
+
+
+def blank_comments(src):
+    """コメントを同じ行数の空行に置き換える (行番号を保つ)。"""
+    keep_lines = lambda m: '\n' * m.group(0).count('\n')
+    return LINE_COMMENT.sub('', BLOCK_COMMENT.sub(keep_lines, src))
+
+
+def ui_line_violates(line):
+    line = unicodedata.normalize('NFKC', line)
+    return bool(JAPANESE.search(line) and STATE_NAMES.search(line))
+
+
+def ui_controls_fail():
+    """対照が期待どおりに当たる・外れるかを確かめ、外れたものを返す。"""
+    bad = [c for c in UI_CONTROLS_HIT if not any(ui_line_violates(l) for l in blank_comments(c).split('\n'))]
+    bad += [c for c in UI_CONTROLS_MISS if any(ui_line_violates(l) for l in blank_comments(c).split('\n'))]
+    return bad
+
+
+def scan_ui_text(paths):
+    """日本語を含む行 (被験者向けの文) に 3 状態の名前があれば違反。
+
+    英語だけの行 (開発ビルドだけで出る確率の帯のラベル・`return 'Flow'`) は拾わない。
+    コメントは地の文の直し (ADR-046 Migration 5) の対象で、ここでは見ない。
+
+    既知の限界 (検査が甘くなる向き。.steering/20261105-dashboard-state-names/decisions.md 判断 4):
+    - 文字列の中の `/*` から次の `*/` まで、`:` の直後でない `//` から行末までもコメントとして消す。
+    - 判定は 1 行ずつなので、日本語と名前が別の行に分かれた文は拾わない。
+    - 対象は src/ の ts・tsx だけ。Rust の文字列 (トレイは tray.rs のテストが守る)・
+      index.html・tauri.conf.json・CSS は見ない。
+    """
+    hits = []
+    label = '被験者向けの文の状態名 (ADR-046 D1)'
+    for path in paths:
+        code = blank_comments(open(path, encoding='utf-8').read())
+        for i, line in enumerate(code.split('\n'), 1):
+            if ui_line_violates(line):
+                hits.append((path, i, label, line.strip()[:90]))
+    return hits
+
+
 def main():
     violations = []
 
@@ -87,6 +168,19 @@ def main():
     retracted = re.compile(r'一方向に消耗させ|最大の強みである|不便益 ?HCI ?である|不便益を測定可能')
     violations += scan(MITOU, retracted, '撤回済みの主張')
 
+    # 5) 被験者が見る日本語の文に 3 状態の名前と「推定状態」を出さない (ADR-046 D1)
+    ui_files = frontend_sources()
+    if not ui_files:
+        print('=== 検査が成立していない: src/ に ts・tsx が 1 本も無い ===')
+        return 1
+    bad_controls = ui_controls_fail()
+    if bad_controls:
+        print('=== 検査が成立していない: 検査 5 の対照が期待と違う ===')
+        for c in bad_controls:
+            print('  [control] %s' % c)
+        return 1
+    violations += scan_ui_text(ui_files)
+
     if not violations:
         print('=== 違反なし ===')
         return 0
@@ -97,6 +191,7 @@ def main():
         print('    [%s] %s' % (label, text))
     print()
     print('履歴記述として正当な場合は、その行に「廃止」「旧称」「削除済」「逐語」等を含めること。')
+    print('（検査 5 の被験者向けの文には、この許可は効かない。）')
     return 1
 
 if __name__ == '__main__':

@@ -115,7 +115,7 @@ const PHASE_WEEKS: WeekConfig[] = [
   {
     value: "week1_blind",
     label: "第1週 (blind 較正)",
-    description: "介入は発火せず推定状態も非表示。X1 較正ラベルを収集 (calibration_blind)。",
+    description: "介入は発火せず推定の結果も非表示。X1 較正ラベルを収集 (calibration_blind)。",
     interventionEnabled: false,
     calibrationMode: true,
     condition: "blind_calibration",

@@ -489,8 +489,8 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
           </span>
           <p>
             {o1Mode
-              ? '推定状態 (Flow / Incubation / Stuck) は表示していません。画面を気にせず、ふだんどおりに作業してください。'
-              : '主観回答の独立性を保つため、推定状態 (Flow / Incubation / Stuck) は表示していません。画面の問いに、今の感覚のまま回答してください。'}
+              ? '推定の結果は表示していません。画面を気にせず、ふだんどおりに作業してください。'
+              : '主観回答の独立性を保つため、推定の結果は表示していません。画面の問いに、今の感覚のまま回答してください。'}
           </p>
         </div>
       ) : (
