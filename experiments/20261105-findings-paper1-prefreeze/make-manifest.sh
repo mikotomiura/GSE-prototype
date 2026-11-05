@@ -16,5 +16,6 @@ shasum -a 256 \
   docs/preregistration-p1-episode.md docs/adr/ADR-030-stall-onset-and-decision-episode.md \
   .steering/20261105-public-data-findings-paper/paper-write/prereg-draft.md \
   .steering/20261105-public-data-findings-paper/paper-write/prereg-draft.en.md \
-  .steering/20261105-public-data-findings-paper/paper-write/prereg-en-check.md > "$E/confirm-manifest.sha256"
+  .steering/20261105-public-data-findings-paper/paper-write/prereg-en-check.md \
+  .steering/20261105-public-data-findings-paper/paper-write/check_prereg_en.py > "$E/confirm-manifest.sha256"
 shasum -a 256 "$E/confirm-manifest.sha256"
