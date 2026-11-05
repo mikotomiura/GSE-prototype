@@ -52,6 +52,7 @@ PRESS_SET = TEXT | {"backspace"}
 SEP_SYM = {"space", "enter", "tab", "punctuation", "sentence_punctuation"}  # 区切りの感度（空白・記号）
 H = 3_600_000
 NAN = float("nan")
+FLOOR = 0.02  # 推定の水準の床（判断 17）
 
 # 主の設定（P3〜P6）。感度（P8）はこの 1 つの値だけを変える
 MAIN = {"d_win": 30_000, "ctrl_hi": 30_000, "ctrl_condA": True, "stall_condA": True, "align": "newline", "layer": "past30",
@@ -690,22 +691,27 @@ def h3_summary(writers, writer_rows, writer_h2, seed, hide=True, n_rep=None, exc
     out = {"rows": int(len(y)), "stalls": int(y.sum()), "missing": miss, "n_rep": n_rep}
     if control:
         Xc, yc, wc, gc, cc, cic = h2_ml_rows(writers, writer_h2, random.Random(seed + 5))
-        out["control_rows"] = int(len(yc))
+        out["window_control_rows"] = int(len(yc))
+        # 門（判断 17）: 同じ行に既知の大きさを埋め込んだ仮のデータで、学習器が下限 0.55 を超えて回収できるか
+        gate = h3_recovery(writer_rows, seed, n_rep=n_rep)
+        out["gate_recovery"] = gate
     for name, spec in models(seed, which).items():
         ci, fails = boot_oof(X, y, wt, g, cells, cids, spec, seed, n_rep)
         e = {"ci_width": (ci[1] - ci[0]) if ci else None, "boot_failures": fails}
         if control:
+            gok = gate[name]["recovered_lower_gt_055"] and gate[name]["boot_failures"] <= FAIL_MAX * n_rep
+            e["gate_passed"] = gok
+            # 揃えない窓の対照は記述（判断 17）。可否は seen でも出す
             cci, cfails = boot_oof(Xc, yc, wc, gc, cc, cic, spec, seed, n_rep)
-            cok = cfails <= FAIL_MAX * n_rep and cci is not None and cci[0] > BAND_HI
-            e |= {"control_ci_width": (cci[1] - cci[0]) if cci else None, "control_boot_failures": cfails,
-                  "control_passed": cok}  # 可否だけは seen でも出す（H1 の値は漏れない・判断 16）
+            e |= {"window_control_ci_width": (cci[1] - cci[0]) if cci else None, "window_control_boot_failures": cfails,
+                  "window_control_passed": cfails <= FAIL_MAX * n_rep and cci is not None and cci[0] > BAND_HI}
         if not hide:
             a = oof_auc(X, y, wt, g, cells, cids, spec, seed)
             e |= {"auc": a, "ci95": ci}
             if control:
                 ac = oof_auc(Xc, yc, wc, gc, cc, cic, spec, seed)
-                e |= {"control_auc": ac, "control_ci95": cci,
-                      "branch": h3_branch(ci, fails, n_rep, cok)}
+                e |= {"window_control_auc": ac, "window_control_ci95": cci,
+                      "branch": h3_branch(ci, fails, n_rep, gok)}
             else:
                 e["branch_without_control"] = h3_branch(ci, fails, n_rep)
         out[name] = e
@@ -715,7 +721,7 @@ def h3_summary(writers, writer_rows, writer_h2, seed, hide=True, n_rep=None, exc
 
 
 def h3_recovery(writer_rows, seed, target=0.58, n_rep=50):
-    """凍結の前だけ: 停滞の行の 1 つの量（1 分あたりの文字の押下の差）に定数を足して、その量単独の AUC を
+    """H3 の門（判断 17・取り置きでも回す）: 停滞の行の 1 つの量（1 分あたりの文字の押下の差）に定数を足して、その量単独の AUC を
     目標にした仮のデータで、2 つの学習器の区間の下限が 0.55 を超えるか（回収できるか）。値は書かず可否だけ。"""
     X, y, wt, g, cells, cids, _ = ml_rows(writer_rows)
     col = RATE_DIFF_COL
@@ -955,6 +961,19 @@ def sensitivities(writers, seed, hide, main_rows, main_h2, replay_dirs, hold_p, 
                      ("stall_without_condA", {"stall_condA": False}),
                      ("neither_condA", {"stall_condA": False, "ctrl_condA": False})):
         S[name] = h1_run(writers, cfg_of(**kw), seed, hide)[1]
+    # 床にない対だけ（判断 17）: 主の行から、停滞の u と対照の u の両方で p_stuck ≥ 0.02 の対だけを残す（引き直さない）
+    off = []
+    for r in main_rows:
+        rr = []
+        for cell, sv, fv, ctrl in r:
+            if sv["p_stuck"] < FLOOR:
+                continue
+            cf = [x for x in ctrl if x[1]["p_stuck"] >= FLOOR]
+            if cf:
+                rr.append((cell, sv, fv, cf))
+        off.append(rr)
+    S["h1_off_floor"] = {"stall_rows_main_layer": sum(1 for r in off for c, _, _, _ in r if c[1] == "none"),
+                         "H1": h1_summary(off, seed, "none", hide, SIGS, True)}
     # H2 だけが変わるもの
     for name, kw in (("h2_look_30s", {"h2_look": 30_000}), ("h2_look_120s", {"h2_look": 120_000}),
                      ("h2_positive_t0", {"h2_pos": "t0"}), ("h2_exclusion_v1", {"h2_excl": "v1"}),
@@ -1029,7 +1048,6 @@ def run(mode, argv):
     res["H3"] = h3_summary(writers, rows, h2, seed, hide)
     res["sensitivity"] = sensitivities(writers, seed, hide, rows, h2, replay_dirs, hold_p, mode, n_keep)
     if mode == "seen":
-        res["H3_recovery"] = h3_recovery(rows, seed, n_rep=3 if smoke else 50)
         pz = [writer_pauses(u, r) for u, r in zip(writers, rows)]
         conv = {}
         for s in SIGS:
@@ -1126,7 +1144,7 @@ def level_floor_share(rows, layer="none"):
     """推定の水準の床と天井（p_stuck が 0.02 未満か 0.98 を超える）にある、主の層の停滞と引かれた対照（重複は 1 回）の割合。"""
     st = [sv["p_stuck"] for r in rows for cell, sv, _, _ in r if cell[1] == layer]
     ct = list({cid: cs["p_stuck"] for r in rows for cell, _, _, ctrl in r if cell[1] == layer for cid, cs, _ in ctrl}.values())
-    f = lambda v: {"floor_lt_002": float(np.mean(np.array(v) < 0.02)), "ceiling_gt_098": float(np.mean(np.array(v) > 0.98)), "n": len(v)} if v else None  # noqa: E731
+    f = lambda v: {"floor_lt_002": float(np.mean(np.array(v) < FLOOR)), "ceiling_gt_098": float(np.mean(np.array(v) > 1 - FLOOR)), "n": len(v)} if v else None  # noqa: E731
     return {"stall": f(st), "control": f(ct)}
 
 
