@@ -1,12 +1,7 @@
 {
- "git_head": "d2a43888b3b6b71cec78ed5f617471986af350f3",
+ "git_head": "c5fc89d0a78b863df568e8b1b1b6b6312def5e42",
  "git_dirty_paths": [
-  " M experiments/20261105-findings-paper1-prefreeze/notes.md",
-  " M experiments/20261105-findings-paper1-prefreeze/results/confirm_seen.json",
-  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_control_summary_seen.json",
-  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_summary_q995_seen.json",
-  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_summary_w15_seen.json",
-  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_summary_w60_seen.json"
+  " M experiments/20261105-findings-paper1-prefreeze/results/confirm_seen.json"
  ],
  "manifest_now": [
   "experiments/20261105-findings-paper1-prefreeze/run-confirm-holdout.sh: OK",
