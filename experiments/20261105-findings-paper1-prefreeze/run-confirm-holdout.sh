@@ -91,8 +91,13 @@ OSF_START_SHA="${3:?OSF が示す start.json の SHA-256 を渡す}"
 [ ! -e "$OUT/failed.json" ] || die "中断の記録がある（再実行は 1 段目から CONFIRM_RERUN_REASON を付けて）"
 START_COMMIT="$(git -C "$REPO_ROOT" log --format=%H -n 1 --grep='^取り置きの確認の開始' HEAD)"
 [ -n "$START_COMMIT" ] || die "開始のコミットが HEAD の履歴に無い"
-[ -z "$(git -C "$REPO_ROOT" log --format=%H -n 1 --grep='^取り置きの確認の計算の開始' "$START_COMMIT..HEAD")" ] \
-  || die "この開始の記録の後に計算の開始の記録がある（再実行は 1 段目から）"
+# 同じ start.json で計算を始めた記録か中断の記録が、どの枝にもあれば止める（枝を切り替えて入り直す道を塞ぐ）
+START_SHA_NOW="$(sha "$OUT/start.json")"
+for c in $(git -C "$REPO_ROOT" log --all --format=%H -E --grep='^取り置きの確認の(計算の開始|中断)'); do
+  if [ "$(git -C "$REPO_ROOT" show "$c:$OUT_REL/start.json" 2>/dev/null | shasum -a 256 | cut -d' ' -f1)" = "$START_SHA_NOW" ]; then
+    die "同じ開始の記録で計算を始めた記録か中断の記録がある（${c}・再実行は 1 段目から CONFIRM_RERUN_REASON を付けて）"
+  fi
+done
 verify "$("$PY" -I -c "import json,sys;print(json.load(open(sys.argv[1]))['manifest_sha256'])" "$OUT/start.json")"
 
 # 計算の開始の記録（コミットしてから計算に入る。確認のスクリプトはこれと start.json が HEAD に無ければ止まる）

@@ -452,10 +452,13 @@ def h1_writer_equal(writer_rows, seed, layer="none", hide=True):
     out = {}
     for sig in SIGS:
         e = {}
+        # 退化は ε = 0.001 の同値の割合で決め、ε = 0 にも同じ判定を当てる（h1_branch・P6）
+        w1 = [h1_pairs(r, sig, layer, EPS) for r in writer_rows]
+        n1 = sum(b for _, b, _ in w1)
+        ts = sum(c for _, _, c in w1) / n1 if n1 else None
         for eps in EPS_SET:
             wpt = [h1_pairs(r, sig, layer, eps) for r in writer_rows]
             per = np.array([a / b for a, b, _ in wpt if b > 0], dtype=float)
-            tot_n, tot_t = sum(b for _, b, _ in wpt), sum(c for _, _, c in wpt)
             ci = None
             if len(per):
                 b = np.random.default_rng(seed + 1).integers(0, len(per), (N_BOOT, len(per)))
@@ -463,7 +466,7 @@ def h1_writer_equal(writer_rows, seed, layer="none", hide=True):
             x = {"writers": int(len(per)), "ci_width": (ci[1] - ci[0]) if ci else None}
             if not hide:
                 x |= {"writer_mean_auc": float(per.mean()) if len(per) else None, "ci95": ci,
-                      "branch_described": h1_branch(tot_t / tot_n if tot_n else None, ci)}
+                      "branch_described": h1_branch(ts, ci)}
             e["eps_%g" % eps] = x
         out[sig] = e
     return out
@@ -848,7 +851,9 @@ def h3_recovery(writer_rows, seed, target=0.58, n_rep=50):
     res = {"target": target, "reached_auc": reached, "calibrated": bool(ok_cal)}
     for name, spec in models(seed).items():
         ci, fails = boot_oof(Xs, y, wt, g, cells, cids, spec, seed, n_rep)
-        res[name] = {"recovered_lower_gt_055": bool(ok_cal and ci and ci[0] > BAND_HI), "boot_failures": fails}
+        # 門を通るのは、較正が届き・下限が 0.55 を超え・学習の失敗が 5% 以下のとき。理由を分けて書く
+        res[name] = {"lower_gt_055": bool(ci and ci[0] > BAND_HI), "boot_failures": fails,
+                     "recovered_lower_gt_055": bool(ok_cal and ci and ci[0] > BAND_HI)}
     return res
 
 
@@ -1200,8 +1205,26 @@ def holdout_gate(out, smoke):
         if r.returncode != 0 or not os.path.exists(sp) or r.stdout != open(sp, "rb").read():
             sys.exit("%s がコミットされていない（run-confirm-holdout.sh の 1 段目と 2 段目を通す）" % name)
         got[name] = r.stdout
-    if json.loads(got["compute.json"]).get("osf_start_sha256") != hashlib.sha256(got["start.json"]).hexdigest():
+    start_sha = hashlib.sha256(got["start.json"]).hexdigest()
+    if json.loads(got["compute.json"]).get("osf_start_sha256") != start_sha:
         sys.exit("OSF に添えた start.json の SHA-256 が手元の start.json と違う")
+    # 計算は 2 段目の計算の開始のコミットの直後だけ（手順を通らない直接の起動・2 回目・上書きを止める）
+    git = lambda *a: subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True).stdout  # noqa: E731
+    if not git("log", "-1", "--format=%s", "HEAD").startswith("取り置きの確認の計算の開始"):
+        sys.exit("HEAD が計算の開始のコミットでない（run-confirm-holdout.sh の 2 段目からだけ回す）")
+    if git("log", "--all", "--format=%H", "-n", "1", "--grep=^取り置きの確認の完走"):
+        sys.exit("完走の記録がある（2 回目は回さない・P11）")
+    for name in ("confirm_holdout.json", "failed.json"):
+        if os.path.exists(os.path.join(exp, "results_holdout", name)):
+            sys.exit("%s が既にある（最初の完走だけを使う・P11）" % name)
+    rel_start = os.path.relpath(os.path.join(exp, "results_holdout", "start.json"), repo)
+    head = git("rev-parse", "HEAD").strip()
+    for c in git("log", "--all", "--format=%H", "-E", "--grep=^取り置きの確認の(計算の開始|中断)").split():
+        if c == head:
+            continue
+        r = subprocess.run(["git", "-C", repo, "show", "%s:%s" % (c, rel_start)], capture_output=True)
+        if r.returncode == 0 and hashlib.sha256(r.stdout).hexdigest() == start_sha:
+            sys.exit("同じ開始の記録で計算を始めた記録か中断の記録が別にある（再実行は 1 段目から理由を付けて）")
 
 
 def shifted_pairs(rows, sig, d, eps):
@@ -1257,7 +1280,8 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
                     res["eq_eps_0.001"] += br[0.001] == 1
                     res["eq_both_eps"] += br[0.001] == 1 and br[0.0] == 1
                     res["precision_insufficient"] += br[0.001] == "precision_insufficient"
-                e[how] = {k: v / n_draw for k, v in res.items()}
+                # 仮の信号が目標に届かなければ、その目標での割合は出さない（較正できない）
+                e[how] = {k: v / n_draw for k, v in res.items()} if e["calibrated"] else None
             out[sig]["target_%.2f" % tgt] = e
     return out
 
