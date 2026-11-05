@@ -41,5 +41,8 @@
 - [x] 事前登録の草案（判断 10・`paper-write/prereg-draft.md`）
 - [x] attack-me round 1（Codex あり・major・判断 11）→ 草案 v2
 - [x] 凍結の前の計算 2 つ（`experiments/20261105-findings-paper1-prefreeze/`）→ 草案 v3 に値・付録 A・版を入れる（判断 12）
-- [ ] attack-me round 2 → OSF で凍結
+- [x] attack-me round 2（major・判断 13）→ 確認のスクリプトと空回し（09f33230）→ 草案 v4（dad32265）
+- [x] attack-me round 3（major・査読者は major 1・minor 2・判断 14）
+- [ ] 判断 14 の直し・P8 の感度の全部・空回しのやり直し・草案 v5（引き継ぎ `_handoff/next-session-gse-public-data-findings-paper-4.md`）
+- [ ] attack-me round 4 → OSF で凍結
 - [ ] 計算（Mac）
