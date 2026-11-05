@@ -325,20 +325,32 @@
    "rows_with_any_nan": 18375
   },
   "n_rep": 200,
-  "control_rows": 88360,
+  "window_control_rows": 88360,
+  "gate_recovery": {
+   "logreg": {
+    "recovered_lower_gt_055": true,
+    "boot_failures": 0
+   },
+   "hgb": {
+    "recovered_lower_gt_055": true,
+    "boot_failures": 0
+   }
+  },
   "logreg": {
    "ci_width": 0.018022514364939513,
    "boot_failures": 0,
-   "control_ci_width": 0.019044143726575036,
-   "control_boot_failures": 0,
-   "control_passed": false
+   "gate_passed": true,
+   "window_control_ci_width": 0.019044143726575036,
+   "window_control_boot_failures": 0,
+   "window_control_passed": false
   },
   "hgb": {
    "ci_width": 0.020956016364531038,
    "boot_failures": 0,
-   "control_ci_width": 0.018639067453845803,
-   "control_boot_failures": 0,
-   "control_passed": false
+   "gate_passed": true,
+   "window_control_ci_width": 0.018639067453845803,
+   "window_control_boot_failures": 0,
+   "window_control_passed": false
   }
  },
  "sensitivity": {
@@ -573,6 +585,35 @@
       "pairs": 2597015,
       "tie_share": 0.00012437355964443794,
       "ci_width": 0.01369797332667011
+     }
+    }
+   }
+  },
+  "h1_off_floor": {
+   "stall_rows_main_layer": 4467,
+   "H1": {
+    "d_p_stuck": {
+     "eps_0.001": {
+      "pairs": 175095,
+      "tie_share": 0.011685085239441445,
+      "ci_width": 0.02920376920425738
+     },
+     "eps_0": {
+      "pairs": 175095,
+      "tie_share": 0.0017019332362431822,
+      "ci_width": 0.029314290583437597
+     }
+    },
+    "d_ewma_x": {
+     "eps_0.001": {
+      "pairs": 175095,
+      "tie_share": 0.005853964990433764,
+      "ci_width": 0.030686395982807813
+     },
+     "eps_0": {
+      "pairs": 175095,
+      "tie_share": 0.00046831719923470116,
+      "ci_width": 0.030613305517164846
      }
     }
    }
@@ -1207,16 +1248,6 @@
     "ci_width": 0.022153871592318408,
     "boot_failures": 0
    }
-  }
- },
- "H3_recovery": {
-  "logreg": {
-   "recovered_lower_gt_055": true,
-   "boot_failures": 0
-  },
-  "hgb": {
-   "recovered_lower_gt_055": true,
-   "boot_failures": 0
   }
  },
  "width_conversion_cs1": {
