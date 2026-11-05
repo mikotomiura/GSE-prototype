@@ -44,5 +44,11 @@
 - [x] attack-me round 2（major・判断 13）→ 確認のスクリプトと空回し（09f33230）→ 草案 v4（dad32265）
 - [x] attack-me round 3（major・査読者は major 1・minor 2・判断 14）
 - [ ] 判断 14 の直し・P8 の感度の全部・空回しのやり直し・草案 v5（引き継ぎ `_handoff/next-session-gse-public-data-findings-paper-4.md`）
-- [ ] attack-me round 4 → OSF で凍結
+- [x] attack-me round 4・5（判断 16〜18）
+- [ ] 判断 18 の 3 点（正の順位・H3 を記述・手順を 2 段）をスクリプト・手順・草案に入れる（引き継ぎ `_handoff/next-session-gse-public-data-findings-paper-5.md`）
+- [ ] 判断 18 の既定の直し（床にない対の始点版・較正の復元抽出・H2 の負例の感度・課題の中の比べと書き手均等・休止の中の記述・門の揺らぎの鍵・注記の番号）と selftest
+- [ ] /cross-review（cec6c31b 以降）→ 直す
+- [ ] conditions-5.md をコミット → 見た書き手の空回し → 付録 C → 2 段の手順の予行（仮の取り置きの clone）
+- [ ] 草案 v7（E と監査役の本文の指摘・外枠）
+- [ ] attack-me round 6（回す前に研究者に聞く）→ 英語版 → OSF で凍結
 - [ ] 計算（Mac）

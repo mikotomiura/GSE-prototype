@@ -1,14 +1,14 @@
-"""論文 1 の確認の解析（事前登録 v5 の P3〜P8）。凍結の前に見た書き手で空回しし、凍結の後に取り置きで 1 回だけ回す。
+"""論文 1 の確認の解析（事前登録 v6 の P4〜P9）。凍結の前に見た書き手で空回しし、凍結の後に取り置きで 1 回だけ回す。
 
 使い方:
   python -I confirm_p1.py seen    <cs1_work> <holdout.json> <klicke_work> <seed> <out_dir>
   python -I confirm_p1.py holdout <cs1_work> <holdout.json> <seed> <out_dir>
   python -I confirm_p1.py --selftest
 <cs1_work> の横に、停滞の定義を変えて replay を回し直した中間 <cs1_work>_q995・<cs1_work>_w15・<cs1_work>_w60
-（rebuild_onsets.py の出力）が要る（P8 の感度）。
+（rebuild_onsets.py の出力）が要る（P9 の感度）。
 seen: CS1 の見た書き手で全部を回し、判定の値（点推定・区間の位置・分岐・R）は書かない。書くのは件数・区間の幅・
       ほぼ同値の割合・|値| の分位・重みの集まり・幅の換算（仮の信号）・H3 の埋め込みの回収の可否だけ。
-      感度（P8）は件数と区間の幅だけ。
+      感度（P9）は件数と区間の幅だけ。
 holdout: 取り置きの書き手だけの中間で全部を回し、判定まで書く。
 書き手の ID も番号も出さない。外部の LLM に送らない。
 """
@@ -35,7 +35,7 @@ import prefreeze as pf  # noqa: E402  make_unit・block_start・has_event・k6�
 k6 = pf.k6
 
 EPS = 0.001
-EPS_SET = (0.001, 0.0)  # H1 の支持は両方で分岐 1（P7）
+EPS_SET = (0.001, 0.0)  # H1 の支持は両方で分岐 1（P6）
 SIGS = ("d_p_stuck", "d_ewma_x")
 LEVELS = ("p_stuck", "ewma_x")
 STALL_GAP, CTRL_LO, WARM, N_MATCHED = 30_000, 2_000, 60_000, 5
@@ -44,7 +44,7 @@ LAYER_WIN = 30_000   # 層の窓 [u − 30 秒, u]
 FEAT_WIN = 30_000    # H3 の量の窓
 BAND_LO, BAND_HI, WIDTH_MAX = 0.45, 0.55, 0.10
 N_BOOT, N_BOOT_ML, N_BOOT_GRID = 2_000, 200, 50
-FAIL_MAX = 0.05      # 学習の失敗の割合の上限（P6）
+FAIL_MAX = 0.05      # 学習の失敗の割合の上限（P8）
 H2_STEP = 5_000
 MIN_WRITER_OBS = 10 * 60_000
 TEXT = k6.TEXT
@@ -55,9 +55,9 @@ NAN = float("nan")
 FLOOR = 0.02  # 推定の水準の床（判断 17）
 CAL_TOL = 0.002  # 仮の信号が目標の AUC に届いたとみなす差の上限（届かなければ較正できない）
 
-# 主の設定（P3〜P6）。感度（P8）はこの 1 つの値だけを変える
+# 主の設定（P4〜P8）。感度（P9）はこの 1 つの値だけを変える
 MAIN = {"d_win": 30_000, "ctrl_hi": 30_000, "ctrl_condA": True, "stall_condA": True, "align": "newline", "layer": "past30",
-        "h2_look": 60_000, "h2_pos": "u", "h2_excl": "resume"}
+        "ctrl_scope": "writer", "h2_look": 60_000, "h2_pos": "u", "h2_excl": "resume", "h2_neg_drop_prelong": False}
 # replay を回し直す感度: 中間の dir の接尾辞・Python の再現に当てる値・replay の上書き
 REPLAY_VARIANTS = {
     "q995": {"k6": {"Q": 0.995, "WARMUP": 200}, "overrides": {"q": 0.995, "warmup_count": 200}},
@@ -79,11 +79,12 @@ def finite(v):
 
 
 def sig4(w, t, d_win=30_000):
-    """t の信号 4 つ（差 2・水準 2）。t か t − d_win の行が無い・数値でなければ None。"""
+    """t の信号 4 つ（差 2・水準 2）と、始点 t − d_win の水準 p_stuck_start（床にない対の感度で選ぶのに使う）。
+    t か t − d_win の行が無い・数値でなければ None。"""
     a, b = w.snap(t), w.snap(t - d_win)
     if a is None or b is None or not all(finite(x) for x in (a[1], a[2], b[1], b[2])):
         return None
-    return {"d_p_stuck": a[1] - b[1], "d_ewma_x": a[2] - b[2], "p_stuck": a[1], "ewma_x": a[2]}
+    return {"d_p_stuck": a[1] - b[1], "d_ewma_x": a[2] - b[2], "p_stuck": a[1], "ewma_x": a[2], "p_stuck_start": b[1]}
 
 
 def net(w, t):
@@ -159,8 +160,8 @@ def h1_branch(tie_share_eps, ci):
 
 
 def h2_branch(ciu, cir):
-    """P5: 1 = 揃えない AUC の下限 > 0.55 かつ R の下限 ≥ 0.5（支持）／2 = 下限 > 0.55 かつ R の上限 < 0.5
-    （作業の時期では説明されない上がり）／3 = 下限 > 0.55 で R の区間が 0.5 をまたぐ（判定できない）／4 = それ以外。"""
+    """P7: 1 = 揃えない AUC の下限 > 0.55 かつ R の下限 ≥ 0.5（支持）／2 = 下限 > 0.55 かつ R の上限 < 0.5
+    （指定の揃え直しの後にも残る上がり）／3 = 下限 > 0.55 で R の区間が 0.5 をまたぐ（判定できない）／4 = それ以外。"""
     if ciu is None or not ciu[0] > BAND_HI:
         return 4
     if cir is None:
@@ -177,13 +178,15 @@ def r_for_branch(cir, rbad, n_boot=N_BOOT):
     return None if rbad > FAIL_MAX * n_boot else cir
 
 
-def off_floor_rows(rows):
-    """床にない対だけ（判断 17）: 停滞の u で p_stuck < 0.02 の行を落とし、対照も p_stuck ≥ 0.02 だけを残す（引き直さない）。"""
+def off_floor_rows(rows, at="start"):
+    """床にない対だけ（判断 17・18）: 停滞の水準が床（p_stuck < 0.02）の行を落とし、対照も床にないものだけを残す（引き直さない）。
+    at = "start" は始点 u − 30 秒の水準で選ぶ（主の感度。差そのものでは選ばない）、"end" は終点 u の水準で選ぶ（併記）。"""
+    key = "p_stuck_start" if at == "start" else "p_stuck"
     out = []
     for cell, sv, fv, ctrl in rows:
-        if sv["p_stuck"] < FLOOR:
+        if sv[key] < FLOOR:
             continue
-        cf = [x for x in ctrl if x[1]["p_stuck"] >= FLOOR]
+        cf = [x for x in ctrl if x[1][key] >= FLOOR]
         if cf:
             out.append((cell, sv, fv, cf))
     return out
@@ -198,7 +201,7 @@ def weight_concentration(pairs):
             "effective_writers": float(p.sum() ** 2 / (p ** 2).sum()), "writers_with_pairs": int(len(p))}
 
 
-# ---------------- H3 の量（P4） ----------------
+# ---------------- H3 の量（P5） ----------------
 
 def window_feats(w, a, b, burst=None):
     """(a, b] の押下（文字・空白・改行・後退）から 9 量と、旧い欠測の印（押下 3 未満か 50 ms を超える間隔が無い）。
@@ -252,11 +255,11 @@ def feats18(w, u, burst=None):
 RATE_DIFF_COL = 17  # 1 分あたりの文字の押下の差（埋め込みの回収に使う・常に数値）
 
 
-# ---------------- H1（P3）: 書き手 1 人 ----------------
+# ---------------- H1（P4・P6）: 書き手 1 人 ----------------
 
 def stall_anchors(w, cfg=None):
     """onset ごとの u（G ≥ 30 秒・同じ u は 1 度〔最初の onset だけ〕・u < s・u の時点で条件 A が偽〔純産出 ≥ 1〕）。
-    [(u, s0, nxt, i, t0)]。cfg["stall_condA"] が偽なら条件 A を見ない（v5 の版・感度）。"""
+    [(u, s0, nxt, i, t0)]。cfg["stall_condA"] が偽なら条件 A を見ない（P9 の感度）。"""
     cfg = MAIN if cfg is None else cfg
     out, seen = [], set()
     for s0, t0, _, _ in w.onsets:
@@ -291,11 +294,19 @@ def align_of(w, i, cfg, cs1):
 
 
 def in_stall(w, t):
+    """対照から除く区間（P4）: 課題の全ての onset の [s − 30 秒, t0]（停滞の行にならなかった onset も含む）。"""
     return any(s0 - STALL_PRE <= t <= t0 for s0, t0, _, _ in w.onsets)
 
 
+def pause_info(w, u, end, cs1):
+    """休止の中の記述（P4・P10）: (u, end) の押下（種類を問わない）の数と、[u − 30 秒, end] に出来事があるか
+    （層の窓を休止の終わりまで取った版と同じ集合。主の層の行では休止の中の出来事に当たる）。"""
+    n = bisect.bisect_left(w.press, end) - bisect.bisect_right(w.press, u)
+    return {"in_pause_presses": n, "in_pause_event": bool(cs1 and pf.has_event(w, u - LAYER_WIN, end))}
+
+
 def control_ok(w, i, cfg, cs1, cnt=None):
-    """i 番目の文字の入力 u から次の文字の入力までの休止が対照の候補か（P3）。"""
+    """i 番目の文字の入力 u から次の文字の入力までの休止が対照の候補か（P4）。"""
     u, v = w.text[i], w.text[i + 1]
     if not (CTRL_LO <= v - u < cfg["ctrl_hi"]):
         return False
@@ -310,7 +321,8 @@ def control_ok(w, i, cfg, cs1, cnt=None):
 
 
 def h1_writer(units, rng, cnt, cfg, feats=False, cs1=True, burst=None):
-    """停滞の行と引いた対照。cell = (区切り, 層)。対照の id は (課題, u)。"""
+    """停滞の行と引いた対照。cell = (区切り, 層)。対照の id は (課題, u)。
+    cfg["ctrl_scope"] が "task" なら、対照を同じ課題の候補からだけ引き、cell に課題の番号を足す（課題の中だけの比べ・P9）。"""
     stalls, cands = [], {}
     for k, w in enumerate(units):
         anchors = stall_anchors(w, cfg)
@@ -327,6 +339,9 @@ def h1_writer(units, rng, cnt, cfg, feats=False, cs1=True, burst=None):
                 cnt["stall_no_signal"] += 1
                 continue
             cell = (align_of(w, i, cfg, cs1), layer_of(w, u, nxt, cfg["layer"]) if cs1 else "none")
+            if cfg["ctrl_scope"] == "task":
+                cell += (k,)
+            sv |= pause_info(w, u, nxt, cs1)
             stalls.append(((k, u), sv, cell, feats18(w, u, burst) if feats else None))
         for i in range(len(w.text) - 1):
             if not control_ok(w, i, cfg, cs1, cnt):
@@ -337,6 +352,9 @@ def h1_writer(units, rng, cnt, cfg, feats=False, cs1=True, burst=None):
                 cnt["control_no_signal"] += 1
                 continue
             cell = (align_of(w, i, cfg, cs1), layer_of(w, u, v, cfg["layer"]) if cs1 else "none")
+            if cfg["ctrl_scope"] == "task":
+                cell += (k,)
+            sv |= pause_info(w, u, v, cs1)
             cands.setdefault(cell, []).append(((k, u), sv, feats18(w, u, burst) if feats else None))
             cnt["control_candidates"] += 1
     rows = []  # (cell, stall_sig, stall_feat, [(cid, sig, feat) ...])
@@ -347,7 +365,7 @@ def h1_writer(units, rng, cnt, cfg, feats=False, cs1=True, burst=None):
         if not ctrl:
             cnt["stall_no_control"] += 1
             continue
-        cnt["stall_rows_%s_%s" % cell] += 1
+        cnt["stall_rows_%s_%s" % cell[:2]] += 1
         rows.append((cell, sv, fv, ctrl))
     return rows
 
@@ -428,21 +446,66 @@ def threshold_table(writer_rows, layer="none"):
     return res
 
 
-# ---------------- H2（P5） ----------------
+def h1_writer_equal(writer_rows, seed, layer="none", hide=True):
+    """感度（P9・Codex の round 5）: 書き手ごとの AUC（書き手の中の対を合わせる）を書き手均等に平均した値。区間は書き手の
+    再標本化（2,000 回・SEED + 1）。分岐は P6 の規則を当てた記述。"""
+    out = {}
+    for sig in SIGS:
+        e = {}
+        for eps in EPS_SET:
+            wpt = [h1_pairs(r, sig, layer, eps) for r in writer_rows]
+            per = np.array([a / b for a, b, _ in wpt if b > 0], dtype=float)
+            tot_n, tot_t = sum(b for _, b, _ in wpt), sum(c for _, _, c in wpt)
+            ci = None
+            if len(per):
+                b = np.random.default_rng(seed + 1).integers(0, len(per), (N_BOOT, len(per)))
+                ci = pct_ci(per[b].mean(1))[0]
+            x = {"writers": int(len(per)), "ci_width": (ci[1] - ci[0]) if ci else None}
+            if not hide:
+                x |= {"writer_mean_auc": float(per.mean()) if len(per) else None, "ci95": ci,
+                      "branch_described": h1_branch(tot_t / tot_n if tot_n else None, ci)}
+            e["eps_%g" % eps] = x
+        out[sig] = e
+    return out
+
+
+def pause_summary(writer_rows, layer="none"):
+    """休止の中の記述（P4・P10・判断 18）: 主の層の停滞と引かれた対照（重複は 1 回）の、休止の中に実行・貼り付け・
+    切り替えがある割合（層の窓を休止の終わりまで取った版で出来事ありになる集合）と、休止の中の押下の数の分布。"""
+    st = [sv for r in writer_rows for cell, sv, _, _ in r if cell[1] == layer]
+    ct = list({(wi,) + tuple(cid): cs for wi, r in enumerate(writer_rows) for cell, _, _, ctrl in r if cell[1] == layer
+               for cid, cs, _ in ctrl}.values())
+
+    def f(v):
+        if not v:
+            return None
+        n = np.array([x["in_pause_presses"] for x in v], dtype=float)
+        return {"n": len(v), "share_in_pause_event": float(np.mean([x["in_pause_event"] for x in v])),
+                "share_zero_presses_in_pause": float(np.mean(n == 0)),
+                "presses_in_pause_quantiles": {str(q): float(np.quantile(n, q)) for q in (0.5, 0.75, 0.9, 0.99)}}
+    return {"stall": f(st), "control": f(ct)}
+
+
+# ---------------- H2（P7） ----------------
 
 def h2_unit(w, cfg, cs1=True):
     """窓の終わり w ごとに (信号, 正例か, 経過の十分位, [w − 30, w] の文字の押下の数, 時刻)。と、
-    正例の的（u か t0）の数と、正例の窓を 1 つ以上持てた的の数。"""
+    正例の的（u か t0）の数と、正例の窓を 1 つ以上持てた的の数と、長い休止の中で除いた窓の数と、
+    停滞と数えなかった長い休止の手前の負例の窓の数（(w, w + 先読み] にその休止の u がある負例。
+    cfg["h2_neg_drop_prelong"] が真なら、その負例を除く・P9）。"""
     anchors = stall_anchors(w, cfg)
     look = cfg["h2_look"]
     targets = sorted(a[0] if cfg["h2_pos"] == "u" else a[4] for a in anchors)
+    ends = w.text[1:] + [w.t_end]
+    long_spans = sorted((a, b) for a, b in zip(w.text, ends) if b - a >= STALL_GAP)
+    anchor_us = {a[0] for a in anchors}
+    nonstall_long = sorted(a for a, _ in long_spans if a not in anchor_us)
     if cfg["h2_excl"] == "resume":  # 30 秒以上の全ての休止の u から再開（次の文字の入力・無ければ課題の最後の押下）まで
-        ends = w.text[1:] + [w.t_end]
-        spans = sorted((a, b) for a, b in zip(w.text, ends) if b - a >= STALL_GAP)
-    else:  # v5 の版: 停滞の行になった u の休止だけ
+        spans = long_spans
+    else:  # 感度（P9）: 停滞の行になった u の休止だけ
         spans = sorted((a[0], a[2]) for a in anchors)
     st = [(a[1], a[4]) for a in anchors]
-    out, got, n_ex = [], set(), 0
+    out, got, n_ex, n_pre = [], set(), 0, 0
     blocks = [tuple(b) for b in (w.blocks if cs1 else [[w.t_start, w.t_end]])]
     for b0, b1 in blocks:
         t = b0 + WARM
@@ -461,18 +524,22 @@ def h2_unit(w, cfg, cs1=True):
                     while k < len(targets) and targets[k] <= t + look:
                         got.add(targets[k])
                         k += 1
-                    dec = min(9, int(10 * (t - b0) / max(1, b1 - b0)))
-                    nt = bisect.bisect_right(w.text, t) - bisect.bisect_right(w.text, t - 30_000)
-                    out.append((sv, pos, dec, nt, t))
+                    j2 = bisect.bisect_right(nonstall_long, t)
+                    pre = not pos and j2 < len(nonstall_long) and nonstall_long[j2] <= t + look
+                    n_pre += pre
+                    if not (pre and cfg["h2_neg_drop_prelong"]):
+                        dec = min(9, int(10 * (t - b0) / max(1, b1 - b0)))
+                        nt = bisect.bisect_right(w.text, t) - bisect.bisect_right(w.text, t - 30_000)
+                        out.append((sv, pos, dec, nt, t))
             t += H2_STEP
-    return out, len(set(targets)), len(got), n_ex
+    return out, len(set(targets)), len(got), n_ex, n_pre
 
 
 def h2_writer(units, rng, cfg, cs1=True):
-    wins, n_tg, n_got, n_ex = [], 0, 0, 0
+    wins, n_tg, n_got, n_ex, n_pre = [], 0, 0, 0, 0
     for k, w in enumerate(units):
-        o, a, b, c = h2_unit(w, cfg, cs1)
-        n_tg, n_got, n_ex = n_tg + a, n_got + b, n_ex + c
+        o, a, b, c, e = h2_unit(w, cfg, cs1)
+        n_tg, n_got, n_ex, n_pre = n_tg + a, n_got + b, n_ex + c, n_pre + e
         for sv, pos, dec, nt, t in o:
             wins.append({"sig": sv, "pos": pos, "dec": dec, "nt": nt, "id": (k, t)})
     # 押下の数の五分位（書き手の中）
@@ -494,7 +561,7 @@ def h2_writer(units, rng, cfg, cs1=True):
                 rng.shuffle(pool)
                 if pool[:N_MATCHED]:
                     matched[key].append((kf(x), i, pool[:N_MATCHED]))
-    return wins, matched, (n_tg, n_got, n_ex)
+    return wins, matched, (n_tg, n_got, n_ex, n_pre)
 
 
 def h2_pairs(wins, matched, sig, key=None, eps=EPS):
@@ -522,7 +589,8 @@ def h2_summary(writer_h2, seed, hide=True):
            "positives": sum(sum(1 for x in w if x["pos"]) for w, _, _ in writer_h2),
            "matched_positives": sum(len(m["dec"]) for _, m, _ in writer_h2),
            "targets": tg, "targets_with_positive_window": gt, "share_targets_with_positive": gt / tg if tg else None,
-           "windows_excluded_long_pause": sum(x[2][2] for x in writer_h2)}
+           "windows_excluded_long_pause": sum(x[2][2] for x in writer_h2),
+           "negative_windows_before_nonstall_long_pause": sum(x[2][3] for x in writer_h2)}
     for sig in SIGS:
         U3 = np.array([h2_pairs(w, m, sig) for w, m, _ in writer_h2], dtype=float)
         M3 = np.array([h2_pairs(w, m, sig, "dec") for w, m, _ in writer_h2], dtype=float)
@@ -550,7 +618,7 @@ def h2_summary(writer_h2, seed, hide=True):
     return out
 
 
-# ---------------- H3（P6） ----------------
+# ---------------- H3（P8・記述） ----------------
 
 def ml_rows(writer_rows, layer="none", exclude_missing=False):
     """停滞（1・重み 1）と、その停滞に引かれた対照（0・重み 1/k）。量の欠けは NaN のまま残す（主）。
@@ -628,7 +696,7 @@ def paired_auc(pred, y, keys, cids):
 
 def oof_pred(X, y, wt, split_groups, spec, seed):
     """書き手でまとめた 5 分割の予測。学習が失敗したら None（失敗 = fit か predict が ValueError を出した回。
-    収束しない警告は失敗に数えない・P6）。"""
+    収束しない警告は失敗に数えない・P8）。"""
     from sklearn.model_selection import GroupKFold
     make, fkw = spec
     pred = np.full(len(y), np.nan)
@@ -674,7 +742,7 @@ H2_ML_MAX_POS = 50
 
 
 def h2_ml_rows(writers, writer_h2, rng):
-    """陰性でないことの対照（P6）: 揃えない比べの正例を書き手ごとに最大 50 件（無作為）と、同じ書き手の負例を
+    """揃えない窓の対照（P8・記述）: 揃えない比べの正例を書き手ごとに最大 50 件（無作為）と、同じ書き手の負例を
     正例 1 つにつき 5 件（無作為）。量は窓の終わり w で作る（欠けは NaN のまま）。負例の重みは 正例の数 / 負例の数
     （書き手の中で正例と負例の重みの和を等しくする）。"""
     X, y, wt, g, cells, cids = [], [], [], [], [], []
@@ -704,6 +772,8 @@ def h3_branch(ci, fails, n_rep, control_ok=True):
 
 def h3_summary(writers, writer_rows, writer_h2, seed, hide=True, n_rep=None, exclude_missing=False,
                control=True, which=("logreg", "hgb")):
+    """H3（P8・記述・判断 18）: 学習器の AUC と区間・揃えない窓の対照・門（埋め込みの回収）を並べる。分岐は P6 と
+    同じ規則で記述として出し、判定には使わない。"""
     n_rep = N_BOOT_ML if n_rep is None else n_rep
     X, y, wt, g, cells, cids, miss = ml_rows(writer_rows, exclude_missing=exclude_missing)
     out = {"rows": int(len(y)), "stalls": int(y.sum()), "missing": miss, "n_rep": n_rep}
@@ -722,19 +792,33 @@ def h3_summary(writers, writer_rows, writer_h2, seed, hide=True, n_rep=None, exc
             # 揃えない窓の対照は記述（判断 17）。可否は seen でも出す
             cci, cfails = boot_oof(Xc, yc, wc, gc, cc, cic, spec, seed, n_rep)
             e |= {"window_control_ci_width": (cci[1] - cci[0]) if cci else None, "window_control_boot_failures": cfails,
-                  "window_control_passed": cfails <= FAIL_MAX * n_rep and cci is not None and cci[0] > BAND_HI}
+                  "window_control_lower_gt_055": cfails <= FAIL_MAX * n_rep and cci is not None and cci[0] > BAND_HI}
         if not hide:
             a = oof_auc(X, y, wt, g, cells, cids, spec, seed)
             e |= {"auc": a, "ci95": ci}
             if control:
                 ac = oof_auc(Xc, yc, wc, gc, cc, cic, spec, seed)
                 e |= {"window_control_auc": ac, "window_control_ci95": cci,
-                      "branch": h3_branch(ci, fails, n_rep, gok)}
+                      "branch_described": h3_branch(ci, fails, n_rep, gok)}
             else:
-                e["branch_without_control"] = h3_branch(ci, fails, n_rep)
+                e["branch_described_without_gate"] = h3_branch(ci, fails, n_rep)
         out[name] = e
     if not hide and control:
-        out["H3_supported"] = all(out[m]["branch"] == 1 for m in which)
+        # H3 は記述（判断 18）: 支持の語を使わず、2 つの学習器の分岐が両方 1 かを並べるだけ
+        out["H3_both_learners_branch1_described"] = all(out[m]["branch_described"] == 1 for m in which)
+    return out
+
+
+def gate_jitter(g, cids, seed):
+    """門の揺らぎ: [0, 1) の一様を、書き手の番号 × cid ごとに 1 つ（SEED + 9・行の順に初めて出た鍵から引く）。"""
+    jit = np.random.default_rng(seed + 9)
+    jmap = {}
+    out = np.empty(len(cids))
+    for i in range(len(cids)):
+        key = (int(g[i]),) + tuple(cids[i])
+        if key not in jmap:
+            jmap[key] = jit.random()
+        out[i] = jmap[key]
     return out
 
 
@@ -745,13 +829,9 @@ def h3_recovery(writer_rows, seed, target=0.58, n_rep=50):
     col = RATE_DIFF_COL
     keys = [(g[i], cells[i]) for i in range(len(y))]
     # この量は偶数の整数しか取らず AUC が d について階段になるので、先に [0, 1) の一様の揺らぎを全ての行に足して
-    # 同値を崩す（同じ揺らぎは cid ごとに 1 つ・SEED + 9）。仮のデータの作り方で、実のデータの判定には入らない
-    jit = np.random.default_rng(seed + 9)
-    jmap = {}
-    base = X[:, col].copy()
-    for i in range(len(y)):
-        jmap.setdefault(cids[i], jit.random())
-        base[i] += jmap[cids[i]]
+    # 同値を崩す（同じ揺らぎは 書き手の番号 × cid ごとに 1 つ・SEED + 9。対照の cid は書き手の中でだけ一意なので
+    # 書き手の番号を添える）。仮のデータの作り方で、実のデータの判定には入らない
+    base = X[:, col] + gate_jitter(g, cids, seed)
 
     def feat_auc(d):
         return paired_auc(base + np.where(y == 1, d, 0.0), y, keys, cids)
@@ -961,12 +1041,12 @@ def load_cs1(work, hold_p, mode, variant=None):
         for k, v in saved.items():
             setattr(k6, k, v)
     if chk["onset_mismatch_units"] or chk["theta_mismatch"] or chk["stderr_nonempty_units"] or chk["override_mismatch_units"]:
-        sys.exit("照合が崩れた（P10）: " + json.dumps(chk))
+        sys.exit("照合が崩れた（P11）: " + json.dumps(chk))
     chk["writers_eligible"] = len(writers)
     return writers, chk
 
 
-# ---------------- 感度（P8） ----------------
+# ---------------- 感度（P9） ----------------
 
 def h1_run(writers, cfg, seed, hide, feats=False, burst=None, light=True):
     cnt = Counter()
@@ -982,23 +1062,30 @@ def h2_run(writers, cfg, seed, hide):
 
 
 def sensitivities(writers, seed, hide, main_rows, main_h2, replay_dirs, hold_p, mode, n_keep=None):
-    """P8 の感度。判定に使わない。seen では件数と区間の幅だけ（hide）。replay の中間は 1 本ずつ読み直す
+    """P9 の感度。判定に使わない。seen では件数と区間の幅だけ（hide）。replay の中間は 1 本ずつ読み直す
     （照合は計算の前に一度済ませてある・読み直しでも同じ照合をかける）。"""
     S = {}
     # H1 だけが変わるもの
     for name, kw in (("ctrl_hi_10s", {"ctrl_hi": 10_000}), ("ctrl_hi_60s", {"ctrl_hi": 60_000}),
                      ("align_sep_sym", {"align": "sep_sym"}), ("layer_until_resume", {"layer": "until_resume"}),
                      ("stall_without_condA", {"stall_condA": False}),
-                     ("neither_condA", {"stall_condA": False, "ctrl_condA": False})):
+                     ("neither_condA", {"stall_condA": False, "ctrl_condA": False}),
+                     ("ctrl_within_task", {"ctrl_scope": "task"})):
         S[name] = h1_run(writers, cfg_of(**kw), seed, hide)[1]
-    # 床にない対だけ（判断 17）: 主の行から、停滞の u と対照の u の両方で p_stuck ≥ 0.02 の対だけを残す（引き直さない）
-    off = [off_floor_rows(r) for r in main_rows]
-    S["h1_off_floor"] = {"stall_rows_main_layer": sum(1 for r in off for c, _, _, _ in r if c[1] == "none"),
-                         "H1": h1_summary(off, seed, "none", hide, SIGS, True)}
+    # 書き手均等の重み（主の行のまま）
+    S["h1_writer_equal_weight"] = {"H1": h1_writer_equal(main_rows, seed, "none", hide)}
+    # 床にない対だけ（判断 17・18）: 主の行から、停滞と対照の両方で p_stuck ≥ 0.02 の対だけを残す（引き直さない）。
+    # 始点 u − 30 秒の水準で選ぶ版が主の感度、終点 u の水準で選ぶ版は併記
+    for name, at in (("h1_off_floor_start", "start"), ("h1_off_floor_end", "end")):
+        off = [off_floor_rows(r, at) for r in main_rows]
+        S[name] = {"stall_rows_main_layer": sum(1 for r in off for c, _, _, _ in r if c[1] == "none"),
+                   "H1": h1_summary(off, seed, "none", hide, SIGS, True)}
+        del off
     # H2 だけが変わるもの
     for name, kw in (("h2_look_30s", {"h2_look": 30_000}), ("h2_look_120s", {"h2_look": 120_000}),
                      ("h2_positive_t0", {"h2_pos": "t0"}), ("h2_exclusion_v1", {"h2_excl": "v1"}),
-                     ("h2_exclusion_stall_rows_only", {"h2_excl": "anchors"})):
+                     ("h2_exclusion_stall_rows_only", {"h2_excl": "anchors"}),
+                     ("h2_negatives_without_pre_nonstall_long_pause", {"h2_neg_drop_prelong": True})):
         S[name] = {"H2": h2_run(writers, cfg_of(**kw), seed, hide)[1]}
     # 信号の差の窓（H1 と H2）
     for name, dw in (("signal_diff_window_15s", 15_000), ("signal_diff_window_60s", 60_000)):
@@ -1038,7 +1125,7 @@ def run(mode, argv):
         sys.exit("試しの走りは実験の dir の外に出す")
     if mode == "holdout":
         holdout_gate(out, smoke)
-    # 照合は全部、計算の前に終える（P10）
+    # 照合は全部、計算の前に終える（P11）
     replay_dirs, replay_chk = {}, {}
     for name in REPLAY_VARIANTS:
         vw = work.rstrip("/") + "_" + name
@@ -1061,6 +1148,7 @@ def run(mode, argv):
     ev = h1_summary(rows, seed, "event", hide)
     res["H1_event_layer_described"] = ev
     res["level_floor_ceiling"] = level_floor_share(rows)
+    res["in_pause_described"] = pause_summary(rows)
     if not hide:
         res["threshold_table"] = threshold_table(rows)
     rng2 = random.Random(seed + 6)
@@ -1096,23 +1184,28 @@ def run(mode, argv):
 
 
 def holdout_gate(out, smoke):
-    """取り置きは run-confirm-holdout.sh からだけ回す（P10）: 試しの走りを拒み、出力先は実験の results_holdout、
-    開始の記録 start.json が HEAD にコミット済みで中身が同じこと。"""
+    """取り置きは run-confirm-holdout.sh の 2 段目からだけ回す（P11）: 試しの走りを拒み、出力先は実験の results_holdout、
+    開始の記録 start.json と計算の開始の記録 compute.json が HEAD にコミット済みで中身が同じこと、compute.json に書いた
+    OSF の start.json の SHA-256 が手元の start.json と同じこと。"""
     if smoke:
         sys.exit("取り置きでは試しの走り（CONFIRM_SMOKE）をしない")
     exp = os.path.realpath(os.path.join(HERE, ".."))
     if os.path.realpath(out) != os.path.join(exp, "results_holdout"):
         sys.exit("取り置きの出力先は実験の results_holdout だけ")
-    sp = os.path.join(exp, "results_holdout", "start.json")
     repo = subprocess.run(["git", "-C", exp, "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
-    rel = os.path.relpath(sp, repo)
-    r = subprocess.run(["git", "-C", repo, "show", "HEAD:" + rel], capture_output=True)
-    if r.returncode != 0 or not os.path.exists(sp) or r.stdout != open(sp, "rb").read():
-        sys.exit("開始の記録がコミットされていない（run-confirm-holdout.sh を通す）")
+    got = {}
+    for name in ("start.json", "compute.json"):
+        sp = os.path.join(exp, "results_holdout", name)
+        r = subprocess.run(["git", "-C", repo, "show", "HEAD:" + os.path.relpath(sp, repo)], capture_output=True)
+        if r.returncode != 0 or not os.path.exists(sp) or r.stdout != open(sp, "rb").read():
+            sys.exit("%s がコミットされていない（run-confirm-holdout.sh の 1 段目と 2 段目を通す）" % name)
+        got[name] = r.stdout
+    if json.loads(got["compute.json"]).get("osf_start_sha256") != hashlib.sha256(got["start.json"]).hexdigest():
+        sys.exit("OSF に添えた start.json の SHA-256 が手元の start.json と違う")
 
 
 def shifted_pairs(rows, sig, d, eps):
-    """停滞の値に d を足した仮の信号での、書き手ごとの (勝ち, 対)（P7 の推定量・主の層）。"""
+    """停滞の値に d を足した仮の信号での、書き手ごとの (勝ち, 対)（P6 の推定量・主の層）。"""
     by = {}
     for cell, sv, _, ctrl in rows:
         if cell[1] != "none":
@@ -1148,20 +1241,24 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
             full = {eps: np.array([shifted_pairs(r, sig, d, eps) for r in rows], dtype=float) for eps in EPS_SET}
             reached = full[EPS][:, 0].sum() / full[EPS][:, 1].sum()
             wp = {eps: full[eps][:, :2] for eps in EPS_SET}
-            rng = np.random.default_rng(seed + 8)
-            res = {"eq_eps_0.001": 0, "eq_both_eps": 0, "precision_insufficient": 0}
-            for _ in range(n_draw):
-                sel = rng.choice(len(rows), n_hold, replace=False)
-                ts = full[EPS][sel, 2].sum() / full[EPS][sel, 1].sum()
-                br = {}
-                for eps in EPS_SET:
-                    ci = boot_ratio(wp[eps][sel], np.random.default_rng(int(rng.integers(1 << 31))))
-                    br[eps] = h1_branch(ts, ci)  # 本番と同じ関数（退化と区間なしの扱いを含む）
-                res["eq_eps_0.001"] += br[0.001] == 1
-                res["eq_both_eps"] += br[0.001] == 1 and br[0.0] == 1
-                res["precision_insufficient"] += br[0.001] == "precision_insufficient"
-            out[sig]["target_%.2f" % tgt] = {k: v / n_draw for k, v in res.items()} | {
-                "reached_auc": float(reached), "calibrated": bool(abs(reached - tgt) <= CAL_TOL)}
+            e = {"reached_auc": float(reached), "calibrated": bool(abs(reached - tgt) <= CAL_TOL)}
+            # 非復元（319 人から 138 人）は母集団に近づき、誤って同等とする割合を小さく見積もりうる（判断 18）。
+            # 復元で引く版を並べる。乱数は版ごとに SEED + 8 から引き直す
+            for how, rep in (("without_replacement", False), ("with_replacement", True)):
+                rng = np.random.default_rng(seed + 8)
+                res = {"eq_eps_0.001": 0, "eq_both_eps": 0, "precision_insufficient": 0}
+                for _ in range(n_draw):
+                    sel = rng.choice(len(rows), n_hold, replace=rep)
+                    ts = full[EPS][sel, 2].sum() / full[EPS][sel, 1].sum()
+                    br = {}
+                    for eps in EPS_SET:
+                        ci = boot_ratio(wp[eps][sel], np.random.default_rng(int(rng.integers(1 << 31))))
+                        br[eps] = h1_branch(ts, ci)  # 本番と同じ関数（退化と区間なしの扱いを含む）
+                    res["eq_eps_0.001"] += br[0.001] == 1
+                    res["eq_both_eps"] += br[0.001] == 1 and br[0.0] == 1
+                    res["precision_insufficient"] += br[0.001] == "precision_insufficient"
+                e[how] = {k: v / n_draw for k, v in res.items()}
+            out[sig]["target_%.2f" % tgt] = e
     return out
 
 
@@ -1225,12 +1322,17 @@ def selftest():
     assert h3_branch([0.46, 0.54], 10, 200) == 1 and h3_branch([0.46, 0.54], 11, 200) == "undeterminable_fit_failures"
     assert h3_branch([0.46, 0.54], 0, 200, False) == "undeterminable"
     # 床にない対: 停滞が床なら行ごと落とし、対照は床にないものだけ残す
-    sv_hi, sv_lo = {"p_stuck": 0.5}, {"p_stuck": 0.01}
+    sv_hi, sv_lo = {"p_stuck": 0.5, "p_stuck_start": 0.5}, {"p_stuck": 0.01, "p_stuck_start": 0.01}
     rows_f = [(("other", "none"), sv_hi, None, [((0, 1), sv_lo, None), ((0, 2), sv_hi, None)]),
               (("other", "none"), sv_lo, None, [((0, 3), sv_hi, None)]),
               (("other", "none"), sv_hi, None, [((0, 4), sv_lo, None)])]
-    of = off_floor_rows(rows_f)
-    assert len(of) == 1 and [c[0] for c in of[0][3]] == [(0, 2)], of
+    for at in ("start", "end"):
+        of = off_floor_rows(rows_f, at)
+        assert len(of) == 1 and [c[0] for c in of[0][3]] == [(0, 2)], of
+    # 始点で選ぶ版は終点の水準を見ない（終点だけ床にある停滞も残る）・終点の版は落とす
+    sv_mix = {"p_stuck": 0.01, "p_stuck_start": 0.5}
+    rows_m = [(("other", "none"), sv_mix, None, [((0, 5), sv_hi, None)])]
+    assert len(off_floor_rows(rows_m, "start")) == 1 and off_floor_rows(rows_m, "end") == []
     # 床の割合: 別の書き手の同じ対照の id を別に数える
     lf = level_floor_share([[rows_f[0]], [rows_f[0]]])
     assert lf["control"]["n"] == 4 and lf["stall"]["n"] == 2, lf
@@ -1270,17 +1372,46 @@ def selftest():
     i2 = u2.text.index(91_000)
     assert net(u2, 91_000) < 1 and not control_ok(u2, i2, MAIN, True) and control_ok(u2, i2, cfg_of(ctrl_condA=False), True)
     # H2: u 基準の正例は w = 60〜95 秒の 8 窓（w ∈ [u, 再開] は除く）・t0 基準は 75〜95 秒の 5 窓
-    o, ntg, ngot, nex = h2_unit(u1, MAIN)
-    assert [x[4] for x in o] == list(range(60_000, 100_000, 5_000)) and all(x[1] for x in o) and (ntg, ngot) == (1, 1), o
-    o, _, _, _ = h2_unit(u1, cfg_of(h2_pos="t0"))
+    o, ntg, ngot, nex, npre = h2_unit(u1, MAIN)
+    assert [x[4] for x in o] == list(range(60_000, 100_000, 5_000)) and all(x[1] for x in o) and (ntg, ngot, npre) == (1, 1, 0), o
+    o, _, _, _, _ = h2_unit(u1, cfg_of(h2_pos="t0"))
     assert [x[4] for x in o if x[1]] == list(range(75_000, 100_000, 5_000)) and len(o) == 8, o
     # H2 の除外: 停滞の行にならない長い休止の中の窓も除く（主）・停滞の行の休止だけを除く版では負例に残る
     u0 = fake_unit(pr, onsets=[])
-    o, _, _, nex = h2_unit(u0, MAIN)
+    o, _, _, nex, npre = h2_unit(u0, MAIN)
     assert [x[4] for x in o] == list(range(60_000, 100_000, 5_000)) and not any(x[1] for x in o) and nex == 9, (o, nex)
-    o, _, _, _ = h2_unit(u0, cfg_of(h2_excl="anchors"))
+    o, _, _, _, _ = h2_unit(u0, cfg_of(h2_excl="anchors"))
     assert len(o) == 17, len(o)
-    # 停滞にも条件 A: u の時点で純産出 < 1 の停滞は除く（v5 の版では残る）
+    # 停滞と数えなかった長い休止（u = 100 秒）の手前の負例 8 窓を数え、感度では負例から除く（判断 18）
+    assert npre == 8, npre
+    o, _, _, _, npre2 = h2_unit(u0, cfg_of(h2_neg_drop_prelong=True))
+    assert o == [] and npre2 == 8, (o, npre2)
+    # 対照から除く区間は全ての onset（停滞の行にならない onset でも、その [s − 30 秒, t0] の対照は除く・P4）
+    assert stall_anchors(u_bad) == [] and not any(control_ok(u_bad, i, MAIN, True) for i in range(len(u_bad.text) - 1))
+    # 休止の中の押下と出来事（[u − 30 秒, 休止の終わり]）
+    pe = sorted(pr + [(120_000, "backspace")])
+    u_ev = fake_unit(pe, onsets=[], events=[[120_500, "run"]])
+    assert pause_info(u_ev, 100_000, 160_000, True) == {"in_pause_presses": 1, "in_pause_event": True}
+    assert pause_info(u_ev, 100_000, 110_000, True) == {"in_pause_presses": 0, "in_pause_event": False}
+    # 課題の中だけの比べ: 対照の候補が別の課題にしかない停滞は、課題の中の版では対照なし
+    pr4 = [(t, "alphabetic") for t in range(0, 100_001, 500)] + [(t, "alphabetic") for t in range(160_000, 200_001, 500)]
+    u4 = fake_unit(pr4)
+    assert len(stall_anchors(u4)) == 1
+    c_w, c_t = Counter(), Counter()
+    r_w = h1_writer([u4, u1], random.Random(1), c_w, MAIN)
+    r_t = h1_writer([u4, u1], random.Random(1), c_t, cfg_of(ctrl_scope="task"))
+    assert len(r_w) == 2 and len(r_t) == 1 and c_t["stall_no_control"] == 1 and r_t[0][0] == ("other", "none", 1), (r_w, r_t)
+    # 書き手均等の重み: AUC 1（対 1）と AUC 0（対 3）の書き手 → 書き手均等 0.5・対を合わせると 0.25
+    one = lambda v: {"d_p_stuck": v, "d_ewma_x": v}  # noqa: E731
+    wa = [(("other", "none"), one(1.0), None, [((0, 1), one(0.0), None)])]
+    wb = [(("other", "none"), one(0.0), None, [((0, j), one(1.0), None) for j in range(3)])]
+    we = h1_writer_equal([wa, wb], 1, hide=False)["d_p_stuck"]["eps_0.001"]
+    assert we["writer_mean_auc"] == 0.5 and we["writers"] == 2, we
+    assert h1_summary([wa, wb], 1, hide=False, sigs=SIGS, light=True)["d_p_stuck"]["eps_0.001"]["pooled_auc"] == 0.25
+    # 門の揺らぎ: 別の書き手の同じ cid には別の揺らぎ・同じ書き手の同じ cid には同じ揺らぎ
+    jg = gate_jitter(np.array([0, 0, 1]), [("c", 0, 5), ("c", 0, 5), ("c", 0, 5)], 1)
+    assert jg[0] == jg[1] and jg[0] != jg[2], jg
+    # 停滞にも条件 A: u の時点で純産出 < 1 の停滞は除く（P9 の感度の版では残る）
     pr3 = [(t, "alphabetic") for t in range(0, 60_001, 500)] + [(60_100 + 100 * j, "backspace") for j in range(130)] + \
           [(73_100, "alphabetic")] + [(t, "alphabetic") for t in range(150_000, 200_001, 500)]
     u3 = fake_unit(pr3, onsets=[[103_100, 103_600, 500, 300]])
