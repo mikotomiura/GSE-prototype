@@ -8,6 +8,9 @@
 - `"1"` の完全一致だけを強制とする（`true`・`yes` などは従来どおり）。誤って未設定や別の値でも hosted になる側の誤りは費用の増加だけで安全側だが、意味を一つにしておく。
 - `check` の runs-on の式と、`matrix.runner` 名（`gse-win-selfhosted`）は変えない。ジョブ名は hosted で走っても `check (gse-win-selfhosted, …)` のままになる（既存の fallback と同じ）。
 - 戻し方: `gh variable delete GSE_WIN_FORCE_HOSTED`。コードを戻す必要はない。
+- 変数が空でも "1" でもないときは、従来どおり probe したうえで notice を 1 行出す（設定の誤りを見分けるため）。
+- 効く範囲: Actions は発火した ref の ci.yml を使う。push の CI は、その枝にこの変更が入っているときだけ変数が効く。main 向けの PR は merge ref の ci.yml なので、main に入った後は自動で効く。
+- 判定役の `decide-win-runner` は強制中も `gse-mac`（この MacBook）で走る。強制で hosted だけで完結するわけではないが、G-GEAR を守る目的には影響しない。
 
 ## 変更対象
 

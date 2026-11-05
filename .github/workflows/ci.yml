@@ -272,6 +272,9 @@ jobs:
             echo "::notice::vars.GSE_WIN_FORCE_HOSTED=1 -> hosted (forced; gse-win is not probed)"
             decide "$HOSTED"
           fi
+          if [ -n "${GSE_WIN_FORCE_HOSTED:-}" ]; then
+            echo "::notice::vars.GSE_WIN_FORCE_HOSTED='${GSE_WIN_FORCE_HOSTED}' is not \"1\" -> probe as usual"
+          fi
 
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "::notice::RUNNER_STATUS_TOKEN is unset -> hosted (fail-safe)"
