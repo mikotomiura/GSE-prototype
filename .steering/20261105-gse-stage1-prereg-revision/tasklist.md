@@ -11,5 +11,5 @@
 - [x] 材料を読む（ADR-047 全文の Decision・Consequences・Migration、ADR-048 D3・決めずに残すもの、overview の判断 7〜16、S-DQ）
 - [x] 事前登録に項目を足す
 - [x] check_citations.py（違反なし）
-- [ ] code-reviewer ＋ /cross-review
-- [ ] コミット（push は研究者）
+- [x] code-reviewer ＋ /cross-review（1 巡目・判断 3、Codex 2 巡目・判断 4。3 巡目は回さない）
+- [x] コミット（push は研究者）
