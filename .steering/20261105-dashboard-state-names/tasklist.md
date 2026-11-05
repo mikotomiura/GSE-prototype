@@ -6,7 +6,7 @@
 - [x] functional-design.md:249 の注を直す
 - [x] 検査が緑・tsc が緑
 - [x] 画面で文を見る
-- [ ] code-reviewer・security-checker・/cross-review
+- [x] code-reviewer・security-checker・/cross-review（判断 4・5）
 - [ ] コミット（push と PR は研究者の手元で）
 
 ## 場面ごとに使うもの

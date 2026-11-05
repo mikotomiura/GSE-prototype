@@ -67,7 +67,8 @@ KATA = 'ァ-ヶー'
 STATE_NAMES = re.compile(
     r'(?<![A-Za-z])(Flow|Incubation|Stuck)(?![A-Za-z])'
     r'|(?<![' + KATA + r'])(フロー|インキュベーション|スタック)(?![' + KATA + r'])'
-    r'|推定状態'
+    r'|推定状態',
+    re.IGNORECASE,  # 'stuck状態です' も拾う (2026-11-05 の /cross-review)
 )
 BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
 LINE_COMMENT = re.compile(r'(?<!:)//[^\n]*')
@@ -79,6 +80,7 @@ UI_CONTROLS_HIT = [
     "'状態はStuckです'",
     "'状態はＳｔｕｃｋです'",
     "'フロー状態です'",
+    "'stuck状態です'",
 ]
 UI_CONTROLS_MISS = [
     "'推定の結果は表示していません。'",
@@ -88,6 +90,7 @@ UI_CONTROLS_MISS = [
     "'スタックトレースを送る'",
     "{/* 推定状態 (Flow) はコメント */}",
     "// 推定状態 Stuck はコメント",
+    "isStuck ? '作業中' : '待機中'",
 ]
 
 
