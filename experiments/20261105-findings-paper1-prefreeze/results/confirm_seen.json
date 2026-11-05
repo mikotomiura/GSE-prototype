@@ -53,9 +53,11 @@
   "stall_condA": true,
   "align": "newline",
   "layer": "past30",
+  "ctrl_scope": "writer",
   "h2_look": 60000,
   "h2_pos": "u",
-  "h2_excl": "resume"
+  "h2_excl": "resume",
+  "h2_neg_drop_prelong": false
  },
  "h1_counts": {
   "stall_anchors": 16126,
@@ -285,6 +287,30 @@
    "n": 49014
   }
  },
+ "in_pause_described": {
+  "stall": {
+   "n": 11887,
+   "share_in_pause_event": 0.45907293682173805,
+   "share_zero_presses_in_pause": 0.504416589551611,
+   "presses_in_pause_quantiles": {
+    "0.5": 0.0,
+    "0.75": 4.0,
+    "0.9": 12.0,
+    "0.99": 60.0
+   }
+  },
+  "control": {
+   "n": 49014,
+   "share_in_pause_event": 0.05439262251601583,
+   "share_zero_presses_in_pause": 0.6841106622597625,
+   "presses_in_pause_quantiles": {
+    "0.5": 0.0,
+    "0.75": 1.0,
+    "0.9": 5.0,
+    "0.99": 18.0
+   }
+  }
+ },
  "H2": {
   "windows": 446556,
   "positives": 113541,
@@ -293,6 +319,7 @@
   "targets_with_positive_window": 14475,
   "share_targets_with_positive": 0.8976187523254372,
   "windows_excluded_long_pause": 876089,
+  "negative_windows_before_nonstall_long_pause": 112318,
   "d_p_stuck": {
    "unmatched_ci_width": 0.007067673556398313,
    "matched_ci_width": 0.007114342591150569,
@@ -328,15 +355,17 @@
   "window_control_rows": 88360,
   "gate_recovery": {
    "target": 0.58,
-   "reached_auc": 0.5800003870076802,
+   "reached_auc": 0.5799999150470946,
    "calibrated": true,
    "logreg": {
-    "recovered_lower_gt_055": true,
-    "boot_failures": 0
+    "lower_gt_055": true,
+    "boot_failures": 0,
+    "recovered_lower_gt_055": true
    },
    "hgb": {
-    "recovered_lower_gt_055": true,
-    "boot_failures": 0
+    "lower_gt_055": true,
+    "boot_failures": 0,
+    "recovered_lower_gt_055": true
    }
   },
   "logreg": {
@@ -345,7 +374,7 @@
    "gate_passed": true,
    "window_control_ci_width": 0.019044143726575036,
    "window_control_boot_failures": 0,
-   "window_control_passed": false
+   "window_control_lower_gt_055": false
   },
   "hgb": {
    "ci_width": 0.020956016364531038,
@@ -353,7 +382,7 @@
    "gate_passed": true,
    "window_control_ci_width": 0.018639067453845803,
    "window_control_boot_failures": 0,
-   "window_control_passed": false
+   "window_control_lower_gt_055": false
   }
  },
  "sensitivity": {
@@ -592,7 +621,100 @@
     }
    }
   },
-  "h1_off_floor": {
+  "ctrl_within_task": {
+   "counts": {
+    "stall_anchors": 16126,
+    "stall_excluded_condA_true": 2136,
+    "control_candidates": 187738,
+    "control_excluded_condA_true": 18033,
+    "stall_rows_newline_none": 1697,
+    "stall_rows_other_none": 10184,
+    "stall_rows_other_event": 3221,
+    "stall_rows_newline_event": 529,
+    "stall_warm": 455,
+    "stall_no_control": 40
+   },
+   "H1": {
+    "d_p_stuck": {
+     "eps_0.001": {
+      "pairs": 761937,
+      "tie_share": 0.058727952573506735,
+      "ci_width": 0.013152058274369938
+     },
+     "eps_0": {
+      "pairs": 761937,
+      "tie_share": 0.0008097782362583784,
+      "ci_width": 0.013098976217334468
+     }
+    },
+    "d_ewma_x": {
+     "eps_0.001": {
+      "pairs": 761937,
+      "tie_share": 0.0033677325028184744,
+      "ci_width": 0.015081641349225072
+     },
+     "eps_0": {
+      "pairs": 761937,
+      "tie_share": 0.00015093111372725042,
+      "ci_width": 0.01509169367277996
+     }
+    }
+   }
+  },
+  "h1_writer_equal_weight": {
+   "H1": {
+    "d_p_stuck": {
+     "eps_0.001": {
+      "writers": 312,
+      "ci_width": 0.021174952897837884
+     },
+     "eps_0": {
+      "writers": 312,
+      "ci_width": 0.021702806195592783
+     }
+    },
+    "d_ewma_x": {
+     "eps_0.001": {
+      "writers": 312,
+      "ci_width": 0.02177843593285772
+     },
+     "eps_0": {
+      "writers": 312,
+      "ci_width": 0.021730460189642253
+     }
+    }
+   }
+  },
+  "h1_off_floor_start": {
+   "stall_rows_main_layer": 6067,
+   "H1": {
+    "d_p_stuck": {
+     "eps_0.001": {
+      "pairs": 356876,
+      "tie_share": 0.012699088759120816,
+      "ci_width": 0.024077966421839236
+     },
+     "eps_0": {
+      "pairs": 356876,
+      "tie_share": 0.0009807328035508131,
+      "ci_width": 0.024087760658035307
+     }
+    },
+    "d_ewma_x": {
+     "eps_0.001": {
+      "pairs": 356876,
+      "tie_share": 0.004214348961544065,
+      "ci_width": 0.024075646085061297
+     },
+     "eps_0": {
+      "pairs": 356876,
+      "tie_share": 0.0002213654042300407,
+      "ci_width": 0.024069110359873247
+     }
+    }
+   }
+  },
+  "h1_off_floor_end": {
    "stall_rows_main_layer": 4467,
    "H1": {
     "d_p_stuck": {
@@ -630,6 +752,7 @@
     "targets_with_positive_window": 13953,
     "share_targets_with_positive": 0.8652486667493489,
     "windows_excluded_long_pause": 883781,
+    "negative_windows_before_nonstall_long_pause": 73374,
     "d_p_stuck": {
      "unmatched_ci_width": 0.009252309919173807,
      "matched_ci_width": 0.00901807656976994,
@@ -657,6 +780,7 @@
     "targets_with_positive_window": 14917,
     "share_targets_with_positive": 0.9250279052461863,
     "windows_excluded_long_pause": 859801,
+    "negative_windows_before_nonstall_long_pause": 134217,
     "d_p_stuck": {
      "unmatched_ci_width": 0.00557211215967135,
      "matched_ci_width": 0.006134586362103733,
@@ -684,6 +808,7 @@
     "targets_with_positive_window": 9158,
     "share_targets_with_positive": 0.5679027657199553,
     "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 115627,
     "d_p_stuck": {
      "unmatched_ci_width": 0.011324116756592562,
      "matched_ci_width": 0.014622790195125912,
@@ -711,6 +836,7 @@
     "targets_with_positive_window": 15458,
     "share_targets_with_positive": 0.9585762123279177,
     "windows_excluded_long_pause": 183730,
+    "negative_windows_before_nonstall_long_pause": 190709,
     "d_p_stuck": {
      "unmatched_ci_width": 0.007283657098161811,
      "matched_ci_width": 0.006761575512133244,
@@ -738,6 +864,7 @@
     "targets_with_positive_window": 14832,
     "share_targets_with_positive": 0.9197569142998884,
     "windows_excluded_long_pause": 564946,
+    "negative_windows_before_nonstall_long_pause": 171781,
     "d_p_stuck": {
      "unmatched_ci_width": 0.006916859474578041,
      "matched_ci_width": 0.007400919377853421,
@@ -753,6 +880,34 @@
      "R_boot_nonfinite": 0,
      "unmatched_pairs": 402070458.0,
      "matched_pairs": 27432689.0
+    }
+   }
+  },
+  "h2_negatives_without_pre_nonstall_long_pause": {
+   "H2": {
+    "windows": 334238,
+    "positives": 113541,
+    "matched_positives": 112577,
+    "targets": 16126,
+    "targets_with_positive_window": 14475,
+    "share_targets_with_positive": 0.8976187523254372,
+    "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 112318,
+    "d_p_stuck": {
+     "unmatched_ci_width": 0.007969743050322275,
+     "matched_ci_width": 0.008116606962834338,
+     "unmatched_tie_share": 0.050011577151084695,
+     "R_boot_nonfinite": 0,
+     "unmatched_pairs": 110752636.0,
+     "matched_pairs": 9878506.0
+    },
+    "d_ewma_x": {
+     "unmatched_ci_width": 0.007357645594005813,
+     "matched_ci_width": 0.007469787458903476,
+     "unmatched_tie_share": 0.002424664637327458,
+     "R_boot_nonfinite": 0,
+     "unmatched_pairs": 110752636.0,
+     "matched_pairs": 9878506.0
     }
    }
   },
@@ -803,6 +958,7 @@
     "targets_with_positive_window": 14475,
     "share_targets_with_positive": 0.8976187523254372,
     "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 112318,
     "d_p_stuck": {
      "unmatched_ci_width": 0.005284102065339913,
      "matched_ci_width": 0.005343765324621441,
@@ -870,6 +1026,7 @@
     "targets_with_positive_window": 14468,
     "share_targets_with_positive": 0.897184670718095,
     "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 112230,
     "d_p_stuck": {
      "unmatched_ci_width": 0.00879635537878376,
      "matched_ci_width": 0.00925024262043489,
@@ -939,6 +1096,7 @@
     "targets_with_positive_window": 13992,
     "share_targets_with_positive": 0.8800553493930436,
     "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 118115,
     "d_p_stuck": {
      "unmatched_ci_width": 0.006901421206293112,
      "matched_ci_width": 0.00761307110105236,
@@ -1014,6 +1172,7 @@
     "targets_with_positive_window": 9235,
     "share_targets_with_positive": 0.8933062487908686,
     "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 152890,
     "d_p_stuck": {
      "unmatched_ci_width": 0.008568723342254725,
      "matched_ci_width": 0.008558381545505978,
@@ -1089,6 +1248,7 @@
     "targets_with_positive_window": 18750,
     "share_targets_with_positive": 0.9007494235203689,
     "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 80189,
     "d_p_stuck": {
      "unmatched_ci_width": 0.006177944102837785,
      "matched_ci_width": 0.0066410735240804986,
@@ -1164,6 +1324,7 @@
     "targets_with_positive_window": 9792,
     "share_targets_with_positive": 0.8884050081654872,
     "windows_excluded_long_pause": 876089,
+    "negative_windows_before_nonstall_long_pause": 151696,
     "d_p_stuck": {
      "unmatched_ci_width": 0.008856916931450742,
      "matched_ci_width": 0.009426742161616042,
@@ -1642,48 +1803,90 @@
   "n_draw": 500,
   "d_p_stuck": {
    "target_0.45": {
-    "eq_eps_0.001": 0.004,
-    "eq_both_eps": 0.0,
-    "precision_insufficient": 0.0,
     "reached_auc": 0.45000002359802926,
-    "calibrated": true
+    "calibrated": true,
+    "without_replacement": {
+     "eq_eps_0.001": 0.004,
+     "eq_both_eps": 0.0,
+     "precision_insufficient": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 0.032,
+     "eq_both_eps": 0.016,
+     "precision_insufficient": 0.0
+    }
    },
    "target_0.50": {
-    "eq_eps_0.001": 1.0,
-    "eq_both_eps": 1.0,
-    "precision_insufficient": 0.0,
     "reached_auc": 0.4999997640197072,
-    "calibrated": true
+    "calibrated": true,
+    "without_replacement": {
+     "eq_eps_0.001": 1.0,
+     "eq_both_eps": 1.0,
+     "precision_insufficient": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 1.0,
+     "eq_both_eps": 1.0,
+     "precision_insufficient": 0.0
+    }
    },
    "target_0.55": {
-    "eq_eps_0.001": 0.016,
-    "eq_both_eps": 0.016,
-    "precision_insufficient": 0.0,
     "reached_auc": 0.5500002123822635,
-    "calibrated": true
+    "calibrated": true,
+    "without_replacement": {
+     "eq_eps_0.001": 0.016,
+     "eq_both_eps": 0.016,
+     "precision_insufficient": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 0.048,
+     "eq_both_eps": 0.044,
+     "precision_insufficient": 0.0
+    }
    }
   },
   "d_ewma_x": {
    "target_0.45": {
-    "eq_eps_0.001": 0.002,
-    "eq_both_eps": 0.002,
-    "precision_insufficient": 0.0,
     "reached_auc": 0.45000002359802926,
-    "calibrated": true
+    "calibrated": true,
+    "without_replacement": {
+     "eq_eps_0.001": 0.002,
+     "eq_both_eps": 0.002,
+     "precision_insufficient": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 0.032,
+     "eq_both_eps": 0.026,
+     "precision_insufficient": 0.0
+    }
    },
    "target_0.50": {
-    "eq_eps_0.001": 1.0,
-    "eq_both_eps": 1.0,
-    "precision_insufficient": 0.0,
     "reached_auc": 0.5,
-    "calibrated": true
+    "calibrated": true,
+    "without_replacement": {
+     "eq_eps_0.001": 1.0,
+     "eq_both_eps": 1.0,
+     "precision_insufficient": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 1.0,
+     "eq_both_eps": 1.0,
+     "precision_insufficient": 0.0
+    }
    },
    "target_0.55": {
-    "eq_eps_0.001": 0.002,
-    "eq_both_eps": 0.002,
-    "precision_insufficient": 0.0,
     "reached_auc": 0.5499999764019707,
-    "calibrated": true
+    "calibrated": true,
+    "without_replacement": {
+     "eq_eps_0.001": 0.002,
+     "eq_both_eps": 0.002,
+     "precision_insufficient": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 0.03,
+     "eq_both_eps": 0.026,
+     "precision_insufficient": 0.0
+    }
    }
   }
  }
