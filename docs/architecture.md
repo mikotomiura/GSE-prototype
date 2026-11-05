@@ -180,7 +180,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 ### 4.4 analysis::engine — HMM エンジン
 
-- **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う
+- **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う（2026-11-05 注: HMM 0.5.0 は段 1 の終わりまで固定し、`p_stuck` の役は固定の比べの床と H3 の手がかりに限る・ADR-044。推定は招待の契機を作らない・ADR-047 D2。3 状態の名前は主張に使わない・ADR-046 D1）
 - **依存先**: analysis::features, **analysis::heads**（§4.4b）
 - **インターフェース**: `new_for_domain()`, `set_domain()`, `head_id()`, `update()`, `update_silence()`, `register_keystroke()`, `state_probs()`
 - **状態管理**: HMM 内部状態（forward 確率、EWMA 軸値、display_probs、**走行中の head**）を Mutex で保護
