@@ -439,6 +439,10 @@ def run(argv):
             e = {"auc_055": conversion(ws, s, d55), "auc_050": conversion(ws, s, d50)}
             if show_real:
                 e["real_delta0"] = conversion(ws, s, 0.0) | {"pooled_auc": pooled_auc(ws, s)}
+            else:
+                # δ の符号と大きさは実の AUC の向きを示す（F5）。CS1 では書かない（初回の出力で漏れた・notes の逸脱 1）
+                for v in e.values():
+                    v.pop("delta")
             conv[name][s] = e
     json.dump(conv, open(os.path.join(out, "width_conversion.json"), "w"), indent=1)
 
