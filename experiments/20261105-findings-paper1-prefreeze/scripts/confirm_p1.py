@@ -1251,6 +1251,9 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
     ずらしの量は書かない（向きが分かるため）。ε = 0 の分岐も同じ仮の信号で出す。"""
     n_hold = round(146 * 319 / 338)
     out = {"n_hold": n_hold, "n_draw": n_draw}
+    # 2 つの信号を合わせた割合（判断 20）: 版と目標ごとに乱数を SEED + 8 から引き直すので、draw の i 番目の 138 人は
+    # 信号どうしで同じになる。draw ごとの分岐を残し、同じ draw で両方の信号が同等と判定された割合を出す
+    draws = {}
     for sig in SIGS:
         out[sig] = {}
         for tgt in targets:
@@ -1270,8 +1273,10 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
             for how, rep in (("without_replacement", False), ("with_replacement", True)):
                 rng = np.random.default_rng(seed + 8)
                 res = {"eq_eps_0.001": 0, "eq_both_eps": 0, "precision_insufficient": 0}
+                per = draws.setdefault((tgt, how), {}).setdefault(sig, {"ok": e["calibrated"], "sel": [], "eq001": [], "eqboth": []})
                 for _ in range(n_draw):
                     sel = rng.choice(len(rows), n_hold, replace=rep)
+                    per["sel"].append(hash(sel.tobytes()))
                     ts = full[EPS][sel, 2].sum() / full[EPS][sel, 1].sum()
                     br = {}
                     for eps in EPS_SET:
@@ -1280,10 +1285,27 @@ def boundary_calibration(rows, seed, n_draw=500, targets=(0.45, 0.50, 0.55)):
                     res["eq_eps_0.001"] += br[0.001] == 1
                     res["eq_both_eps"] += br[0.001] == 1 and br[0.0] == 1
                     res["precision_insufficient"] += br[0.001] == "precision_insufficient"
+                    per["eq001"].append(br[0.001] == 1)
+                    per["eqboth"].append(br[0.001] == 1 and br[0.0] == 1)
                 # 仮の信号が目標に届かなければ、その目標での割合は出さない（較正できない）
                 e[how] = {k: v / n_draw for k, v in res.items()} if e["calibrated"] else None
             out[sig]["target_%.2f" % tgt] = e
+    out["joint_both_signals"] = {}
+    for (tgt, how), per in draws.items():
+        out["joint_both_signals"].setdefault("target_%.2f" % tgt, {})[how] = joint_share(per)
     return out
+
+
+def joint_share(per):
+    """信号ごとの draw の分岐から、同じ draw で全ての信号が同等と判定された割合。どれかの信号が目標に届かなければ None。
+    draw の引き（138 人）が信号どうしで違えば止める（合わせた割合の前提が崩れるため）。"""
+    v = list(per.values())
+    if not all(x["ok"] for x in v):
+        return None
+    if any(x["sel"] != v[0]["sel"] for x in v):
+        raise RuntimeError("較正の draw の引きが信号どうしで違う")
+    n = len(v[0]["sel"])
+    return {name: sum(all(x[k][i] for x in v) for i in range(n)) / n for k, name in (("eq001", "eq_eps_0.001"), ("eqboth", "eq_both_eps"))}
 
 
 def level_floor_share(rows, layer="none"):
@@ -1357,6 +1379,16 @@ def selftest():
     sv_mix = {"p_stuck": 0.01, "p_stuck_start": 0.5}
     rows_m = [(("other", "none"), sv_mix, None, [((0, 5), sv_hi, None)])]
     assert len(off_floor_rows(rows_m, "start")) == 1 and off_floor_rows(rows_m, "end") == []
+    # 2 つの信号を合わせた較正の割合: 同じ draw で両方が同等のときだけ数える・届かない信号があれば None・引きが違えば止める
+    pa = {"ok": True, "sel": [1, 2, 3, 4], "eq001": [True, True, False, True], "eqboth": [True, False, False, True]}
+    pb = {"ok": True, "sel": [1, 2, 3, 4], "eq001": [True, False, True, True], "eqboth": [False, False, True, True]}
+    assert joint_share({"a": pa, "b": pb}) == {"eq_eps_0.001": 0.5, "eq_both_eps": 0.25}
+    assert joint_share({"a": pa, "b": dict(pb, ok=False)}) is None
+    try:
+        joint_share({"a": pa, "b": dict(pb, sel=[1, 2, 3, 5])})
+        raise AssertionError("引きの違いで止まらなかった")
+    except RuntimeError:
+        pass
     # 床の割合: 別の書き手の同じ対照の id を別に数える
     lf = level_floor_share([[rows_f[0]], [rows_f[0]]])
     assert lf["control"]["n"] == 4 and lf["stall"]["n"] == 2, lf
