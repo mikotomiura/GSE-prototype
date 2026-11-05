@@ -125,6 +125,7 @@ on_exit() {
   fi
   exit "$rc"
 }
+DONE=0  # 環境に DONE があっても完走の印にしない
 trap on_exit EXIT
 trap 'exit 130' INT TERM
 
