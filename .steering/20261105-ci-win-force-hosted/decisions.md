@@ -44,3 +44,11 @@ PR #387 の 2 回目の run（41991152937）で、hosted の Windows の check �
 候補は (a) hosted のときだけ上限を 60 分、(b) hosted では Loop の 3 段を飛ばす、(c) 取り消しを許して手で判断する。研究者は (a) を採った。検査の中身は変えない。条件は「matrix が Windows のレグで、`decide-win-runner` の出力が `["self-hosted","gse-win"]` でない」（強制・fallback・出力の欠落はどれも hosted に振られるため）。費用は 1 回につき Windows の約 45 分（分数では約 90 分）。
 
 同じ run の frontend-check（ubuntu）は `loop-spawn-cleanup-test.sh` の 11a（別 id の同時 spawn の 3 ラウンド目で rcb=1）の 1 件で赤だった。手元では 3 回とも 118 件すべて通った。同時起動の競合を見るテストのため、たまに落ちる既存の検査と見て、この PR では直さない。次の run でも落ちたら別に調べる。
+
+## 判断 8: frontend-check の 11a の赤を既知としてマージし、別タスクで調べる（研究者の決定・2026-11-05）
+
+3 回目の run（41999707186・ec8406e2）で、check は両 OS とも緑。Windows は `GitHub Actions 1000008130`（windows-latest）で 09:07〜09:40 の 33 分半、60 分の上限に収まった。この PR の目的（11 月中 Windows を hosted で回す）は確かめられた。
+
+frontend-check は 2 回続けて `loop-spawn-cleanup-test.sh` の 11a だけで赤（2 回目 round 3、3 回目 round 2・3）。判断 7 で「たまに落ちる」と見たのは誤りで、環境の変化による再現する失敗だった。最後に通った main の run（2026-10-14）は image `ubuntu24/20261004.327`・git 2.55.0 で 11a は OK、今の run は image `ubuntu26/20261025.179`・git 2.56.0。テストと `scripts/loop-spawn.sh` は 2026-09-26 から変わっていない。手元の Mac は git 2.54.0 で 3 回とも通る。
+
+研究者は「#387 をマージし、11a は別タスク」を採った（他の案: この PR で直す、frontend-check を ubuntu-24.04 に固定する）。引き継ぎは `.steering/_handoff/next-session-ci-loop-spawn-11a-git256.md`（メインのチェックアウト）。R1・M5 の PR も、直るまでは同じ赤が出る。
