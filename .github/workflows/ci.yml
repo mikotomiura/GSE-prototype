@@ -251,6 +251,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+          # 2026-11-05 追加: リポジトリの変数 GSE_WIN_FORCE_HOSTED が "1" なら、gse-win が online でも
+          #   hosted に固定する。probe は online/offline だけを見て busy を見ないので、G-GEAR が
+          #   別の計算で忙しい間（2026-11 中）にランナーが起き上がると、CI のビルドとテストが計算と重なる。
+          #   戻すときは `gh variable delete GSE_WIN_FORCE_HOSTED`（未設定・"1" 以外は従来どおり probe する）。
+          #   記録: .steering/20261105-ci-win-force-hosted/
+          GSE_WIN_FORCE_HOSTED: ${{ vars.GSE_WIN_FORCE_HOSTED }}
         run: |
           set -uo pipefail
           HOSTED='["windows-latest"]'
@@ -261,6 +267,11 @@ jobs:
             echo "resolved runs-on = $1"
             exit 0
           }
+
+          if [ "${GSE_WIN_FORCE_HOSTED:-}" = "1" ]; then
+            echo "::notice::vars.GSE_WIN_FORCE_HOSTED=1 -> hosted (forced; gse-win is not probed)"
+            decide "$HOSTED"
+          fi
 
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "::notice::RUNNER_STATUS_TOKEN is unset -> hosted (fail-safe)"
