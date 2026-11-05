@@ -45,7 +45,7 @@ if [ -e "$OUT" ]; then
   FAILED_DIR="$OUT.failed.$(date -u +%Y%m%dT%H%M%SZ)"
   mv "$OUT" "$FAILED_DIR"
   git -C "$REPO_ROOT" add -A "$EXP_REL/$(basename "$OUT")" "$EXP_REL/$(basename "$FAILED_DIR")"
-  git -C "$REPO_ROOT" commit -q -m "取り置きの確認の前の走りを退避（$EXP_REL/$(basename "$FAILED_DIR")・理由: $CONFIRM_RERUN_REASON）[skip ci]"
+  git -C "$REPO_ROOT" commit -q -m "取り置きの確認の前の走りを退避（$EXP_REL/$(basename "$FAILED_DIR")・理由: ${CONFIRM_RERUN_REASON}）[skip ci]"
 fi
 
 # 2. 開始の記録（コミットしてから計算に入る）
@@ -59,8 +59,8 @@ STEP=start
 record_failure() {
   "$PY" -I -c "import json,sys,datetime;json.dump({'failed_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'step':sys.argv[1],'kind':sys.argv[2]},open(sys.argv[3],'w'),indent=1)" "$STEP" "$1" "$OUT/failed.json" || true
   git -C "$REPO_ROOT" add "$EXP_REL/results_holdout" || true
-  git -C "$REPO_ROOT" commit -q -m "取り置きの確認の中断（段: $STEP・$1）[skip ci]" -- "$EXP_REL/results_holdout" || true
-  echo "途中で止まった（$STEP）。直さずに記録し、研究者に聞く（P10）" >&2
+  git -C "$REPO_ROOT" commit -q -m "取り置きの確認の中断（段: ${STEP}・${1}）[skip ci]" -- "$EXP_REL/results_holdout" || echo "中断の記録をコミットできなかった。手で記録してから研究者に聞く" >&2
+  echo "途中で止まった（${STEP}）。直さずに記録し、研究者に聞く（P10）" >&2
 }
 trap 'record_failure error' ERR
 trap 'record_failure interrupted; exit 130' INT TERM
