@@ -38,5 +38,6 @@
 - [x] 投稿先の適合（`paper-write/venue-fit.md`・判断 8・JEDM）
 - [x] JEDM の最近の論文 3〜5 本の長さと節の並び・テンプレートの確認（Step 0 の残り・6 本・中央値約 10,200 語・上限の規定なし・予算は `paper-write/length-log.md`）
 - [x] 主張と新規性の初回案（Step 1）→ /reimagine → 比べて確定（判断 9・`paper-write/outline.md`）
-- [ ] 事前登録の草案（判断 6 の 4 つの計算・同等性の幅を先に決める）→ attack-me（Codex を加えるかを先に聞く）→ OSF で凍結
+- [x] 事前登録の草案（判断 10・`paper-write/prereg-draft.md`）
+- [ ] attack-me（Codex を加えるかを先に聞く）→ OSF で凍結
 - [ ] 計算（Mac）
