@@ -15,4 +15,4 @@
 - [x] probe の script が `GSE_WIN_FORCE_HOSTED=1` で `["windows-latest"]` を出す（`gse-win` が online でも）
 - [x] 未設定・`0`・空文字では従来どおり probe する（online なら self-hosted）
 - [x] actionlint の指摘が増えない
-- [ ] 変数を設定した後の実際の run で、`check (gse-win-selfhosted, …)` が hosted で走ったことをログの notice で確かめる
+- [ ] 変数を設定した後の実際の run で、`decide-win-runner` のログの強制の notice と、`check (gse-win-selfhosted, …)` のログ冒頭の `Runner name:`・`Machine name:` が GitHub の hosted のもの（G-GEAR でない）であることの両方を確かめる

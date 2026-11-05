@@ -20,3 +20,13 @@ code-reviewer（HIGH 無し）と /cross-review の Claude 側の指摘を受け
 ## 判断 4: Codex の機密フィルタの誤検知と `--ack-filtered`
 
 1 回目の /cross-review で、`scripts/secrets-filter.sh` が行内マッチ 3 件で止めた（Codex は 0 回）。3 件は ci.yml の文脈の行 2 つ（シークレットの参照名 `secrets.RUNNER_STATUS_TOKEN` を env に渡す行と、token の変数が空かを見る行）と、この decisions.md の判断 2 の説明文。どれも値を含まないことを私が diff で確かめた。判断 2 の説明文は変数名の書き方を言い換えた。ci.yml の 2 行は変えられないので、2 回目は `--ack-filtered` で回す。
+
+## 判断 5: Codex の指摘の採否（2026-11-05・/cross-review 2 回目）
+
+Codex は HIGH 無し。3 件とも採った。
+
+- MEDIUM「notice だけでは実際の実行先を確かめていない」: 受け入れ条件と tasklist に、`check` の Windows のレグのログ冒頭の `Runner name:`・`Machine name:` を足した。
+- MEDIUM「変数を設定する前に self-hosted と決まって待機しているジョブは守られない」: 変数を設定する直前に queued・in_progress の run が 0 件であることを確かめる段を tasklist に足した。2026-11-05 の時点では queued・in_progress・waiting はどれも 0 件。
+- LOW「強制のときに probe しないことの検査が弱い」: 呼ばれた回数を記録する偽の `gh` で測った。強制=1 で 0 回（windows-latest）、`0` で 1 回（self-hosted）。
+
+Codex の使用は 1 回。量はメインの台帳へ写した。
