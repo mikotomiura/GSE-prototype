@@ -28,7 +28,7 @@
 | `docs/architecture/gse-design-map.md:9` | §0 の位置づけ（同じ文と、言い方の見直しは research-positioning §1 の改訂で） | 上と同じ |
 | `docs/research-positioning.md` §1 の L0〜L2 の表（38 行ほか） | 確証の核は L0（X 摩擦・Y 前進と Q1・Q2 の順序の一致）・L1 Stuck・L2 Need | ADR-043（段 1 のラベルは C4 の 6 択＋Q1・Q2）・ADR-045（停滞の中身の内訳が H1）。L0 を確証の核に残すかは議論の論点 |
 | `docs/architecture/personalization-and-online-learning.md` 全体 | 個人適応を前提にした設計（V3「個人適応の必要性」） | ADR-046 D3（学習は 1 人ごとが既定）と、coauthor-ml-improve（構造を良くすると 1 人ごとの効きは小さい） |
-| アウトカム（ADR-024 D1 を引く文書の全体） | 主は `receipt_free_resumption` | stall-decomposition（O1 の停滞の単位で 1b が 99.5% 情報なし）・受領がデータで 0.13%〜81% |
+| アウトカム（ADR-024 D1 を引く文書の全体） | 主は `receipt_free_resumption` | stall-decomposition（O1 の停滞の単位で 1b が 99.5% 情報なし）・public-data-landscape（再開までの受領 KLiCKe 0.13%・CoAuthor 22%、5 分の地平で 3.0%・81%） |
 
 ## 確かめたが、ずれではなかったもの
 

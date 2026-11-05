@@ -8,6 +8,7 @@
 - [x] 研究者の決定（AskUserQuestion・1 問ずつ）→ decisions.md
 - [x] 上流の文書を直す・ADR-047 を起票（research-positioning §1・agent-shared・design-map・wbs・functional-design・architecture.md・references [V370]）。gse-v2-overview.md は否定の文脈なので直さなかった
 - [x] /cross-review 1 巡目（判断 7）で直した
-- [ ] /cross-review 2 巡目
-- [ ] 次のタスクの候補: 段 1 の事前登録の改訂（ADR-047 Migration 3・D3 の層と 2 つの内訳・D5 の選び方・申告を求めない区間と回答率の層別・識別と保留の評価の量と許容する誤り）
+- [x] /cross-review 2 巡目（判断 8・9）で直した
+- [ ] /cross-review 3 巡目（直しの確かめ）
+- [ ] 次のタスクの候補: 段 1 の事前登録の改訂（ADR-047 Migration 3・D3 の層と 2 つの内訳・D5 の選び方・申告を求めない区間と回答率の層別・識別と保留の評価の量と許容する誤り・条件を見つけるデータと確かめるデータの分け方・契機の時点までの観測だけでの評価し直し）
 - [ ] push は研究者・PR は研究者が確かめてから（[skip ci]）
