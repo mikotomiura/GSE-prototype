@@ -1888,6 +1888,38 @@
      "precision_insufficient": 0.0
     }
    }
+  },
+  "joint_both_signals": {
+   "target_0.45": {
+    "without_replacement": {
+     "eq_eps_0.001": 0.0,
+     "eq_both_eps": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 0.006,
+     "eq_both_eps": 0.004
+    }
+   },
+   "target_0.50": {
+    "without_replacement": {
+     "eq_eps_0.001": 1.0,
+     "eq_both_eps": 1.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 1.0,
+     "eq_both_eps": 1.0
+    }
+   },
+   "target_0.55": {
+    "without_replacement": {
+     "eq_eps_0.001": 0.0,
+     "eq_both_eps": 0.0
+    },
+    "with_replacement": {
+     "eq_eps_0.001": 0.008,
+     "eq_both_eps": 0.008
+    }
+   }
   }
  }
 }
