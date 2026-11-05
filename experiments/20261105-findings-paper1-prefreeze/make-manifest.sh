@@ -13,6 +13,7 @@ shasum -a 256 \
   experiments/20261031-coauthor-pre-request-signal/scripts/convert.py \
   experiments/20261031-coauthor-pre-request-signal/scripts/add_feat.py \
   src-tauri/prereg/p1-episode.json \
+  docs/preregistration-p1-episode.md docs/adr/ADR-030-stall-onset-and-decision-episode.md \
   .steering/20261105-public-data-findings-paper/paper-write/prereg-draft.md \
   .steering/20261105-public-data-findings-paper/paper-write/prereg-draft.en.md \
   .steering/20261105-public-data-findings-paper/paper-write/prereg-en-check.md > "$E/confirm-manifest.sha256"
