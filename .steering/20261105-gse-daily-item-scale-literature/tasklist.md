@@ -20,5 +20,5 @@
 - [x] research-positioning.md への還元の判断
 - [x] check_citations.py 違反なし
 - [x] code-reviewer ＋ /cross-review（1 巡目・判断 6）
-- [ ] /cross-review 2 巡目（修正の差分）
+- [x] /cross-review 2 巡目（修正の差分・判断 7。3 巡目は回さない）
 - [x] 単独コミット（d2f71bfe・push は研究者）
