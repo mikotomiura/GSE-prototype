@@ -11,7 +11,7 @@
 ## 1 残り（この順）
 
 1. 実機の確かめ（研究者・トレイの後から差し込む項目は AX から見えない）: 第 1 週で始めてトレイに「印の説明と設定」が無い → 第 2 週で始めて 2 秒ほど後に項目が出る・押すと設定の窓が開く → 「出さない」にしても項目が残り窓を開ける → 停止で項目が消え、第 1 週で再開しても出ない → 状態表示と終了の項目が崩れない。招待の図像が第 2 週で出ることは、契機を立ちやすくした `~/.gse/invitation_trigger.json`（例 `{"kind":"estimator","p_stuck":0.5,"hold_ms":10000}`）で早く見られる。
-2. push の前に `git fetch` し origin/main を取り込む（T3 の d6b1e978 以降）。テストを回し直す。G-GEAR が空いているかを研究者に確かめてから push（`feature/*` は self-hosted の CI が走る）。PR も研究者に確かめてから。
+2. ~~push の前に `git fetch` し origin/main を取り込む（T3 の d6b1e978 以降）。テストを回し直す。~~ 済み（2026-11-05・`9d49cac2`・origin/main `be9f14de` まで。ソースの重なり 0・衝突は文書 8 ファイル。cargo test 1054 passed・clippy 0・fmt 差分なし・tsc 0・emit_schema byte-equal）。実機の確かめはこの取り込みの後のコードで行う。残りは: G-GEAR が空いているかを研究者に確かめてから push（`feature/*` は self-hosted の CI が走る）。PR も研究者に確かめてから。
 3. gse-dataset の schema parity: `schema/current.json` に `InvitationCondition` が増えた。gse-dataset 側の同期は別作業。
 4. `_handoff/README.md` の T1 の行を、push の時に更新する。
 
