@@ -1,6 +1,26 @@
 {
- "git_head": "09f3323063c53a97e10d88098cee553f05577d2e",
- "git_dirty_paths": [],
- "confirm_p1_sha256": "a17930a772969cc04d80df0c758d43efe96614959708ec318db8c8133a2eba20",
- "prefreeze_sha256": "c1ab0c1825e7b6ce4268d646b25ae209c9253c52c64a82818c6feed4789fc632"
+ "git_head": "d2a43888b3b6b71cec78ed5f617471986af350f3",
+ "git_dirty_paths": [
+  " M experiments/20261105-findings-paper1-prefreeze/notes.md",
+  " M experiments/20261105-findings-paper1-prefreeze/results/confirm_seen.json",
+  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_control_summary_seen.json",
+  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_summary_q995_seen.json",
+  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_summary_w15_seen.json",
+  "?? experiments/20261105-findings-paper1-prefreeze/results/rebuild_summary_w60_seen.json"
+ ],
+ "manifest_now": [
+  "experiments/20261105-findings-paper1-prefreeze/run-confirm-holdout.sh: OK",
+  "experiments/20261105-findings-paper1-prefreeze/build-variants.sh: OK",
+  "experiments/20261105-findings-paper1-prefreeze/requirements-confirm.txt: OK",
+  "experiments/20261105-findings-paper1-prefreeze/scripts/confirm_p1.py: OK",
+  "experiments/20261105-findings-paper1-prefreeze/scripts/prefreeze.py: OK",
+  "experiments/20261105-findings-paper1-prefreeze/scripts/rebuild_onsets.py: OK",
+  "experiments/20261104-cs1-landscape/scripts/build_cs1.py: OK",
+  "experiments/20261104-cs1-landscape/scripts/analyze_cs1.py: OK",
+  "experiments/20261102-public-data-landscape/scripts/analyze_landscape.py: OK",
+  "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py: OK",
+  "experiments/20261031-coauthor-pre-request-signal/scripts/convert.py: OK",
+  "experiments/20261031-coauthor-pre-request-signal/scripts/add_feat.py: OK",
+  "src-tauri/prereg/p1-episode.json: OK"
+ ]
 }
