@@ -2098,22 +2098,31 @@ fn emit_s1_superseded(log_tx: &Sender<LogEntry>, t: u64, card: &crate::s1_driver
     }
 }
 
-/// 段 1: 駆動役の出来事を実行する（★ `S1_DRIVER` のロックの外で呼ぶ）。
+/// 段 1: 駆動役の出来事を実行する。
+///
+/// ★ **`S1_DRIVER` のロックを持ったまま呼ぶ**（`s1_apply_locked` 経由・2026-11-07 /cross-review の両者一致）。
+///   ロックの外で実行すると、取り消しのコマンドが割り込んだ後に問いの行が出うる・状態ファイルの書き込みと
+///   画面への通知の順が入れ替わりうる。中でするのは `try_send`・状態ファイルの書き込み・emit だけで、
+///   `LogState` のロックは取らない（ロックの順 `S1_DRIVER` → `LogState` を崩さない）。
 fn run_s1_effects(
     app: &tauri::AppHandle,
     log_tx: &Sender<LogEntry>,
     effects: Vec<crate::s1_driver::Effect>,
     view: &crate::s1_driver::S1CardView,
-) {
+) -> S1EffectOutcome {
     use crate::s1_driver::Effect;
     let mut changed = false;
-    // ★ 同意を読み直す（取り消しのコマンドが、ロックの外のこの実行の間に割り込んだとき、
-    //   取り消しの後に問いの行を 1 行も出さない・本タスクの判断 2）。
+    let mut outcome = S1EffectOutcome::default();
+    // ★ 同意を読む（取り消しの後に問いの行を 1 行も出さない・本タスクの判断 2）。
     let consent = crate::submission::s1_probe_consent_acknowledged();
     let paused = crate::recording::is_paused();
     for effect in effects {
+        let is_frame = matches!(effect, Effect::Frame { .. });
         let entry = match effect {
-            Effect::Frame { .. } | Effect::Suppressed { .. } | Effect::Assigned { .. }
+            Effect::Frame { .. }
+            | Effect::Suppressed { .. }
+            | Effect::Assigned { .. }
+            | Effect::DayRow(_)
                 if !consent =>
             {
                 None
@@ -2170,7 +2179,8 @@ fn run_s1_effects(
                 match crate::s1_day_state::state_path() {
                     Some(p) => {
                         if let Err(e) = crate::s1_day_state::save(&p, &state) {
-                            tracing::warn!("stage 1: day state not saved: {e}");
+                            tracing::warn!("stage 1: day state not saved (retry next tick): {e}");
+                            outcome.save_failed = true;
                         }
                     }
                     None => tracing::warn!("stage 1: day state path (home dir) is unavailable"),
@@ -2181,6 +2191,8 @@ fn run_s1_effects(
         if let Some(entry) = entry {
             if let Err(e) = log_tx.try_send(entry) {
                 tracing::warn!("stage 1: row not sent: {}", log_send_error(e));
+                // ★ 枠の行が送れなければ枠を作り直す（以後の行が seed の無い記録にならないように）
+                outcome.frame_failed |= is_frame;
             }
         }
     }
@@ -2188,6 +2200,34 @@ fn run_s1_effects(
         if let Err(e) = app.emit("s1_card_state", view) {
             tracing::warn!("s1_card_state emit failed: {}", e);
         }
+    }
+    outcome
+}
+
+/// 段 1: 出来事の実行の結果（駆動役にやり直しを知らせる）。
+#[derive(Debug, Default, Clone, Copy)]
+struct S1EffectOutcome {
+    /// `probe_frame` の行を送れなかった（次の tick で枠を作り直す）。
+    frame_failed: bool,
+    /// 状態ファイルを書けなかった（次の tick で書き直す）。
+    save_failed: bool,
+}
+
+/// 段 1: ロックを持ったまま出来事を実行し、結果を駆動役に返す。`view` を省けば今のカードを送る。
+fn s1_apply_locked(
+    app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    d: &mut crate::s1_driver::S1Driver,
+    fx: Vec<crate::s1_driver::Effect>,
+    view: Option<crate::s1_driver::S1CardView>,
+) {
+    let view = view.unwrap_or_else(|| d.visible_card(crate::recording::is_paused()));
+    let outcome = run_s1_effects(app, log_tx, fx, &view);
+    if outcome.frame_failed {
+        d.forget_frame();
+    }
+    if outcome.save_failed {
+        d.mark_unsaved();
     }
 }
 
@@ -2197,13 +2237,10 @@ fn with_s1_driver<R>(
     log_tx: &Sender<LogEntry>,
     f: impl FnOnce(&mut crate::s1_driver::S1Driver) -> (R, Vec<crate::s1_driver::Effect>),
 ) -> Option<R> {
-    let (r, fx, view) = {
-        let mut g = s1_driver_lock();
-        let d = g.as_mut()?;
-        let (r, fx) = f(d);
-        (r, fx, d.visible_card(crate::recording::is_paused()))
-    };
-    run_s1_effects(app, log_tx, fx, &view);
+    let mut g = s1_driver_lock();
+    let d = g.as_mut()?;
+    let (r, fx) = f(d);
+    s1_apply_locked(app, log_tx, d, fx, None);
     Some(r)
 }
 
@@ -2282,7 +2319,7 @@ fn spawn_s1_driver(
                 return;
             }
             let env = env_now(&mut offset);
-            let (fx, view) = {
+            {
                 let mut g = s1_driver_lock();
                 let Some(d) = g.as_mut() else { continue };
                 for t in press_rx.try_iter() {
@@ -2309,9 +2346,8 @@ fn spawn_s1_driver(
                 fx.extend(d.tick(&env, &mut || {
                     ProbeId::generate(&mut id_rng).as_str().to_string()
                 }));
-                (fx, d.visible_card(env.paused))
-            };
-            run_s1_effects(&app, &log_tx, fx, &view);
+                s1_apply_locked(&app, &log_tx, d, fx, None);
+            }
             let dropped = S1_INPUT_DROPPED.load(Ordering::Relaxed);
             if dropped != last_dropped {
                 tracing::warn!("stage 1: {} input events dropped (channel full)", dropped);
@@ -2328,13 +2364,11 @@ fn s1_on_pause_requested(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>) {
     }
     let wall = epoch_ms();
     let off = s1_utc_offset_secs();
-    let fx = {
-        let mut g = s1_driver_lock();
-        let Some(d) = g.as_mut() else { return };
-        d.on_pause_requested(wall, off)
-    };
+    let mut g = s1_driver_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.on_pause_requested(wall, off);
     // ★ 止めた後なので画面は空にする
-    run_s1_effects(app, log_tx, fx, &crate::s1_driver::S1CardView::None);
+    s1_apply_locked(app, log_tx, d, fx, Some(crate::s1_driver::S1CardView::None));
 }
 
 /// 段 1: 終了の直前（`End` の前）に、開いている日の問いの行を書く（★ どの終了経路でも `shutdown` が呼ぶ）。
@@ -2343,12 +2377,10 @@ fn s1_finish_before_end(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>) {
         return;
     }
     let wall = epoch_ms();
-    let fx = {
-        let mut g = s1_driver_lock();
-        let Some(d) = g.as_mut() else { return };
-        d.finish_before_end(wall)
-    };
-    run_s1_effects(app, log_tx, fx, &crate::s1_driver::S1CardView::None);
+    let mut g = s1_driver_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.finish_before_end(wall);
+    s1_apply_locked(app, log_tx, d, fx, Some(crate::s1_driver::S1CardView::None));
 }
 
 /// トレイの「終了」。★ 段 1 で日の問いの時間帯の中なら、日の問いを「答えて終了／答えずに終了」で出し、
@@ -2461,16 +2493,21 @@ fn revoke_s1_probe_consent(
     }
     let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
     // ★ 印を消すのと駆動役を止めるのを同じロックの中で（駆動スレッドが間に枠を作り直さない）
-    let (res, fx, view) = {
+    let res = {
         let mut g = s1_driver_lock();
         let res = crate::submission::remove_s1_probe_consent();
-        let fx = match (res.is_ok(), g.as_mut()) {
-            (true, Some(d)) => d.revoke(),
-            _ => Vec::new(),
-        };
-        (res, fx, crate::s1_driver::S1CardView::None)
+        if let (true, Some(d)) = (res.is_ok(), g.as_mut()) {
+            let fx = d.revoke();
+            s1_apply_locked(
+                &app,
+                &log_tx,
+                d,
+                fx,
+                Some(crate::s1_driver::S1CardView::None),
+            );
+        }
+        res
     };
-    run_s1_effects(&app, &log_tx, fx, &view);
     if res.is_ok() {
         tracing::info!("stage 1: consent to the questions revoked");
     }

@@ -64,6 +64,20 @@ EMITTER="src-tauri/src/lib.rs"
 #   `run_checks` の中に置くと `--selftest` からは**見えない**（★ selftest は `run_checks` を
 #   呼ばないため）。⚠️ 見えないまま比較すると、**対照が常に失敗する / 常に通る**ことになる。
 leak_name_hits () { grep -iE '(^|/)[go]1[-_]submit[^/]*\.json$' || true; }
+# ★ Rust のファイルから本番のコードだけを出す（2026-11-07・M5 の 2 本目）。
+#   列 0 の `#[cfg(test)]` の直後が `mod … {` のときだけ、そのブロック（列 0 の `}` まで）を除く。
+#   ⚠️ 「最初の `#[cfg(test)]` から後ろを全部捨てる」と、テストのモジュールの後ろに本番のコードがある
+#     ファイル（`input/hook.rs` など 5 本・security-checker が実測）の送出元が門から消える（fail-open）。
+#   ★ 改行の CR を先に落とす（CRLF の checkout でも切り出せるように）。コメントの行も除く。
+rust_production_src () {
+  awk '
+    { sub(/\r$/, "") }
+    skip { if ($0 ~ /^}/) skip = 0; next }
+    pending { pending = 0; if ($0 ~ /^mod[ \t]/) { if ($0 !~ /}[ \t]*$/) skip = 1; next } }
+    /^#\[cfg\(test\)\][ \t]*$/ { pending = 1; next }
+    { print }
+  ' "$1" | grep -vE '^[[:space:]]*(//|/\*|\*)' || true
+}
 # ⚠️ **実物の** Apps Script デプロイ ID（★ 40 文字以上）。
 #   ★ プレースホルダを誤検知しない閾値: 本 repo の `DRYRUN_NOT_A_REAL_DEPLOYMENT` は **28 文字**、
 #   実物は 57〜72 文字（★ 2026-08-29 に実測して 40 で分離できることを確認）。
@@ -115,10 +129,10 @@ else
   #   ★ `grep -q` が早く見つけて終わると、前段が SIGPIPE（141）で落ち、パイプ全体が偽になる。
   #   lib.rs が大きく、送出元が前の方にあると「送出元がまだ無い」と **黙って緑** を出していた
   #   （M5 の 2 本目で送出元ができて実測で踏んだ）。→ コメントを除いた本文を変数に取り、here-string で渡す。
-  #   ★ 検査のモジュール（最初の列 0 の `#[cfg(test)]` から後ろ）は本番のコードではないので外す
-  #     （`lib.rs` の本文の検査が、探す文字列そのものを持つため）。
+  #   ★ 検査のモジュール（列 0 の `#[cfg(test)]` の直後の `mod` のブロック）は本番のコードではないので外す
+  #     （`lib.rs` の本文の検査が、探す文字列そのものを持つため・`rust_production_src`）。
   esm_src=""
-  [ -f "$EMITTER" ] && esm_src=$(sed '/^#\[cfg(test)\]$/,$d' "$EMITTER" | grep -vE '^[[:space:]]*(//|/\*|\*)')
+  [ -f "$EMITTER" ] && esm_src=$(rust_production_src "$EMITTER")
   if [ ! -f "$EMITTER" ]; then
     ng "送出元の判定対象が無い: ${EMITTER}（★ 計器と同意の連動を判定できない）"
   #   ⚠️★★★ **コメント行を除いてから見る**（2026-09-14・`/cross-review` 2 巡目 HIGH-1）。
@@ -140,12 +154,13 @@ else
     #   O1 の判定を渡す門を足しても見逃さないように。定義（`fn activity_label_allowed(`）は数えない。
     #   ★ 第 2 引数も照らす（段 1 の同意の印を渡さない呼び出しは段 1 だけとみなさない）。
     esm_code=$(find "$(dirname "$EMITTER")" -name '*.rs' -type f | sort | while IFS= read -r f; do
-                 sed '/^#\[cfg(test)\]$/,$d' "$f" | grep -vE '^[[:space:]]*(//|/\*|\*)'
+                 rust_production_src "$f"
                done | tr -d '[:space:]')
     esm_calls=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(' | wc -l | tr -d ' ')
     esm_defs=$(printf '%s' "$esm_code" | grep -oF 'fnactivity_label_allowed(' | wc -l | tr -d ' ')
     esm_all=$(( ${esm_calls:-0} - ${esm_defs:-0} ))
-    esm_s1=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(crate::s1::is_s1(),crate::submission::s1_probe_consent_acknowledged()' | wc -l | tr -d ' ')
+    # ★ 末尾の `)` まで照らす（第 2 引数の後ろに式を続けた呼び出しを段 1 だけとみなさない・rustfmt の末尾のカンマは許す）
+    esm_s1=$(printf '%s' "$esm_code" | grep -oE 'activity_label_allowed\(crate::s1::is_s1\(\),crate::submission::s1_probe_consent_acknowledged\(\),?\)' | wc -l | tr -d ' ')
     # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
     #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
     #     *説明文* 自体にヒットして緑になる**（= 承認していないのに配れてしまう）。
@@ -825,6 +840,10 @@ selftest () {
     #   ★ 写さないと「計器があるか」の判定が常に「ファイルが無い」で赤になり、
     #     ⚠️ **連動の検査だけ変異試験が成立しない**（★ 本ゲートが戒めている型そのもの）。
     cp "$repo/$CAPS" "$fix/w/$CAPS" 2>/dev/null
+    # ★ 2026-11-07: テストの中に 6 択の門の呼び出しを持つ `logger.rs` も写す（テストのモジュールの切り出しを
+    #   本物と同じ状態で撃つ・security-checker LOW）。⚠️ `o1.rs` はここでは写さない（「o1.rs を含まないタグ」の
+    #   検査が成り立たなくなる）。定義の差し引きは selftest 2 の専用のケースで写して撃つ。
+    cp "$repo/src-tauri/src/logger.rs" "$fix/w/src-tauri/src/" 2>/dev/null
     printf 'x\n.timeout(std::time::Duration::from_secs(180))\n' > "$fix/w/src-tauri/src/reconcile.rs"
     cp "$repo/$MEASURE" "$fix/w/$MEASURE" 2>/dev/null
     # ⚠️★★★ **移植性ゲートも写す**（security-checker 指摘・2026-08-29）。
@@ -935,11 +954,18 @@ selftest () {
   # ★ 2026-11-07（判断 4）: 6 択の門に O1 の判定を渡す呼び出しが 1 つ混じると、承認を求めて赤に戻る。
   #   ⚠️ 対照の文字列は実行時に組む（検査対象のファイルに書かない・自己参照の空回りの先例）。
   o1_gate_arg="crate::o1""::is_o1()"
+  s1_gate_arg_early="crate::s1""::is_s1()"
   build; prepend_emitter_ "fn wired_o1() { activity_label_allowed(${o1_gate_arg}, true); }"
   expect_red "同意の ESM 追補が未承認" "6 択の門に O1 の判定（段 1 だけでない）"
   # ★ 別のファイルに O1 の判定を渡す門を足しても赤（`lib.rs` だけを見ていない）。
   build; printf 'fn other_file() { activity_label_allowed(%s, true); }\n' "$o1_gate_arg" > "$fix/w/src-tauri/src/zz_other_emitter.rs"
   expect_red "同意の ESM 追補が未承認" "別のファイルの 6 択の門に O1 の判定"
+  # ★ テストのモジュールの後ろに本番のコードが続くファイル（`input/hook.rs` 型）の O1 の門も数える。
+  build; printf '#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n\npub fn after_tests() { activity_label_allowed(%s, true); }\n' "$o1_gate_arg" > "$fix/w/src-tauri/src/zz_after_tests.rs"
+  expect_red "同意の ESM 追補が未承認" "テストのモジュールの後ろの本番のコードに O1 の判定"
+  # ★ 第 2 引数の後ろに式を続けた呼び出しは段 1 だけとみなさない。
+  build; prepend_emitter_ "fn wired_s1_or() { activity_label_allowed(${s1_gate_arg_early}, crate::submission::s1_probe_consent_acknowledged() || true); }"
+  expect_red "同意の ESM 追補が未承認" "6 択の門の第 2 引数の後ろに式"
   # ★ 第 1 引数が段 1 でも、第 2 引数が段 1 の同意の印でなければ段 1 だけとみなさない。
   s1_gate_arg="crate::s1""::is_s1()"
   build; prepend_emitter_ "fn wired_s1_no_ack() { activity_label_allowed(${s1_gate_arg}, true); }"
@@ -1124,6 +1150,9 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   # ★ 2026-11-07（判断 4）: 段 1 だけの送出元（本物の lib.rs のまま）は、O1 の承認なしで緑。
   build
   expect_green "6 択 ESM の送出元は段 1 だけ" "段 1 だけの送出元（O1 の ESM 追補は不要）"
+  # ★ 門の定義（`o1.rs` の `fn activity_label_allowed(`）があっても、呼び出しとして数えない（差し引きが効く）。
+  build; cp "$repo/src-tauri/src/o1.rs" "$fix/w/src-tauri/src/o1.rs"
+  expect_green "6 択 ESM の送出元は段 1 だけ" "門の定義（o1.rs）を呼び出しに数えない"
   # ⚠️★★★ **送出元があるのに同意の門を通していないと赤**（★ M5 の穴）。
   #   ★ 本物の lib.rs は門を通しているので、門の呼び出しを消してから足す。
   build; sed_i 's/activity_label_allowed(/NOT_THE_GATE_(/g' "$fix/w/$EMITTER"

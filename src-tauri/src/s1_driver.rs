@@ -687,6 +687,16 @@ impl S1Driver {
         vec![Effect::CardChanged]
     }
 
+    /// 枠の行を送れなかった（次の tick で枠を作り直す）。
+    pub fn forget_frame(&mut self) {
+        self.frame_gen = None;
+    }
+
+    /// 状態ファイルを書けなかった（次の tick で書き直す）。
+    pub fn mark_unsaved(&mut self) {
+        self.saved = None;
+    }
+
     fn save_if_changed(&mut self) -> Vec<Effect> {
         let now_state = self.day_question().and_then(DayQuestion::state).cloned();
         match now_state {
@@ -1186,6 +1196,29 @@ mod tests {
         assert!(idle
             .debug_show_probe(T_1859Z, Stratum::Random, "ID00000000000009".into())
             .is_empty());
+    }
+
+    #[test]
+    fn failed_frame_and_save_are_retried_next_tick() {
+        let mut d = driver_with_frame(1_000_000);
+        assert_eq!(d.frame_gen(), Some(0));
+        d.forget_frame();
+        assert_eq!(d.frame_gen(), None, "枠を作り直させる");
+        // 状態を変えてから保存の失敗を知らせると、次の tick でもう一度 SaveDayState が出る
+        d.push_press(2_000_000);
+        let fx = d.tick(&env(2_010_000), &mut ids());
+        assert!(fx.iter().any(|e| matches!(e, Effect::SaveDayState(_))));
+        let fx = d.tick(&env(2_011_000), &mut ids());
+        assert!(
+            !fx.iter().any(|e| matches!(e, Effect::SaveDayState(_))),
+            "変わらなければ出ない"
+        );
+        d.mark_unsaved();
+        let fx = d.tick(&env(2_012_000), &mut ids());
+        assert!(
+            fx.iter().any(|e| matches!(e, Effect::SaveDayState(_))),
+            "失敗の後は書き直す"
+        );
     }
 
     #[test]
