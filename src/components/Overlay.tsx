@@ -3,6 +3,8 @@ import { getCurrentWindow, currentMonitor, primaryMonitor } from "@tauri-apps/ap
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import ProbeCard from "./ProbeCard";
+import S1CardHost from "./S1CardHost";
+import type { S1ModeDto } from "../probeTypes";
 import InvitationGlyph, { GLYPH_SIZE_PX, INVITATION_GLYPH } from "./InvitationGlyph";
 
 // プローブ/Nudge 単独表示時、overlay 窓は「カードの実寸ちょうど」に縮める (logical px)。
@@ -109,6 +111,14 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
     const [nudgeVisible, setNudgeVisible] = useState(false);
     // Task C: プローブカード表示中フラグ。表示中は cursor events を受け付け、overlay を可視化する。
     const [probeActive, setProbeActive] = useState(false);
+    // 段 1 か（起動時に 1 回読む）。★ 段 1 では今のプローブのスレッドが起きないので、
+    //   今のカード（probe_triggered の購読）の代わりに段 1 のカードの受け手を出す。
+    const [s1Mode, setS1Mode] = useState(false);
+    useEffect(() => {
+        invoke<S1ModeDto>("get_s1_mode")
+            .then((m) => setS1Mode(m.s1))
+            .catch(() => setS1Mode(false));
+    }, []);
     // プローブ/Nudge カードの実描画サイズ (logical px)。overlay 窓をこの実寸へ縮め透明余白を消す。
     // null = 未測定 (フォールバックサイズを使う)。サイズ未変化なら state を更新しない (窓再配置の churn 抑制)。
     const [probeCardSize, setProbeCardSize] = useState<{ w: number; h: number } | null>(null);
@@ -421,7 +431,13 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
             {/* Task C: v0.3 較正のプローブ回答カード (probe_triggered を listen)。
                 overlay 窓は tauri-nspanel で非アクティブ Panel 化しクリックを webview へ配送する
                 (透明窓でもクリックが届く・フォーカスは奪わない。decisions D7)。 */}
-            <ProbeCard onActiveChange={setProbeActive} onResize={handleProbeResize} />
+            {/* 段 1: カードは backend が決める（S1CardHost）。段 1 でなければ今のプローブのカード。
+                どちらも同じ箱（probeActive・実寸）で出す。 */}
+            {s1Mode ? (
+                <S1CardHost onActiveChange={setProbeActive} onResize={handleProbeResize} />
+            ) : (
+                <ProbeCard onActiveChange={setProbeActive} onResize={handleProbeResize} />
+            )}
 
             {/* EH3 の招待の図像（文字なし・固定の大きさ・量を描かない。ADR-026 / R-I1）。 */}
             {invitationPresent && !probeActive && !nudgeVisible && (

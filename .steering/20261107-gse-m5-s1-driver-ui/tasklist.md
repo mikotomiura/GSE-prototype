@@ -29,12 +29,12 @@
 
 ## U 画面
 
-- [ ] U1 `probeTypes.ts`: `S1CardState`・6 択・`DayTrigger`
-- [ ] U2 `ProbeCard.tsx`: 段 1 の 3 問 1 枚（props で受ける）
-- [ ] U3 `DayQuestionCard.tsx`
-- [ ] U4 `S1CardHost.tsx`・`Overlay.tsx`
-- [ ] U5 `RecordingControls.tsx`（同意と取り消し）・`App.tsx`（`get_s1_mode`）
-- [ ] U6 `npx tsc --noEmit`・`npm run build`
+- [x] U1 `probeTypes.ts`: `S1CardState`・6 択・`DayTrigger`
+- [x] U2 `ProbeCard.tsx`: 段 1 の 3 問 1 枚（props で受ける）
+- [x] U3 `DayQuestionCard.tsx`
+- [x] U4 `S1CardHost.tsx`・`Overlay.tsx`
+- [x] U5 `RecordingControls.tsx`（同意と取り消し）・`App.tsx`（`get_s1_mode`）
+- [x] U6 `npx tsc --noEmit`・`npm run build`
 
 ## V 確かめと点検
 
