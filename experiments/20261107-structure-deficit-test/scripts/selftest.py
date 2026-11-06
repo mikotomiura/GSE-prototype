@@ -455,7 +455,7 @@ def decs_summary(D):
     n = sum(v["decreases"] for v in D["pool_full_diag"].values()) + sum(v["decreases"] for v in D["pool_excl_diag"].values())
     for pn in D["em"].values():
         for E in pn.values():
-            for St in E["structs"].values():
+            for St in E.get("structs", {}).values():
                 n += sum(v["decreases"] for v in St["diag"].values())
     return n
 

@@ -35,7 +35,7 @@ def cell_of(S, q_, order, ds, pn, k):
 
 def vals(S, ds, pn, k, q_, name):
     o, p = cell_of(S, q_, "o", ds, pn, k), cell_of(S, q_, "p", ds, pn, k)
-    if o is None or p is None:
+    if o is None or p is None or "structs" not in o or "structs" not in p:
         return None
     so, sp = o["structs"][name], p["structs"][name]
     return dict(G_o=med(so["tau_other"]["all/self_minus_pool_same"]), G_p=med(sp["tau_other"]["all/self_minus_pool_same"]),

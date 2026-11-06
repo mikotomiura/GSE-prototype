@@ -487,11 +487,12 @@ def summarize_em(results, S0, cfg, ns, rng, structs=None):
     structs = STRUCTS if structs is None else structs
     S = {}
     for pn, ws in panel_members(results, cfg, ns).items():
-        if 0 < len(ws) < N_MIN:
-            raise SystemExit("パネルの人数が %d 人未満（伏せの規則・本計算では起きない見込み）" % N_MIN)
         P = {}
         for k in cfg["panels"][pn][1]:
             if not ws:
+                continue
+            if len(ws) < N_MIN:  # 人数の少ないパネルは節ごと伏せる（診断の和も出さない・security-checker LOW-1）
+                P[str(k)] = dict(writers=len(ws), suppressed=True)
                 continue
             E = dict(writers=len(ws), structs={},
                      n_train=q([results[w]["em"]["k"][str(k)]["n_train"] for w in ws]),
