@@ -839,8 +839,9 @@ pub struct DayQuestionRow {
     /// 閉じた時刻（★ 区間の削除の鍵 `"t"`）。
     pub timestamp: u64,
     pub shown_ts: u64,
-    /// 問いを出した現地の暦の分（0..1440）。
-    pub shown_local_minute: u32,
+    /// 問いを出したとき、現地の時刻が日の問いの時間帯の中だったか。
+    /// ★ 現地の分そのものは書かない（UTC の `shown_ts` と並べると時差が分の精度で出るため・本タスクの判断 9）。
+    pub in_eod_window: bool,
     /// 対象の日（現地の日の番号・`eh3::local_day` と同じ数え方）。
     pub target_day: i64,
     pub trigger: crate::analysis::probe_arbiter::DayTrigger,
@@ -1825,9 +1826,10 @@ fn format_probe_suppressed_line(
 /// `day_question` 行の本文（改行なし）。回答は 1..5 に閉じ、範囲外は `null` にする。
 fn format_day_question_line(r: &DayQuestionRow) -> String {
     let opt = |v: Option<u64>| v.map_or_else(|| "null".to_string(), |x| x.to_string());
+    // ★ 答えていない行には回答を書かない（`answered` と食い違う行を作らない）
     let motivation = r
         .motivation
-        .filter(|m| (1..=5).contains(m))
+        .filter(|m| r.answered && (1..=5).contains(m))
         .map_or_else(|| "null".to_string(), |m| m.to_string());
     // ★ 版は固定の文字列だけを想定するが、念のため英数と `-` 以外を含むなら書かない
     let items_version = if r
@@ -1841,13 +1843,13 @@ fn format_day_question_line(r: &DayQuestionRow) -> String {
     };
     format!(
         concat!(
-            r#"{{"type":"day_question","t":{},"shown_ts":{},"shown_local_minute":{},"target_day":{},"#,
+            r#"{{"type":"day_question","t":{},"shown_ts":{},"in_eod_window":{},"target_day":{},"#,
             r#""trigger":"{}","delayed":{},"answered":{},"closed_by":"{}","items_version":"{}","#,
             r#""motivation":{},"latency_ms":{},"duration_ms":{}}}"#
         ),
         r.timestamp,
         r.shown_ts,
-        r.shown_local_minute,
+        r.in_eod_window,
         r.target_day,
         r.trigger.as_str(),
         r.delayed,
@@ -4134,7 +4136,7 @@ mod tests {
         DayQuestionRow {
             timestamp: 1_800_000_060_000,
             shown_ts: 1_800_000_000_000,
-            shown_local_minute: 1110,
+            in_eod_window: true,
             target_day: 20_833,
             trigger: DayTrigger::EveningIdle,
             delayed: false,
@@ -4159,7 +4161,7 @@ mod tests {
             format_day_question_line(&sample_day_question_row()),
             concat!(
                 r#"{"type":"day_question","t":1800000060000,"shown_ts":1800000000000,"#,
-                r#""shown_local_minute":1110,"target_day":20833,"trigger":"evening_idle","#,
+                r#""in_eod_window":true,"target_day":20833,"trigger":"evening_idle","#,
                 r#""delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","#,
                 r#""motivation":4,"latency_ms":2500,"duration_ms":1200}"#
             )
@@ -4186,14 +4188,23 @@ mod tests {
         let mut r = sample_day_question_row();
         r.motivation = Some(9);
         r.items_version = "x\",\"evil";
-        r.answered = false;
         r.latency_ms = None;
         let line = format_day_question_line(&r);
         let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
-        assert_eq!(v["motivation"], serde_json::Value::Null);
+        assert_eq!(v["motivation"], serde_json::Value::Null, "範囲外は書かない");
+        assert!(v.get("shown_local_minute").is_none(), "現地の分を書かない");
         assert_eq!(v["items_version"], "invalid");
         assert_eq!(v["latency_ms"], serde_json::Value::Null);
         assert!(v.get("evil").is_none());
+        let mut unanswered = sample_day_question_row();
+        unanswered.answered = false;
+        let v: serde_json::Value =
+            serde_json::from_str(&format_day_question_line(&unanswered)).expect("valid json");
+        assert_eq!(
+            v["motivation"],
+            serde_json::Value::Null,
+            "答えていない行に回答を書かない"
+        );
         // seed は 2^53 − 1 を超えて書かない
         let f = format_probe_frame_line(
             1,

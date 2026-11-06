@@ -591,13 +591,15 @@ pub enum LogEntryDto {
     },
     /// 段 1 の日の終わりの問い（ADR-048 D3）。`meta.s1_mode` があるときだけ出る。カードが閉じた時刻に 1 行。
     ///
-    /// `target_day` は現地の日の番号（4:00 区切り・1970-01-01 からの日数）。時差は書かない。
+    /// `target_day` は現地の日の番号（4:00 区切り・1970-01-01 からの日数）。時差は書かない
+    /// （現地の分も書かない。UTC の時刻と並べると時差が分の精度で出るため）。
     /// `motivation` は 1..5 の 1 項目（答えていなければ `null`）。自由記述・理由を持たない。
     /// 区間指定削除では `shown_ts` 〜 `t` の区間で消える。
     DayQuestion {
         t: u64,
         shown_ts: u64,
-        shown_local_minute: u32,
+        /// 問いを出したとき現地の時刻が時間帯の中だったか（現地の分そのものは書かない・時差が出るため）。
+        in_eod_window: bool,
         target_day: i64,
         trigger: DayQuestionTriggerDto,
         delayed: bool,

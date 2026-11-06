@@ -48,3 +48,37 @@
 - 理由: 点で消すと、削除した区間の中の時刻（表示した時刻・候補の時刻）が残った行の別の欄に残りうる。消す側に倒す（`data-privacy` ルール 6-iii）。
 - 研究者には聞いていない: 削除の約束（その時間帯が消える）を強める向きで、約束の文言とも合う。
 - 影響範囲: `redaction.rs`。3 本目の replay で、削除の後に欠けた候補を「欠け」と数える照合に効く。
+
+## 判断 9: `day_question` に現地の分を書かず、時間帯の中かの真偽 `in_eod_window` だけを書く
+
+- 判断日時: 2026-11-06
+- 背景: security-checker の MEDIUM。`shown_local_minute`（現地の分）と `shown_ts`（UTC）を同じ行に書くと、時差が分の精度で正確に出る。計画の判断 4 は「日付と UTC の時刻から時差をおおよそ逆算できる点は残る」と書いていたが、効き方は「おおよそ」ではなかった。今の O1 の記録はファイル名も UTC（`logger.rs:3240-3265`）なので、時差を出す初めての欄になる。
+- 選択肢: A 時間帯の中かの真偽に落とす／B そのまま残し判断 4 の文を直す／C 30 分単位に丸める（多くの時差は 1 時間か 30 分の倍数なので隠す効きが小さい）
+- 採用: A（研究者・推奨どおり）
+- 理由: 判断 4 の目的（出た問いが時間帯の中だったかを記録で確かめる）は保ち、時差は出さない。
+- トレードオフ: 他の参加者の記録で「現地の何時に出たか」の分布（S1-F5）を記録だけからは描けない。本人の試しでは研究者が自分の時差を知っているので UTC から戻せる。`target_day` と `t` からおおよその時差が出る点（日の切れ目の近くだけ）は残る。
+- 影響範囲: `logger.rs`（`DayQuestionRow`）・`schema_dto.rs`・`schema/current.json`・調停器の `Action::ShowDayQuestion { in_window }`。計画の判断 4 の文は書き換えず、ここで上書きする。
+
+## 判断 10: 作業中の点検（code-reviewer・security-checker）への対応
+
+- 判断日時: 2026-11-06
+- 対応したもの（一次で確かめてから直し、HIGH と MEDIUM のうち調停器の 3 点は直した処理を壊すと名指しの検査が赤になることを確かめた）:
+
+| 出所 | 重さ | 指摘 | 対応 |
+|---|---|---|---|
+| code-reviewer | HIGH | 溜まった候補の離席を今の時刻で判定し、同じ tick の押下を先に入れていた（スリープ明けに何時間も前の候補が発火しうる） | 離席を候補の時刻 `c` 以前の最後の押下から判定。この tick の押下は ① の後で反映。検査 `stale_candidate_after_sleep_does_not_fire` |
+| code-reviewer | MEDIUM | 拾い直しの印がカードが開いていても立つ | 尋ねたときか対象が無いと決まったときだけ立て、開いていれば持ち越す。検査 `pickup_deferred_while_card_open` |
+| code-reviewer | MEDIUM | 日の問いの途切れに一時停止とスリープの時間が入る | 再開と復帰で起点を置き直す。検査 `eod_idle_excludes_pause_and_sleep` |
+| code-reviewer | MEDIUM | `s1_and_eh3_both_dropped` が空回り（EH3 を落とす行を消しても緑） | 純粋な関数 `s1::resolve_with_eh3` に切り出して 4 通りを検査。`lib.rs` はその戻り値を `eh3::resolve` に渡す |
+| code-reviewer | MEDIUM | 送出元が無いのにログが「問いを出す」と言う | ログの文を「モードだけを記録・駆動役は未実装」に改めた。2 本目で文を戻す（引き継ぎに書く） |
+| code-reviewer | MEDIUM | 層化と無作為の検査の日の問いの側が空回り | 模擬の現地の時刻を進め（16:40 から・日の切れ目をまたぐ）、日の問いが出たことを assert |
+| code-reviewer | LOW | `hourly_max_total` の切り捨て | `div_ceil` |
+| code-reviewer | LOW | 再開の予約を `take()` が先に消す | カードが開いていれば残す |
+| code-reviewer | LOW | 溜まった候補に今の区画を当てる | 候補ごとの時刻で区画を引く（`local_at`・検査 `local_at_steps_back_across_the_cutoff`） |
+| code-reviewer | LOW | スリープの復帰でウォームアップをやり直さない | やり直す |
+| code-reviewer | LOW | 同意の印を直書き | 一時ファイル → 置き換え |
+| code-reviewer | LOW | 答えていない行に回答を書ける | 整形で `null` に揃える |
+| security-checker | MEDIUM | 現地の分で時差が出る | 判断 9 |
+| security-checker | LOW | 2 つ目の時刻が 0 の行が epoch から消える | 点に倒す |
+
+- 見送ったもの: code-reviewer LOW「日をまたいだ再開で予約を消す処理の検査は、消しても緑」。日の比較と新しい日に押下が無いことで二重に守られており、消去の処理は保険。security-checker LOW 2 件（同意の時点で出す枠の行の `t`・同意の取り消しの関数）は送出元と画面を作る 2 本目で決める（引き継ぎに書く）。

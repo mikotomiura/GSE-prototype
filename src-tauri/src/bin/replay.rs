@@ -6925,7 +6925,7 @@ not json\n";
             ),
             (
                 "day_question",
-                r#"{"type":"day_question","t":2,"shown_ts":1,"shown_local_minute":1100,"target_day":20000,"trigger":"pickup","delayed":true,"answered":false,"closed_by":"dismiss","items_version":"dq-draft-1","motivation":null,"latency_ms":null,"duration_ms":null}"#,
+                r#"{"type":"day_question","t":2,"shown_ts":1,"in_eod_window":false,"target_day":20000,"trigger":"pickup","delayed":true,"answered":false,"closed_by":"dismiss","items_version":"dq-draft-1","motivation":null,"latency_ms":null,"duration_ms":null}"#,
             ),
         ];
 

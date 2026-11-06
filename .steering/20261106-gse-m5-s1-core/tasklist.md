@@ -30,13 +30,13 @@
 - [x] `schema_dto.rs` → `emit_schema` → `schema/current.json`
 
 ## 検証
-- [ ] `cargo test --workspace`（test-runner）
-- [ ] `cargo clippy --all-targets -- -D warnings`・`cargo fmt --check`
-- [ ] ゴールデンの `gse-replay --snapshot`
-- [ ] `emit_schema` の byte-equal
-- [ ] code-reviewer ＋ security-checker を並列・HIGH に対応
+- [x] `cargo test --workspace`（test-runner）
+- [x] `cargo clippy --all-targets -- -D warnings`・`cargo fmt --check`
+- [x] ゴールデンの `gse-replay --snapshot`
+- [x] `emit_schema` の byte-equal
+- [x] code-reviewer ＋ security-checker を並列・HIGH に対応
 
 ## 完了
-- [ ] `docs/functional-design.md` の追記（Step H）と glossary の要否
-- [ ] 2 本目の引き継ぎ（`config_gated` への移し・登録の画面・JST と UTC の検査・駆動役）
+- [x] `docs/functional-design.md` の追記（Step H）と glossary の要否
+- [x] 2 本目の引き継ぎ（`config_gated` への移し・登録の画面・JST と UTC の検査・駆動役）
 - [ ] `/finish-task`（`/cross-review`）・push と PR は研究者に確かめる

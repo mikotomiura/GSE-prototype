@@ -122,9 +122,10 @@ impl ArbiterConfig {
     /// 設定から導いた 1 時間の最大の合計（半開の 1 時間に収まる発火の数の上限）。
     pub fn hourly_max_total(&self) -> u64 {
         const HOUR: u64 = 3_600_000;
-        let random = (HOUR / self.random.cap_window_ms) * self.random.cap_count as u64;
+        // ★ 切り上げる（窓が 60 分を割り切らないとき、切り捨てだと上限を過小に出す・同意文書の数の根拠）
+        let random = HOUR.div_ceil(self.random.cap_window_ms) * self.random.cap_count as u64;
         let strata = if self.strata_enabled {
-            (HOUR / self.strat_cap_window_ms) * self.strat_cap_count as u64
+            HOUR.div_ceil(self.strat_cap_window_ms) * self.strat_cap_count as u64
         } else {
             0
         };
@@ -323,11 +324,12 @@ pub enum Action {
     },
     /// 開いている層化のカードを閉じ、`skip_reason = "superseded"` で記録する（無作為が出たため）。
     SupersedeOpenStrat,
-    /// 日の終わりの問いを出す。
+    /// 日の終わりの問いを出す。`in_window` は出した時点が時間帯の中だったか（`day_question.in_eod_window`）。
     ShowDayQuestion {
         target_day: i64,
         trigger: DayTrigger,
         delayed: bool,
+        in_window: bool,
     },
     /// 日の終わりの問いのカードを閉じる（日の切れ目）。
     CloseDayQuestion {
@@ -388,9 +390,12 @@ impl RandomFrame {
         let cap_window = self.config.cap_window_ms;
         self.recent_fires
             .retain(|&t| c.saturating_sub(t) < cap_window);
+        // ★ 離席は候補の時刻 `c` で判定する（`c` 以前の最後の押下から）。⚠️ 今の時刻で判定すると、
+        //   スリープの後に溜まった候補が、戻った直後の押下で発火し、データの無い窓にラベルが付く
+        //   （2026-11-06・code-reviewer HIGH）。warmup・gap・cap も `c` 基準なので基準がそろう。
         let idle = ctx
-            .last_press_ms
-            .map_or(u64::MAX, |p| ctx.now_ms.saturating_sub(p));
+            .last_press_le_c_ms
+            .map_or(u64::MAX, |p| c.saturating_sub(p));
         if idle >= self.config.away_idle_ms {
             Some(SuppressReason::Away)
         } else if c.saturating_sub(ctx.warmup_origin_ms) < self.config.min_session_elapsed_ms {
@@ -419,8 +424,8 @@ impl RandomFrame {
 
 /// 判定に使う 1 tick の文脈。
 struct JudgeCtx {
-    now_ms: u64,
-    last_press_ms: Option<u64>,
+    /// 候補の時刻以前の最後の押下。
+    last_press_le_c_ms: Option<u64>,
     warmup_origin_ms: u64,
     open_card: Option<OpenCard>,
     no_ask: bool,
@@ -573,8 +578,12 @@ pub struct DayQuestion {
     state: Option<DayState>,
     last_local_day: Option<i64>,
     pickup_checked_day: Option<i64>,
+    /// 拾い直しの契機があったが、カードが開いていて尋ねられなかった。
+    pickup_pending: bool,
     pause_reserved_day: Option<i64>,
     last_press_ms: Option<u64>,
+    /// 途切れの起点の下限（一時停止の再開・スリープからの復帰の時刻）。
+    idle_origin_ms: Option<u64>,
 }
 
 impl DayQuestion {
@@ -583,8 +592,10 @@ impl DayQuestion {
             state: Some(state),
             last_local_day: None,
             pickup_checked_day: None,
+            pickup_pending: false,
             pause_reserved_day: None,
             last_press_ms: None,
+            idle_origin_ms: None,
         }
     }
 
@@ -594,8 +605,10 @@ impl DayQuestion {
             state: None,
             last_local_day: None,
             pickup_checked_day: None,
+            pickup_pending: false,
             pause_reserved_day: None,
             last_press_ms: None,
+            idle_origin_ms: None,
         }
     }
 
@@ -651,39 +664,52 @@ impl DayQuestion {
                 r.seen_keys = true;
             }
         }
+        // ★ 途切れの起点を、一時停止の再開・スリープからの復帰で置き直す
+        //   （止めていた時間・眠っていた時間を「押下の途切れ」に数えない・2026-11-06 code-reviewer MEDIUM）。
+        if input.resumed || input.power_resumed {
+            self.idle_origin_ms = Some(input.now_ms);
+        }
+        let in_window = config.in_eod_window(input.local_minute);
 
-        // 翌日の拾い直し（切れ目の後の最初の利用）
+        // 翌日の拾い直し（切れ目の後の最初の利用）。
+        // ★ 印は、尋ねたときか対象が無いと決まったときだけ立てる。カードが開いていれば次の tick に持ち越す
+        //   （開いていたせいで黙って消さない・2026-11-06 code-reviewer MEDIUM）。
         if self.pickup_checked_day != Some(today)
-            && (input.app_started || input.power_resumed || pressed)
+            && (input.app_started || input.power_resumed || pressed || self.pickup_pending)
+            && open.is_none()
         {
             self.pickup_checked_day = Some(today);
-            if open.is_none() {
-                if let Some(target) = self.pickup_target(today) {
-                    if let Some(r) = self.record(target) {
-                        r.asked_pickup = true;
-                    }
-                    out.push(Action::ShowDayQuestion {
-                        target_day: target,
-                        trigger: DayTrigger::Pickup,
-                        delayed: true,
-                    });
-                    open = Some(OpenCard::Day { target_day: target });
+            self.pickup_pending = false;
+            if let Some(target) = self.pickup_target(today) {
+                if let Some(r) = self.record(target) {
+                    r.asked_pickup = true;
                 }
+                out.push(Action::ShowDayQuestion {
+                    target_day: target,
+                    trigger: DayTrigger::Pickup,
+                    delayed: true,
+                    in_window,
+                });
+                open = Some(OpenCard::Day { target_day: target });
             }
+        } else if self.pickup_checked_day != Some(today)
+            && (input.app_started || input.power_resumed || pressed)
+        {
+            self.pickup_pending = true;
         }
 
-        // 一時停止の後の再開
-        if input.resumed && self.pause_reserved_day.take() == Some(today) && open.is_none() {
-            if let Some(trigger) = self.same_day_ask(today, DayTrigger::PauseResume) {
+        // 一時停止の後の再開（★ カードが開いていれば予約を消さずに残す）
+        if input.resumed && open.is_none() && self.pause_reserved_day == Some(today) {
+            self.pause_reserved_day = None;
+            if let Some(trigger) = self.same_day_ask(today, DayTrigger::PauseResume, in_window) {
                 out.push(trigger);
                 open = Some(OpenCard::Day { target_day: today });
             }
         }
 
         // 夕方の途切れ（主）
-        let idle = self
-            .last_press_ms
-            .map_or(0, |p| input.now_ms.saturating_sub(p));
+        let idle_from = self.last_press_ms.max(self.idle_origin_ms);
+        let idle = idle_from.map_or(0, |p| input.now_ms.saturating_sub(p));
         let random_near = next_random_ms >= input.now_ms
             && next_random_ms - input.now_ms <= config.eod_yield_before_random_ms;
         if open.is_none()
@@ -692,7 +718,7 @@ impl DayQuestion {
             && idle >= config.eod_idle_ms
             && !random_near
         {
-            if let Some(a) = self.same_day_ask(today, DayTrigger::EveningIdle) {
+            if let Some(a) = self.same_day_ask(today, DayTrigger::EveningIdle, in_window) {
                 out.push(a);
             }
         }
@@ -711,7 +737,7 @@ impl DayQuestion {
     }
 
     /// 当日の問いを出せるなら出す（押下を観測していて、当日まだ尋ねていない）。
-    fn same_day_ask(&mut self, today: i64, trigger: DayTrigger) -> Option<Action> {
+    fn same_day_ask(&mut self, today: i64, trigger: DayTrigger, in_window: bool) -> Option<Action> {
         let r = self.record(today)?;
         if !r.seen_keys || r.asked_same_day || r.answered {
             return None;
@@ -721,6 +747,7 @@ impl DayQuestion {
             target_day: today,
             trigger,
             delayed: false,
+            in_window,
         })
     }
 
@@ -742,7 +769,7 @@ impl DayQuestion {
         if open_card.is_some() || !config.in_eod_window(local_minute) {
             return None;
         }
-        self.same_day_ask(local_day, DayTrigger::Quit)
+        self.same_day_ask(local_day, DayTrigger::Quit, true)
     }
 
     /// カードが閉じた（答えた・閉じた・終了）。★ 回答は更新させない（一度答えた日は答えたまま）。
@@ -758,6 +785,18 @@ impl DayQuestion {
 // ---------------------------------------------------------------------------
 // 調停器
 // ---------------------------------------------------------------------------
+
+/// 今の現地の日と分（`now_ms` の時点）から、過去の時刻 `t_ms` の現地の日と暦の分を引く（純関数）。
+///
+/// ★ 日は 4:00 区切り（`eh3::DAY_CUTOFF_HOUR` と同じ）。時差の変わり目（夏時間）は考えない。
+pub fn local_at(local_day: i64, local_minute: u32, now_ms: u64, t_ms: u64) -> (i64, u32) {
+    const CUTOFF_MIN: i64 = 4 * 60;
+    let back = (now_ms.saturating_sub(t_ms) / 60_000) as i64;
+    let since_cutoff = (i64::from(local_minute) - CUTOFF_MIN).rem_euclid(1440) - back;
+    let day = local_day + since_cutoff.div_euclid(1440);
+    let minute = (since_cutoff.rem_euclid(1440) + CUTOFF_MIN).rem_euclid(1440) as u32;
+    (day, minute)
+}
 
 /// 段 1 の問いの調停器。
 #[derive(Debug, Clone)]
@@ -816,7 +855,9 @@ impl Arbiter {
     pub fn tick(&mut self, input: &TickInput) -> Vec<Action> {
         let mut out = Vec::new();
         let now = input.now_ms;
-        if input.resumed {
+        // ★ 一時停止の再開とスリープからの復帰の両方でウォームアップをやり直す
+        //   （どちらも直前の分析窓に記録の無い時間が入る）。
+        if input.resumed || input.power_resumed {
             self.resumed_at_ms = Some(now);
         }
         let warmup_origin = self
@@ -845,19 +886,22 @@ impl Arbiter {
             );
             return out;
         }
-        if let Some(&last) = input.key_presses_ms.last() {
-            self.last_press_ms = Some(last);
-        }
-
-        // ① 無作為の枠
+        // ① 無作為の枠（★ この tick の押下は、候補の時刻以前のものだけを判定に入れる）
         while self.frame.next_candidate_ms() <= now {
             let c = self.frame.next_candidate_ms();
+            let in_tick = input
+                .key_presses_ms
+                .iter()
+                .copied()
+                .filter(|&p| p <= c)
+                .max();
+            let (day_c, minute_c) = local_at(input.local_day, input.local_minute, now, c);
             let ctx = JudgeCtx {
-                now_ms: now,
-                last_press_ms: self.last_press_ms,
+                last_press_le_c_ms: in_tick.max(self.last_press_ms),
                 warmup_origin_ms: warmup_origin,
                 open_card: open,
-                no_ask,
+                // ★ 溜まった候補は、その候補の時刻の区画で引く
+                no_ask: is_no_ask_block(&self.config, self.frame_seed, day_c, minute_c),
             };
             match self.frame.judge(c, &ctx) {
                 Some(reason) => out.push(Action::Suppress {
@@ -878,6 +922,9 @@ impl Arbiter {
                 }
             }
             self.frame.advance();
+        }
+        if let Some(&last) = input.key_presses_ms.last() {
+            self.last_press_ms = Some(last);
         }
 
         // ② 層化（① の枠は読むだけ）
@@ -929,6 +976,8 @@ mod tests {
     const MIN: u64 = 60 * SEC;
     /// JST の現地の日の番号の例（値そのものに意味は無い・日の切れ目の列を作るだけ）。
     const DAY0: i64 = 20_000;
+    /// 模擬の始まりの現地の分（16:40）。
+    const SIM_START_MINUTE: u64 = 1000;
 
     fn input<'a>(now: u64, presses: &'a [u64], focus: &'a [u64]) -> TickInput<'a> {
         TickInput {
@@ -1007,6 +1056,10 @@ mod tests {
             }
             let mut inp = input(now, &presses[ps..pi], &focus[fs..fi]);
             inp.open_card = open.map(|(c, _)| c);
+            // ★ 現地の時刻を進める（16:40 に始め、時間帯に入り、日の切れ目もまたぐ）
+            let m = SIM_START_MINUTE + (now - T0) / MIN;
+            inp.local_minute = (m % 1440) as u32;
+            inp.local_day = DAY0 + (m as i64 - 240).div_euclid(1440);
             for a in arb.tick(&inp) {
                 match a {
                     Action::FireProbe {
@@ -1014,6 +1067,10 @@ mod tests {
                         ..
                     } => open = Some((OpenCard::Random, now)),
                     Action::FireProbe { .. } => open = Some((OpenCard::Strat, now)),
+                    Action::ShowDayQuestion { target_day, .. } => {
+                        open = Some((OpenCard::Day { target_day }, now))
+                    }
+                    Action::CloseDayQuestion { .. } => open = None,
                     _ => {}
                 }
                 out.push((now, a));
@@ -1117,6 +1174,12 @@ mod tests {
                     "seed={seed}: 層化のカードと無作為の候補が重なっていない（検査が空回りする）"
                 );
             }
+            // 日の問いが実際に動いていること（空回りでない・2026-11-06 code-reviewer MEDIUM）
+            assert!(
+                with.iter()
+                    .any(|(_, a)| matches!(a, Action::ShowDayQuestion { .. })),
+                "seed={seed}: 日の問いが 1 回も出ていない"
+            );
             // 層化が実際に動いていること（空回りでない）
             assert!(
                 with.iter().any(|(_, a)| matches!(
@@ -1277,6 +1340,61 @@ mod tests {
         }
         // 対照: 同じ探し方で本文の語は見つかる
         assert!(body.contains("key_presses_ms"));
+    }
+
+    /// ⚠️★★★ スリープの後に溜まった候補は、戻った直後の押下で発火しない（離席は候補の時刻で判定する）。
+    #[test]
+    fn stale_candidate_after_sleep_does_not_fire() {
+        let mut arb = new_arb(13, ArbiterConfig::default());
+        let c = arb.frame().next_candidate_ms();
+        // 候補の 10 秒前まで打っていて、そのまま 2 時間眠った
+        let before = [c - 10 * SEC];
+        arb.tick(&input(c - 10 * SEC, &before, &[]));
+        let now = c + 2 * 3_600_000;
+        let back = [now - SEC];
+        let mut inp = input(now, &back, &[]);
+        inp.power_resumed = true;
+        let acts = arb.tick(&inp);
+        let fired: Vec<u64> = acts
+            .iter()
+            .filter_map(|a| match a {
+                Action::FireProbe {
+                    stratum: Stratum::Random,
+                    scheduled_ts,
+                } => Some(*scheduled_ts),
+                _ => None,
+            })
+            .collect();
+        // ★ 候補 c の時点では 10 秒前に打っていたので離席ではない（c はウォームアップの判定に回る）。
+        //   c より後の溜まった候補は、どれも離席として抑える。
+        assert!(
+            fired.iter().all(|&t| t == c),
+            "溜まった候補が発火した: {acts:?}"
+        );
+        let away = acts
+            .iter()
+            .filter(|a| {
+                matches!(
+                    a,
+                    Action::Suppress {
+                        reason: SuppressReason::Away,
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert!(away >= 3, "{acts:?}");
+    }
+
+    /// 過去の時刻の現地の日と分を、日の切れ目（4:00）をまたいで引ける。
+    #[test]
+    fn local_at_steps_back_across_the_cutoff() {
+        // 今が DAY0 の 4:10 なら、20 分前は前の日の 3:50
+        assert_eq!(local_at(DAY0, 250, T0, T0 - 20 * MIN), (DAY0 - 1, 230));
+        assert_eq!(local_at(DAY0, 250, T0, T0 - 5 * MIN), (DAY0, 245));
+        // 暦の 0 時をまたいでも日は 4:00 まで同じ
+        assert_eq!(local_at(DAY0, 30, T0, T0 - 60 * MIN), (DAY0, 1410));
+        assert_eq!(local_at(DAY0, 600, T0, T0), (DAY0, 600));
     }
 
     #[test]
@@ -1506,6 +1624,7 @@ mod tests {
                     target_day,
                     trigger,
                     delayed,
+                    ..
                 } => Some((*target_day, *trigger, *delayed)),
                 _ => None,
             })
@@ -1652,6 +1771,77 @@ mod tests {
         inp.app_started = true;
         dq2.tick(&cfg(), &inp, None, u64::MAX, &mut out);
         assert!(shows(&out).is_empty());
+    }
+
+    /// カードが開いていて拾い直しを尋ねられなかった日は、閉じた後に尋ねる（黙って消さない）。
+    #[test]
+    fn pickup_deferred_while_card_open() {
+        let mut dq = DayQuestion::new(DayState::default());
+        let mut out = Vec::new();
+        dq.tick(
+            &cfg(),
+            &day_input(T0, DAY0, 700, &[T0]),
+            None,
+            u64::MAX,
+            &mut out,
+        );
+        let next = T0 + 24 * 3_600_000;
+        let open = Some(OpenCard::Random);
+        dq.tick(
+            &cfg(),
+            &day_input(next, DAY0 + 1, 500, &[next]),
+            open,
+            u64::MAX,
+            &mut out,
+        );
+        assert!(shows(&out).is_empty(), "開いている間は尋ねない");
+        dq.tick(
+            &cfg(),
+            &day_input(next + 30 * SEC, DAY0 + 1, 500, &[]),
+            None,
+            u64::MAX,
+            &mut out,
+        );
+        assert_eq!(shows(&out), vec![(DAY0, DayTrigger::Pickup, true)]);
+    }
+
+    /// 一時停止とスリープの時間は、日の問いの「押下の途切れ」に数えない。
+    #[test]
+    fn eod_idle_excludes_pause_and_sleep() {
+        for resume_kind in ["pause", "sleep"] {
+            let mut dq = DayQuestion::new(DayState::default());
+            let mut out = Vec::new();
+            // 16:59 に打っていて、時間帯の外で止め（予約なし）、18:00 に戻る
+            dq.tick(
+                &cfg(),
+                &day_input(T0, DAY0, 1019, &[T0]),
+                None,
+                u64::MAX,
+                &mut out,
+            );
+            let back = T0 + 61 * MIN;
+            let mut inp = day_input(back, DAY0, 1080, &[]);
+            if resume_kind == "pause" {
+                inp.resumed = true;
+            } else {
+                inp.power_resumed = true;
+            }
+            dq.tick(&cfg(), &inp, None, u64::MAX, &mut out);
+            assert!(shows(&out).is_empty(), "{resume_kind}: 戻った瞬間に出た");
+            let later = back + 20 * MIN;
+            dq.tick(
+                &cfg(),
+                &day_input(later, DAY0, 1100, &[]),
+                None,
+                u64::MAX,
+                &mut out,
+            );
+            assert_eq!(
+                shows(&out),
+                vec![(DAY0, DayTrigger::EveningIdle, false)],
+                "{resume_kind}: 戻ってから途切れが閾値に達したら出す"
+            );
+        }
     }
 
     #[test]

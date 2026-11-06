@@ -377,13 +377,19 @@ fn write_s1_probe_consent_at(path: &Path, now_ms: u64) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("保存先を作成できません: {e}"))?;
     }
+    // ★ 一時ファイルに書いてから置き換える（書きかけの印を残さない・`eh3::save_ledger` と同じ作法）
+    let tmp = path.with_extension("tmp");
     std::fs::write(
-        path,
+        &tmp,
         format!(
             "{{\"acknowledged_at\":{now_ms},\"consent_version\":\"{S1_PROBE_CONSENT_VERSION}\"}}\n"
         ),
     )
-    .map_err(|e| format!("同意を保存できません: {e}"))
+    .map_err(|e| format!("同意を保存できません: {e}"))?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("同意を保存できません: {e}")
+    })
 }
 
 /// G1 参加者 ID を保存する。妥当でない ID は **書かずに** `Err` を返す (fail-closed)。

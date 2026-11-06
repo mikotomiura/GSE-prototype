@@ -79,6 +79,25 @@ pub fn resolve(
     }
 }
 
+/// 段 1 と EH3 の検出から、立てる段 1 と EH3 に渡す検出を決める（純関数・`lib.rs` が起動時に 1 回呼ぶ）。
+///
+/// ★ 両方が検出されたら、段 1 を落とし、**EH3 の検出も捨てて**返す（EH3 は `OnceLock` なので、
+/// `eh3::resolve` に渡す前に決める・本タスクの判断 7）。EH3 の型には依存しない（`T` で受ける）。
+pub fn resolve_with_eh3<T>(
+    s1_detected: Option<S1Source>,
+    o1_active: bool,
+    eh3_detected: Option<T>,
+) -> (Option<S1Source>, Option<T>) {
+    if conflicts_with_eh3(s1_detected, eh3_detected.is_some()) {
+        (None, None)
+    } else {
+        (
+            resolve(s1_detected, o1_active, eh3_detected.is_some()),
+            eh3_detected,
+        )
+    }
+}
+
 /// `exe` に対応する印の想定パス（純関数）。★ 階層数は `g1` を再利用する（`o1::marker_path_for` と同じ）。
 pub fn marker_path_for(exe: &Path, levels_up: usize) -> Option<PathBuf> {
     Some(crate::g1::folder_up(exe, levels_up)?.join(MARKER_FILE_NAME))
@@ -142,14 +161,33 @@ mod tests {
             "段 1 が無ければ衝突ではない"
         );
         assert!(!conflicts_with_eh3(Some(S1Source::Env), false));
-        // ★ 呼び出し側（`lib.rs`）が衝突のときに EH3 を落としていることを、本文で確かめる。
-        //   探し方が空回りしていないことは、同じ探し方で既存の呼び出しが見つかることで確かめる。
+        // ★ EH3 に渡す検出も落とす（2026-11-06 code-reviewer MEDIUM: 旧版は述語を呼ぶことしか見ていなかった）
+        let eh3 = Some("eh3-assignment");
+        assert_eq!(
+            resolve_with_eh3(Some(S1Source::Marker), true, eh3),
+            (None, None)
+        );
+        assert_eq!(
+            resolve_with_eh3(None, true, eh3),
+            (None, eh3),
+            "段 1 が無ければ EH3 はそのまま"
+        );
+        assert_eq!(
+            resolve_with_eh3(Some(S1Source::Env), true, None::<&str>),
+            (Some(S1Source::Env), None)
+        );
+        assert_eq!(
+            resolve_with_eh3(Some(S1Source::Env), false, None::<&str>),
+            (None, None),
+            "O1 でなければ段 1 は立たない"
+        );
+        // ★ 呼び出し側（`lib.rs`）がこの関数の戻り値を EH3 に渡していることを、本文で確かめる。
         const LIB: &str = include_str!("lib.rs");
         assert!(
-            LIB.contains("crate::s1::conflicts_with_eh3("),
-            "lib.rs が衝突の述語を呼んでいない"
+            LIB.contains("crate::s1::resolve_with_eh3(")
+                && LIB.contains("crate::eh3::resolve(eh3_kept,"),
+            "lib.rs が段 1 と EH3 の決め方を通していない"
         );
-        assert!(LIB.contains("crate::eh3::resolve("), "対照が見つからない");
     }
 
     /// 印が env より優先される。

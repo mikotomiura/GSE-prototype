@@ -4188,17 +4188,19 @@ pub fn run() {
              (stage 1 runs only on top of O1 collection)."
         );
     }
-    let s1_mode = crate::s1::resolve(s1_detected, o1_source.is_some(), eh3_detected.is_some());
+    let (s1_mode, eh3_kept) =
+        crate::s1::resolve_with_eh3(s1_detected, o1_source.is_some(), eh3_detected);
     crate::s1::set_mode(s1_mode);
     if let Some(src) = s1_mode {
+        // ⚠️ 2026-11-06（M5 の 1 本目）時点では、問いを出す駆動役はまだ無い（M5 の 2 本目）。
+        //   印があればモードは立ち `meta` に `s1_mode` が刻まれるが、問いは出ない。
+        //   → 駆動役を作るときにこの文を「問いを出す」に改める（2026-11-06 code-reviewer MEDIUM）。
         tracing::warn!(
-            "STAGE 1 MODE ENABLED (source={}): probes and the end-of-day question run on top of \
-             O1 collection; Nudge and invitations stay OFF.",
+            "STAGE 1 MODE ENABLED (source={}): this build records the mode only; the probe and              end-of-day question driver is NOT wired yet (M5 part 2). Nudge and invitations stay OFF.",
             src.as_str()
         );
     }
-    let eh3_detected = if s1_eh3_conflict { None } else { eh3_detected };
-    let eh3_mode = crate::eh3::resolve(eh3_detected, o1_source.is_some());
+    let eh3_mode = crate::eh3::resolve(eh3_kept, o1_source.is_some());
     crate::eh3::set_mode(eh3_mode);
     init_wall_channel();
     if let Some((src, _)) = eh3_mode {

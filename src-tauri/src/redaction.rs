@@ -220,8 +220,9 @@ pub fn line_interval(line: &str) -> Option<(u64, u64)> {
         }
         // ★ 段 1（2026-11-06・本タスクの判断 8）: 行が持つ 2 つ目の時刻も区間に入れる。
         //   点（`t`）だけで消すと、削除した区間の中の時刻が別の欄に残りうる（消す側に倒す）。
-        Some("day_question") => num("shown_ts").zip(Some(point)),
-        Some("probe_suppressed") => num("candidate_ts").zip(Some(point)),
+        // ⚠️ 2 つ目の時刻が 0（欠けた値）なら点に倒す（epoch からの全区間にしない・security-checker LOW）。
+        Some("day_question") => num("shown_ts").filter(|&v| v > 0).zip(Some(point)),
+        Some("probe_suppressed") => num("candidate_ts").filter(|&v| v > 0).zip(Some(point)),
         _ => None,
     };
     Some(match window {
@@ -830,7 +831,7 @@ mod tests {
     /// 段 1 の申告と候補の行は `"t"` で消える。2 つ目の時刻（表示・候補）が区間に入っても消える。
     #[test]
     fn new_s1_rows_are_deleted_by_t() {
-        let dq = r#"{"type":"day_question","t":3000,"shown_ts":2000,"shown_local_minute":1100,"target_day":20000,"trigger":"evening_idle","delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","motivation":4,"latency_ms":10,"duration_ms":10}"#;
+        let dq = r#"{"type":"day_question","t":3000,"shown_ts":2000,"in_eod_window":true,"target_day":20000,"trigger":"evening_idle","delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","motivation":4,"latency_ms":10,"duration_ms":10}"#;
         let sup = r#"{"type":"probe_suppressed","t":3000,"candidate_ts":2999,"stratum":"random","reason":"away"}"#;
         assert_eq!(line_timestamp(dq), Some(3000));
         assert_eq!(line_timestamp(sup), Some(3000));
@@ -843,6 +844,9 @@ mod tests {
         assert_eq!(kept, vec![sup]);
         assert_eq!(line_interval(dq), Some((2000, 3000)));
         assert_eq!(line_interval(sup), Some((2999, 3000)));
+        // 2 つ目の時刻が 0 なら点に倒す（epoch から消さない）
+        let zero = r#"{"type":"probe_suppressed","t":3000,"candidate_ts":0,"stratum":"random","reason":"away"}"#;
+        assert_eq!(line_interval(zero), Some((3000, 3000)));
     }
 
     /// ★ 通しの回帰: **自己申告行が実際に落ちて、`session_meta` と `meta` は残る**。
