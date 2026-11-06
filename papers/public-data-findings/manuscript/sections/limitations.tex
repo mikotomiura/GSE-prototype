@@ -1,0 +1,39 @@
+\section{Limitations}
+\label{sec:limitations}
+
+The confirmation used one introductory programming dataset and one estimator with hand-set coefficients. The
+equivalence concerns this estimator on this input, the no-event stratum, stalls and controls with condition A false at
+$u$, and the discrimination AUC of each signal alone, averaged over pairs; it says nothing about small differences inside
+the band, combinations of signals or individual writers.
+
+We did not check whether the estimator could have detected a run-up change larger than the band; the positive-control
+gate was applied only to the learners. Its levels were also inside the band and lower than in the essays. The
+equivalence cannot be told apart from a weakening of the instrument by the way the input was built, the synthesised
+release and coefficients that were not estimated on these data.
+
+The band was set conservatively after we had seen the essay and co-writing data and was not derived from a conversion;
+it is not justified as a practical boundary and is wider than the field's precedent of 0.01 for differences between two
+models \cite{gardner2018evaluating}. That precedent compares a different quantity, but applied to our statistic, the
+distance of the point estimates from 0.5 (about 0.011 to 0.013) would not count as equivalent.
+
+The confirmation came after the direction in the seen writers was known. The false-equivalence rate was at most 5.2\% in
+the version with replacement and at most 1.4\% in the version without, among the configurations examined; it is not an
+upper bound over the whole null, it does not account for selecting the maximum, and its mechanism was not tested. The
+decision rule was not changed.
+
+The Stuck-state probability is mostly at the floor (61\% of stalls, 65\% of controls), so claims about run-up change
+rely on the friction axis and on the pairs not at the floor.
+
+A stall is a stop in character production, not a judgement of being stuck, and it was not checked against evidence
+beyond keystrokes such as speech or self-report. Pauses can contain non-character key presses. The personalised
+threshold sets only when a stall starts; its 0.99 quantile was inherited, and the 30~s and 2~s limits are fixed.
+
+The input was built from edit events with a release 100~ms after each press, so flight times and the meaning of
+corrections, bursts and pauses after deletions may differ from writing with recorded releases
+(Table~\ref{tab:mapping}).
+
+Matching was on writer, block, stratum and newline; other factors, such as the phase of the assignment or the amount of
+preceding typing, were not matched, and only controls are excluded by proximity to a later onset.
+
+If the estimator and the replay tool cannot be released and the estimate rows cannot be shared, the holdout values cannot
+be reproduced from outside. Nothing is claimed about Japanese, input method editors, natural work or other populations.

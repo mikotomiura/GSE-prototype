@@ -289,3 +289,11 @@
 - **外枠で直したこと（v6）**: verdict.md の 7 に 1 項目ずつ。
 - **草稿の前に数えるもの（条件を先にコミット・[探索・取り置き]）**: CS1 の取り置きで複数の文字の編集の出来事が占める割合、2 つの信号の全時間の床の割合と分散・u の後の値。位置の 3 区分の実効の書き手（S7）。
 - **影響範囲**: `paper-write/outline.md`・`requirement.md`（背景に追記）。
+
+## 判断 33: 草稿の前の計数（X9）・草稿の置き場・推定器の呼び方（2026-11-06）
+
+- **計数**: 条件 X9 を先にコミット（bb4a3575）してから数えた（b390fd32・`experiments/20261106-findings-paper1-exploration/results/explore_predraft.json`）。門 3 つが通り、変異で 3 つとも赤になった。値は同じ dir の notes.md の X9。
+- **置き場（研究者の採否・AskUserQuestion）**: 草稿は `papers/public-data-findings/manuscript/` に新設する。papers/README.md の公開物の規則（GSE の名前・内部の番号・[Vn] を書かない・学術的な英語・BibTeX の引用）に最初から合わせる。JEDM のテンプレートは repo に入れず BUILD.md に取り方を書く。
+- **推定器の呼び方（研究者の採否・AskUserQuestion）**: 草稿の前に一次を開いたところ、IME の無い入力（CS1・KLiCKe・CoAuthor）で使う正規化の基準値は `heads/writing.rs` の `BETA_WRITING_LATIN_*` で、注記は「Source: Dhakal et al. (2018) general population medians, coding-adjusted」、導入時（4fc62bf8）の名前は `β_coding`（"reference values for alphanumeric / coding input"）だった。遷移・放出行列は作業の種類に依らず共通で、どれも手で定めた値。→ 本文では「係数を手で定めた打鍵の状態推定器」と呼び、由来を事実どおり書く（行列は文献と調整・直接入力の基準値は一般の打鍵の中央値〔[P269] Dhakal 2018〕を手で調整した値・作文の作業向けのヘッドで回した）。外枠 v6 の「作文の打鍵向けに係数を定めた」と限界 (c) の「作文向けの係数の持ち出し」は、「この入力の写し方・合成の離し・このデータで推定していない係数」に言い換える。
+- **私の誤り**: 判断 32 (3) で推定器を「作文の打鍵向けに係数を定めた」と呼ぶ案を出したとき、基準値の出どころの注記を開いていなかった（`// TUNE:` と合成の重みだけを見た）。
+- **影響範囲**: 草稿（新設）。外枠 v6 は書き換えない（草稿が新しい版になる）。
