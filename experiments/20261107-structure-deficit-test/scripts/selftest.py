@@ -325,7 +325,7 @@ def p_shuf(seed):
 
 def p_qw(seed):
     rng = np.random.default_rng([seed, 23])
-    ok = True
+    ok, err = True, None
     for q_ in (3, 7):
         H.set_nsym(q_ * q_ + 1)
         try:
@@ -339,9 +339,11 @@ def p_qw(seed):
                 else:
                     ok = ok and m["H"].shape == (K, n) and m["C"].shape == (K, n, n)
                 ok = ok and T.shape == (n, n)
+        except (IndexError, ValueError) as e:  # 幅が列に合わないと配列の大きさで落ちる。落ちたことを赤として残す（m35・判断 12）
+            ok, err = False, type(e).__name__
         finally:
             H.set_nsym(26)
-    return dict(passed=bool(ok))
+    return dict(passed=bool(ok), error=err)
 
 
 def p_d(seed):
@@ -592,7 +594,18 @@ def main(seed, out, only, mut, run_id):
                     R["P-TAU"] = R_tau
             if "P-SAME" in want:
                 R["P-SAME"] = p_same(seed, mut, ex)
-    if want & {"P-OTHER", "P-LEAK", "P-COMP", "P-EM2"}:
+    if want & {"P-LEAK", "P-EM2"}:
+        # P-LEAK は真が hmm3 で表せる合成で見る（K = 3 の粘る HMM・tau-extend の P-POOL と同じ型・判断 12）。
+        # P-COMP の合成（真が AR(1)）では hmm3 が真より大きく劣り、漏れの上積みがその差に埋もれる。
+        rng = np.random.default_rng([seed, 34])
+        cm = common_model(rng)
+        truths = [perturb(cm, rng) for _ in range(8)]
+        writers = writers_from(truths, rng)
+        Dl, Xl = ml.run_one("coauthor", None, seed + 2, 5, "o", 4, ex_writers=writers, structs=HMM3)
+        decs += decs_summary(Dl)
+        if "P-LEAK" in want:
+            R["P-LEAK"] = p_leak(Xl, writers, truths)
+    if want & {"P-OTHER", "P-COMP", "P-EM2"}:
         rng = np.random.default_rng([seed, 32])
         truths = comp_models(rng, 8)
         writers = writers_from(truths, rng)
@@ -600,8 +613,6 @@ def main(seed, out, only, mut, run_id):
         decs += decs_summary(Do) + decs_summary(Dp)
         if "P-OTHER" in want:
             R["P-OTHER"] = p_other(Xo, writers)
-        if "P-LEAK" in want:
-            R["P-LEAK"] = p_leak(Xo, writers, truths)
         if "P-COMP" in want:
             v = part_vals(Do, Dp, 15, "hmm3")
             R["P-COMP"] = dict(passed=part1(v) == "vanish", part1=part1(v), part2=part2(v), values=v)
