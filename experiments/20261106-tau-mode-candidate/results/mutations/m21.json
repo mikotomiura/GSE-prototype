@@ -1,0 +1,13 @@
+{
+ "run_id": "20261106T205818-149",
+ "mutate": [
+  "m21"
+ ],
+ "P-AB": {
+  "passed": false,
+  "max_abs_dev": 0.03217243716826701,
+  "median_dev": 0.003990696366652724
+ },
+ "seconds": 49.66668248176575,
+ "all_passed": false
+}

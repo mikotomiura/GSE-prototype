@@ -1,0 +1,26 @@
+{
+ "run_id": "20261106T205818-149",
+ "mutate": [
+  "m17"
+ ],
+ "P-MODE": {
+  "passed": false,
+  "equal_to_excl_sbar_mode": false,
+  "min_abs_vs_excl_pool": 0.0,
+  "min_abs_vs_full_sbar_mode": 0.0040877242376144984,
+  "equal_ar": false
+ },
+ "P-LIMIT": {
+  "passed": false,
+  "median_abs_self_minus_mode": {
+   "100000": 0.0008571125501219967,
+   "300000": 0.0009856969793164971,
+   "1000000": 0.0011299480259188144
+  },
+  "median_abs_self_minus_pool_1e6": 0.0011299480259188144,
+  "writers_mode_neg_inf": 0,
+  "writers_finite": 17
+ },
+ "seconds": 216.27160573005676,
+ "all_passed": false
+}

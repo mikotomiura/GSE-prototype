@@ -1,0 +1,12 @@
+{
+ "run_id": "20261106T205818-149",
+ "mutate": [
+  "m22"
+ ],
+ "P-NOSEL": {
+  "passed": false,
+  "mode_picked": true
+ },
+ "seconds": 50.44871234893799,
+ "all_passed": false
+}
