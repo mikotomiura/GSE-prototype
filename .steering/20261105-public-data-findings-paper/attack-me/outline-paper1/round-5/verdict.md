@@ -1,0 +1,53 @@
+# verdict（outline round 5・対象 outline.md v5 commit 3a947903）
+
+## 1. 判定: major revision（E が「直してから回す」のため）
+
+有効な査読 4 本（R1・R2・R3・E。接地はどれも 2 本以上〔E は一次＋1 本〕から逐語で抜き出せた）。R1 minor・R2 minor・R3 minor・E「直してから回す」（→ major 以上）。Codex minor（既知の未決 16 件を添えた）。
+
+判定の推移: round 1 major → round 2 major → round 3 major → round 4 major（R は 3 人とも minor）→ round 5 major（R は 3 人とも minor・Codex も minor）。査読者 3 人と Codex は 2 回続けて minor 以下。止め手は毎回 E で、round 5 の E の major 4 件のうち 2 件（N4 置き場の規則の食い違い・N3 の「コードを渡す」）は v5 の直しから出た。
+
+## 2. 一致した指摘（分母 = 有効な査読 4 本。Codex は別枠）
+
+| # | 指摘 | 一致 | Codex | 裏取り |
+|---|---|---|---|---|
+| A | 抄録・考察の「その評価の手順とコードを渡す」が、推定器・gse-replay の公開の未決（:66・:78）と食い違う。再現の最後の手段の「推定の行（中間物）」が公開物の一覧に無い | R2（minor）・R3（m-A）・E（N3 major）（3/4） | — | 真（:27・:60・:66・:78） |
+| B | 置き場と桁の規則（:111）が外枠の中で守られず食い違う（床 :23 対 :111・5.2% の値が考察 :64・向き :33・本文 0.479〜0.500・脚注 0.50006 の 5 桁・探索 :54） | E（N4 major・N9 nit）（1/4）＋監査 3-B・3-C | — | 真（v5 で私が書いた規則と文の食い違い） |
+| C | 抄録の H3「（0.540〜0.567）」が区間と読まれる・抄録に置くか | R3（n-A）・E（N5）（2/4） | 4 と重なる | 真 |
+| D | 「持ち出しだけでは説明しにくい」（:7）が強い（入力の定義が違う・幅を KLiCKe を見た後に置いた循環） | R3（m-C の近縁）（1/4）＋監査 2-B | 3 と重なる | 真 |
+| E | 幅の内側が契機として何を意味するか（事前登録の付録 D の換算: AUC 0.50 で停滞の休止に落ちる発火 8.2〜8.9%、0.55 で 8.9〜10.0%〔0.1〜1.8 ポイント〕、0.70 でも 12.9〜18.4%）／閾値の表を考察の根拠に | R2（minor 上位）・E（N6）（2/4） | — | 真（prereg-draft.en.md:244 で逐語を確かめた。:83 で換算の例として開示済み） |
+
+監査だけ（どれも真・重い順）:
+- 3-A（高）抄録から較正の括弧を外したのは事前登録 P0 に反する。prereg-draft.en.md:18 逐語 "(the false-equivalence rate is at most 5.2% [Wilson 95% interval 3.6–7.5%] among the configurations examined in the calibration on seen writers, and is not an upper bound over the whole null; P10)"). This qualification is not dropped in the paper's abstract either." → v5 で私が E の round 4 の m3 を受けて外した。凍結した書き方に反するので、抄録に括弧を戻す（逸脱にしない）。私の誤り（P0 の全文を grep せずに直した）。
+- 2-A（中）H3 の本文の感度を「少ない打鍵の窓を除いた版」（0.5 へ寄る側）だけにし、バーストの閾値の感度（ロジスティック回帰 0.568〔0.5519〜0.581〕・分岐 3・幅を超える側）が本文から消えた。P0 "Branches 3 and 5 … are limited to description per signal, ε, and learner"。→ 真（JSON `h3_burst_theta_x1` で確かめた）。2 つの向きを 1 文で並べる。
+- 2-C P0 の固定の文（"the rise in the run-up…"）を「識別の AUC」に言い換えたことを S1 に 1 文。
+
+1 人だけの指摘（どれも真）:
+- R1: [major] 「作文の打鍵で学んだ」の係数の出どころが資料に無い（prereg-draft.en.md:39 "it uses the writing head (coefficients without IME; `heads/writing.rs`)" だけ）→ 3 節に由来 1〜2 文・出どころは S2、推定で決めた値でなければ語を改める／推定器の状態 Stuck とラベル「停滞」が同じ語（「停滞の確率」）→ 語を分ける／IDE の編集の出来事を打鍵に写す規則と複数の文字の出来事の割合／「代理」を「候補」に下げる／[V157] を個人化の先例に／計器の全時間の挙動は JSON に無い（`level_floor_ceiling` は停滞と対照の集合だけ）→ 草稿の前に条件をコミットして数える。
+- R2: 較正が名目を超えたときの扱いと 2 版の違い／書き手ごとの分位を読む参照（無作為の広がり）／含意の推奨を文献に結ぶ。
+- R3: m-C 作文の水準 0.569・0.580（prereg-draft.en.md:239・[記述]）と CS1 の 0.524・0.521 の落差を並べ、「同等は計器の移し替えでの弱まりと区別できない」を 1 句／m-B H3 では揃えた比べ（0.567・0.540）が揃えない窓（0.529・0.526）より高く [V458] の向きと逆／m-D 信号が u より後を見ないことを 4 節に 1 文。
+- E: N1 [major] 効くと期待された根拠（欠け）が序論に無い／N2 [major] 適用を超える一般性の柱（比べの表か、手順の移植可能性〔表 3〕）／N7 題名の案／N8 結果の細部を S3・S8・データの節へ／N10 序論の括弧が重い（→ P0 があるので抄録と序論では残す）。
+
+Codex（minor）: 1 [major] 各信号を単独の順位スコアとして用いた AUC に限定（両裾・組合せは別の評価対象）→ 真／2 [major] 対で重み付けた平均の同等で、典型の書き手や各書き手での無効性は示さない → 真（:40 の 42%・分位）／3 作文の側からの説明の排除が強い（→ D と同じ）／4 抄録の H3（→ C と同じ）。
+
+## 3. 直す順
+
+- major: 3-A 抄録に較正の括弧を戻す（P0）／A「コード」を評価の手順のコード（推定器に依らない部分）に限定し、推定の行を公開物の候補に・出せないなら再現の範囲を正直に／2-A H3 の感度は 2 つの向きを 1 文で／E 付録 D の換算を評価の設計（[記述]・見た書き手・幅を置いた後）と考察の 1 文に／Codex 1・2 推定量の限定（単独の順位スコア・対で重み付けた平均で、個人別の無効性は示さない）／R1 係数の出どころ（メインが一次で確かめた: HMM 0.5.0 の遷移・放出行列は `src-tauri/src/analysis/engine.rs` の `// TUNE:` で文献の注記つきの手で定めた値、潜在軸の重みは `heads/writing.rs:83` の固定の 0.30・0.25・0.25・0.20。データから推定した係数ではない → 「作文の打鍵で学んだ」は事実と違う。「作文の打鍵向けに係数を定めた（手で設定・データから推定していない）」に改め、外枠の全文の語を直す）・語の分離（推定器の Stuck 状態の確率とラベルの停滞）／E N1・N2（研究者の判断: 期待の根拠をどこから取るか・一般性の柱）
+- minor: B 置き場と桁の規則を 1 つに直し、外枠の全文をそれに合わせる（床は P0 どおり抄録の第 2 文と 5.2 と限界）／C 抄録の H3 は「2 つの学習器で 0.540 と 0.567（記述）」か外す／D :7 を「作文の側でも同様の記述結果だった」にとどめる／R3 m-C・m-B・m-D／R1 IDE の写し・「候補」・[V157]／R2 較正の扱い・分位の参照／監査 2-C
+- nit: E N7 題名・N8 細部の移動・R2 推奨と文献
+
+## 4. 意図の監査役
+- 意図にあって外枠に無い: 1-A（H3 の感度の向き）。
+- 漂流: 3-A（抄録の括弧・P0 違反）・2-A（分岐 3 の記述が落ちた）・2-B（持ち出しの推論）。3-A と 2-A は判断 31 の直しで私が生んだ。
+- 4b. 編集者 E: 直してから回す（N1 期待の根拠・N2 一般性の柱・N3 公開と「コードを渡す」・N4 置き場の規則）。→ 判定は major 以上。
+- 4c. 本文の分量: 本文なし。外枠の予算の合計 6,650 語（round 4 の版 f611db9f と同じ・±0）。測った版 3a947903。
+
+## 5. 逸脱・注入
+- 応答 5 本と Codex は secrets-filter を通り、絶対パスは含まない。
+- 逸脱: 応答はメインが縮めて tmp に置いた（round 1〜4 と同じ）。依頼文はファイルの絶対パスで渡した（round 4 と同じ）。
+- 接地の引用は 4 役とも本文で逐語に確かめた（roeser2025「was successful at uncovering the parameter values」・guo2020「Such a personalized threshold was larger than the 95th percentile」・gardner2018「large or important enough to be useful」・pelanek2015「The choice of suitable metric depends on the intended use」・lakens2017「whether an experiment was performed competently」・kapoor2023「Clean train-test separation」・mensh2017「The title is the ultimate refinement」・jedm_aims「Generalizable Applicability」）。
+- 注入の疑い: なし。
+
+## 6. 研究者に問うこと
+- 次の段: 直して閉じ草稿へ進むか、round 6 を回すか（推移・費用は上の 1）。
+- E の N1（期待の根拠）と N2（一般性の柱）の扱い。
+- （R1 の係数の出どころはメインが一次で確かめた。手で定めた値なので語を改める。）
