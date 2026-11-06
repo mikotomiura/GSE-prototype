@@ -31,6 +31,17 @@ import build_cs1 as B  # noqa: E402
 SEED = 20261106
 WIN = 30_000
 CONDS = [("base", None), ("noop", None), ("S", 1.5), ("S", 2.0), ("S", 3.0), ("C", 0.1), ("C", 0.25), ("C", 0.5)]
+# X13（判断 36）: 小さい側の段と、対照を基準の値に固定した版
+CONDS_V2 = [("base", None), ("noop", None), ("S", 1.02), ("S", 1.05), ("S", 1.1), ("S", 1.2), ("S", 1.5), ("S", 2.0),
+            ("S", 3.0), ("C", 0.02), ("C", 0.05), ("C", 0.1), ("C", 0.25), ("C", 0.5)]
+
+
+def fixed_rows(base_rows, rows):
+    """停滞の値は rows から、引かれた対照の値は base_rows から取った行（対照の組と引きは同じ・G2 で確かめた後に呼ぶ）。"""
+    out = []
+    for rb, rn in zip(base_rows, rows):
+        out.append([(cn, sn, fn, ctb) for (cb, sb, fb, ctb), (cn, sn, fn, ctn) in zip(rb, rn)])
+    return out
 
 
 def cname(kind, x):
@@ -135,7 +146,14 @@ def window_desc(w, u):
 def main():
     argv = sys.argv[1:]
     mutate = "--mutate-m1" in argv
-    argv = [a for a in argv if a != "--mutate-m1"]
+    v2 = "--v2" in argv
+    argv = [a for a in argv if a not in ("--mutate-m1", "--v2")]
+    v1_p = None
+    if v2:
+        global CONDS
+        CONDS = CONDS_V2
+        work, hold_p, replay, seen_p, out_p, v1_p = argv
+        argv = argv[:5]
     work, hold_p, replay, seen_p, out_p = argv
     seen = json.load(open(seen_p))
     writers, chk = C.load_cs1(work, hold_p, "seen")
@@ -198,6 +216,11 @@ def main():
             h = summ["H1"][s]
             e[s] = {k: {"pooled_auc": h[k]["pooled_auc"], "ci95": h[k]["ci95"], "tie_share": h[k]["tie_share"],
                         "branch_form": h[k].get("branch")} for k in ("eps_0.001", "eps_0")}
+        if v2:
+            fr = fixed_rows(base_rows, rows)
+            fs = C.h1_summary(fr, SEED, "none", False, C.SIGS + C.LEVELS, light=True)
+            e["controls_fixed"] = {s: {k: {"pooled_auc": fs[s][k]["pooled_auc"], "ci95": fs[s][k]["ci95"]}
+                                       for k in ("eps_0.001", "eps_0")} for s in C.SIGS + C.LEVELS}
         res["conditions"][name] = e
         if kind == "base":
             g3 = all(summ["H1"][s][k][f] == seen["H1"][s][k][f] for s in C.SIGS + C.LEVELS
@@ -241,6 +264,30 @@ def main():
     with open(out_p + ".tmp", "w") as f:
         json.dump(res, f, indent=1)
     os.replace(out_p + ".tmp", out_p)
+    if v2:
+        v1 = json.load(open(v1_p))["conditions"]
+        res["gates"]["G4_v1_conditions_equal"] = all(
+            res["conditions"][c][s] == v1[c][s] for c in v1 for s in C.SIGS + C.LEVELS)
+        b = res["conditions"]["base"]
+        res["gates"]["G5_fixed_equals_base_at_base"] = all(
+            b["controls_fixed"][s][k]["pooled_auc"] == b[s][k]["pooled_auc"] for s in C.SIGS for k in ("eps_0.001", "eps_0"))
+        res["first_level_outside_band_controls_fixed"] = {}
+        for s in C.SIGS:
+            for kind in ("S", "C"):
+                hit = None
+                for k2, x in CONDS:
+                    if k2 != kind:
+                        continue
+                    ci = res["conditions"][cname(k2, x)]["controls_fixed"][s]["eps_0.001"]["ci95"]
+                    if ci and (ci[0] > C.BAND_HI or ci[1] < C.BAND_LO):
+                        hit = x
+                        break
+                res["first_level_outside_band_controls_fixed"]["%s_%s" % (s, kind)] = hit
+        with open(out_p + ".tmp", "w") as f:
+            json.dump(res, f, indent=1)
+        os.replace(out_p + ".tmp", out_p)
+        if not (res["gates"]["G4_v1_conditions_equal"] and res["gates"]["G5_fixed_equals_base_at_base"]):
+            sys.exit("G4 か G5 が外れた")
     print(json.dumps({"gates": res["gates"], "first_level_outside_band": res["first_level_outside_band"]}))
 
 
