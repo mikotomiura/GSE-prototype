@@ -21,7 +21,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def load_constants(path=None):
     with open(path or os.path.join(HERE, "constants.json"), encoding="utf-8") as f:
-        return json.load(f)
+        c = json.load(f)
+    rows = c["silence_alpha"]
+    mins = [r["min_silence_s"] for r in rows]
+    if not rows or mins != sorted(mins, reverse=True) or mins[-1] != 0.0:
+        raise ValueError("silence_alpha must be sorted by decreasing min_silence_s and end at 0.0")
+    return c
 
 
 def clamp01(v):
@@ -289,10 +294,16 @@ def symbolize(t0, presses, c=None):
     """Symbolize one recording.
 
     t0: start time of the recording in ms (ticks fall on t0 + k * tick_ms).
-    presses: list of (t_ms, category), sorted by time (ties keep their order).
+    presses: list of (t_ms, category) with non-negative integer times, sorted by time by the
+        caller (ties keep their order; the list is not re-sorted). Categories must be one of
+        constants.json key_categories (ValueError otherwise). Presses before t0 are discarded
+        by the reset at t0, as in the original implementation.
     Returns rows (t_ms, x, y, symbol, alpha, path). Ticks are processed before key events at
-    the same time, and no tick is processed after the last event.
+    the same time, and no tick is processed after the last event. One row is produced for
+    every second from t0 to the last event, so the work grows with the time span.
     """
+    if any(b[0] < a[0] for a, b in zip(presses, presses[1:])):
+        raise ValueError("presses must be sorted by time")
     c = c or load_constants()
     sym = Symbolizer(t0, c)
     events = [(t0, "start", None, None), (t0, "start", None, None)]

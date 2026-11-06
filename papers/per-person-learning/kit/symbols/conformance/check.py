@@ -40,8 +40,13 @@ def load(path):
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     args = sys.argv[1:] or [os.path.join(here, "data", "inputs.json.gz"), os.path.join(here, "data", "expected.json.gz")]
+    if len(args) != 2:
+        sys.exit("usage: check.py [<inputs.json[.gz]> <expected.json[.gz]>]")
     cases = load(args[0])["cases"]
     expected = load(args[1])["expected"]
+    if not cases or len(cases) != len(expected):
+        print(json.dumps({"cases": len(cases), "expected": len(expected), "error": "case count mismatch or empty"}))
+        sys.exit(1)
     c = load_constants()
     kinds = {}
     first = None

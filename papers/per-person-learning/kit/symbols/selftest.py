@@ -86,6 +86,50 @@ def test_run_symbol():
     assert any(r[3] == C["backspace_run_symbol"] for r in rows), [r[3] for r in rows]
 
 
+def test_edge_inputs():
+    assert symbolize(0, [], C) == []
+    one = symbolize(0, [(5000, "alphabetic")], C)
+    assert one and all(r[5] == "silence" for r in one) and one[0][0] == 2000, one[:2]
+    ties = symbolize(0, [(1000, "alphabetic")] * 50 + [(1500, "space")], C)
+    assert all(0 <= r[3] <= 25 for r in ties)
+    for bad in ([(1, "Alphabetic")], [(2000, "alphabetic"), (1000, "alphabetic")]):
+        try:
+            symbolize(0, bad, C)
+        except ValueError:
+            continue
+        raise AssertionError("expected ValueError for %r" % (bad,))
+    assert cs1_2021.classify({"EventType": "X-Keystroke", "X-Metadata": None}) == (None, None)
+
+
+def test_branch_coverage():
+    with gzip.open(os.path.join(HERE, "conformance", "data", "inputs.json.gz"), "rt", encoding="utf-8") as f:
+        cases = json.load(f)["cases"]
+    paths, alphas, run_symbols, dense = set(), set(), 0, 0
+    for t0, presses in cases:
+        rows = symbolize(t0, [tuple(p) for p in presses], C)
+        paths |= {r[5] for r in rows}
+        alphas |= {r[4] for r in rows}
+        run_symbols += sum(1 for r in rows if r[3] == C["backspace_run_symbol"])
+        p = [t for t, cat in presses if t >= t0 and cat in C["key_categories"]["feature"]]
+        if any(p[i + 300] - p[i] <= C["window_ms"] for i in range(len(p) - 300)):
+            dense += 1
+    assert paths == {"typing", "transition", "silence"}, paths
+    assert alphas == {0.3, 0.15, 0.18, 0.25}, alphas
+    assert run_symbols > 0 and dense > 0, (run_symbols, dense)
+    print("   coverage: run-symbol rows %d, cases with buffer overflow inside the window %d" % (run_symbols, dense))
+
+
+def test_check_rejects_count_mismatch():
+    with tempfile.TemporaryDirectory() as td:
+        empty = os.path.join(td, "e.json")
+        with open(empty, "w") as f:
+            json.dump({"expected": []}, f)
+        r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "conformance", "check.py"),
+                            os.path.join(HERE, "conformance", "data", "inputs.json.gz"), empty],
+                           capture_output=True)
+        assert r.returncode != 0
+
+
 def test_regenerate_inputs():
     with tempfile.TemporaryDirectory() as td:
         out = os.path.join(td, "inputs.json")

@@ -22,8 +22,8 @@ BLOCK_GAP_MS = 1_800_000
 
 def classify(row):
     """One CSV row -> ("key", category), ("ev", None) or (None, None) for rows that are not kept."""
-    et = row["EventType"]
-    md = row.get("X-Metadata", "")
+    et = row.get("EventType") or ""
+    md = row.get("X-Metadata") or ""
     if et == "X-Keystroke":
         return ("key", char_category(md)) if len(md) == 1 else (None, None)
     if et == "X-Action":
@@ -33,7 +33,8 @@ def classify(row):
             return ("key", KEYS[md])
         return ("ev", None)
     if et == "File.Edit":
-        return ("ev", None) if row["EditType"] == "Insert" and len(row["InsertText"]) >= 2 else (None, None)
+        insert = (row.get("EditType") or "") == "Insert" and len(row.get("InsertText") or "") >= 2
+        return ("ev", None) if insert else (None, None)
     if et in ("X-Paste", "X-Copy"):
         return ("ev", None)
     if et == "Run.Program":

@@ -23,8 +23,14 @@ def ndjson(t0, presses):
     return "".join(json.dumps(x) + "\n" for x in lines)
 
 
+REPLAY_SHA256 = "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3"  # 試験の中間を作った replay
+
+
 def main():
     inp, replay, out = sys.argv[1:4]
+    import hashlib
+    if hashlib.sha256(open(replay, "rb").read()).hexdigest() != REPLAY_SHA256:
+        sys.exit("gse-replay の SHA-256 が試験のものと違う")
     cases = json.load(open(inp))["cases"]
     res = []
     with tempfile.TemporaryDirectory() as td:

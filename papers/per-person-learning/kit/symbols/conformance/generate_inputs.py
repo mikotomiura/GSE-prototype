@@ -1,10 +1,9 @@
 """Generate synthetic key-press sequences for the conformance check (no human data).
 
-Each case is (t0, presses). The generator mixes typing gaps, dense typing that overflows the event buffer within the
-window, pauses of 2 to 90 s, ties
-(gap 0), deletion runs of up to 20 presses, ignored keys, a start time before the first
-press, and sequences longer than the event buffer, so that every branch of the
-symbolizer is exercised.
+Each case is (t0, presses). The generator mixes typing gaps, dense typing that overflows
+the event buffer within the 30 s window, pauses of 2 to 90 s, ties (gap 0), deletion runs
+of up to 20 presses, ignored keys, a start time before the first press, and sequences
+longer than the event buffer. Branch coverage is reported by selftest.py.
 
 Usage: python3 generate_inputs.py <seed> <n_cases> <out.json>
 """
@@ -33,12 +32,12 @@ def gap(rng):
 
 def dense_case(rng):
     """More than 300 presses within 30 s, so that the event buffer overflows inside the window."""
-    t = rng.randint(1_600_000_000_000, 1_700_000_000_000)
+    t = t_first = rng.randint(1_600_000_000_000, 1_700_000_000_000)
     presses = []
     for _ in range(rng.randint(320, 420)):
         presses.append((t, "backspace" if rng.random() < 0.2 else rng.choice(CATS[:36])))
         t += rng.randint(0, 60) if rng.random() < 0.8 else rng.randint(250, 400)
-    return [t - rng.randint(0, 500), presses]
+    return [t_first - rng.randint(0, 500), presses]
 
 
 def case(rng):
