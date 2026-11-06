@@ -26,6 +26,8 @@ worktree は `/Users/johnd/GSE-prototype-tau-mode`（枝 `exp/gse-tau-mode-candi
 
 ## 3 論文 3（1 人ごとの学習の効き）
 
+- 専用の引き継ぎ: `next-session-gse-paper3-per-person-learning.md`（入口の文つき）。以下は要約。
+
 - 別の worktree・別のセッションで始めてよい（PR の後なら main から切る）。`paper-write` Skill の Step 0〜1 から。誰に読ませて何を変えるかを先に研究者に聞いて、投稿先はそれから選ぶ。無料の道を既定にする。
 - 材料: 前の 2 つの試験（`20261103-coauthor-per-person/`・`20261104-coauthor-ml-improve/`）、τ の 2 つの試験（`20261104-timeseries-tau-extend/`・`20261106-tau-mode-candidate/`）。
 - 限界の節の書き換え案は、`20261106-tau-mode-candidate/notes.md` の「論文 3 へのつなぎ」にある。対象は CoAuthor の ar で、選ばれた τ が 10^5 以上の行に限る。中央値で比べた読みであって、書き手ごとの配分ではない。CS1 は但し書きを残す。主の表は変えず、a・b の表は補足資料に置く。
@@ -33,6 +35,8 @@ worktree は `/Users/johnd/GSE-prototype-tau-mode`（枝 `exp/gse-tau-mode-candi
 - 公開データの知見の論文（`/Users/johnd/GSE-prototype/.steering/_handoff/next-session-gse-public-data-findings-paper.md`）とは境を合わせ、そちらでは 1 人ごとの学習を扱わない。
 
 ## 4 並行: 仮説を確かめる試験（研究者が 2026-11-07 に決めた）
+
+- 専用の引き継ぎ: `next-session-gse-hypothesis-structure-test.md`（入口の文つき）。以下は要約。
 
 - 論文 3 が進み始めたら、並行して「構造の族（ar の次数・状態の数）と量子化の列を増やし、前回の読みの仮説（B で本人が勝っていたのは構造の足りなさの補い）を確かめる試験」を回す。
 - 論文 3 の範囲は今ある 4 つの試験で凍結する。この試験の結果は論文 3 に入れない。論文 3 では仮説を「同じ向きだが確かめていない」と書き、試験は次の論文か改訂の材料にする。
