@@ -13,15 +13,15 @@
 - [x] 引き継ぎ・前の試験の conditions・notes の結果 2 の但し書き・ml.py・hmm2.py を読む
 - [x] worktree `/Users/johnd/GSE-prototype-tau-mode`（枝 `exp/gse-tau-mode-candidate`・`2911f940` から・fetch 済み）
 - [x] grill → 判断 1〜6
-- [ ] /reimagine（v1 と v2 を比べて研究者が選ぶ）
-- [ ] `experiments/20261106-tau-mode-candidate/conditions.md`・`SEED` をコミット（コードより前）
-- [ ] 前の試験の scripts・run.sh・mutate.sh を写して変える
-- [ ] 合成の selftest（全対照）を Mac で通す
-- [ ] code-reviewer（計算の前）
-- [ ] 変異の門を Mac で通す
-- [ ] 時間を測り直す（合成）
-- [ ] 職場の PC 向けの引き継ぎ（repo と Drive の `GSE_ML_run`）
-- [ ] 結果が戻った後の Mac 向けの引き継ぎ（notes の骨組み・値なし）
+- [x] /reimagine（v1 と v2 を比べて研究者が選ぶ）
+- [x] `experiments/20261106-tau-mode-candidate/conditions.md`・`SEED` をコミット（コードより前）
+- [x] 前の試験の scripts・run.sh・mutate.sh を写して変える
+- [x] 合成の selftest（全対照）を Mac で通す
+- [x] code-reviewer（計算の前）
+- [x] 変異の門を Mac で通す
+- [x] 時間を測り直す（合成）
+- [x] 職場の PC 向けの引き継ぎ（repo と Drive の `GSE_ML_run`）
+- [x] 結果が戻った後の Mac 向けの引き継ぎ（notes の骨組み・値なし）
 - [ ] コミット（push と PR は研究者が確かめてから）
 
 ## 本計算の後（別のセッション）
