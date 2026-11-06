@@ -69,13 +69,18 @@ impl ProbeSourceKind {
     }
 }
 
-/// skip 理由。`none` = 回答済み、`dont_remember` = 思い出せない、`dismissed` = 閉じた。
+/// skip 理由。`none` = 回答済み、`dont_remember` = 思い出せない、`dismissed` = 閉じた、
+/// `superseded` = 段 1 で層化のカードが無作為の問いに差し替えられた（2026-11-06）。
+///
+/// ⚠️ `logger::SkipReason` と値をそろえる。知らない値の行は `gse-replay` が
+/// `unknown_enum_lines` に数えて捨てる（`skip_reason_kind_knows_every_logger_value`）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SkipReasonKind {
     None,
     DontRemember,
     Dismissed,
+    Superseded,
 }
 
 impl SkipReasonKind {
@@ -84,6 +89,7 @@ impl SkipReasonKind {
             "none" => Some(Self::None),
             "dont_remember" => Some(Self::DontRemember),
             "dismissed" => Some(Self::Dismissed),
+            "superseded" => Some(Self::Superseded),
             _ => None,
         }
     }
@@ -1402,6 +1408,20 @@ fn fmt_opt(v: Option<f64>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ⚠️ `logger::SkipReason` が書く値はすべて読める（知らない値の行は replay が黙って捨てる）。
+    #[test]
+    fn skip_reason_kind_knows_every_logger_value() {
+        use crate::logger::SkipReason;
+        for r in [
+            SkipReason::None,
+            SkipReason::DontRemember,
+            SkipReason::Dismissed,
+            SkipReason::Superseded,
+        ] {
+            assert!(SkipReasonKind::parse(r.as_str()).is_some(), "{:?}", r);
+        }
+    }
 
     fn feat_at(ts: u64, ewma_x: f64, ewma_y: f64) -> FeatSnapshot {
         FeatSnapshot {

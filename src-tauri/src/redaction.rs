@@ -158,9 +158,12 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
     let line_type = obj.get("type").and_then(serde_json::Value::as_str);
     //   ★ `invitation_condition`（招待の契機の種類と値・推定器の版）も同じ側（セッションの条件の行）。
     //   消すとそのファイルの招待の条件が読めなくなる（ADR-040 D4・2026-11-01 研究者の決定）。
+    //   ★ `probe_frame`（段 1 の問いの枠: seed・起点・調停器の定数）も同じ側。中身は系の設定だけで、
+    //   行動も申告も含まない。削除した区間の候補の行（`probe_assignment`・`probe_suppressed`）は消える
+    //   （`.steering/20261105-gse-m5-probe-wiring-plan/decisions.md` 判断 8）。
     if matches!(
         line_type,
-        Some("meta") | Some("session_meta") | Some("invitation_condition")
+        Some("meta") | Some("session_meta") | Some("invitation_condition") | Some("probe_frame")
     ) {
         return None;
     }
@@ -194,8 +197,10 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
 /// |---|---|
 /// | `activity_label` | `recall_window_start_ms` 〜 `recall_window_end_ms` ∪ `t` |
 /// | `realtime_label` | `analysis_window_start_ms` 〜 `analysis_window_end_ms` ∪ `ts` |
+/// | `day_question` | `shown_ts` 〜 `t`（表示から閉じるまで） |
+/// | `probe_suppressed` | `candidate_ts` 〜 `t`（候補の時刻から判定まで） |
 /// | それ以外 | 点（[`line_timestamp`]） |
-/// | `meta` / `session_meta` | **`None`（常に残す）** |
+/// | `meta` / `session_meta` / `invitation_condition` / `probe_frame` | **`None`（常に残す）** |
 ///
 /// ⚠️★★★ **区間は「答えた時刻」も含める**（和集合）。★ 回答そのものの時刻を消す
 /// 要求（「さっきの 5 分を消して」）でも落ちるようにするためである。
@@ -213,6 +218,10 @@ pub fn line_interval(line: &str) -> Option<(u64, u64)> {
         Some("realtime_label") => {
             num("analysis_window_start_ms").zip(num("analysis_window_end_ms"))
         }
+        // ★ 段 1（2026-11-06・本タスクの判断 8）: 行が持つ 2 つ目の時刻も区間に入れる。
+        //   点（`t`）だけで消すと、削除した区間の中の時刻が別の欄に残りうる（消す側に倒す）。
+        Some("day_question") => num("shown_ts").zip(Some(point)),
+        Some("probe_suppressed") => num("candidate_ts").zip(Some(point)),
         _ => None,
     };
     Some(match window {
@@ -612,7 +621,10 @@ mod tests {
             let line_type = &rest[..q];
 
             // ★ `meta` / `session_meta` は**常に残す**側である (D6 決定 3)。
-            if matches!(line_type, "meta" | "session_meta" | "invitation_condition") {
+            if matches!(
+                line_type,
+                "meta" | "session_meta" | "invitation_condition" | "probe_frame"
+            ) {
                 continue;
             }
 
@@ -661,7 +673,12 @@ mod tests {
         let expected: std::collections::BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
             .iter()
             .copied()
-            .filter(|t| !matches!(*t, "meta" | "session_meta" | "invitation_condition"))
+            .filter(|t| {
+                !matches!(
+                    *t,
+                    "meta" | "session_meta" | "invitation_condition" | "probe_frame"
+                )
+            })
             .collect();
         assert_eq!(
             checked, expected,
@@ -797,6 +814,35 @@ mod tests {
         let (kept, removed) = retain_outside_range([line], 500, 5000);
         assert_eq!(removed, 0);
         assert_eq!(kept.len(), 1);
+    }
+
+    /// `probe_frame` は区間の削除で消さない（系の設定だけ・計画の判断 8）。対照の候補の行は消える。
+    #[test]
+    fn probe_frame_survives_redaction() {
+        let frame = r#"{"type":"probe_frame","t":1000,"frame_seed":42,"anchor_ms":900,"arbiter_version":"s1-arbiter-1"}"#;
+        assert_eq!(line_timestamp(frame), None);
+        let assignment = r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random"}"#;
+        let (kept, removed) = retain_outside_range([frame, assignment], 500, 5000);
+        assert_eq!(removed, 1);
+        assert_eq!(kept, vec![frame]);
+    }
+
+    /// 段 1 の申告と候補の行は `"t"` で消える。2 つ目の時刻（表示・候補）が区間に入っても消える。
+    #[test]
+    fn new_s1_rows_are_deleted_by_t() {
+        let dq = r#"{"type":"day_question","t":3000,"shown_ts":2000,"shown_local_minute":1100,"target_day":20000,"trigger":"evening_idle","delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","motivation":4,"latency_ms":10,"duration_ms":10}"#;
+        let sup = r#"{"type":"probe_suppressed","t":3000,"candidate_ts":2999,"stratum":"random","reason":"away"}"#;
+        assert_eq!(line_timestamp(dq), Some(3000));
+        assert_eq!(line_timestamp(sup), Some(3000));
+        // 閉じた時刻を含む削除
+        let (_, removed) = retain_outside_range([dq, sup], 2500, 3500);
+        assert_eq!(removed, 2);
+        // 表示した時刻だけを含む削除でも、日の問いは消える
+        let (kept, removed) = retain_outside_range([dq, sup], 1500, 2500);
+        assert_eq!(removed, 1);
+        assert_eq!(kept, vec![sup]);
+        assert_eq!(line_interval(dq), Some((2000, 3000)));
+        assert_eq!(line_interval(sup), Some((2999, 3000)));
     }
 
     /// ★ 通しの回帰: **自己申告行が実際に落ちて、`session_meta` と `meta` は残る**。

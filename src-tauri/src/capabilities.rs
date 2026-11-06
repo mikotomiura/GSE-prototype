@@ -105,6 +105,11 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     // 通常のモード（EH3・O1・G1 でない走行）で招待を許すセッションの条件（ADR-040 D4・タスク B）。
     //   EH3 の条件は `eh3_day` が持つので、EH3 では出さない。
     "invitation_condition",
+    // 段 1（ADR-043・M5）: 問いの枠・出さなかった候補・日の終わりの問い。
+    //   ⚠️ 2026-11-06 時点では送出元が無い（駆動役は M5 の 2 本目）→ `emitterless` に置く。
+    "probe_frame",
+    "probe_suppressed",
+    "day_question",
 ];
 
 /// **閾値ゲート付き**の行種 (ADR-013 D1)。
@@ -493,15 +498,29 @@ mod tests {
         //   (逐語「導出元は『送出元があるか』であって writer ではない」)。
         //   ★ M5 で送出元ができたら [`activity_label_has_no_emitter_until_it_is_wired`] が赤になり、
         //   **宣言の追加を強制する**。
+        // ⚠️★★★ 2026-11-06（M5 の 1 本目）: 段 1 の 3 行種も **まだ送出元が無い**。
+        //   writer と schema はあるが、行を書く駆動役は M5 の 2 本目で作る（本タスクの判断 2）。
+        //   → 送出元を作るときに `activity_label` と一緒に `config_gated`（段 1 のときだけ）へ移す。
         #[cfg(target_os = "windows")]
-        let emitterless: &[&str] = &["secure_input", "activity_label"];
+        let emitterless: &[&str] = &[
+            "secure_input",
+            "activity_label",
+            "probe_frame",
+            "probe_suppressed",
+            "day_question",
+        ];
         // ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
         //   macOS 側の送出元を実装したので、この行から外した (`observe_macos.rs`)。
         // ⚠️★★★ 2026-09-11 (issue 008): `ime_shadow` も外した ——
         //   macOS 側の送出元ができた (`ime_compose::drive` → `lib.rs::emit_ime_shadow`)。
         //   → ★ 非 Windows で「送出元が無い行種」は**無くなった**。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &["activity_label"];
+        let emitterless: &[&str] = &[
+            "activity_label",
+            "probe_frame",
+            "probe_suppressed",
+            "day_question",
+        ];
         // EH3 の走行でだけ宣言する行種（送出元はある・テストは EH3 ではない）。
         let mode_gated: &[&str] = &["eh3_day", "invitation_present", "invitation_condition"];
 
@@ -542,8 +561,24 @@ mod tests {
              2. `declaration_partitions_known_line_types` の `emitterless` から外す
              3. 本テストを消す"
         );
+        // ★ 2026-11-06: 段 1 の 3 行種も同じ（M5 の 2 本目で送出元を作ると赤になり、移しを強制する）。
+        for ctor in [
+            "LogEntry::ProbeFrame {",
+            "LogEntry::ProbeSuppressed {",
+            "LogEntry::DayQuestion(",
+        ] {
+            assert!(
+                !LIB.contains(ctor),
+                "★ 段 1 の行種の送出元ができた（{ctor}）。→ capabilities の宣言を更新すること: \
+                 `emitterless` から外し、段 1 のときだけ `config_gated` に入れる"
+            );
+        }
         // ⚠️★★★ **検査が空回りしていないこと** —— ★ 対照として、送出元が実在する行種で
         //   同じ探し方をすると見つかることを見る (`verify-before-claiming` ルール 5b)。
+        assert!(
+            LIB.contains("LogEntry::InvitationCondition {"),
+            "対照が見つからない"
+        );
         assert!(
             LIB.contains("emit_ime_shadow"),
             "対照が見つからない。★ 探し方が壊れているので、上の assert は何も言っていない"

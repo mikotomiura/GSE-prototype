@@ -3353,7 +3353,8 @@ fn record_realtime_skip(
     }
     let skip_reason = SkipReason::parse(&skip_reason)
         .ok_or_else(|| format!("invalid skip_reason: {:?}", skip_reason))?;
-    if matches!(skip_reason, SkipReason::None) {
+    // ★ `superseded` は段 1 の調停器だけが書く値（UI が名乗ると本人の未回答と差し替えが混ざる）。
+    if matches!(skip_reason, SkipReason::None | SkipReason::Superseded) {
         return Err("skip_reason must be dont_remember or dismissed".to_string());
     }
     log.lock()

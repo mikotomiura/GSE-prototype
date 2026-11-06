@@ -9,25 +9,25 @@
 - [x] design.md・研究者の承認
 
 ## B1 段 1 の層
-- [ ] `s1.rs` と検査（`s1_requires_o1`・`s1_and_eh3_both_dropped`・`s1_marker_beats_env`・`env_value_exactly_1`）
-- [ ] `lib.rs` の起動時の判定（判断 7）と `mod s1;`
-- [ ] `meta` の `s1_mode`（`o1_meta_unchanged_without_s1_marker`・`s1_meta_fragment_order`）
-- [ ] `o1::activity_label_allowed` の読み替え（`activity_label_none_for_o1_even_with_consent`・`activity_label_some_only_for_s1_with_ack`）
-- [ ] `submission` の段 1 の同意の印の読み書きと検査
+- [x] `s1.rs` と検査（`s1_requires_o1`・`s1_and_eh3_both_dropped`・`s1_marker_beats_env`・`env_value_exactly_1`）
+- [x] `lib.rs` の起動時の判定（判断 7）と `mod s1;`
+- [x] `meta` の `s1_mode`（`o1_meta_unchanged_without_s1_marker`・`s1_meta_fragment_order`）
+- [x] `o1::activity_label_allowed` の読み替え（`activity_label_none_for_o1_even_with_consent`・`activity_label_some_only_for_s1_with_ack`）
+- [x] `submission` の段 1 の同意の印の読み書きと検査
 
 ## B2 調停器
-- [ ] `SplitMix64`・`sample_interval_ms` の公開範囲
-- [ ] 定数と `ArbiterConfig`・`RandomFrame`
-- [ ] `StrataDetector`・`NoAskPlan`
-- [ ] `DayQuestion`・`DayState`
-- [ ] `Arbiter::tick` と検査一式
+- [x] `SplitMix64`・`sample_interval_ms` の公開範囲
+- [x] 定数と `ArbiterConfig`・`RandomFrame`
+- [x] `StrataDetector`・`NoAskPlan`
+- [x] `DayQuestion`・`DayState`
+- [x] `Arbiter::tick` と検査一式
 
 ## B3 行種と記録
-- [ ] `SkipReason::Superseded`・`SkipReasonKind::Superseded`・`record_realtime_skip` で拒む
-- [ ] `LogEntry` の 3 行種・整形・書き出し・`line_type`・検査
-- [ ] `capabilities.rs`（`KNOWN_LINE_TYPES`・`emitterless` の両 OS）
-- [ ] `redaction.rs`（`probe_frame` を外す・他は `"t"` で消える・検査）
-- [ ] `schema_dto.rs` → `emit_schema` → `schema/current.json`
+- [x] `SkipReason::Superseded`・`SkipReasonKind::Superseded`・`record_realtime_skip` で拒む
+- [x] `LogEntry` の 3 行種・整形・書き出し・`line_type`・検査
+- [x] `capabilities.rs`（`KNOWN_LINE_TYPES`・`emitterless` の両 OS）
+- [x] `redaction.rs`（`probe_frame` を外す・他は `"t"` で消える・検査）
+- [x] `schema_dto.rs` → `emit_schema` → `schema/current.json`
 
 ## 検証
 - [ ] `cargo test --workspace`（test-runner）

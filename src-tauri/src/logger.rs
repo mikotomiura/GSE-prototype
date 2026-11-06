@@ -142,6 +142,17 @@ pub enum ProbeStratum {
     Resumption,
 }
 
+impl From<crate::analysis::probe_arbiter::Stratum> for ProbeStratum {
+    fn from(s: crate::analysis::probe_arbiter::Stratum) -> Self {
+        use crate::analysis::probe_arbiter::Stratum;
+        match s {
+            Stratum::Random => Self::Random,
+            Stratum::LowOperationEnd => Self::LowOperationEnd,
+            Stratum::Resumption => Self::Resumption,
+        }
+    }
+}
+
 impl ProbeStratum {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -274,6 +285,10 @@ pub enum SkipReason {
     None,
     DontRemember,
     Dismissed,
+    /// 段 1: 層化のカードが未回答のまま、無作為の問いに差し替えられた（2026-11-06・計画の判断 9）。
+    /// ⚠️ 調停器だけが書く値。UI からは受けない（`record_realtime_skip` が拒む）。
+    /// 本人の未回答（`dismissed`）と混ぜると回答率（S1-A4・A7）が歪むので分ける。
+    Superseded,
 }
 
 impl SkipReason {
@@ -282,6 +297,7 @@ impl SkipReason {
             Self::None => "none",
             Self::DontRemember => "dont_remember",
             Self::Dismissed => "dismissed",
+            Self::Superseded => "superseded",
         }
     }
 
@@ -290,6 +306,7 @@ impl SkipReason {
             "none" => Some(Self::None),
             "dont_remember" => Some(Self::DontRemember),
             "dismissed" => Some(Self::Dismissed),
+            "superseded" => Some(Self::Superseded),
             _ => None,
         }
     }
@@ -816,6 +833,34 @@ fn format_vignette_response_line(
     )
 }
 
+/// `day_question` 行の中身（段 1・ADR-048 D3・S1-F5〜F10）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DayQuestionRow {
+    /// 閉じた時刻（★ 区間の削除の鍵 `"t"`）。
+    pub timestamp: u64,
+    pub shown_ts: u64,
+    /// 問いを出した現地の暦の分（0..1440）。
+    pub shown_local_minute: u32,
+    /// 対象の日（現地の日の番号・`eh3::local_day` と同じ数え方）。
+    pub target_day: i64,
+    pub trigger: crate::analysis::probe_arbiter::DayTrigger,
+    /// 翌日の拾い直しで尋ねたか。
+    pub delayed: bool,
+    pub answered: bool,
+    pub closed_by: crate::analysis::probe_arbiter::DayClosedBy,
+    /// 項目の文の版（★ 固定の文字列だけ・外部由来の文字列を入れない）。
+    pub items_version: &'static str,
+    /// 動機づけの 1 項目（1..5）。答えていなければ `None`。
+    pub motivation: Option<u8>,
+    /// 表示から最初の操作まで。
+    pub latency_ms: Option<u64>,
+    /// 最初の操作から送信まで。
+    pub duration_ms: Option<u64>,
+}
+
+/// 日の終わりの問いの項目の文の仮の版（S-DQ の候補の表からの仮の文・妥当性は無いものとして扱う・S1-F7）。
+pub const DAY_QUESTION_ITEMS_VERSION: &str = "dq-draft-1";
+
 /// ログエントリの種別
 #[derive(Debug)]
 pub enum LogEntry {
@@ -1173,6 +1218,24 @@ pub enum LogEntry {
         /// セッションの開始時刻(`session_start` 行の `t`)。無作為の実効 seed を導く。
         session_start_ms: u64,
     },
+    /// 段 1: 問いの枠（seed・起点・調停器の定数）。★ 系の設定だけで、行動も申告も持たない。
+    /// ★ 区間の削除で消さない（`meta`・`invitation_condition` と同じ側・計画の判断 8）。
+    ProbeFrame {
+        timestamp: u64,
+        frame_seed: u64,
+        anchor_ms: u64,
+        config: crate::analysis::probe_arbiter::ArbiterConfig,
+    },
+    /// 段 1: 問いの候補を出さなかった記録（計画の判断 9）。時刻と固定の理由だけ。
+    ProbeSuppressed {
+        timestamp: u64,
+        candidate_ts: u64,
+        stratum: ProbeStratum,
+        reason: crate::analysis::probe_arbiter::SuppressReason,
+    },
+    /// 段 1: 日の終わりの問い（ADR-048 D3・閉じた時刻に 1 行）。★ 時差は書かない（計画の判断 4）。
+    /// ⚠️ 自由記述・理由を持たない（`data-privacy` ルール 7）。回答は 1..5 の 1 項目か `null`。
+    DayQuestion(DayQuestionRow),
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
     ///
@@ -1230,6 +1293,9 @@ impl LogEntry {
             LogEntry::Eh3Day { .. } => "eh3_day",
             LogEntry::InvitationPresent { .. } => "invitation_present",
             LogEntry::InvitationCondition { .. } => "invitation_condition",
+            LogEntry::ProbeFrame { .. } => "probe_frame",
+            LogEntry::ProbeSuppressed { .. } => "probe_suppressed",
+            LogEntry::DayQuestion(_) => "day_question",
             // ★ ここから下は**行を書かない制御エントリ**である
             //   (`BlockEnd` / `Rotate` は `meta`(session_end/session_start) を副作用で書くが、
             //   ⚠️ それは `meta` 行であってこのエントリ自身の行ではない)。
@@ -1688,6 +1754,109 @@ fn format_eh3_day_line(timestamp: u64, day: u32, condition: crate::eh3::Conditio
         timestamp,
         day,
         condition.as_str(),
+    )
+}
+
+/// `probe_frame` 行の本文（改行なし）。系の設定（seed・起点・調停器の版と定数）だけを持つ。
+fn format_probe_frame_line(
+    timestamp: u64,
+    frame_seed: u64,
+    anchor_ms: u64,
+    c: &crate::analysis::probe_arbiter::ArbiterConfig,
+) -> String {
+    let num = |x: f64| serde_json::to_string(&x).unwrap_or_else(|_| "null".to_string());
+    let r = &c.random;
+    format!(
+        concat!(
+            r#"{{"type":"probe_frame","t":{},"frame_seed":{},"anchor_ms":{},"arbiter_version":"{}","#,
+            r#""lambda_per_ms":{},"gap_min_ms":{},"cap_window_ms":{},"cap_count":{},"max_gap_ms":{},"#,
+            r#""away_idle_ms":{},"warmup_ms":{},"#,
+            r#""strata_enabled":{},"strat_low_op_min_gap_ms":{},"strat_resume_min_gap_ms":{},"#,
+            r#""strat_guard_after_any_ms":{},"strat_cap_count":{},"strat_cap_window_ms":{},"#,
+            r#""strat_yield_before_random_ms":{},"#,
+            r#""no_ask_enabled":{},"no_ask_block_ms":{},"no_ask_fraction":{},"#,
+            r#""eod_window_start_min":{},"eod_window_end_min":{},"eod_idle_ms":{},"#,
+            r#""eod_yield_before_random_ms":{}}}"#
+        ),
+        timestamp,
+        frame_seed & crate::analysis::probe_arbiter::FRAME_SEED_MAX,
+        anchor_ms,
+        crate::analysis::probe_arbiter::ARBITER_VERSION,
+        num(r.lambda_per_ms),
+        r.gap_min_ms,
+        r.cap_window_ms,
+        r.cap_count,
+        r.max_gap_ms,
+        r.away_idle_ms,
+        r.min_session_elapsed_ms,
+        c.strata_enabled,
+        c.strat_low_op_min_gap_ms,
+        c.strat_resume_min_gap_ms,
+        c.strat_guard_after_any_ms,
+        c.strat_cap_count,
+        c.strat_cap_window_ms,
+        c.strat_yield_before_random_ms,
+        c.no_ask_enabled,
+        c.no_ask_block_ms,
+        num(c.no_ask_fraction),
+        c.eod_window_start_min,
+        c.eod_window_end_min,
+        c.eod_idle_ms,
+        c.eod_yield_before_random_ms,
+    )
+}
+
+/// `probe_suppressed` 行の本文（改行なし）。時刻と固定の層・理由だけ。
+fn format_probe_suppressed_line(
+    timestamp: u64,
+    candidate_ts: u64,
+    stratum: ProbeStratum,
+    reason: crate::analysis::probe_arbiter::SuppressReason,
+) -> String {
+    format!(
+        r#"{{"type":"probe_suppressed","t":{},"candidate_ts":{},"stratum":"{}","reason":"{}"}}"#,
+        timestamp,
+        candidate_ts,
+        stratum.as_str(),
+        reason.as_str()
+    )
+}
+
+/// `day_question` 行の本文（改行なし）。回答は 1..5 に閉じ、範囲外は `null` にする。
+fn format_day_question_line(r: &DayQuestionRow) -> String {
+    let opt = |v: Option<u64>| v.map_or_else(|| "null".to_string(), |x| x.to_string());
+    let motivation = r
+        .motivation
+        .filter(|m| (1..=5).contains(m))
+        .map_or_else(|| "null".to_string(), |m| m.to_string());
+    // ★ 版は固定の文字列だけを想定するが、念のため英数と `-` 以外を含むなら書かない
+    let items_version = if r
+        .items_version
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
+        r.items_version
+    } else {
+        "invalid"
+    };
+    format!(
+        concat!(
+            r#"{{"type":"day_question","t":{},"shown_ts":{},"shown_local_minute":{},"target_day":{},"#,
+            r#""trigger":"{}","delayed":{},"answered":{},"closed_by":"{}","items_version":"{}","#,
+            r#""motivation":{},"latency_ms":{},"duration_ms":{}}}"#
+        ),
+        r.timestamp,
+        r.shown_ts,
+        r.shown_local_minute,
+        r.target_day,
+        r.trigger.as_str(),
+        r.delayed,
+        r.answered,
+        r.closed_by.as_str(),
+        items_version,
+        motivation,
+        opt(r.latency_ms),
+        opt(r.duration_ms),
     )
 }
 
@@ -2452,6 +2621,43 @@ impl SessionLogger {
                                         crate::analysis::engine::HMM_VERSION
                                     )
                                 );
+                                dirty = true;
+                            }
+                            LogEntry::ProbeFrame {
+                                timestamp,
+                                frame_seed,
+                                anchor_ms,
+                                config,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_probe_frame_line(
+                                        timestamp, frame_seed, anchor_ms, &config
+                                    )
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ProbeSuppressed {
+                                timestamp,
+                                candidate_ts,
+                                stratum,
+                                reason,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_probe_suppressed_line(
+                                        timestamp,
+                                        candidate_ts,
+                                        stratum,
+                                        reason
+                                    )
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::DayQuestion(row) => {
+                                let _ = writeln!(writer, "{}", format_day_question_line(&row));
                                 dirty = true;
                             }
                             LogEntry::BlockEnd => {
@@ -3923,6 +4129,105 @@ mod tests {
     }
 
     /// ★ `line_type_matches_known_line_types` 用の代表エントリ (全 variant)。
+    fn sample_day_question_row() -> DayQuestionRow {
+        use crate::analysis::probe_arbiter::{DayClosedBy, DayTrigger};
+        DayQuestionRow {
+            timestamp: 1_800_000_060_000,
+            shown_ts: 1_800_000_000_000,
+            shown_local_minute: 1110,
+            target_day: 20_833,
+            trigger: DayTrigger::EveningIdle,
+            delayed: false,
+            answered: true,
+            closed_by: DayClosedBy::Answer,
+            items_version: DAY_QUESTION_ITEMS_VERSION,
+            motivation: Some(4),
+            latency_ms: Some(2_500),
+            duration_ms: Some(1_200),
+        }
+    }
+
+    /// 段 1 の 3 行種の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る）。
+    #[test]
+    fn s1_rows_format_byte_equal() {
+        use crate::analysis::probe_arbiter::{ArbiterConfig, SuppressReason};
+        assert_eq!(
+            format_probe_suppressed_line(10, 9, ProbeStratum::Resumption, SuppressReason::Yielded),
+            r#"{"type":"probe_suppressed","t":10,"candidate_ts":9,"stratum":"resumption","reason":"yielded"}"#
+        );
+        assert_eq!(
+            format_day_question_line(&sample_day_question_row()),
+            concat!(
+                r#"{"type":"day_question","t":1800000060000,"shown_ts":1800000000000,"#,
+                r#""shown_local_minute":1110,"target_day":20833,"trigger":"evening_idle","#,
+                r#""delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","#,
+                r#""motivation":4,"latency_ms":2500,"duration_ms":1200}"#
+            )
+        );
+        assert_eq!(
+            format_probe_frame_line(5, 42, 3, &ArbiterConfig::default()),
+            concat!(
+                r#"{"type":"probe_frame","t":5,"frame_seed":42,"anchor_ms":3,"arbiter_version":"s1-arbiter-1","#,
+                r#""lambda_per_ms":1.111111111111111e-6,"gap_min_ms":360000,"cap_window_ms":1200000,"#,
+                r#""cap_count":2,"max_gap_ms":1320000,"away_idle_ms":180000,"warmup_ms":31000,"#,
+                r#""strata_enabled":true,"strat_low_op_min_gap_ms":90000,"strat_resume_min_gap_ms":15000,"#,
+                r#""strat_guard_after_any_ms":360000,"strat_cap_count":1,"strat_cap_window_ms":1200000,"#,
+                r#""strat_yield_before_random_ms":120000,"#,
+                r#""no_ask_enabled":false,"no_ask_block_ms":3600000,"no_ask_fraction":0.2,"#,
+                r#""eod_window_start_min":1020,"eod_window_end_min":1380,"eod_idle_ms":1200000,"#,
+                r#""eod_yield_before_random_ms":120000}"#
+            )
+        );
+    }
+
+    /// 段 1 の行は content-free: 数値・真偽・固定の文字列だけ。範囲外の回答・不正な版は書かない。
+    #[test]
+    fn s1_rows_are_content_free_and_bounded() {
+        let mut r = sample_day_question_row();
+        r.motivation = Some(9);
+        r.items_version = "x\",\"evil";
+        r.answered = false;
+        r.latency_ms = None;
+        let line = format_day_question_line(&r);
+        let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
+        assert_eq!(v["motivation"], serde_json::Value::Null);
+        assert_eq!(v["items_version"], "invalid");
+        assert_eq!(v["latency_ms"], serde_json::Value::Null);
+        assert!(v.get("evil").is_none());
+        // seed は 2^53 − 1 を超えて書かない
+        let f = format_probe_frame_line(
+            1,
+            u64::MAX,
+            1,
+            &crate::analysis::probe_arbiter::ArbiterConfig::default(),
+        );
+        let v: serde_json::Value = serde_json::from_str(&f).expect("valid json");
+        assert_eq!(
+            v["frame_seed"].as_u64(),
+            Some(crate::analysis::probe_arbiter::FRAME_SEED_MAX)
+        );
+    }
+
+    /// 差し替えは `superseded` で書かれ、`dismissed` に正規化されない。
+    #[test]
+    fn realtime_label_skip_superseded() {
+        let probe = ProbeRef::RandomProbe {
+            probe_id: "abcdefghijkl".to_string(),
+        };
+        let e = LogEntry::realtime_label_skipped(1, &probe, SkipReason::Superseded, 0, 0, 0);
+        match e {
+            LogEntry::RealtimeLabel {
+                skip_reason,
+                answered,
+                ..
+            } => {
+                assert_eq!(skip_reason, SkipReason::Superseded);
+                assert!(!answered);
+            }
+            _ => panic!("realtime_label ではない"),
+        }
+    }
+
     fn sample_entries_for_line_type() -> Vec<LogEntry> {
         vec![
             LogEntry::Eh3Day {
@@ -3936,6 +4241,19 @@ mod tests {
                 kind: crate::analysis::invitation::TriggerKind::default(),
                 session_start_ms: 1,
             },
+            LogEntry::ProbeFrame {
+                timestamp: 1,
+                frame_seed: 1,
+                anchor_ms: 1,
+                config: crate::analysis::probe_arbiter::ArbiterConfig::default(),
+            },
+            LogEntry::ProbeSuppressed {
+                timestamp: 1,
+                candidate_ts: 1,
+                stratum: ProbeStratum::Random,
+                reason: crate::analysis::probe_arbiter::SuppressReason::Away,
+            },
+            LogEntry::DayQuestion(sample_day_question_row()),
             LogEntry::Key {
                 vk_code: 0x41,
                 timestamp: 1,
@@ -4868,6 +5186,7 @@ mod tests {
             SkipReason::None,
             SkipReason::DontRemember,
             SkipReason::Dismissed,
+            SkipReason::Superseded,
         ] {
             assert_eq!(SkipReason::parse(r.as_str()), Some(r));
         }
@@ -5454,6 +5773,7 @@ mod tests {
         assert_eq!(SkipReason::None.as_str(), "none");
         assert_eq!(SkipReason::DontRemember.as_str(), "dont_remember");
         assert_eq!(SkipReason::Dismissed.as_str(), "dismissed");
+        assert_eq!(SkipReason::Superseded.as_str(), "superseded");
         assert_eq!(ExpectedQuadrant::Flow.as_str(), "flow");
         assert_eq!(ExpectedQuadrant::Stuck.as_str(), "stuck");
         assert_eq!(ExpectedQuadrant::Incubation.as_str(), "incubation");

@@ -39,3 +39,12 @@
 | 5 | 候補の間隔の乱数と `probe_id` の乱数を分ける | 同じ列から引くと発火の有無で後の候補が動く |
 | 6 | `SkipReasonKind` にも `superseded`。UI の `record_realtime_skip` は拒む | `replay.rs:3896-3899` が未知の値の行を数えて捨てる（impact-analyzer の指摘を一次で確認） |
 | 7 | EH3 の `set_mode`（`lib.rs:4169`）の前に段 1 を判定する | `OnceLock` は後から落とせない |
+
+## 判断 8: `day_question` と `probe_suppressed` は 2 つの時刻を両端とする区間で消す
+
+- 判断日時: 2026-11-06
+- 背景: 計画の design.md §4 は新しい行種を `"t"` の点で消すとしていた。`day_question` は `t`（閉じた時刻）のほかに `shown_ts`、`probe_suppressed` は `t`（判定した時刻）のほかに `candidate_ts` を持つ。
+- 採用: `redaction::line_interval` で `day_question` は `shown_ts`〜`t`、`probe_suppressed` は `candidate_ts`〜`t` の区間にする（`activity_label` の `recall_window` と同じ作り）。検査 `new_s1_rows_are_deleted_by_t`。
+- 理由: 点で消すと、削除した区間の中の時刻（表示した時刻・候補の時刻）が残った行の別の欄に残りうる。消す側に倒す（`data-privacy` ルール 6-iii）。
+- 研究者には聞いていない: 削除の約束（その時間帯が消える）を強める向きで、約束の文言とも合う。
+- 影響範囲: `redaction.rs`。3 本目の replay で、削除の後に欠けた候補を「欠け」と数える照合に効く。
