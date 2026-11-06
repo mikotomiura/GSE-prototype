@@ -180,10 +180,10 @@ pub fn effective_seed(seed: u64, session_start_ms: u64) -> u64 {
 
 /// splitmix64（外部 crate を足さない）。同じ入力から同じ値を返す。
 #[derive(Debug, Clone)]
-struct SplitMix64(u64);
+pub(crate) struct SplitMix64(pub(crate) u64);
 
 impl SplitMix64 {
-    fn next_u64(&mut self) -> u64 {
+    pub(crate) fn next_u64(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -192,7 +192,7 @@ impl SplitMix64 {
     }
 
     /// `[0, 1)` の一様乱数（上位 53 bit）。
-    fn next_unit(&mut self) -> f64 {
+    pub(crate) fn next_unit(&mut self) -> f64 {
         (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
     }
 }

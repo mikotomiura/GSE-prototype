@@ -20,4 +20,6 @@ pub mod loop_step;
 pub mod metrics;
 // ★ ポインタ活動の 1 秒ビン量子化 (O1 / ADR-014 D4 の L-b)。⚠️ OS API を呼ばない純関数。
 pub mod pointer_bin;
+// 段 1（ADR-043）の問いの調停器: 無作為の枠・層化・申告を求めない区間・日の終わりの問い（純関数・M5）。
+pub mod probe_arbiter;
 pub mod probe_scheduler;
