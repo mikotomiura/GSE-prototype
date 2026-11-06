@@ -70,4 +70,16 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/tau_mode_candidate_run.log"; echo "exi
 
 ## 7 HP Z2 での実行の記録（職場の PC のセッションが追記）
 
-（ここに追記する）
+- 実行: 2026-11-06（HP Z2・git-bash）。`run_id` `20261106T205818-149`（`summary.json` と `provenance.json` で一致）。終了コード 0。
+- 版: Python 3.11.9（`python`）・numpy 2.4.4（前の試験と同じ）。JOBS=16。AC のスリープ・休止は 0 のままだった。C: の空きは 231 GB。
+- データ: 前の試験と同じ `C:/Users/SDS02/gse-public-data`。manifest の SHA-256 は一致。
+- 各段の時刻（ログの時刻とファイルの更新時刻から）:
+  - 開始 20:58:18 → manifest の照合・P-D1 の門 2 つ 20:58〜20:58:39（緑）
+  - selftest（26 対照・`repro_check.py --selftest` を含む）20:58〜21:08 頃（605.7 秒・`all_passed` true）
+  - 変異 23 個 21:08〜21:34:15（約 26 分・23 個すべて `hit` true・終了コード 3）
+  - 本計算 21:34〜23:27（CoAuthor は 22:03 まで・CS1 は 23:27 まで。合わせて約 1 時間 53 分）
+  - provenance・P-REPRO 23:27:20 → 終了 23:27:20
+- P-REPRO（`results/repro_check.json`）: `passed` true・`cells` 72332・`mismatched` 0・`max_rel_diff` 0.0・`mismatched_sections` []（`tolerance_rel` 1e-09）。
+- `provenance.json` の `pool_params_file_sha256`: coauthor・cs1 の 2 つとも値が入っている（null なし）。npz は `DATA_DIR/landscape/` に 2 つ（約 2.2 MB・2.0 MB）。
+- 止まった段・赤: なし。
+- 結果のコミット `cdc1f0f7`（push 済み・PR は出していない）。`results/mutations/*.log` は .gitignore（`*.log`）で除かれ、`.exit` と `.json` だけが入った。
