@@ -135,9 +135,17 @@ else
     #   印の無い O1 は 6 択を出さない（ADR-043 D8）ので、O1 の同意の ESM 追補の承認を求めない。
     #   ⚠️ 1 か所でも別の引数（`o1::is_o1()` など）を渡せば、今までどおり承認を求める。
     #   ★ 空白を詰めてから数える（rustfmt が引数を改行で割っても数えられるように）。
-    esm_code=$(tr -d '[:space:]' <<< "$esm_src")
-    esm_all=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(' | wc -l | tr -d ' ')
-    esm_s1=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(crate::s1::is_s1(),' | wc -l | tr -d ' ')
+    # ★ 2026-11-07（security-checker MEDIUM）: 免除は `lib.rs` だけでなく `src-tauri/src` の全体の本番のコード
+    #   （各ファイルの最初の列 0 の `#[cfg(test)]` から後ろとコメントを除く）で数える。別のファイルに
+    #   O1 の判定を渡す門を足しても見逃さないように。定義（`fn activity_label_allowed(`）は数えない。
+    #   ★ 第 2 引数も照らす（段 1 の同意の印を渡さない呼び出しは段 1 だけとみなさない）。
+    esm_code=$(find "$(dirname "$EMITTER")" -name '*.rs' -type f | sort | while IFS= read -r f; do
+                 sed '/^#\[cfg(test)\]$/,$d' "$f" | grep -vE '^[[:space:]]*(//|/\*|\*)'
+               done | tr -d '[:space:]')
+    esm_calls=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(' | wc -l | tr -d ' ')
+    esm_defs=$(printf '%s' "$esm_code" | grep -oF 'fnactivity_label_allowed(' | wc -l | tr -d ' ')
+    esm_all=$(( ${esm_calls:-0} - ${esm_defs:-0} ))
+    esm_s1=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(crate::s1::is_s1(),crate::submission::s1_probe_consent_acknowledged()' | wc -l | tr -d ' ')
     # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
     #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
     #     *説明文* 自体にヒットして緑になる**（= 承認していないのに配れてしまう）。
@@ -929,6 +937,13 @@ selftest () {
   o1_gate_arg="crate::o1""::is_o1()"
   build; prepend_emitter_ "fn wired_o1() { activity_label_allowed(${o1_gate_arg}, true); }"
   expect_red "同意の ESM 追補が未承認" "6 択の門に O1 の判定（段 1 だけでない）"
+  # ★ 別のファイルに O1 の判定を渡す門を足しても赤（`lib.rs` だけを見ていない）。
+  build; printf 'fn other_file() { activity_label_allowed(%s, true); }\n' "$o1_gate_arg" > "$fix/w/src-tauri/src/zz_other_emitter.rs"
+  expect_red "同意の ESM 追補が未承認" "別のファイルの 6 択の門に O1 の判定"
+  # ★ 第 1 引数が段 1 でも、第 2 引数が段 1 の同意の印でなければ段 1 だけとみなさない。
+  s1_gate_arg="crate::s1""::is_s1()"
+  build; prepend_emitter_ "fn wired_s1_no_ack() { activity_label_allowed(${s1_gate_arg}, true); }"
+  expect_red "同意の ESM 追補が未承認" "6 択の門の第 2 引数が段 1 の同意の印でない"
   # ★ O1 の配布スクリプトが段 1 の印を書き出したら赤。
   s1_marker_line=': > "$M/s1''.mode"'
   build; printf '\n%s\n' "$s1_marker_line" >> "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"

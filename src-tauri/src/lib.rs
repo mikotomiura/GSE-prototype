@@ -2107,8 +2107,23 @@ fn run_s1_effects(
 ) {
     use crate::s1_driver::Effect;
     let mut changed = false;
+    // ★ 同意を読み直す（取り消しのコマンドが、ロックの外のこの実行の間に割り込んだとき、
+    //   取り消しの後に問いの行を 1 行も出さない・本タスクの判断 2）。
+    let consent = crate::submission::s1_probe_consent_acknowledged();
+    let paused = crate::recording::is_paused();
     for effect in effects {
         let entry = match effect {
+            Effect::Frame { .. } | Effect::Suppressed { .. } | Effect::Assigned { .. }
+                if !consent =>
+            {
+                None
+            }
+            // ⚠️ 一時停止の間は行を書けない（ロガーの停止ゲートが落とす）。黙って落とさず診断に残す。
+            //   調停器と状態ファイルの側は進める（答えていない日として翌日の拾い直しの対象になる）。
+            Effect::DayRow(_) if paused => {
+                tracing::info!("stage 1: end-of-day question closed while paused; no row written");
+                None
+            }
             // ★ 枠の行の時刻は起点（本タスクの判断 1: 本人が同意を押した時刻を消えない行に残さない）
             Effect::Frame {
                 anchor_ms,
@@ -2284,7 +2299,9 @@ fn spawn_s1_driver(
                 }
                 let anchor = O1_LOG_OPENED_MS.load(Ordering::Acquire);
                 let gen = S1_FRAME_GEN.load(Ordering::Acquire);
-                if consent && anchor != 0 && d.frame_gen() != Some(gen) {
+                // ★ 一時停止の間は枠を作らない（`probe_frame` が停止ゲートで落ち、世代が一致したまま
+                //   出し直されなくなる・2026-11-07 security-checker MEDIUM）。
+                if consent && anchor != 0 && !env.paused && d.frame_gen() != Some(gen) {
                     let seed = frame_seed_from_entropy(rand::random());
                     tracing::info!("stage 1 frame: seed={seed} anchor_ms={anchor} gen={gen}");
                     fx.extend(d.start_frame(gen, anchor, seed, ArbiterConfig::default()));
@@ -2483,6 +2500,10 @@ fn record_probe_response(
     latency_ms: u64,
 ) -> Result<(), String> {
     s1_answer_gate()?;
+    // ★ 目盛りの外は丸めずに拒む（日の問いの `motivation` と扱いをそろえる）
+    if !(1..=5).contains(&q1_friction) || !(1..=5).contains(&q2_progress) {
+        return Err(format!("invalid scale: q1={q1_friction} q2={q2_progress}"));
+    }
     let category = crate::logger::ActivityCategory::parse(&category)
         .ok_or_else(|| format!("invalid category: {:?}", category))?;
     let consent = crate::o1::activity_label_allowed(
@@ -7781,9 +7802,10 @@ mod invitation_reset_tests {
 #[cfg(test)]
 mod s1_driver_wiring_tests {
     fn production_code() -> String {
-        const LIB: &str = include_str!("lib.rs");
-        let end = LIB.find("\n#[cfg(test)]\n").expect("test module marker");
-        LIB[..end]
+        // ★ Windows の checkout は改行が CRLF になりうる（autocrlf）ので、LF にそろえてから切る
+        let lib = include_str!("lib.rs").replace("\r\n", "\n");
+        let end = lib.find("\n#[cfg(test)]\n").expect("test module marker");
+        lib[..end]
             .lines()
             .filter(|l| {
                 let t = l.trim_start();

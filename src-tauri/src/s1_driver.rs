@@ -71,7 +71,13 @@ pub struct DayCard {
     pub shown_ts: u64,
     /// トレイの終了の補助で出したか（ボタンが「答えて終了／答えずに終了」になる）。
     pub quit_flow: bool,
+    /// 研究者の画面の確かめ用に出したカード（調停器の覚えの外）。★ 閉じても日の問いの状態を変えない。
+    pub debug: bool,
 }
+
+/// 画面の確かめ用のカードの番号の帯（★ 2^53 未満にする: 画面の JavaScript の数で丸められないように。
+/// 調停器の通し番号は 1 から数えるので重ならない）。
+const DEBUG_CARD_ID_BASE: u64 = 1 << 52;
 
 /// 画面に送るカードの状態（全体）。★ `stratum`・対象の日・契機は本人に見せない。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -434,6 +440,7 @@ impl S1Driver {
                         in_window,
                         shown_ts: wall,
                         quit_flow: false,
+                        debug: false,
                     });
                     out.push(Effect::CardChanged);
                 }
@@ -526,8 +533,10 @@ impl S1Driver {
             return Vec::new();
         };
         self.day = None;
-        if let Some(q) = self.day_question_mut() {
-            q.on_closed(d.card_id, d.target_day, answered);
+        if !d.debug {
+            if let Some(q) = self.day_question_mut() {
+                q.on_closed(d.card_id, d.target_day, answered);
+            }
         }
         let mut out = vec![Effect::CardChanged];
         out.extend(self.save_if_changed());
@@ -542,7 +551,8 @@ impl S1Driver {
         if self.probe.take().is_some() {
             out.push(Effect::CardChanged);
         }
-        let (day, minute) = local_clock(wall, utc_offset_secs);
+        // ★ tick と同じく遅らせた時刻で日と分を引く（4:00 の境目の 2 秒で日がずれないように）
+        let (day, minute) = local_clock(wall.saturating_sub(S1_TICK_LAG_MS), utc_offset_secs);
         if let Some(a) = self.arbiter.as_mut() {
             let config = *a.config();
             a.day_question_mut().on_pause(&config, day, minute);
@@ -562,7 +572,7 @@ impl S1Driver {
             return (false, Vec::new());
         }
         let open = self.open_card_for_arbiter();
-        let (day, minute) = local_clock(wall, utc_offset_secs);
+        let (day, minute) = local_clock(wall.saturating_sub(S1_TICK_LAG_MS), utc_offset_secs);
         let Some(a) = self.arbiter.as_mut() else {
             return (false, Vec::new());
         };
@@ -583,6 +593,7 @@ impl S1Driver {
                     in_window,
                     shown_ts: wall,
                     quit_flow: true,
+                    debug: false,
                 });
                 let mut out = vec![Effect::CardChanged];
                 out.extend(self.save_if_changed());
@@ -634,7 +645,8 @@ impl S1Driver {
         stratum: Stratum,
         probe_id: String,
     ) -> Vec<Effect> {
-        if self.probe.is_some() {
+        // ★ 同意の後（枠がある）だけ。同意の前に行を書かない。
+        if self.probe.is_some() || !self.is_active() {
             return Vec::new();
         }
         self.apply(
@@ -654,12 +666,12 @@ impl S1Driver {
         utc_offset_secs: i32,
         delayed: bool,
     ) -> Vec<Effect> {
-        if self.day.is_some() {
+        if self.day.is_some() || !self.is_active() {
             return Vec::new();
         }
         let (day, _) = local_clock(wall, utc_offset_secs);
         self.day = Some(DayCard {
-            card_id: u64::MAX - wall % 1_000_000,
+            card_id: DEBUG_CARD_ID_BASE + wall % 1_000_000,
             target_day: if delayed { day - 1 } else { day },
             trigger: if delayed {
                 DayTrigger::Pickup
@@ -670,6 +682,7 @@ impl S1Driver {
             in_window: false,
             shown_ts: wall,
             quit_flow: false,
+            debug: true,
         });
         vec![Effect::CardChanged]
     }
@@ -1139,6 +1152,40 @@ mod tests {
         assert!(fx.iter().all(|e| matches!(e, Effect::SaveDayState(_))));
         assert_eq!(d.visible_card(false), S1CardView::None);
         assert!(d.presses.is_empty());
+    }
+
+    #[test]
+    fn debug_day_card_id_fits_js_number_and_leaves_state_alone() {
+        let mut d = driver_with_frame(1_000_000);
+        d.debug_show_day(T_1859Z, JST, false);
+        let id = d.day_card().unwrap().card_id;
+        // ★ 画面の JavaScript の数で丸められない（2^53 未満）
+        assert!(id < (1u64 << 53));
+        let before = d.day_question().and_then(DayQuestion::state).cloned();
+        let row = d
+            .day_row_for_close(
+                id,
+                T_1859Z + 5_000,
+                Some(4),
+                DayClosedBy::Answer,
+                None,
+                None,
+            )
+            .unwrap();
+        assert!(row.answered);
+        d.commit_day_close(id, true);
+        assert!(d.day_card().is_none());
+        // ★ 確かめ用のカードは日の問いの状態（その日に答えたか）を変えない
+        assert_eq!(
+            d.day_question().and_then(DayQuestion::state).cloned(),
+            before
+        );
+        // 同意の前（枠が無い）は確かめ用のカードも出さない
+        let mut idle = S1Driver::new(DayQuestion::new(DayState::default()), &env(0));
+        assert!(idle.debug_show_day(T_1859Z, JST, false).is_empty());
+        assert!(idle
+            .debug_show_probe(T_1859Z, Stratum::Random, "ID00000000000009".into())
+            .is_empty());
     }
 
     #[test]
