@@ -21,6 +21,8 @@ main test without the raw files:
 - for each pause analysed (about 4,500 stalls and their matched control pauses), the values of two derived signals at
   the start of the pause and 30 seconds earlier, the pair identifiers used in the statistic, and the anonymised
   SubjectID and AssignmentID of the dataset;
+- the list of the 146 writers I set aside as the holdout, as anonymised SubjectIDs of the dataset, so that readers can
+  see which writers the confirmatory test used;
 - no keystrokes, no inserted or deleted text, no timestamps, and no assignment content.
 
 If you prefer that I keep to aggregate values only, I will do so, and readers who obtain the files from you will be able
