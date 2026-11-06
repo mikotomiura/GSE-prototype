@@ -1247,6 +1247,93 @@ else
   fi
 fi
 
+# --- 11a2: ⚠️★★★ mkdir が不可分でない環境でも、同時 spawn の両方が成功すること (2026-11-06) ---
+#   ★ ubuntu 26.04 の既定の mkdir (uutils coreutils 0.10.0) は、同時に呼ばれると既にある
+#     ディレクトリにも 0 を返す (CI の対照で 300 回中 258 回、両方が成功した。python の os.mkdir・
+#     bash の noclobber・GNU の mkdir は 0 回)。mkdir の成否だけをロックにすると、2 本が同時に
+#     ロックを取ったと思い込み、pid の読み戻しで片方が fail-closed で止まっていた (11a が赤)。
+#   → 「既にあっても 0 を返す mkdir」(mkdir -p) に差し替え、macOS でも同じ状況を再現する。
+#     直す前は片方が落ち、直した後は片方が待って両方とも成功する。
+R11U="${TMP}/r11u/repo"; mkdir -p "${R11U}"
+if ! setup_fake_repo "${R11U}"; then
+  ng "11a2: 準備できなかった (★ 判定できない)"
+else
+  round=1
+  all_ok=1
+  while [ "${round}" -le 3 ]; do
+    ida="u${round}a"; idb="u${round}b"
+    (
+      mkdir() { command mkdir -p "$@"; }
+      export -f mkdir
+      cd "${R11U}" && bash scripts/loop-spawn.sh --no-exec "${ida}" t
+    ) >"${TMP}/r11u-${round}a.log" 2>&1 &
+    pa=$!
+    (
+      mkdir() { command mkdir -p "$@"; }
+      export -f mkdir
+      cd "${R11U}" && bash scripts/loop-spawn.sh --no-exec "${idb}" t
+    ) >"${TMP}/r11u-${round}b.log" 2>&1 &
+    pb=$!
+    rca=0; wait "${pa}" || rca=$?
+    rcb=0; wait "${pb}" || rcb=$?
+    if [ "${rca}" -ne 0 ] || [ "${rcb}" -ne 0 ] \
+       || ! wt_has "${R11U}" "repo-${ida}-t" || ! wt_has "${R11U}" "repo-${idb}-t"; then
+      all_ok=0
+      ng "11a2: round ${round} 失敗 (rca=${rca} rcb=${rcb})"
+      sed 's/^/         | /' "${TMP}/r11u-${round}a.log" "${TMP}/r11u-${round}b.log" | grep -i 'lock' | head -4
+    fi
+    round=$((round + 1))
+  done
+  if [ "${all_ok}" -eq 1 ]; then
+    ok "11a2: 既にあっても 0 を返す mkdir の下でも、同時 spawn を 3 ラウンド、毎回両方 exit 0・両方 worktree あり"
+  fi
+fi
+
+# --- 11a3: ⚠️★★★ ロックの中の区間が重ならないこと (2026-11-06・Codex の指摘) ---
+#   ★ 11a・11a2 は「両方 exit 0」しか見ないので、2 本が同時にロックの中にいても通ってしまう。
+#   → git を包み、`git worktree add` の間だけ印ファイルを noclobber で作る。既に在れば重なり。
+#     mkdir -p (既にあっても 0) の下で 3 本 × 4 ラウンド。
+R11V="${TMP}/r11v/repo"; mkdir -p "${R11V}"
+OVL="${TMP}/r11v-overlap"; MARK="${TMP}/r11v-mark"; : > "${OVL}"
+if ! setup_fake_repo "${R11V}"; then
+  ng "11a3: 準備できなかった (★ 判定できない)"
+else
+  round=1; all_ok=1
+  while [ "${round}" -le 4 ]; do
+    pids=""
+    for k in a b c; do
+      (
+        mkdir() { command mkdir -p "$@"; }
+        git() {
+          if [ "${1:-}" = "worktree" ] && [ "${2:-}" = "add" ]; then
+            if ! ( set -C; : > "${MARK}" ) 2>/dev/null; then echo "overlap" >> "${OVL}"; fi
+            sleep 0.3
+            command git "$@"; local grc=$?
+            command rm -f "${MARK}"
+            return "${grc}"
+          fi
+          command git "$@"
+        }
+        export -f mkdir git
+        export MARK OVL
+        cd "${R11V}" && bash scripts/loop-spawn.sh --no-exec "v${round}${k}" t
+      ) >"${TMP}/r11v-${round}${k}.log" 2>&1 &
+      pids="${pids} $!"
+    done
+    for p in ${pids}; do
+      rc=0; wait "${p}" || rc=$?
+      [ "${rc}" -eq 0 ] || { all_ok=0; ng "11a3: round ${round} で spawn が rc=${rc}"; }
+    done
+    round=$((round + 1))
+  done
+  n_ovl="$(grep -c overlap "${OVL}" 2>/dev/null)" || n_ovl=0
+  if [ "${n_ovl}" -ne 0 ]; then
+    ng "11a3: ロックの中の区間が ${n_ovl} 回重なった"
+  elif [ "${all_ok}" -eq 1 ]; then
+    ok "11a3: mkdir -p の下で 3 本 × 4 ラウンド、git worktree add の区間が 1 回も重ならず、全部 exit 0"
+  fi
+fi
+
 # --- 11b: ⚠️★★★ git worktree add を失敗させたとき、branch が残らないこと ---
 #   ★ 失敗のさせ方: 作成先パスに **同名の実ファイル**を事前に置く (★ Windows もファイル名で
 #     衝突させられるので両 OS で同じ fixture を作れる。パーミッションでの再現は移植性が無い)。
@@ -1363,7 +1450,10 @@ run_fakerm_scenario() { # run_fakerm_scenario <repo-dir> <spawn-src> <id> <out-p
   (
     cd "${r}" || exit 1
     rm() { return 1; }
-    export -f rm
+    # ★ 2026-11-06: ロックは mv で外してから消す形 (discard_dir) になったので、「消せない」状況を保つには
+    #   mv も失敗させる (検査の意図「消せない状態が続いてもスピンせず止まる」は変えない)。
+    mv() { return 1; }
+    export -f rm mv
     # ⚠️★★★ 起票 (2026-09-26 の裁定・項目 7): **exec を明示する。**
     #   ★ exec 最適化の保証が無い bash (macOS 3.2) では、`(...)` サブシェルの最後のコマンドが
     #     単純な `env ... bash ...` でも新たな子プロセスへ fork されうる。
@@ -2122,17 +2212,13 @@ else
     #   ⚠️ 実測: Windows/git-bash では umask/chmod によるパーミッション遮断が
     #   所有者に対して効かない (umask 0200 で mkdir しても drwxr-xr-x のままだった) ので、
     #   パーミッションではなくこの形で決定論的に再現する。
-    mkdir() {
-      case "$1" in
-        */loop-spawn.lock)
-          command mkdir "$1" || return $?
-          command mkdir "$1/pid"
-          return 0
-          ;;
-      esac
-      command mkdir "$@"
+    # ★ 2026-11-06: 書き込みの失敗は printf '%s' "$$" だけを失敗させて作る (pid の場所にディレクトリを置く形は、
+    #   新しい claim_dir では「残骸」として何も消さずに止まる経路 (14f) に入るため)。
+    printf() {
+      if [ "$#" -eq 2 ] && [ "$1" = '%s' ] && [ "$2" = "$$" ]; then return 1; fi
+      builtin printf "$@"
     }
-    export -f mkdir
+    export -f printf
     exec env bash scripts/loop-spawn.sh --no-exec 14a t
   ) >"${TMP}/14a.out" 2>"${TMP}/14a.err"
   RC14A=$?
@@ -2159,17 +2245,13 @@ else
   else
     (
       cd "${R14B}" || exit 1
-      mkdir() {
-        case "$1" in
-          */loop-spawn.lock)
-            command mkdir "$1" || return $?
-            command mkdir "$1/pid"
-            return 0
-            ;;
-        esac
-        command mkdir "$@"
+      # ★ 2026-11-06: 書き込みの失敗は printf '%s' "$$" だけを失敗させて作る (pid の場所にディレクトリを置く形は、
+      #   新しい claim_dir では「残骸」として何も消さずに止まる経路 (14f) に入るため)。
+      printf() {
+        if [ "$#" -eq 2 ] && [ "$1" = '%s' ] && [ "$2" = "$$" ]; then return 1; fi
+        builtin printf "$@"
       }
-      export -f mkdir
+      export -f printf
       exec env bash scripts/loop-spawn.sh --no-exec 14b t
     ) >"${TMP}/14b.out" 2>"${TMP}/14b.err"
     if [ -d "${R14B}/.git/loop-spawn.lock" ]; then
@@ -2181,6 +2263,62 @@ else
 fi
 
 # --- 14c: ⚠️★★★ CR LOW: origin 無し + base と同名の tag だけ → die し worktree/branch を作らない ---
+# --- 14f: ⚠️★★★ pid が普通のファイルでない残骸なら、何も消さずに止まる (2026-11-06) ---
+#   ★ 残骸 (pid がディレクトリ等) を「自分のもの」として消すと、2 本が同じ残骸を見たときに、間で正しく
+#     取られた他人のロックを消しうる (/cross-review 2 巡目の HIGH)。→ 消さずに案内を出して止まる。
+echo "14f. ⚠️★★★ pid が普通のファイルでない残骸なら、何も消さずに止まるか"
+run14f() { # run14f <label> <use-mkdir-p:0|1> <expected-text>
+  local r="${TMP}/r14f-$1/repo" rc err
+  mkdir -p "${r}"
+  if ! setup_fake_repo "${r}"; then ng "14f($1): 準備できなかった (★ 判定できない)"; return; fi
+  mkdir -p "${r}/.git/loop-spawn.lock/pid"
+  (
+    cd "${r}" || exit 1
+    if [ "$2" -eq 1 ]; then mkdir() { command mkdir -p "$@"; }; export -f mkdir; fi
+    exec env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec "14f$1" t
+  ) >"${TMP}/14f-$1.out" 2>"${TMP}/14f-$1.err"
+  rc=$?
+  err="$(cat "${TMP}/14f-$1.err" 2>/dev/null || true)"
+  if [ "${rc}" -ne 0 ] && ! wt_has "${r}" "repo-14f$1-t" \
+     && [ -d "${r}/.git/loop-spawn.lock/pid" ] && has_text "${err}" "$3"; then
+    ok "14f($1): ★★★ 残骸の pid を消さずに止まった (${3})"
+  else
+    ng "14f($1): rc=${rc} / worktree 残=$(wt_has "${r}" "repo-14f$1-t" && echo yes || echo no) / 残骸 残=$([ -d "${r}/.git/loop-spawn.lock/pid" ] && echo yes || echo no) / stderr=[${err}]"
+  fi
+}
+# 不可分な mkdir: ロックのディレクトリが在るので mkdir で止まり、タイムアウトの案内で止まる。
+run14f atomic 0 "秒待っても取得できませんでした"
+# 既にあっても 0 を返す mkdir (uutils の模擬): 残骸の判定に届き、残骸の案内で止まる。
+run14f uutils 1 "普通のファイルではありません"
+
+# pid が FIFO: noclobber は普通のファイルでない既存対象を O_EXCL なしで開くので、作る前に判定しないと
+#   読み手を待って詰まり、タイムアウトも効かない (Codex の実測)。15 秒で打ち切る見張りを付ける。
+R14G="${TMP}/r14f-fifo/repo"; mkdir -p "${R14G}"
+if ! setup_fake_repo "${R14G}"; then
+  ng "14f(fifo): 準備できなかった (★ 判定できない)"
+else
+  mkdir -p "${R14G}/.git/loop-spawn.lock" && mkfifo "${R14G}/.git/loop-spawn.lock/pid"
+  (
+    cd "${R14G}" || exit 1
+    mkdir() { command mkdir -p "$@"; }; export -f mkdir
+    exec env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 14ffifo t
+  ) >"${TMP}/14f-fifo.out" 2>"${TMP}/14f-fifo.err" &
+  g14=$!; w14=0
+  while kill -0 "${g14}" 2>/dev/null && [ "${w14}" -lt 15 ]; do sleep 1; w14=$((w14 + 1)); done
+  if kill -0 "${g14}" 2>/dev/null; then
+    pkill -P "${g14}" 2>/dev/null || true; kill -9 "${g14}" 2>/dev/null || true; wait "${g14}" 2>/dev/null || true
+    ng "14f(fifo): pid が FIFO のとき 15 秒たっても止まらなかった (noclobber の open で詰まった)"
+  else
+    rc14g=0; wait "${g14}" || rc14g=$?
+    if [ "${rc14g}" -ne 0 ] && [ -p "${R14G}/.git/loop-spawn.lock/pid" ] \
+       && has_text "$(cat "${TMP}/14f-fifo.err" 2>/dev/null)" "普通のファイルではありません"; then
+      ok "14f(fifo): ★★★ pid が FIFO でも詰まらず、消さずに止まった (${w14} 秒)"
+    else
+      ng "14f(fifo): rc=${rc14g} / stderr=[$(cat "${TMP}/14f-fifo.err" 2>/dev/null)]"
+    fi
+  fi
+fi
+
 echo "14c-14d. ⚠️★★★ CR LOW: ローカルに base が無く origin も無い/fetch 失敗 + 同名 tag → die するか"
 
 R14C="${TMP}/r14c/repo"; mkdir -p "${R14C}"
