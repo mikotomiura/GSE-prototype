@@ -41,3 +41,9 @@ R1（PR #388）とは関係のない直しなので、main への別の PR に�
 - 14f を足した: 残骸（pid がディレクトリ）を、不可分な mkdir ではタイムアウトで、既にあっても 0 を返す mkdir では残骸の案内で、どちらも消さずに止まる。pid が FIFO でも詰まらずに止まる（15 秒の見張り付き）。変異（事前判定を外す）で 14f(uutils)・14f(fifo) が赤（fifo は 15 秒で打ち切り）になることを確かめた。
 
 検証: `loop-spawn-cleanup-test.sh` 123 件・0 件、`loop-run-guard-test.sh` 98・`loop-worktree-deny-test.sh` 34・`check-shell-portability.sh` 12 通過。
+
+## 判断 6: 3 巡目の実測で閉じる（2026-11-06）
+
+code-reviewer の取り合いのハーネス（新しい claim_dir・discard_dir の逐語の写し）で、mkdir -p の下・6 本 × 1500 回 × 4 回（うち 2 回は mv と rm の間に sleep を入れて窓を広げた形）、二重保持・rc=2・読み戻しの不一致がすべて 0 件。同型のハーネスは 2 巡目に旧の放し方で 4 件・2 回の stat の判定で 1 件を検出しており、感度はある。HIGH・MEDIUM は無し。
+
+LOW 2 件は記録に留める: (1) discard_dir の再試行の sleep は待ちのカウンタに数えないので、mv が一時的に失敗し続けると実際の待ちが LOCK_TIMEOUT より伸びる（上限はある・スピンしない）。(2) mv も rmdir も失敗する環境で、空の `${LOCK}.gone.XXXXXX` が残りうる（害は無い）。
