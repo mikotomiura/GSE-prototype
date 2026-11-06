@@ -78,3 +78,13 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/timeseries_tau_extend_run.log"; echo "
 - P-REPRO（`results/repro_check.json`）: `passed` true・`cells` 4224・`mismatched` 0・`max_rel_diff` 0.0（`tolerance_rel` 1e-09）。
 - 止まった段・赤: なし。
 - 結果のコミット `1c3259d9`（push 済み・PR は出していない）。`results/mutations/*.log` は .gitignore で除かれ、`.exit` と `.json` だけが入った。
+
+## 8 Mac での受け取りと、職場の PC の残り（2026-11-06・Mac が追記）
+
+- 状態: この試験の職場の PC の分は完了した。Mac で結果を受け取り、門・来歴・P-REPRO をすべて確かめた。notes を埋め、code-reviewer と /cross-review を通した（判断 7）。枝 `exp/gse-timeseries-tau-extend` は `bd039ec3` まで push 済みで、PR はまだ出していない。
+- 職場の PC で追加でする計算: いまは無い。新しい計算を回さない。
+- 職場の PC で行うこと:
+  1. `git -C <職場の PC の checkout> fetch origin` の後、`git checkout exp/gse-timeseries-tau-extend` と `git pull --ff-only` で `bd039ec3` に揃える（職場の PC 側にコミットを足さない）。
+  2. `C:/Users/SDS02/gse-public-data` と、書き手ごとの値 `timeseries_tau_extend_writer_values.*.json` は消さずに残す（次の候補の計算に使う可能性がある）。人が開いて読まない。
+  3. Drive の `GSE_ML-run_results` の zip とログは消さない。
+- 次の候補（まだ回さない）: τ の候補に事前分布の最頻値を足す計算（引き継ぎ `next-session-gse-timeseries-after-tau-extend.md` §2 の 1）。回すかどうかは研究者が決める。回す場合は、Mac で条件とコードを先にコミットし、職場の PC 向けの新しい引き継ぎを Drive に置く。このメモの手順では回さない。

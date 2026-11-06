@@ -17,6 +17,7 @@
 ## 3 論文 3（1 人ごとの学習の効き）
 
 - 引き継ぎ `next-session-gse-timeseries-tau-extend-after-run.md` §5 の 6 の条件（「1 人ごとに学ぶ効きは、構造を良くすると小さい」が仮説と同じ向き）は満たした。前回の 2 つの試験（`20261103-coauthor-per-person/`・`20261104-coauthor-ml-improve/`）と合わせて、方法の短い論文として書く。
+- 公開する git（コード・集計値・図）は、GSE-prototype とは別の公開 repo にする（2026-11-06 研究者の指示）。GSE-prototype を公開しない。中身は集計値と合成の検査だけにし、書き手ごとの値・CoAuthor と CS1 の記録は入れない。README は図と日本語版を付ける形を既定にする。
 - 別の worktree・別のセッションで始める（`paper-write` Skill の Step 0〜1）。誰に読ませて何を変えるかを研究者に聞いてから投稿先を選ぶ。無料の道を既定にする。
 - 本文に入れるべき限界: 判断 7 の但し書き（τ = ∞ と最頻値のずれ）。候補 1 の計算を論文の前に行うかは研究者に聞く。
 - 公開データの知見の論文（`/Users/johnd/GSE-prototype/.steering/_handoff/next-session-gse-public-data-findings-paper.md`）とは境を合わせ、そちらで 1 人ごとの学習を扱わない。
