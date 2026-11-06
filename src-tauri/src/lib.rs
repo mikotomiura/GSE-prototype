@@ -1146,6 +1146,19 @@ pub(crate) fn show_invitation_settings_window(app: &tauri::AppHandle) -> Result<
 /// 説明と設定の窓のラベル（`capabilities/default.json` の `windows` にも載せる）。
 const INVITATION_SETTINGS_LABEL: &str = "invitation-settings";
 
+/// 本体の窓のラベル（`tauri.conf.json` に label が無いので Tauri の既定の "main"）。
+const MAIN_WINDOW_LABEL: &str = "main";
+
+/// 窓の close の要求でアプリを終えるか。本体の窓のときだけ終える。
+///
+/// 2026-11-06: 以前は「overlay を除く全部」で終えていたため、招待の説明と設定の窓を × で
+/// 閉じるとアプリ全体が終わり、記録が止まった（窓ごとの handler の `prevent_close` は
+/// builder 側の handler を止めない）。除外の列挙は窓を足すたびに足し忘れうるので、
+/// 本体の窓だけを許す形にした（`.steering/20261106-settings-window-close-quits/`）。
+fn close_request_shuts_down(label: &str) -> bool {
+    label == MAIN_WINDOW_LABEL
+}
+
 /// 招待の状態機械の作り方。
 #[derive(Clone, Copy)]
 enum MachineBuild {
@@ -5958,7 +5971,7 @@ pub fn run() {
             if !matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
                 return;
             }
-            if window.label() == "overlay" {
+            if !close_request_shuts_down(window.label()) {
                 return;
             }
             tracing::info!("main window close requested -> shutting down");
@@ -6024,6 +6037,25 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod close_request_tests {
+    use super::*;
+
+    #[test]
+    fn only_main_window_close_shuts_down() {
+        assert!(close_request_shuts_down(MAIN_WINDOW_LABEL));
+        assert!(!close_request_shuts_down("overlay"));
+        assert!(
+            !close_request_shuts_down(INVITATION_SETTINGS_LABEL),
+            "招待の説明と設定の窓の × でアプリを終えてはいけない（記録が止まる）"
+        );
+        assert!(
+            !close_request_shuts_down("some-future-window"),
+            "今後足す窓の × でも道連れにしない"
+        );
+    }
 }
 
 #[cfg(test)]
