@@ -72,3 +72,12 @@
 ## ロールバック
 
 - PR を `git revert`。印 `s1.mode` を置かなければ、本タスクの後も配布物の挙動と記録は 1 バイトも変わらない（`o1_meta_unchanged_without_s1_marker`）。schema の追加は additive。
+
+## 実装中に変わった点（2026-11-06・最終化）
+
+- `day_question` は `shown_local_minute` を書かず `in_eod_window`（真偽）を書く（decisions 判断 9・時差を出さない）。`Action::ShowDayQuestion` に `in_window` を足した。
+- 区間の削除: `day_question` は `shown_ts`〜`t`、`probe_suppressed` は `candidate_ts`〜`t`。2 つ目の時刻が 0 なら点（判断 8・10）。
+- 調停器: 無作為の離席は候補の時刻 `c` 以前の最後の押下から判定し、この tick の押下は ① の後に反映する。溜まった候補の問わない区画は候補ごとの時刻で引く（`local_at`）。一時停止の再開に加えてスリープの復帰でもウォームアップと日の問いの途切れの起点をやり直す。拾い直しはカードが開いていれば持ち越す（判断 10）。
+- `s1::resolve_with_eh3` を足し、`lib.rs` は戻り値を `eh3::resolve` に渡す。
+- `bin/replay.rs` に 3 行種の読み飛ばしの変種を足した（足さないと段 1 の記録が `--snapshot` で読めない）。`calibration_eval::SkipReasonKind` に `superseded`。
+- 2 本目へ回したもの: `.steering/_handoff/next-session-gse-m5-part2-driver-ui.md` §2。
