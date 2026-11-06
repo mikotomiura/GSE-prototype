@@ -23,7 +23,8 @@ C = E.C
 k6 = C.k6
 GAP_MS, DWELL = 2_500, 100
 AI_PRE, AI_POST = 60_000, 60_000
-EXTEND_TAIL = os.environ.get("GSE_X7_MUTATE_NO_TAIL") != "1"  # 変異（門 G2 が赤になることの確かめ）だけで外す
+EXPECT_SESSIONS, EXPECT_WRITERS = 1_157, 43  # conditions.md X6（中間の build_summary と sessions.json の件数）
+EXTEND_TAIL =os.environ.get("GSE_X7_MUTATE_NO_TAIL") != "1"  # 変異（門 G2 が赤になることの確かめ）だけで外す
 
 
 def is_ai(name):
@@ -72,7 +73,8 @@ def bridge(sessions):
     """sessions: [(番号, d)]。つないだ時刻の θ と onset を作り、セッションへ戻す。"""
     order = sorted(sessions, key=lambda kd: min(kd[1]["keys"][0][0], kd[1]["feat"][0][0] if kd[1]["feat"] else kd[1]["keys"][0][0]))
     if EXTEND_TAIL:  # X7: つなぐと 2.5 秒の間隔は idle_trim の長い穴に当たらず、最後以外のセッションの終わりは削られない
-        order = [(k, dict(d, observed_intervals=d["observed_intervals"][:-1] + [[d["observed_intervals"][-1][0], d["feat"][-1][0]]]))
+        order = [(k, dict(d, observed_intervals=d["observed_intervals"][:-1]
+                          + [[d["observed_intervals"][-1][0], max(d["observed_intervals"][-1][1], d["feat"][-1][0])]]))
                  if j < len(order) - 1 and d["feat"] and d["observed_intervals"] else (k, d)
                  for j, (k, d) in enumerate(order)]
     press, cats, ivs, offs, spans, cursor = [], [], [], {}, [], None
@@ -108,6 +110,10 @@ def load(obs, old, ons_dir):
             sys.exit("sessions.json に無いセッションが中間にある")
         by_w.setdefault(keep[k], []).append((k, json.load(open(p))))
     chk = Counter(writers=len(by_w))
+    # 門の網羅性: 中間のセッションの集合 = sessions.json の全件、G2 の書き手の集合 = 中間の書き手の集合
+    chk["sessions_missing_from_work"] = len(set(keep) - {k for v in by_w.values() for k, _ in v})
+    g2_w = {os.path.basename(p)[1:-5] for p in glob.glob(os.path.join(ons_dir, "w*.json"))}
+    chk["g2_writer_set_mismatch"] = len(g2_w ^ {str(w) for w in by_w})
     writers = []
     for wid in sorted(by_w):
         sess = by_w[wid]
@@ -122,7 +128,10 @@ def load(obs, old, ons_dir):
                 chk["g1_mismatch_sessions"] += 1
         theta, offs, per, unassigned = bridge(sess)
         chk["bridge_unassigned"] += unassigned
-        ref = json.load(open(os.path.join(ons_dir, "w%s.json" % wid)))  # G2
+        ref_p = os.path.join(ons_dir, "w%s.json" % wid)  # G2
+        if not os.path.exists(ref_p):
+            sys.exit("門が崩れた: G2 の中間に書き手が欠けている")
+        ref = json.load(open(ref_p))
         chk["g2_unassigned"] += ref["unassigned"]
         chk["g2_stderr_bytes"] += ref["stderr_bytes"]
         mine = sorted([k] + o for k in per for o in per[k])
@@ -139,7 +148,9 @@ def load(obs, old, ons_dir):
 def gates_ok(chk):
     return (chk.get("g1_mismatch_sessions", 0) == 0 and chk.get("g2_mismatch_writers", 0) == 0
             and chk.get("bridge_unassigned", 0) == 0 and chk.get("g2_unassigned", 0) == 0
-            and chk.get("g2_onsets", 0) > 0)
+            and chk.get("g2_onsets", 0) > 0 and chk.get("g1_session_onsets", 0) > 0
+            and chk.get("sessions_missing_from_work", 1) == 0 and chk.get("g2_writer_set_mismatch", 1) == 0
+            and chk.get("sessions") == EXPECT_SESSIONS and chk.get("writers") == EXPECT_WRITERS)
 
 
 def patch(cnt):
@@ -158,7 +169,7 @@ def patch(cnt):
         return True
 
     C.stall_anchors, C.control_ok = stall_anchors, control_ok
-    return orig_sa
+    return orig_sa, orig_co
 
 
 def main(obs, old, ons_dir, out, gates_only=False):
@@ -168,14 +179,17 @@ def main(obs, old, ons_dir, out, gates_only=False):
         sys.exit("門が崩れた: " + json.dumps(chk))
     if not gates_only:
         cnt = Counter()
-        orig_sa = patch(cnt)
-        for units in writers:
-            for w in units:
-                raw = orig_sa(w, C.MAIN)
-                cnt["stall_anchors_before_ai"] += len(raw)
-                cnt["stall_excluded_ai"] += sum(1 for a in raw if ai_in(w, a[0] - AI_PRE, a[0]))
-        res["coauthor_seen"] = {"writers": len(writers), "sessions": sum(len(u) for u in writers),
-                                "ai_exclusion_counts": dict(cnt)} | E.run_set(writers, cs1=False)
+        orig_sa, orig_co = patch(cnt)
+        try:
+            for units in writers:
+                for w in units:
+                    raw = orig_sa(w, C.MAIN)
+                    cnt["stall_anchors_before_ai"] += len(raw)
+                    cnt["stall_excluded_ai"] += sum(1 for a in raw if ai_in(w, a[0] - AI_PRE, a[0]))
+            res["coauthor_seen"] = {"writers": len(writers), "sessions": sum(len(u) for u in writers)} \
+                | E.run_set(writers, cs1=False)
+        finally:
+            C.stall_anchors, C.control_ok = orig_sa, orig_co
         res["coauthor_seen"]["ai_exclusion_counts"] = dict(cnt)
     res = E.strip_per_writer(res)
     with open(out + ".tmp", "w") as f:

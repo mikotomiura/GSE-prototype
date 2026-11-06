@@ -3,6 +3,8 @@
  "note": "\u767b\u9332\u306e\u5916\u306e\u63a2\u7d22\uff08\u4ed8\u9332 F\u30fbX6\uff09\u3002\u5224\u5b9a\u306b\u4f7f\u308f\u306a\u3044\u3002",
  "checks": {
   "writers": 43,
+  "sessions_missing_from_work": 0,
+  "g2_writer_set_mismatch": 0,
   "sessions": 1157,
   "stderr_bytes": 0,
   "g1_session_onsets": 1519,
@@ -15,11 +17,6 @@
  "coauthor_seen": {
   "writers": 43,
   "sessions": 1157,
-  "ai_exclusion_counts": {
-   "stall_anchors_before_ai": 1237,
-   "stall_excluded_ai": 599,
-   "control_excluded_ai": 31600
-  },
   "counts": {
    "stall_anchors": 638,
    "stall_excluded_condA_true": 5,
@@ -199,6 +196,11 @@
     "branch": 4
    },
    "H2_supported": false
+  },
+  "ai_exclusion_counts": {
+   "stall_anchors_before_ai": 1237,
+   "stall_excluded_ai": 599,
+   "control_excluded_ai": 31600
   }
  }
 }

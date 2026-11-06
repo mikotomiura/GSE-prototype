@@ -9,6 +9,7 @@
   中間の jsonl・NDJSON・replay の出力は書き手ごとに消す。本文を書き出さない。
 """
 import csv
+import hashlib
 import json
 import os
 import subprocess
@@ -23,6 +24,10 @@ sys.path.insert(0, ITEM1)
 import convert as ca  # noqa: E402
 
 DWELL = 100
+SHA_ZIP = "8d7380ca3811c671e774e43bfb9f5d3265e2a5d425788a066a612831aa1e418b"
+SHA_REPLAY = "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3"
+SHA_META = ("66fd2ca541999412de4050a85c17274f02eea04424e83906b697f4cd824c65bf",   # metadata_creative.csv
+            "cfadf031b21c07951f648b02422b6703850359c7ff6a78a8ef513624c8e4c0d1")   # metadata_argumentative.csv
 ADD_FEAT = os.path.join(ITEM1, "add_feat.py")
 CONCAT = os.path.join(ITEM1, "concat_writer.py")
 
@@ -88,6 +93,14 @@ def one_writer(args):
 def main():
     zp, replay, old, out_dir, jobs = sys.argv[1:6]
     metas = sys.argv[6:]
+    # 通し番号の規則（メタデータのセッション ID ∩ zip の昇順）が中間を作った時と同じ集合の上にあることを、
+    # 読む前に入力の SHA-256 で確かめる（experiments/20261103-coauthor-per-person/run.sh と同じ値）。
+    # 違えば番号が別のセッション（取っておいた書き手を含みうる）を指すので止める。
+    for p, want in [(zp, SHA_ZIP), (replay, SHA_REPLAY)] + list(zip(metas, SHA_META)):
+        if hashlib.sha256(open(p, "rb").read()).hexdigest() != want:
+            sys.exit("入力の SHA-256 が中間を作った時と違う: " + os.path.basename(p))
+    if len(metas) != len(SHA_META):
+        sys.exit("メタデータは creative・argumentative の 2 本をこの順で渡す")
     keep = json.load(open(os.path.join(old, "sessions.json")))  # 番号 -> 書き手の通し番号
     sid2w = {}
     for p in metas:
