@@ -1247,6 +1247,48 @@ else
   fi
 fi
 
+# --- 11a2: ⚠️★★★ mkdir が不可分でない環境でも、同時 spawn の両方が成功すること (2026-11-06) ---
+#   ★ ubuntu 26.04 の既定の mkdir (uutils coreutils 0.10.0) は、同時に呼ばれると既にある
+#     ディレクトリにも 0 を返す (CI の対照で 300 回中 258 回、両方が成功した。python の os.mkdir・
+#     bash の noclobber・GNU の mkdir は 0 回)。mkdir の成否だけをロックにすると、2 本が同時に
+#     ロックを取ったと思い込み、pid の読み戻しで片方が fail-closed で止まっていた (11a が赤)。
+#   → 「既にあっても 0 を返す mkdir」(mkdir -p) に差し替え、macOS でも同じ状況を再現する。
+#     直す前は片方が落ち、直した後は片方が待って両方とも成功する。
+R11U="${TMP}/r11u/repo"; mkdir -p "${R11U}"
+if ! setup_fake_repo "${R11U}"; then
+  ng "11a2: 準備できなかった (★ 判定できない)"
+else
+  round=1
+  all_ok=1
+  while [ "${round}" -le 3 ]; do
+    ida="u${round}a"; idb="u${round}b"
+    (
+      mkdir() { command mkdir -p "$@"; }
+      export -f mkdir
+      cd "${R11U}" && bash scripts/loop-spawn.sh --no-exec "${ida}" t
+    ) >"${TMP}/r11u-${round}a.log" 2>&1 &
+    pa=$!
+    (
+      mkdir() { command mkdir -p "$@"; }
+      export -f mkdir
+      cd "${R11U}" && bash scripts/loop-spawn.sh --no-exec "${idb}" t
+    ) >"${TMP}/r11u-${round}b.log" 2>&1 &
+    pb=$!
+    rca=0; wait "${pa}" || rca=$?
+    rcb=0; wait "${pb}" || rcb=$?
+    if [ "${rca}" -ne 0 ] || [ "${rcb}" -ne 0 ] \
+       || ! wt_has "${R11U}" "repo-${ida}-t" || ! wt_has "${R11U}" "repo-${idb}-t"; then
+      all_ok=0
+      ng "11a2: round ${round} 失敗 (rca=${rca} rcb=${rcb})"
+      sed 's/^/         | /' "${TMP}/r11u-${round}a.log" "${TMP}/r11u-${round}b.log" | grep -i 'lock' | head -4
+    fi
+    round=$((round + 1))
+  done
+  if [ "${all_ok}" -eq 1 ]; then
+    ok "11a2: 既にあっても 0 を返す mkdir の下でも、同時 spawn を 3 ラウンド、毎回両方 exit 0・両方 worktree あり"
+  fi
+fi
+
 # --- 11b: ⚠️★★★ git worktree add を失敗させたとき、branch が残らないこと ---
 #   ★ 失敗のさせ方: 作成先パスに **同名の実ファイル**を事前に置く (★ Windows もファイル名で
 #     衝突させられるので両 OS で同じ fixture を作れる。パーミッションでの再現は移植性が無い)。

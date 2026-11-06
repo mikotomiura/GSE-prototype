@@ -804,10 +804,29 @@ esac
 awk -v t="${LOCK_TIMEOUT}" 'BEGIN{ exit !(t+0 > 0) }' \
   || die "LOOP_SPAWN_LOCK_TIMEOUT は 0 より大きい数値にしてください: [$(sanitize_disp "${LOCK_TIMEOUT}")]"
 
+# claim_dir <dir> → <dir> を作り、その中の pid ファイルを noclobber (O_EXCL) で作る。
+#   戻り値: 0 = 取れた / 1 = 取れなかった (他の印がある・持ち主が放した直後 → 待って取り直す)
+#           2 = 書けない (pid が普通のファイルでない等 → 呼び手が fail-closed にする)
+#   ⚠️★★★ 2026-11-06: mkdir の成否だけをロックにしない。ubuntu 26.04 の既定の mkdir
+#     (uutils coreutils 0.10.0) は、同時に呼ばれると既にあるディレクトリにも 0 を返す
+#     (CI の対照で 300 回中 258 回、2 本とも成功した。python の os.mkdir・bash の noclobber・
+#     GNU の mkdir は 0 回)。2 本が同時にロックを取ったと思い込み、pid の読み戻しで片方が
+#     fail-closed で止まっていた (loop-spawn-cleanup-test.sh 11a・11a2)。
+#   ★ 印は bash の noclobber で作る pid ファイル (bash 自身が O_EXCL で開くので coreutils に依らない)。
+#     取れなかった側はディレクトリを消さない (持ち主のものだから)。
+claim_dir() {
+  mkdir "$1" 2>/dev/null || return 1
+  ( set -C; printf '%s' "$$" > "$1/pid" ) 2>/dev/null && return 0
+  [ -d "$1" ] || return 1
+  [ -f "$1/pid" ] && return 1
+  return 2
+}
+
 release_spawn_lock() {
   # ⚠️★★★ 判断 9 (C-M1/C-M2 の後始末): reap 用ロックが自分の手に残っていれば先に片づける
   #   (★ mkdir "${LOCK}.reap" と rmdir "${LOCK}.reap" の間で中断されると残骸になる —— ここが最後の網)。
   if [ "${REAP_HELD}" -eq 1 ]; then
+    rm -f "${LOCK}.reap/pid" 2>/dev/null || true
     rmdir "${LOCK}.reap" 2>/dev/null || true
     REAP_HELD=0
   fi
@@ -839,7 +858,7 @@ trap release_spawn_lock EXIT
 # acquire_spawn_lock → ★ mkdir で排他を取る。stale (pid が死んでいる) なら別ロックで直列化して除去し取り直す。
 #   ⚠️ pid ファイルが無い/読めない (作成直後の競合) ときは stale と見なさない (待つ側に倒す)。
 acquire_spawn_lock() {
-  local i=0 max_i lock_pid reap_pid written_pid
+  local i=0 max_i lock_pid reap_pid reap_rc written_pid
   # ⚠️ bash 3.2 に浮動小数演算は無いので、待ち回数は awk で整数化する (sleep 自体は小数を受ける)。
   max_i="$(awk -v t="${LOCK_TIMEOUT}" -v p="${LOCK_POLL}" \
     'BEGIN{n=t/p; i=int(n); if (n>i) i++; if (i<1) i=1; print i}')"
@@ -857,7 +876,11 @@ acquire_spawn_lock() {
           待ち回数が大きすぎます (max_i=${max_i})。
           ⚠️ このまま進めると数値比較が壊れてタイムアウトが効かなくなるため、判定せず止まります。"
   fi
-  while ! mkdir "${LOCK}" 2>/dev/null; do
+  local claim_rc
+  while :; do
+    claim_rc=0; claim_dir "${LOCK}" || claim_rc=$?
+    # ★ 0 = 取れた / 2 = 書けない (下の読み戻しで fail-closed) → どちらもループを出る。1 だけ待つ。
+    [ "${claim_rc}" -ne 1 ] && break
     if [ -f "${LOCK}/pid" ]; then
       lock_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
       case "${lock_pid:-}" in
@@ -872,7 +895,10 @@ acquire_spawn_lock() {
             #     その中で pid を **読み直し**、読み直した pid が「死んでいると判断した pid」と
             #     同じで、なお kill -0 が失敗するときに限り rm -rf する。
             #   ⚠️ reap を取れなければここでは何もしない (★ 下の i 加算 / sleep で普通に待つ)。
-            if mkdir "${LOCK}.reap" 2>/dev/null; then
+            reap_rc=0; claim_dir "${LOCK}.reap" || reap_rc=$?
+            # ★ 書けない (2) なら自分が作った除去用ロックを残さない (残すと以後の stale 除去が止まる)。
+            if [ "${reap_rc}" -eq 2 ]; then rm -rf "${LOCK}.reap" 2>/dev/null || true; fi
+            if [ "${reap_rc}" -eq 0 ]; then
               # ⚠️★★★ 判断 9 (C-M1/C-M2 の後始末): ここから rmdir までの間に中断されると
               #   `${LOCK}.reap` が残骸になる。★ フラグを立てておき、EXIT trap
               #   (`release_spawn_lock`) にも同じ後始末をさせる (＝ 中断されても最後の網が効く)。
@@ -885,6 +911,8 @@ acquire_spawn_lock() {
               #   以後の stale 除去ができなくなる (許容する —— 待ち切れば die し、
               #   die メッセージで reap ディレクトリの手動削除を案内する。
               #   ⚠️ ★ ここで中断されても EXIT trap が REAP_HELD を見て後始末する)。
+              # ⚠️ `set -e` の下なので rm の失敗で黙って抜けないよう `|| true` を付ける (11g は rm を失敗させる)。
+              rm -f "${LOCK}.reap/pid" 2>/dev/null || true
               rmdir "${LOCK}.reap" 2>/dev/null && REAP_HELD=0
             fi
           fi
@@ -903,7 +931,8 @@ acquire_spawn_lock() {
     fi
     sleep "${LOCK_POLL}"
   done
-  printf '%s' "$$" > "${LOCK}/pid" 2>/dev/null || true
+  # ★ 2026-11-06: pid は claim_dir が noclobber で書いた (ここで上書きしない —— 上書きは別のプロセスの
+  #   印を消しうる)。書けなかった場合 (claim_rc=2) も、下の読み戻しで fail-closed にする。
   # ⚠️★★★ CR MEDIUM (2026-09-26 2巡目): 書き込めたかを確かめずに LOCK_HELD=1 にすると、
   #   pid の書き込みに失敗した (権限・I/O エラー・書き込み先が塞がっている等。空ファイルのまま
   #   残る場合を含む) ときに、release_spawn_lock は「pid が自分と一致しない」と見て**解放しない**
