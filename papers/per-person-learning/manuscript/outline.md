@@ -42,3 +42,29 @@ Supporting result 2 (supplementary; one paragraph in the main text): logistic mo
 
 - Literature round done (2026-11-07). Remaining: full texts of Pardos and Heffernan 2010, Yudelson 2016, Chung et al. 2013 (variance estimates at the boundary in multilevel models), Aarts and Haslbeck 2025 (multilevel HMMs).
 - Preprint policy of the target journal (not yet read in the primary source).
+
+## Structure and placement (paper-write Steps 2 to 5, 2026-11-07)
+
+Sections follow the reader's questions: what is the problem, how was it checked, what was found, what changes. Each results section is written with four items: what we set out to check, what we measured, what we found, why it matters for the claim. The status of the analyses is defined once in Section 3.4 and marked afterwards only by a short tag.
+
+Body budget: 7,000 words (introduction to conclusion, captions included). Recent UMUAI papers ran about 9,800 to 13,300 words (three papers, see the venue notes); the journal states no limit. We take the lower target because the central claim needs few mechanisms, and move detail to the supplement.
+
+| Section | Budget (words) | In the body | Moved to the supplement |
+|---|---|---|---|
+| 1 Introduction | 800 | Personalization claims depend on what the per-person model is compared with; take-home sentence; C1 to C3 | — |
+| 2 Related work | 700 | Small-gain reports (person-mean baseline; individualized knowledge tracing); large-gain reports and their comparisons and splits; selection on evaluation data; sequence-model misfit and Markov baselines | Extended comparison table of prior designs (S1) |
+| 3 Data, models and evaluation | 1,200 | 3.1 Two datasets (writers, sessions/assignments, symbols; Table 1). 3.2 Symbol sequences, one paragraph (26 symbols from two smoothed keystroke-timing features, 1 Hz). 3.3 Model families (HMM K = 3, 10; AR(1)-HMM K = 1 to 3), per-person MAP fit shrunk toward the pooled model with strength tau, the pooled model and the per-person first-order Markov chain; Figure 1 schematic. 3.4 Evaluation: k training units before five held-out units of the same writer, nats per symbol, per-writer differences summarized by median, IQR and share favoring the per-person fit; selection of structure and tau on other writers; status of analyses (conditions committed before each computation; four sequential analyses, each designed after the previous results; descriptive, no tests) | Quantization and preprocessing details (S2); full model equations, priors, EM, initialization (S3); panel definitions and inclusion counts (S4) |
+| 4.1 Per-person gain with a three-state HMM | 500 | hmm3 per-person minus pooled by k (CoAuthor, CS1) | All structures and k, both panels and the all-writer panel (S5) |
+| 4.2 Against the person's own first-order Markov chain | 700 | hmm3 loses by about 0.5 (CoAuthor) and 1.1 (CS1) nats/symbol; AR(1)-HMM wins for every writer; most of the margin comes from the pooled structure; Figure 2 (both differences against k) | Pressed-symbol-only analysis (S6); bootstrap intervals of medians (S7) |
+| 4.3 Selecting structure and shrinkage on other people | 900 | Two-stage selection picks AR(1)-HMM K = 3 everywhere; per-person minus same-structure pooled about 1e-3 or less (CoAuthor), 0 (CS1); hmm3 contrast; Table 2 (main table) | Selected tau and K counts per cell; per-person cross-validated tau and K (S8) |
+| 4.4 What remains at large shrinkage | 400 | Grid extended to 10^6 and the pooled limit: CS1 selects the pooled limit; CoAuthor small remainder, by median comparison larger in prior-mode minus pooled than in the person's data | Full grid tables, writers with infinite log loss, decomposition tables a and b (S9) |
+| 5 Discussion | 1,200 | Take-home and who it changes; confirmed findings vs untested reading (structure-compensation hypothesis: same direction, two families and one quantization); recommendations for personalization studies (compare with a same-structure pooled model with a person-level intercept; select shrinkage on other people with the pooled limit in the grid; report a first-order Markov baseline for symbol sequences); one paragraph on the proxy-label logistic results | Proxy-label logistic results in full (S10) |
+| 6 Limitations | 500 | Single place for all caveats: two datasets, one quantization, sessions and assignments are not days, no state names, no tests, median comparisons, CS1 caveat at large shrinkage | — |
+| 7 Conclusion | 100 | Take-home in the same words as the abstract | — |
+| Total | 7,000 | | Verification record: self-tests, mutation checks, reproduction checks, provenance (S11); deviations from the pre-computation conditions, all four analyses (S12) |
+
+Figures and tables in the body: Table 1 (data), Figure 1 (comparison schematic), Figure 2 (per-person minus pooled and minus first-order Markov against k, by structure), Table 2 (two-stage selection, main). Four items.
+
+## Open items before writing the body
+
+- Symbol sequence: decided to re-implement the quantization for the public archive and to check, locally, that it reproduces the symbols for every session and assignment (the archive holds the match counts only). The section 3.2 paragraph and supplement S2 are written from that re-implementation.
