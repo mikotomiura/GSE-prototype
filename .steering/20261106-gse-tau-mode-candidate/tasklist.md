@@ -26,6 +26,9 @@
 
 ## 本計算の後（別のセッション）
 
-- [ ] P-REPRO・門・来歴を確かめる
-- [ ] notes（読みの形は判断 5）・tables.md
-- [ ] code-reviewer と /cross-review（Codex を加える）
+- [x] 職場の PC の結果（`cdc1f0f7`・`cc0b959c`）を取り込む（fast-forward）
+- [x] P-REPRO・門・来歴を確かめる（26 対照・変異 23 個・P-REPRO 72,332 セル一致・NaN 0）
+- [x] notes（読みの形は判断 5）・tables.md（report.py の出力のまま）
+- [x] code-reviewer と /cross-review（Codex を加える・Codex には notes と read_forms.py だけ）→ 判断 12
+- [x] 道具の対応を照らす（reproducibility-discipline: 来歴と P-REPRO を notes に記録／code-reviewer と /cross-review を通した／決めることは無かった）
+- [ ] push と PR（研究者が確かめてから。前の 2 つの枝との順番を聞く）

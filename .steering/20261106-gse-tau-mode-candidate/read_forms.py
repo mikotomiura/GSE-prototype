@@ -1,4 +1,9 @@
-"""読みの形 1〜5 を summary.json から機械的に当てる（読みの補助・repo の外）。"""
+"""読みの形 1〜5 を summary.json から機械的に当てる（読みの補助・計算のコードではない）。
+
+結果 1 の表（主のパネル・構造 × k・全記号と押下のある記号）だけを数える。2 段（他人）は数えない。
+形 4 は 10^5 → 3×10^5 → 10^6 の 3 点で狭義に減るか。notes の数は all の行だけを足したもの。
+使い方: python3 -I read_forms.py experiments/20261106-tau-mode-candidate/results/summary.json
+"""
 import json, sys, math
 from collections import Counter, defaultdict
 D = json.load(open(sys.argv[1]))
@@ -10,7 +15,10 @@ def v(x):
     return x
 def form(a, b, c, share):
     a, b, c = v(a), v(b), v(c)
+    if any(math.isnan(x) for x in (a, b, c, share)):
+        raise SystemExit("NaN が summary にある（判断 4 では出ないはず）")
     if any(math.isinf(x) for x in (a, b, c)): return 5
+    # 形 1 の「b の符号が c と同じ」は、b と c が 0 のときは同じと数えない（c = 0 は CS1 の 2 段の行で、もともと読まない）
     if abs(a) < abs(b) and (b > 0) == (c > 0) and b != 0 and c != 0: return 1
     if abs(a) > abs(b) and a > 0 and share > 0.5: return 2
     return 3
