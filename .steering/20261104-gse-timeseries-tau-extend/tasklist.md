@@ -26,7 +26,7 @@
 
 ## 本計算の後
 
-- [ ] P-REPRO の結果を確かめる
-- [ ] notes（言えること・言えないこと）。骨組み（値なし・読みの形を結果の前に決めた）は 2026-11-05 に書いた
-- [ ] code-reviewer と /cross-review
+- [x] P-REPRO の結果を確かめる（cells 4,224・mismatched 0・max_rel_diff 0.0。門・来歴もすべて通った・2026-11-06）
+- [x] notes（言えること・言えないこと）。骨組み（値なし・読みの形を結果の前に決めた）は 2026-11-05 に書いた。値と読みは 2026-11-06。tables.md を report.py で生成
+- [x] code-reviewer と /cross-review（HIGH 1 件は両者一致: 但し書きの範囲 → 判断 7 で直した。MEDIUM・LOW の転記・範囲の誤りも直した）
 - [ ] push（研究者の手元で）・PR は研究者に確かめてから・`[skip ci]`
