@@ -64,7 +64,8 @@
 - [x] 休止の位置の探索 X8（判断 27・df14c58d）
 - [x] attack-me outline round 2（major・判断 28）→ v3
 - [x] attack-me outline round 3（major・C2 を手順と限界へ・判断 29）→ v4
-- [ ] attack-me outline round 4（次のセッション・引き継ぎ `_handoff/next-session-gse-public-data-findings-paper-8.md`）
+- [x] 文献 [V465]（判断 30）→ attack-me outline round 4（major・査読者 3 人 minor・E 直してから・判断 31）→ v5
+- [ ] attack-me outline round 5
 - [ ] 原稿（JEDM・英語・MacTeX）
 - [ ] round 6 に渡す未決: 境界の較正で、138 人を復元で引く版は誤って同等とする割合が信号ごとに 3.0〜4.8%（名目の 2.5% を超える）。非復元の版は 0.2〜1.6%。判定は 2 つの信号の両方なので合わせた割合はこれより小さいが、どちらの引き方を読むかは決めていない
 - [x] 草案 v7（E と監査役の本文の指摘・外枠・付録 F）
