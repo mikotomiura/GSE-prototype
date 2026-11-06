@@ -106,7 +106,7 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     //   EH3 の条件は `eh3_day` が持つので、EH3 では出さない。
     "invitation_condition",
     // 段 1（ADR-043・M5）: 問いの枠・出さなかった候補・日の終わりの問い。
-    //   ⚠️ 2026-11-06 時点では送出元が無い（駆動役は M5 の 2 本目）→ `emitterless` に置く。
+    //   ★ 2026-11-07（M5 の 2 本目）に送出元（段 1 の駆動役）ができた → 段 1 のときだけ `config_gated`。
     "probe_frame",
     "probe_suppressed",
     "day_question",
@@ -130,7 +130,7 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 ///
 /// | 行種 | 止まる条件 | 実測 |
 /// |---|---|---|
-/// | `probe_assignment` / `realtime_label` | ⚠️ **G1 実施中と EH3 では常に止まる** | `lib.rs`: `probes_disabled = disabled_by_env \|\| disabled_by_g1.is_some() \|\| disabled_by_eh3` |
+/// | `probe_assignment` / `realtime_label` | ⚠️ **G1 実施中と EH3 では常に止まる**（段 1 では今のスレッドの代わりに段 1 の駆動役が書き、問いへの同意が無ければ止まる） | `lib.rs`: `probes_disabled = disabled_by_env \|\| disabled_by_g1.is_some() \|\| disabled_by_eh3 \|\| disabled_by_s1` |
 /// | `intervention_decision` / `intervention_response` | ⚠️ **`intervention_enabled=false` では常に止まる**（盲検較正・O1・EH3、★ ADR-040 D1 で既定も false） | `lib.rs`: `if !INTERVENTION_ENABLED { return safe_default(); }` |
 ///
 /// → ⚠️★★★ **G1 ログを D1 の判定表に掛けると `probe_assignment` 0 行が
@@ -268,6 +268,7 @@ pub fn config_gated() -> Vec<&'static str> {
         v.push("secure_input");
     }
     v.extend(eh3_line_types(crate::eh3::is_eh3()));
+    v.extend(s1_line_types(crate::s1::is_s1()));
     v.extend(normal_invitation_line_types(
         crate::eh3::is_eh3(),
         crate::o1::is_o1(),
@@ -288,6 +289,25 @@ pub fn config_gated() -> Vec<&'static str> {
 fn eh3_line_types(eh3: bool) -> Vec<&'static str> {
     if eh3 {
         vec!["eh3_day", "invitation_present"]
+    } else {
+        Vec::new()
+    }
+}
+
+/// 段 1 のときだけ宣言する行種 (純関数・ADR-043・M5 の 2 本目)。
+///
+/// `config_gated` に置く: 問いへの本人の同意が無い・取り消した走行では送出元（段 1 の駆動役と
+/// `lib.rs` の段 1 のコマンド）が止まるので、0 行は「判定不能」である。
+/// 段 1 でないときは何も足さない（印の無い O1 の `meta.capabilities` は従来と同じ文字列）。
+/// ⚠️ 6 択（`activity_label`）は段 1 だけで書く（O1 だけでは同意の門が `None`・ADR-043 D8）。
+fn s1_line_types(s1: bool) -> Vec<&'static str> {
+    if s1 {
+        vec![
+            "activity_label",
+            "day_question",
+            "probe_frame",
+            "probe_suppressed",
+        ]
     } else {
         Vec::new()
     }
@@ -491,38 +511,28 @@ mod tests {
     fn declaration_partitions_known_line_types() {
         // ⚠️★★★ `secure_input` は **Windows には送出元が無い** (Windows に
         //   `EnableSecureEventInput` 相当の API が存在しない・`observe_windows.rs` は常に `None`)。
-        // ⚠️★★★ **`activity_label` は *まだ送出元が無い*** (2026-09-14・code-reviewer HIGH)。
-        //   ★ `logger.rs` に writer はあるが、`LogEntry::activity_label_*` を呼ぶ production
-        //   コードが **1 か所も無い** (★ プローブ発火と 6 択 UI の配線は ADR-031 §Migration M5)。
-        //   → ⚠️ **宣言すると ADR-013 D2 の過大申告になる**
-        //   (逐語「導出元は『送出元があるか』であって writer ではない」)。
-        //   ★ M5 で送出元ができたら [`activity_label_has_no_emitter_until_it_is_wired`] が赤になり、
-        //   **宣言の追加を強制する**。
-        // ⚠️★★★ 2026-11-06（M5 の 1 本目）: 段 1 の 3 行種も **まだ送出元が無い**。
-        //   writer と schema はあるが、行を書く駆動役は M5 の 2 本目で作る（本タスクの判断 2）。
-        //   → 送出元を作るときに `activity_label` と一緒に `config_gated`（段 1 のときだけ）へ移す。
+        // ★ 2026-11-07（M5 の 2 本目）: `activity_label` と段 1 の 3 行種は送出元ができたので
+        //   `emitterless` から外し、段 1 のときだけ宣言する（`s1_line_types`・下の `mode_gated`）。
+        //   旧検査 `activity_label_has_no_emitter_until_it_is_wired` は ADR-031 D4 の手順どおり消した。
         #[cfg(target_os = "windows")]
-        let emitterless: &[&str] = &[
-            "secure_input",
-            "activity_label",
-            "probe_frame",
-            "probe_suppressed",
-            "day_question",
-        ];
+        let emitterless: &[&str] = &["secure_input"];
         // ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
         //   macOS 側の送出元を実装したので、この行から外した (`observe_macos.rs`)。
         // ⚠️★★★ 2026-09-11 (issue 008): `ime_shadow` も外した ——
         //   macOS 側の送出元ができた (`ime_compose::drive` → `lib.rs::emit_ime_shadow`)。
         //   → ★ 非 Windows で「送出元が無い行種」は**無くなった**。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &[
+        let emitterless: &[&str] = &[];
+        // EH3・段 1・通常のモードの走行でだけ宣言する行種（送出元はある・テストはどのモードでもない）。
+        let mode_gated: &[&str] = &[
+            "eh3_day",
+            "invitation_present",
+            "invitation_condition",
             "activity_label",
+            "day_question",
             "probe_frame",
             "probe_suppressed",
-            "day_question",
         ];
-        // EH3 の走行でだけ宣言する行種（送出元はある・テストは EH3 ではない）。
-        let mode_gated: &[&str] = &["eh3_day", "invitation_present", "invitation_condition"];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);
@@ -533,56 +543,42 @@ mod tests {
         assert_eq!(lhs, known, "宣言集合が KNOWN_LINE_TYPES を割り切っていない");
     }
 
-    /// ⚠️★★★ **`activity_label` の送出元がまだ無いことを固定する** (ADR-031 §Migration M5)。
+    /// 段 1 の行種は段 1 のときだけ宣言し、段 1 でないときは何も足さない（引き継ぎ §2 の 1）。
     ///
-    /// ## ★ なぜ「無いこと」を固定するのか
-    ///
-    /// ★ `capabilities` は **「このビルドが何を記録できるか」**の宣言である (ADR-013 D1)。
-    /// ⚠️ `logger.rs` に writer があっても、**それを呼ぶ production コードが無ければ
-    /// このビルドは 1 行も記録できない**。→ ★ 宣言すると**過大申告**になる
-    /// (ADR-013 D2 逐語「導出元は『送出元があるか』であって writer ではない」)。
-    ///
-    /// ## ⚠️★★★ このテストは「赤くなるために」置いてある
-    ///
-    /// ★ ADR-031 **M5** でプローブ発火と 6 択 UI を配線すると、**本テストが落ちる**。
-    /// ⚠️ 配線するときは、EH3 のモードでは出さない門（`!crate::eh3::is_eh3()`）も同時に入れる
-    /// （EH3 では ESM をアプリの外で取る・`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 3 #1）。
-    /// → ★ そのとき [`config_gated`] へ `"activity_label"` を足し、
-    /// [`declaration_partitions_known_line_types`] の `emitterless` から外し、本テストを消すこと。
-    /// ⚠️ **順序を間違えると、記録できないものを「測ったが 0 行」と読ませることになる。**
+    /// ★ 2026-11-07: `activity_label_has_no_emitter_until_it_is_wired`（送出元が無いことを固定する検査）を
+    ///   消した代わり。宣言には送出元（`lib.rs`）と writer（`logger.rs`）の両方を求める（ADR-013 D2）。
     #[test]
-    fn activity_label_has_no_emitter_until_it_is_wired() {
-        const LIB: &str = include_str!("lib.rs");
-        assert!(
-            !LIB.contains("activity_label_answered(") && !LIB.contains("activity_label_skipped("),
-            "★ `activity_label` の送出元ができた (ADR-031 M5)。
-             → ⚠️ capabilities の宣言を更新すること: 
-             1. `config_gated()` に \"activity_label\" を足す
-             2. `declaration_partitions_known_line_types` の `emitterless` から外す
-             3. 本テストを消す"
+    fn s1_line_types_are_declared_only_in_s1() {
+        assert!(s1_line_types(false).is_empty());
+        assert_eq!(
+            s1_line_types(true),
+            vec![
+                "activity_label",
+                "day_question",
+                "probe_frame",
+                "probe_suppressed"
+            ]
         );
-        // ★ 2026-11-06: 段 1 の 3 行種も同じ（M5 の 2 本目で送出元を作ると赤になり、移しを強制する）。
+        // 送出元が lib.rs に実在する
+        let lib = include_str!("lib.rs");
         for ctor in [
             "LogEntry::ProbeFrame {",
             "LogEntry::ProbeSuppressed {",
             "LogEntry::DayQuestion(",
+            "LogEntry::activity_label_answered(",
+            "LogEntry::activity_label_skipped(",
         ] {
-            assert!(
-                !LIB.contains(ctor),
-                "★ 段 1 の行種の送出元ができた（{ctor}）。→ capabilities の宣言を更新すること: \
-                 `emitterless` から外し、段 1 のときだけ `config_gated` に入れる"
-            );
+            assert!(lib.contains(ctor), "{ctor} の送出元が lib.rs に無い");
         }
-        // ⚠️★★★ **検査が空回りしていないこと** —— ★ 対照として、送出元が実在する行種で
-        //   同じ探し方をすると見つかることを見る (`verify-before-claiming` ルール 5b)。
-        assert!(
-            LIB.contains("LogEntry::InvitationCondition {"),
-            "対照が見つからない"
-        );
-        assert!(
-            LIB.contains("emit_ime_shadow"),
-            "対照が見つからない。★ 探し方が壊れているので、上の assert は何も言っていない"
-        );
+        // 宣言したものには writer がある（過大申告の逆アサート）
+        let in_source = line_types_in_logger_source();
+        for t in s1_line_types(true) {
+            assert!(in_source.contains(t), "{t:?} の writer が logger.rs に無い");
+        }
+        // EH3 の宣言と重ならない（両方が同時に立つことは無いが、宣言の集合としても分ける）
+        for t in s1_line_types(true) {
+            assert!(!eh3_line_types(true).contains(&t), "{t:?} が EH3 と重なる");
+        }
     }
 
     /// ★ ADR-013 D3-2 (OS 対): `ime_shadow` は **両 OS で**宣言される。

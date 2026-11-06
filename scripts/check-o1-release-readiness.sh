@@ -111,6 +111,14 @@ else
   #     呼ぶ側が無ければ 1 行も記録されない** —— ★ それを「計器がある」と読むと、
   #     **記録できない計器のためにゲートが赤くなる**（＝ 偽の赤）。
   #   ★ ADR-013 D2 の「導出元は *送出元があるか* であって writer ではない」と基準を揃える。
+  # ⚠️★★★ 2026-11-07: `grep -v … | grep -q …` を `set -o pipefail` の下で使わない。
+  #   ★ `grep -q` が早く見つけて終わると、前段が SIGPIPE（141）で落ち、パイプ全体が偽になる。
+  #   lib.rs が大きく、送出元が前の方にあると「送出元がまだ無い」と **黙って緑** を出していた
+  #   （M5 の 2 本目で送出元ができて実測で踏んだ）。→ コメントを除いた本文を変数に取り、here-string で渡す。
+  #   ★ 検査のモジュール（最初の列 0 の `#[cfg(test)]` から後ろ）は本番のコードではないので外す
+  #     （`lib.rs` の本文の検査が、探す文字列そのものを持つため）。
+  esm_src=""
+  [ -f "$EMITTER" ] && esm_src=$(sed '/^#\[cfg(test)\]$/,$d' "$EMITTER" | grep -vE '^[[:space:]]*(//|/\*|\*)')
   if [ ! -f "$EMITTER" ]; then
     ng "送出元の判定対象が無い: ${EMITTER}（★ 計器と同意の連動を判定できない）"
   #   ⚠️★★★ **コメント行を除いてから見る**（2026-09-14・`/cross-review` 2 巡目 HIGH-1）。
@@ -121,11 +129,21 @@ else
   #   ★★★ **最後の砦は型である** —— `LogEntry::activity_label_*` は
   #     `o1::EsmConsent`（`activity_label_allowed` からしか作れない）を要求するので、
   #     ⚠️ **門を通さない送出はコンパイルできない**。本検査は二重の網である。
-  elif grep -vE '^[[:space:]]*(//|/\*|\*)' "$EMITTER" | grep -qE 'activity_label_(answered|skipped)\('; then
+  elif grep -qE 'activity_label_(answered|skipped)\(' <<< "$esm_src"; then
+    # ★ 2026-11-07（M5 の 2 本目・decisions 判断 4）: 6 択の送出元は段 1 のために作った。
+    #   同意の門の呼び出しが **すべて** 第 1 引数に段 1 の判定（`crate::s1::is_s1()`）を渡しているなら、
+    #   印の無い O1 は 6 択を出さない（ADR-043 D8）ので、O1 の同意の ESM 追補の承認を求めない。
+    #   ⚠️ 1 か所でも別の引数（`o1::is_o1()` など）を渡せば、今までどおり承認を求める。
+    #   ★ 空白を詰めてから数える（rustfmt が引数を改行で割っても数えられるように）。
+    esm_code=$(tr -d '[:space:]' <<< "$esm_src")
+    esm_all=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(' | wc -l | tr -d ' ')
+    esm_s1=$(printf '%s' "$esm_code" | grep -oF 'activity_label_allowed(crate::s1::is_s1(),' | wc -l | tr -d ' ')
     # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
     #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
     #     *説明文* 自体にヒットして緑になる**（= 承認していないのに配れてしまう）。
-    if grep -qE '^<!-- o1-esm-consent: approved -->[[:space:]]*$' "$CONSENT"; then
+    if [ "${esm_all:-0}" -gt 0 ] && [ "${esm_all}" = "${esm_s1}" ]; then
+      ok "6 択 ESM の送出元は段 1 だけ（同意の門の呼び出し ${esm_all} 件がすべて段 1 の判定・O1 の ESM 追補は不要）"
+    elif grep -qE '^<!-- o1-esm-consent: approved -->[[:space:]]*$' "$CONSENT"; then
       ok "6 択 ESM の送出元がある版で、同意の ESM 追補が承認済み"
     else
       ng "6 択 ESM の送出元があるのに同意の ESM 追補が未承認（★ 注 D ＋ 承認マーカを研究者が入れること）"
@@ -133,7 +151,7 @@ else
     # ⚠️★★★ **送出元があるなら、同意の門を通していなければならない**（ADR-031 M5）。
     #   ★ `o1::activity_label_allowed(o1_mode, consent_approved)` を経由せずに記録すると、
     #     **同意承認と実際の記録が結びつかない穴**になる（★ `/cross-review` の「テスト不足」）。
-    if grep -vE '^[[:space:]]*(//|/\*|\*)' "$EMITTER" | grep -q 'activity_label_allowed('; then
+    if grep -qF 'activity_label_allowed(' <<< "$esm_src"; then
       ok "6 択 ESM の記録が同意の門（activity_label_allowed）を通っている"
     else
       ng "6 択 ESM の送出元が同意の門を通っていない（★ o1::activity_label_allowed を経由すること）"
@@ -230,6 +248,16 @@ else
     ng "O1 の受領台帳のガード検査が赤"
     printf '%s\n' "$out" | grep '^NG' | sed 's/^/       /'   # ★ 原因を画面に出す
   fi
+fi
+
+# ★ 2026-11-07（decisions 判断 4）: O1 の配布物に段 1 の印 `s1.mode` を書き出さない。
+#   ⚠️ 入ると、O1 の参加者の画面に段 1 の問い（6 択）が出る（O1 の同意文書は問いを出さないと約束している）。
+if grep -rqE '>[[:space:]]*"?\$[A-Za-z_]+/s1\.mode"?' \
+     experiments/20260801-controlled-friction-task/make-distribution.sh \
+     experiments/20260801-controlled-friction-task/make-common-app-zip.sh 2>/dev/null; then
+  ng "O1 の配布スクリプトが段 1 の印 s1.mode を書き出す（★ O1 の参加者に段 1 の問いが出る）"
+else
+  ok "O1 の配布スクリプトは段 1 の印 s1.mode を書き出さない"
 fi
 
 # ⚠️★ 限界: **書き込み文**を要求する（コメントに `o1.mode` と書くだけでは緑にしない）。
@@ -847,6 +875,12 @@ selftest () {
   }
 
   local sp=0 sf=0
+  # ★ 2026-11-07: 変異は送出元のファイルの **先頭** に入れる（ゲートは最初の `#[cfg(test)]` から後ろを
+  #   本番のコードとして見ないので、末尾に足すと変異が当たらず空回りする）。
+  prepend_emitter_ () {
+    local f="$fix/w/$EMITTER"
+    { printf '%s\n' "$1"; cat "$f"; } > "$f.tmp" && mv "$f.tmp" "$f"
+  }
   # $1 = 赤くなるはずの行に含まれる語 / $2 = 説明
   expect_red () {
     out=$(bash "$fix/w/scripts/gate.sh" 2>&1)
@@ -888,8 +922,17 @@ selftest () {
   # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
   build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
   # ⚠️★★★ ADR-031: **送出元を足すと、承認が無い限り赤になる**（★ M5 が来た瞬間に門が効く）。
-  build; printf '\nfn wired() { activity_label_answered(); activity_label_allowed(true, true); }\n' >> "$fix/w/$EMITTER"
+  build; prepend_emitter_ 'fn wired() { activity_label_answered(); activity_label_allowed(true, true); }'
   expect_red "同意の ESM 追補が未承認" "計器と同意の連動（送出元あり・未承認）"
+  # ★ 2026-11-07（判断 4）: 6 択の門に O1 の判定を渡す呼び出しが 1 つ混じると、承認を求めて赤に戻る。
+  #   ⚠️ 対照の文字列は実行時に組む（検査対象のファイルに書かない・自己参照の空回りの先例）。
+  o1_gate_arg="crate::o1""::is_o1()"
+  build; prepend_emitter_ "fn wired_o1() { activity_label_allowed(${o1_gate_arg}, true); }"
+  expect_red "同意の ESM 追補が未承認" "6 択の門に O1 の判定（段 1 だけでない）"
+  # ★ O1 の配布スクリプトが段 1 の印を書き出したら赤。
+  s1_marker_line=': > "$M/s1''.mode"'
+  build; printf '\n%s\n' "$s1_marker_line" >> "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"
+  expect_red "段 1 の印 s1.mode を書き出す" "O1 の配布物に s1.mode"
   # ⚠️★★★ 運用管理シート（起票 T-25）—— ★ **3 つの壊し方を別々に撃つ**。
   #   ⚠️ 1 つだけだと「どれか 1 つでも欠けたら赤」なのか「たまたま拾えた」のか分からない。
   build; sed_i 's/function buildO1MgmtSheet/function DISABLED_buildO1MgmtSheet/' "$fix/w/$FORM_BUILDER"
@@ -1060,11 +1103,16 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   build; blank_measure; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
 
   # ⚠️★★★ ADR-031: **送出元 ＋ 承認マーカ ＋ 同意の門がそろうと緑**（★ M5 後の正しい姿）。
-  build; printf '\nfn wired() { activity_label_answered(); activity_label_allowed(true, true); }\n' >> "$fix/w/$EMITTER"
+  build; prepend_emitter_ 'fn wired() { activity_label_answered(); activity_label_allowed(true, true); }'
   printf '\n<!-- o1-esm-consent: approved -->\n' >> "$cons"
   expect_green "同意の ESM 追補が承認済み" "計器と同意の連動（送出元 ＋ 承認）"
+  # ★ 2026-11-07（判断 4）: 段 1 だけの送出元（本物の lib.rs のまま）は、O1 の承認なしで緑。
+  build
+  expect_green "6 択 ESM の送出元は段 1 だけ" "段 1 だけの送出元（O1 の ESM 追補は不要）"
   # ⚠️★★★ **送出元があるのに同意の門を通していないと赤**（★ M5 の穴）。
-  build; printf '\nfn wired() { activity_label_answered(); }\n' >> "$fix/w/$EMITTER"
+  #   ★ 本物の lib.rs は門を通しているので、門の呼び出しを消してから足す。
+  build; sed_i 's/activity_label_allowed(/NOT_THE_GATE_(/g' "$fix/w/$EMITTER"
+  prepend_emitter_ 'fn wired() { activity_label_answered(); }'
   printf '\n<!-- o1-esm-consent: approved -->\n' >> "$cons"
   expect_red "同意の門を通っていない" "送出元はあるが同意の門を通していない"
 

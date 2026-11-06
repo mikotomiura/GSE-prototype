@@ -392,6 +392,24 @@ fn write_s1_probe_consent_at(path: &Path, now_ms: u64) -> Result<(), String> {
     })
 }
 
+/// 段 1 の問いへの本人の同意を取り消す（印のファイルを消す・本タスクの decisions 判断 2）。
+/// ★ 無ければ何もしない（取り消し済みを取り消しても失敗にしない）。
+pub fn remove_s1_probe_consent() -> Result<(), String> {
+    let path = home_dir()
+        .map(|h| h.join(".gse").join(S1_PROBE_CONSENT_FILE_NAME))
+        .ok_or("保存先 (~/.gse) を解決できませんでした。")?;
+    remove_s1_probe_consent_at(&path)
+}
+
+/// `remove_s1_probe_consent` の内側（パスを受け取る・検査用に分けた）。
+fn remove_s1_probe_consent_at(path: &Path) -> Result<(), String> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("同意を取り消せません: {e}")),
+    }
+}
+
 /// G1 参加者 ID を保存する。妥当でない ID は **書かずに** `Err` を返す (fail-closed)。
 pub fn write_g1_participant_id(id: &str) -> Result<(), String> {
     let id = id.trim();
@@ -1113,6 +1131,11 @@ mod tests {
         assert!(!s1_probe_consent_acknowledged_at(&path), "無い間は無効");
         write_s1_probe_consent_at(&path, 1_700_000_000_000).unwrap();
         assert!(s1_probe_consent_acknowledged_at(&path));
+        // 取り消すと無効に戻り、2 度目の取り消しも失敗にしない
+        remove_s1_probe_consent_at(&path).unwrap();
+        assert!(!s1_probe_consent_acknowledged_at(&path));
+        remove_s1_probe_consent_at(&path).unwrap();
+        write_s1_probe_consent_at(&path, 1_700_000_000_000).unwrap();
         let v: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         let keys: Vec<&String> = v.as_object().unwrap().keys().collect();
