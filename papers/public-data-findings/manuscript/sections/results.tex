@@ -28,8 +28,7 @@ degeneracy rule. The writer-equal version gave 0.491 and 0.488 [C-D].
 
   \smallskip
   \parbox{\linewidth}{\footnotesize Note. All four point estimates lie slightly below 0.5; three of the four intervals
-  exclude 0.5. All four intervals also lie inside $0.5 \pm 0.025$ (largest distance of an end from 0.5: 0.0242); this
-  narrower band was found after the data were seen and is not a decision.}
+  exclude 0.5.}
 \end{table}
 
 \begin{figure}
@@ -120,12 +119,12 @@ version was registered as the main one. The event stratum gave 0.495 and 0.496 (
 sensitivity analyses, all equivalent, and the spread over the seed of the control draw (0.488 to 0.494 for the
 Stuck-state probability over 20 seeds) are in Appendix~\ref{app:sensitivity}.
 
-\subsection{The rise in the unmatched comparison was not replicated}
+\subsection{The unmatched comparison did not show a rise beyond the band}
 
 In the secondary comparison of windows within writers (173,511 windows; 45,405 positives; 89\% of stalls had at least one
 positive window), the unmatched AUC was 0.497 (0.491--0.503) for the Stuck-state probability and 0.494 (0.489--0.4997)
 for the friction axis [C-D]. The registered condition for this comparison, a lower bound above 0.55, was not met for
-either signal, so the rise in the unmatched comparison was not replicated. Because the unmatched AUC was not above 0.5,
+either signal, so a rise of the kind that unmatched window-by-window evaluations would show was not replicated. Because the unmatched AUC was not above 0.5,
 the attenuation after re-matching by phase is not interpreted (Appendix~\ref{app:unmatched}). We therefore report only
 the equivalence in the matched comparison and do not contrast it with the unmatched one.
 
@@ -134,13 +133,53 @@ the equivalence in the matched comparison and do not contrast it with the unmatc
 The gate passed for both learners on the holdout: with a known difference added to one quantity so that its own AUC was
 0.580, both learners recovered an interval with a lower bound above 0.55 [C-D]. On the 18 quantities, logistic
 regression reached 0.567 (0.5497--0.578) and gradient boosting 0.540 (0.525--0.558). Both intervals cross 0.55, so the
-main analysis neither established nor excluded an AUC above 0.55; the point estimate of logistic regression lay outside
-the band and that of gradient boosting inside. Applied to the unmatched windows, the same learners gave 0.529 and 0.526,
-lower than in the matched comparison (the windows were built differently from the unmatched comparison above;
-Appendix~\ref{app:learners}). The sensitivity analyses moved in both directions: with the burst threshold set to
-$1 \times \theta$, the lower bound of logistic regression exceeded 0.55 (0.568, 0.5519--0.581), which we do not report as
-the discovery of a difference, whereas dropping the windows with few key presses (3,000 stalls instead of 4,554) brought
-gradient boosting inside the band (0.511). We did not compare the learners with the estimator's signals.
+learners neither established nor excluded an AUC above 0.55. Their sensitivity analyses moved in both directions
+(Appendix~\ref{app:learners}).
+
+\subsection{What bounds the reading of the equivalence}
+\label{sec:res-bounds}
+
+Two explorations, with conditions committed before each computation, address whether the estimator could have shown a
+run-up difference and how its signals compare with the learners.
+
+\paragraph{Positive control of the estimator [E].} On the 319 seen writers, we rebuilt the estimate rows after changing
+the key presses in the 30~s before every stall's $u$, keeping the stalls, controls and draws fixed. Two kinds of change
+were applied at three sizes: the intervals between key presses were multiplied by $k$ (keeping the press at $u$), or a
+backspace and a retyped key were inserted into a share $r$ of the intervals (Table~\ref{tab:poscontrol}). Unchanged, the
+rebuilt rows matched the stored ones in all 1,042 assignments, and the AUC was 0.492 and 0.490. The friction axis left the
+band when the intervals were doubled or when a quarter of them received a correction; the Stuck-state probability left
+it only when the intervals were tripled and did not respond to corrections. The changes needed were large compared with
+the observed difference: in the 30~s before $u$, the median of the mean interval between presses was 598~ms for stalls
+and 605~ms for controls, and the median share of backspaces 0.091 and 0.100. Because the estimator carries its state
+forward, 34--47\% of the drawn controls also changed value, so these AUCs understate the response to the change alone.
+
+\begin{table}
+  \caption{Positive control on the seen CS1 writers [E]: discrimination AUC ($\varepsilon = 0.001$, 95\% interval) after
+  changing the key presses in the 30~s before each stall's $u$. Values outside the band are in bold.}
+  \label{tab:poscontrol}
+  \centering\small
+  \begin{tabular}{l c c}
+    \toprule
+    Change & $\Delta p_{\mathrm{stuck}}$ & $\Delta x$ \\
+    \midrule
+    None & 0.492 (0.485--0.499) & 0.490 (0.483--0.497) \\
+    Intervals $\times 1.5$ & 0.518 (0.511--0.525) & 0.524 (0.517--0.531) \\
+    Intervals $\times 2$ & 0.537 (0.530--0.544) & \textbf{0.564 (0.556--0.572)} \\
+    Intervals $\times 3$ & \textbf{0.562 (0.555--0.569)} & \textbf{0.627 (0.620--0.635)} \\
+    Corrections, $r = 0.1$ & 0.496 (0.490--0.503) & 0.530 (0.524--0.537) \\
+    Corrections, $r = 0.25$ & 0.500 (0.492--0.507) & \textbf{0.562 (0.555--0.569)} \\
+    Corrections, $r = 0.5$ & 0.495 (0.488--0.502) & \textbf{0.563 (0.556--0.571)} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Signals and learners on the same pairs [E-H].} On the holdout's main stratum, we computed the AUC of the
+estimator's four values and of the two learners with the same statistic ($\varepsilon = 0$) on the same pairs, and the
+differences over the learners' 200 resamples of writers (the learners' values and intervals reproduced the confirmatory
+ones exactly). Logistic regression exceeded the 30-second changes by 0.078 (95\% interval 0.057--0.093) and 0.081
+(0.057--0.097), and gradient boosting by 0.051 (0.031--0.073) and 0.054 (0.034--0.076). The levels at $u$ exceeded the
+changes by 0.036 (0.017--0.059) and 0.035 (0.022--0.050), and gradient boosting did not clearly exceed the levels
+(0.015, $-0.007$--0.040, and 0.019, $-0.004$--0.045). These differences are descriptions and do not enter the decision.
 
 \subsection{In the exploration outside the registration, the discrimination AUC also stayed inside the band}
 \label{sec:res-explore}
@@ -149,8 +188,8 @@ After the confirmation we applied the same procedure, with conditions committed 
 (Table~\ref{tab:explore}). In the 31 seen writers of the 2021 CS1 edition, all four combinations were inside the band
 [E]. Matching stalls and controls on three positions at once (after a newline, after a token boundary, within a token)
 in the holdout gave 0.490 and 0.488 [E-H]; stalls were slightly more frequent after a token boundary than controls (53.9\%
-against 50.9\%). The procedure also ran without change on the full essay corpus and on the seen co-writing data
-(Appendix~\ref{app:explore}); in the co-writing data the intervals were too wide to decide, because one or two writers
+against 50.9\%). The procedure also ran on the full essay corpus and, with sessions joined per writer and events around AI suggestions
+removed, on the seen co-writing data (Appendix~\ref{app:explore}); in the co-writing data the intervals were too wide to decide, because one or two writers
 held most pairs.
 
 \begin{table}

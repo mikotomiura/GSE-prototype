@@ -9,7 +9,8 @@ format \cite{edwards2023cs1}. A writer is a student and an assignment is one uni
 30 minutes apart start a new work block. Before any analysis, 146 of the 487 writers were drawn at random as the holdout
 (Appendix~\ref{app:prereg}). Of these, 145 had at least one assignment (one writer had a single checkpoint row and no key
 press), giving 438 assignments; 140 had at least 10 minutes of observation, and 139 had at least one stall paired with
-a control.
+a control. Of the 341 seen writers, 338 had an assignment, 319 had at least 10 minutes of observation and 312 had a stall
+paired with a control; these are the seen writers of the descriptions [D] and of the calibration.
 
 The data record edit events rather than key presses, so the input to the estimator was built by a mapping fixed before
 the study (Appendix~\ref{app:definitions}). An insertion of one character with a recorded key became a key press of that
@@ -27,7 +28,7 @@ the estimator as key presses.
   counted after the confirmatory run; 1,490,503 edit rows). Shares of characters are of all inserted characters.}
   \label{tab:mapping}
   \centering\small
-  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{3.3cm} r r}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.9cm} r r}
     \toprule
     Edit row & Becomes & Rows & Characters \\
     \midrule
@@ -37,7 +38,7 @@ the estimator as key presses.
     Undo or redo & non-text key press (key recorded) or event & 0.46\% & -- \\
     Insertion of whitespace only, no key (automatic indentation) & event & 1.0\% & 4.6\% \\
     Paste & event & 0.37\% & 49.0\% \\
-    Other (cut, drag, checkpoint, other insertions without key) & event or nothing & 0.1\% & $<$0.1\% \\
+    Other (cut, drag, checkpoint, other insertions without key) & event or nothing & 0.11\% & $<$0.1\% \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -53,7 +54,12 @@ $t_0 = s + \theta$, an onset is raised at $t_0$. Here $\theta$ is the 0.99 quant
 intervals so far in the assignment, defined once at least 100 intervals exist; it personalises the moment at which the
 stall starts. We write $u$ for the last character input at or before $t_0$. An onset becomes a \emph{stall} when the
 pause that starts at $u$ lasts at least 30~s, $u$ is earlier than $s$, and condition A is false at $u$ (the writer had
-net production in the preceding 30~s). The 0.99 quantile was inherited from the earlier definition and was not chosen
+net production in the preceding 30~s). A stall is therefore not simply 30~s without character input: condition A must
+first become true and then stay true for $\theta$, so the onset lies well after $u$. In the holdout's main stratum
+[E-H], the onset came a median of 48.5~s after $u$ (10th and 90th percentiles 35.2 and 77.6~s), and the next character
+input a median of 97.2~s after $u$ (78.6\% of stalls lasted 60~s or more). Pauses at the edge of the observation
+rarely mattered: of 9,133 distinct $u$ of onsets, 22 had no later character input in the assignment and 51 had the next
+one in a later work block. The 0.99 quantile was inherited from the earlier definition and was not chosen
 in this study; the 30~s length of a stall and the 2~s lower limit of the controls below are fixed.
 
 What happens inside a pause is not used to match stalls and controls. In the holdout's main stratum
@@ -68,8 +74,8 @@ Section~\ref{sec:intro} over the preceding 30~s. Each quantity is mapped to $[0,
 axis ($0.30$ correction ratio $+ 0.25$ pauses after deletion $+ 0.25$ flight time $+ 0.20$ number of pauses) and an
 engagement axis, whose exponentially smoothed values are quantised into the observations of a three-state hidden Markov
 model updated by the forward algorithm. The designer named the states Flow, Incubation and Stuck; we use only the
-probability of the third and do not interpret the names. All coefficients were set by hand (Section~\ref{sec:intro}),
-and the version used is fixed (Appendix~\ref{app:definitions}). A replay tool re-reads a recorded stream and writes one
+probability of the third and do not interpret the names. All coefficients were set by hand (Section~\ref{sec:intro}) and are listed in
+Appendix~\ref{app:coefficients}; the version used is fixed (Appendix~\ref{app:definitions}). A replay tool re-reads a recorded stream and writes one
 estimate row per second together with the stall onsets.
 
 We use two signals, each taken as the change over 30~s: the \emph{change in the Stuck-state probability}, the
