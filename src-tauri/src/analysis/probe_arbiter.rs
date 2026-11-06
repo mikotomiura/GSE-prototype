@@ -938,6 +938,14 @@ impl Arbiter {
         &mut self.day
     }
 
+    /// 日の問いの状態機械を取り出す（枠を作り直すとき、新しい [`Arbiter::new`] に渡す）。
+    ///
+    /// ★ 出したまま閉じていないカードの覚えと通し番号を引き継ぐ。`DayQuestion::new` で作り直すと
+    ///   通し番号が 1 に戻り、開いているカードの番号とぶつかる。判定の規則は変えない（版は据え置き）。
+    pub fn into_day_question(self) -> DayQuestion {
+        self.day
+    }
+
     /// 1 秒に 1 回進める。順は ① 無作為 → ② 層化 → ③ 日の問い。
     pub fn tick(&mut self, input: &TickInput) -> Vec<Action> {
         let mut out = Vec::new();

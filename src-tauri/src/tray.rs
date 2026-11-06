@@ -192,7 +192,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         .on_menu_event(|app, event| {
             if event.id.as_ref() == MENU_QUIT {
                 tracing::info!("tray: quit requested");
-                crate::shutdown_and_exit(app);
+                // 段 1 では日の終わりの問いを挟みうる（段 1 でなければ今のまま `shutdown_and_exit`）。
+                crate::request_quit(app);
             } else if event.id.as_ref() == MENU_PORTRAIT_STOP {
                 // ⚠️ 選んだことは記録しない（applog にも出さない・R-P9）。
                 crate::stop_portrait_by_person();

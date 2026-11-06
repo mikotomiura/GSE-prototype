@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import S1ConsentPanel from "./S1ConsentPanel";
 
 /**
  * O1（普段の作業の長期記録）で被験者に約束した **3 点セット** の UI。
@@ -444,6 +445,8 @@ const RecordingControls: React.FC = () => {
               )}
             </div>
           )}
+          {/* 段 1: 問いへの同意と取り消し（段 1 でなければ何も出さない・decisions 判断 2）。 */}
+          <S1ConsentPanel />
         </div>
       )}
 

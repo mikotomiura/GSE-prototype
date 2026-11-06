@@ -49,6 +49,10 @@ pub mod recording;
 pub mod redaction;
 // 段 1（ADR-043）の「段 1 モード」判定（OS API 非依存）。★ O1 の上に載せる層（EH3 と同じ作り方）。
 pub mod s1;
+// 段 1 の駆動役の純粋な部分（カードの状態と Action の写し・OS API と Tauri を持たない）。
+pub mod s1_driver;
+// 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
+pub mod s1_day_state;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -661,6 +665,75 @@ impl UtcOffsetCache {
 /// 分析スレッドがこれを見て、新しいファイルにもその日の `eh3_day` 行を出し直す
 /// （ある時刻の条件をファイルの中で読めるようにする。条件は日中に変わらない）。
 static EH3_REEMIT_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// 段 1: O1 のローテートが成立するたびに 1 進める。駆動役が見て、新しいファイルの起点で問いの枠を作り直す
+/// （`probe_frame` を出し直す）。段 1 でなければ誰も読まない。
+static S1_FRAME_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// 段 1: スリープからの復帰の通知の世代（電源の受け口の中継が進め、駆動役が読む）。
+static S1_POWER_RESUMED_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// 段 1 の駆動役の状態（カード・調停器）。★ 駆動スレッドの tick とコマンドが同じロックを取る。
+/// ⚠️ ロックの順は `S1_DRIVER` → `LogState`。`S1_DRIVER` を持ったまま `o1_rotate` を呼ばない
+/// （`o1_rotate` は `O1_ROTATE` → `LogState` を取る）。`None` = 段 1 でない・駆動役がまだ起きていない。
+static S1_DRIVER: Mutex<Option<crate::s1_driver::S1Driver>> = Mutex::new(None);
+
+/// 段 1: 分析スレッドから駆動役へ押下の時刻を送る口（段 1 のときだけ設定される）。
+static S1_PRESS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
+    std::sync::OnceLock::new();
+/// 段 1: observe のドレインから駆動役へ、自分の窓を除いたフォーカスの遷移の時刻を送る口。
+static S1_FOCUS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
+    std::sync::OnceLock::new();
+/// 段 1: 駆動役への入力を落とした数（満杯）。★ 黙って消さない（駆動スレッドが warn に出す）。
+static S1_INPUT_DROPPED: AtomicU64 = AtomicU64::new(0);
+
+/// 段 1: 駆動役へ押下を送る（段 1 でなければ口が無いので何もしない）。
+fn s1_send_press(t_ms: u64) {
+    if let Some(tx) = S1_PRESS_TX.get() {
+        if tx.try_send(t_ms).is_err() {
+            S1_INPUT_DROPPED.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+/// 段 1: 駆動役へフォーカスの遷移を送る。
+fn s1_send_focus(t_ms: u64) {
+    if let Some(tx) = S1_FOCUS_TX.get() {
+        if tx.try_send(t_ms).is_err() {
+            S1_INPUT_DROPPED.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+/// 電源の通知の受け口を 1 本にまとめる（★ `power::start` は 1 回しか登録できず、2 回目は黙って何もしない・
+/// `input/power.rs`）。肖像（EH3）には今と同じ受信端を返し、段 1 には復帰の世代を進める。
+/// ★ `power::start` を呼ぶのは `lib.rs` でここだけ（`power_start_is_called_once` が本文で縛る）。
+fn start_power_hub(
+    portrait: bool,
+    s1: bool,
+) -> Option<crossbeam_channel::Receiver<crate::input::power::PowerEvent>> {
+    use crate::input::power::PowerEvent;
+    if !portrait && !s1 {
+        return None;
+    }
+    let (tx, rx) = crossbeam_channel::bounded::<PowerEvent>(8);
+    crate::input::power::start(tx);
+    if !s1 {
+        return Some(rx);
+    }
+    let (ptx, prx) = crossbeam_channel::bounded::<PowerEvent>(8);
+    thread::spawn(move || {
+        for ev in rx.iter() {
+            if matches!(ev, PowerEvent::Resumed) {
+                S1_POWER_RESUMED_GEN.fetch_add(1, Ordering::AcqRel);
+            }
+            if portrait {
+                let _ = ptx.try_send(ev);
+            }
+        }
+    });
+    portrait.then_some(prx)
+}
 
 /// EH3: 壁紙のスレッドへの指示。
 enum WallCmd {
@@ -1946,6 +2019,768 @@ fn acknowledge_o1_enrollment(participant_id: String) -> Result<(), String> {
     Ok(())
 }
 
+// ===========================================================================
+// 段 1（ADR-043・M5 の 2 本目）: 駆動役の副作用と IPC
+//
+// ★ 判断と状態は純粋な `s1_driver.rs`。ここは `Effect` を行（`LogEntry`）・画面（emit）・状態ファイルに
+//   変えるだけ。6 択（`activity_label`）の行を組むのは、ここの `emit_s1_superseded` と
+//   `record_probe_response`・`record_probe_skip` の 3 か所だけで、どれも同意の門
+//   `o1::activity_label_allowed(s1::is_s1(), s1_probe_consent_acknowledged())` を通す
+//   （`o1::is_o1()` を渡さない・`s1_esm_gate_passes_stage1_not_o1` が本文で縛る）。
+// ===========================================================================
+
+/// 段 1 のトレイの終了の補助で、日の問いの答えを待っているか（2 度目の終了は待たずに終わる）。
+static S1_QUIT_PENDING: AtomicBool = AtomicBool::new(false);
+
+/// 段 1: 駆動役のロックを取る（毒されていても中身を使う）。
+fn s1_driver_lock() -> std::sync::MutexGuard<'static, Option<crate::s1_driver::S1Driver>> {
+    S1_DRIVER.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// 段 1: 今の時差（秒）。★ OS の時刻帯はここで引き、`s1_driver` には秒数だけを渡す。
+fn s1_utc_offset_secs() -> i32 {
+    chrono::Local::now().offset().local_minus_utc()
+}
+
+/// 段 1: `day_question` 行を組む。
+fn s1_day_question_entry(r: crate::s1_driver::DayRowData) -> LogEntry {
+    LogEntry::DayQuestion(crate::logger::DayQuestionRow {
+        timestamp: r.t,
+        shown_ts: r.shown_ts,
+        in_eod_window: r.in_eod_window,
+        target_day: r.target_day,
+        trigger: r.trigger,
+        delayed: r.delayed,
+        answered: r.answered,
+        closed_by: r.closed_by,
+        items_version: crate::logger::DAY_QUESTION_ITEMS_VERSION,
+        motivation: r.motivation,
+        latency_ms: r.latency_ms,
+        duration_ms: r.duration_ms,
+    })
+}
+
+/// 段 1: 差し替えた層化のカードの 2 行（`realtime_label` と `activity_label`・`superseded`）。
+///
+/// ★ 調停器だけが書く値（UI からは受けない・`record_probe_skip` が拒む）。本人の未回答と分ける。
+/// ★ `latency_ms` は 0（本人の操作が無い）。
+fn emit_s1_superseded(log_tx: &Sender<LogEntry>, t: u64, card: &crate::s1_driver::ProbeCard) {
+    let Some(consent) = crate::o1::activity_label_allowed(
+        crate::s1::is_s1(),
+        crate::submission::s1_probe_consent_acknowledged(),
+    ) else {
+        tracing::warn!("stage 1: superseded card not recorded (no consent to the questions)");
+        return;
+    };
+    let probe = ProbeRef::RandomProbe {
+        probe_id: card.probe_id.clone(),
+    };
+    let realtime = LogEntry::realtime_label_skipped(
+        t,
+        &probe,
+        SkipReason::Superseded,
+        0,
+        card.window_start_ms,
+        card.window_end_ms,
+    );
+    let activity = LogEntry::activity_label_skipped(
+        &consent,
+        t,
+        Some(card.probe_id.as_str()),
+        0,
+        card.window_start_ms,
+        card.window_end_ms,
+    );
+    for entry in [realtime, activity] {
+        if let Err(e) = log_tx.try_send(entry) {
+            tracing::warn!("stage 1: superseded row not sent: {}", log_send_error(e));
+        }
+    }
+}
+
+/// 段 1: 駆動役の出来事を実行する。
+///
+/// ★ **`S1_DRIVER` のロックを持ったまま呼ぶ**（`s1_apply_locked` 経由・2026-11-07 /cross-review の両者一致）。
+///   ロックの外で実行すると、取り消しのコマンドが割り込んだ後に問いの行が出うる・状態ファイルの書き込みと
+///   画面への通知の順が入れ替わりうる。中でするのは `try_send`・状態ファイルの書き込み・emit だけで、
+///   `LogState` のロックは取らない（ロックの順 `S1_DRIVER` → `LogState` を崩さない）。
+fn run_s1_effects(
+    app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    effects: Vec<crate::s1_driver::Effect>,
+    view: &crate::s1_driver::S1CardView,
+) -> S1EffectOutcome {
+    use crate::s1_driver::Effect;
+    let mut changed = false;
+    let mut outcome = S1EffectOutcome::default();
+    // ★ 同意を読む（取り消しの後に問いの行を 1 行も出さない・本タスクの判断 2）。
+    let consent = crate::submission::s1_probe_consent_acknowledged();
+    let paused = crate::recording::is_paused();
+    for effect in effects {
+        let is_frame = matches!(effect, Effect::Frame { .. });
+        let entry = match effect {
+            Effect::Frame { .. }
+            | Effect::Suppressed { .. }
+            | Effect::Assigned { .. }
+            | Effect::DayRow(_)
+                if !consent =>
+            {
+                None
+            }
+            // ⚠️ 一時停止の間は行を書けない（ロガーの停止ゲートが落とす）。黙って落とさず診断に残す。
+            //   調停器と状態ファイルの側は進める（答えていない日として翌日の拾い直しの対象になる）。
+            Effect::DayRow(_) if paused => {
+                tracing::info!("stage 1: end-of-day question closed while paused; no row written");
+                None
+            }
+            // ★ 枠の行の時刻は起点（本タスクの判断 1: 本人が同意を押した時刻を消えない行に残さない）
+            Effect::Frame {
+                anchor_ms,
+                frame_seed,
+                config,
+            } => Some(LogEntry::ProbeFrame {
+                timestamp: anchor_ms,
+                frame_seed,
+                anchor_ms,
+                config,
+            }),
+            Effect::Suppressed {
+                t,
+                candidate_ts,
+                stratum,
+                reason,
+            } => Some(LogEntry::ProbeSuppressed {
+                timestamp: t,
+                candidate_ts,
+                stratum: stratum.into(),
+                reason,
+            }),
+            Effect::Assigned {
+                probe_id,
+                scheduled_ts,
+                session_elapsed_ms,
+                stratum,
+            } => Some(LogEntry::ProbeAssignment {
+                probe_id,
+                scheduled_ts,
+                session_elapsed_ms,
+                stratum: stratum.into(),
+            }),
+            Effect::Superseded { t, card } => {
+                emit_s1_superseded(log_tx, t, &card);
+                None
+            }
+            Effect::DayRow(r) => Some(s1_day_question_entry(r)),
+            Effect::CardChanged => {
+                changed = true;
+                None
+            }
+            Effect::SaveDayState(state) => {
+                match crate::s1_day_state::state_path() {
+                    Some(p) => {
+                        match crate::s1_day_state::save(&p, &state) {
+                            Ok(()) => S1_SAVE_WARNED.store(false, Ordering::Relaxed),
+                            Err(e) => {
+                                // ★ 警告は続けて失敗している間は最初の 1 回だけ（毎秒出さない）
+                                if !S1_SAVE_WARNED.swap(true, Ordering::Relaxed) {
+                                    tracing::warn!(
+                                        "stage 1: day state not saved (retrying every tick): {e}"
+                                    );
+                                }
+                                outcome.save_failed = true;
+                            }
+                        }
+                    }
+                    None => {
+                        if !S1_SAVE_WARNED.swap(true, Ordering::Relaxed) {
+                            tracing::warn!("stage 1: day state path (home dir) is unavailable");
+                        }
+                        outcome.save_failed = true;
+                    }
+                }
+                None
+            }
+        };
+        if let Some(entry) = entry {
+            if let Err(e) = log_tx.try_send(entry) {
+                // ★ 枠の行がロガーの満杯で送れなければ、枠を作り直す（以後の行が seed の無い記録にならない
+                //   ように）。受け口が閉じた（ロガーが止まった）ときはやり直さない（毎秒作り直さない）。
+                outcome.frame_failed |=
+                    is_frame && matches!(e, crossbeam_channel::TrySendError::Full(_));
+                tracing::warn!("stage 1: row not sent: {}", log_send_error(e));
+            }
+        }
+    }
+    if changed {
+        if let Err(e) = app.emit("s1_card_state", view) {
+            tracing::warn!("s1_card_state emit failed: {}", e);
+        }
+    }
+    outcome
+}
+
+/// 段 1: 状態ファイルの保存の失敗を警告したか（続けて失敗している間は 1 回だけ出す）。
+static S1_SAVE_WARNED: AtomicBool = AtomicBool::new(false);
+
+/// 段 1: 出来事の実行の結果（駆動役にやり直しを知らせる）。
+#[derive(Debug, Default, Clone, Copy)]
+struct S1EffectOutcome {
+    /// `probe_frame` の行を送れなかった（次の tick で枠を作り直す）。
+    frame_failed: bool,
+    /// 状態ファイルを書けなかった（次の tick で書き直す）。
+    save_failed: bool,
+}
+
+/// 段 1: ロックを持ったまま出来事を実行し、結果を駆動役に返す。`view` を省けば今のカードを送る。
+fn s1_apply_locked(
+    app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    d: &mut crate::s1_driver::S1Driver,
+    fx: Vec<crate::s1_driver::Effect>,
+    view: Option<crate::s1_driver::S1CardView>,
+) {
+    let view = view.unwrap_or_else(|| d.visible_card(crate::recording::is_paused()));
+    let outcome = run_s1_effects(app, log_tx, fx, &view);
+    if outcome.frame_failed {
+        d.forget_frame();
+    }
+    if outcome.save_failed {
+        d.mark_unsaved();
+    }
+}
+
+/// 段 1: 駆動役を動かし、出来事を実行する（コマンドから使う）。
+fn with_s1_driver<R>(
+    app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    f: impl FnOnce(&mut crate::s1_driver::S1Driver) -> (R, Vec<crate::s1_driver::Effect>),
+) -> Option<R> {
+    let mut g = s1_driver_lock();
+    let d = g.as_mut()?;
+    let (r, fx) = f(d);
+    s1_apply_locked(app, log_tx, d, fx, None);
+    Some(r)
+}
+
+/// 段 1: overlay を出す（同意があるときだけ）。★ 先に画面外・1×1 に置いてから `show()` する
+/// （Overlay.tsx の退避の effect が走る前に、透明の窓が Windows で一瞬背後のクリックを奪うのを防ぐ）。
+/// `hide()` は使わない（webview の JS が休眠して状態の通知を取りこぼす・Overlay.tsx D10）。
+fn show_s1_overlay(app: &tauri::AppHandle) {
+    if !crate::s1::is_s1() || !crate::submission::s1_probe_consent_acknowledged() {
+        return;
+    }
+    let Some(win) = app.get_webview_window("overlay") else {
+        tracing::error!("stage 1: overlay window not found");
+        return;
+    };
+    let _ = win.set_position(tauri::PhysicalPosition::new(-20_000, -20_000));
+    let _ = win.set_size(tauri::PhysicalSize::new(1, 1));
+    if let Err(e) = win.show() {
+        tracing::warn!("stage 1: overlay show failed: {e}");
+    }
+}
+
+/// 段 1 の駆動スレッド（1 秒に 1 回）。★ 段 1 のときだけ起こす。
+fn spawn_s1_driver(
+    app: tauri::AppHandle,
+    log_tx: Sender<LogEntry>,
+    press_rx: crossbeam_channel::Receiver<u64>,
+    focus_rx: crossbeam_channel::Receiver<u64>,
+) {
+    use crate::analysis::probe_arbiter::{
+        frame_seed_from_entropy, ArbiterConfig, DayQuestion, DayState,
+    };
+    use crate::analysis::probe_scheduler::ProbeId;
+    use crate::s1_day_state::DayStateLoad;
+    use rand::SeedableRng;
+
+    thread::spawn(move || {
+        tracing::info!("stage 1 driver thread started");
+        let day = match crate::s1_day_state::state_path() {
+            Some(p) => match crate::s1_day_state::load(&p) {
+                DayStateLoad::Fresh => DayQuestion::new(DayState::default()),
+                DayStateLoad::Loaded(s) => DayQuestion::new(s),
+                DayStateLoad::Broken => {
+                    tracing::error!(
+                        "stage 1 day state is unreadable; no end-of-day question this run"
+                    );
+                    DayQuestion::disabled()
+                }
+            },
+            None => {
+                tracing::error!("stage 1 day state path (home dir) is unavailable; no end-of-day question this run");
+                DayQuestion::disabled()
+            }
+        };
+        let mut offset = UtcOffsetCache::new();
+        let env_now = |offset: &mut UtcOffsetCache| {
+            let wall = epoch_ms();
+            crate::s1_driver::TickEnv {
+                wall_ms: wall,
+                utc_offset_secs: offset.get(wall),
+                paused: crate::recording::is_paused(),
+                pause_epoch: crate::recording::pause_epoch(),
+                power_gen: S1_POWER_RESUMED_GEN.load(Ordering::Acquire),
+            }
+        };
+        {
+            let env = env_now(&mut offset);
+            *s1_driver_lock() = Some(crate::s1_driver::S1Driver::new(day, &env));
+        }
+        // ★ probe_id の乱数は候補の乱数と別（1 本目の判断 5）
+        let mut id_rng = rand::rngs::StdRng::from_entropy();
+        let mut last_dropped = 0u64;
+        loop {
+            thread::sleep(Duration::from_millis(1000));
+            if is_shutting_down() {
+                tracing::info!("stage 1 driver thread stopping (shutdown)");
+                return;
+            }
+            let env = env_now(&mut offset);
+            {
+                let mut g = s1_driver_lock();
+                let Some(d) = g.as_mut() else { continue };
+                // ★ ロックを取った直後にもう一度見る（`shutdown` が日の問いの行を書いて `End` を送った後に、
+                //   tick の行を `End` の後ろへ送らないように）
+                if is_shutting_down() {
+                    return;
+                }
+                for t in press_rx.try_iter() {
+                    d.push_press(t);
+                }
+                for t in focus_rx.try_iter() {
+                    d.push_focus(t);
+                }
+                let mut fx = Vec::new();
+                // ★ 同意・起点・世代はロックの中で読む（取り消しのコマンドと競らない）
+                let consent = crate::submission::s1_probe_consent_acknowledged();
+                if !consent && d.is_active() {
+                    fx.extend(d.revoke());
+                }
+                let anchor = O1_LOG_OPENED_MS.load(Ordering::Acquire);
+                let gen = S1_FRAME_GEN.load(Ordering::Acquire);
+                // ★ 一時停止の間は枠を作らない（`probe_frame` が停止ゲートで落ち、世代が一致したまま
+                //   出し直されなくなる・2026-11-07 security-checker MEDIUM）。
+                if consent && anchor != 0 && !env.paused && d.frame_gen() != Some(gen) {
+                    let seed = frame_seed_from_entropy(rand::random());
+                    tracing::info!("stage 1 frame: seed={seed} anchor_ms={anchor} gen={gen}");
+                    // ★ 枠の行はこの回の他の行より先に、単独で送る。送れなければこの秒は調停器を回さず、
+                    //   次の秒に枠を作り直す（同じ回の後ろの行が seed の無い記録にならないように・
+                    //   2026-11-07 /cross-review 2 巡目の両者一致）。
+                    let mut frame_fx = std::mem::take(&mut fx);
+                    frame_fx.extend(d.start_frame(gen, anchor, seed, ArbiterConfig::default()));
+                    let view = d.visible_card(env.paused);
+                    let outcome = run_s1_effects(&app, &log_tx, frame_fx, &view);
+                    if outcome.save_failed {
+                        d.mark_unsaved();
+                    }
+                    if outcome.frame_failed {
+                        d.forget_frame();
+                        continue;
+                    }
+                }
+                fx.extend(d.tick(&env, &mut || {
+                    ProbeId::generate(&mut id_rng).as_str().to_string()
+                }));
+                s1_apply_locked(&app, &log_tx, d, fx, None);
+            }
+            let dropped = S1_INPUT_DROPPED.load(Ordering::Relaxed);
+            if dropped != last_dropped {
+                tracing::warn!("stage 1: {} input events dropped (channel full)", dropped);
+                last_dropped = dropped;
+            }
+        }
+    });
+}
+
+/// 段 1: 一時停止を押した（★ `set_paused` の前に呼ぶ）。カードを伏せ、時間帯の中なら再開の直後に尋ねる予約をする。
+fn s1_on_pause_requested(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>) {
+    if !crate::s1::is_s1() {
+        return;
+    }
+    let wall = epoch_ms();
+    let off = s1_utc_offset_secs();
+    let mut g = s1_driver_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.on_pause_requested(wall, off);
+    // ★ 止めた後なので画面は空にする
+    s1_apply_locked(app, log_tx, d, fx, Some(crate::s1_driver::S1CardView::None));
+}
+
+/// 段 1: 終了の直前（`End` の前）に、開いている日の問いの行を書く（★ どの終了経路でも `shutdown` が呼ぶ）。
+fn s1_finish_before_end(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>) {
+    if !crate::s1::is_s1() {
+        return;
+    }
+    let wall = epoch_ms();
+    let mut g = s1_driver_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.finish_before_end(wall);
+    s1_apply_locked(app, log_tx, d, fx, Some(crate::s1_driver::S1CardView::None));
+}
+
+/// トレイの「終了」。★ 段 1 で日の問いの時間帯の中なら、日の問いを「答えて終了／答えずに終了」で出し、
+/// 押されるか 60 秒で終わる（計画の判断 10）。段 1 でなければ今のまま終わる。
+pub(crate) fn request_quit(app: &tauri::AppHandle) {
+    if !crate::s1::is_s1() || S1_QUIT_PENDING.swap(true, Ordering::SeqCst) {
+        // ★ 2 度目のトレイの終了は待たずに終わる（開いている日の問いは `shutdown` が `quit` で書く）
+        shutdown_and_exit(app);
+        return;
+    }
+    let log_tx = app
+        .state::<Arc<Mutex<LogState>>>()
+        .inner()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone_log_tx();
+    let wall = epoch_ms();
+    let off = s1_utc_offset_secs();
+    let asked = with_s1_driver(app, &log_tx, |d| {
+        d.on_quit(wall, off, crate::recording::is_paused())
+    })
+    .unwrap_or(false);
+    if !asked {
+        shutdown_and_exit(app);
+        return;
+    }
+    tracing::info!("stage 1: asking the end-of-day question before quitting");
+    show_s1_overlay(app);
+    let app = app.clone();
+    thread::spawn(move || {
+        let deadline = epoch_ms() + crate::s1_driver::EOD_QUIT_WAIT_MS;
+        while epoch_ms() < deadline {
+            if is_shutting_down() {
+                return;
+            }
+            thread::sleep(Duration::from_millis(250));
+        }
+        tracing::info!("stage 1: no answer within the wait; quitting");
+        shutdown_and_exit(&app);
+    });
+}
+
+#[derive(serde::Serialize)]
+struct S1ModeDto {
+    /// 段 1 モードか。
+    s1: bool,
+    /// 問いへの本人の同意の印があるか。
+    consent: bool,
+}
+
+/// 段 1 か・問いへの同意があるか（登録の画面と overlay が起動時に読む）。
+#[tauri::command]
+fn get_s1_mode() -> S1ModeDto {
+    let s1 = crate::s1::is_s1();
+    S1ModeDto {
+        s1,
+        consent: s1 && crate::submission::s1_probe_consent_acknowledged(),
+    }
+}
+
+/// 段 1: いま出すカード（画面の取り直し用）。
+#[tauri::command]
+fn get_s1_card() -> crate::s1_driver::S1CardView {
+    if !crate::s1::is_s1() {
+        return crate::s1_driver::S1CardView::None;
+    }
+    s1_driver_lock()
+        .as_ref()
+        .map_or(crate::s1_driver::S1CardView::None, |d| {
+            d.visible_card(crate::recording::is_paused())
+        })
+}
+
+/// 段 1: 問いへの本人の同意（ADR-043 D7）。★ 記録の途中なら O1 のローテートを 1 回起こし、
+/// 新しいファイルの起点で枠を作らせる（本タスクの判断 6）。ローテートを先に済ませてから印を書く
+/// （印を先に書くと、駆動役が古い起点で枠を作り、溜まった候補を判定しうる）。
+#[tauri::command]
+fn acknowledge_s1_probe_consent(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    engine: State<'_, CognitiveStateEngine>,
+    reset_signal: State<'_, ResetSignal>,
+) -> Result<(), String> {
+    if !crate::s1::is_s1() {
+        return Err("この画面はこの記録では使いません。".to_string());
+    }
+    if !crate::submission::s1_probe_consent_acknowledged() {
+        o1_rotate(
+            &log,
+            &engine,
+            &reset_signal,
+            O1Declaration::KeepCurrent,
+            "stage 1 probe consent",
+        )?;
+        crate::submission::write_s1_probe_consent(epoch_ms())?;
+        tracing::info!("stage 1: consent to the questions acknowledged");
+    }
+    show_s1_overlay(&app);
+    Ok(())
+}
+
+/// 段 1: 問いへの同意を取り消す（本タスクの判断 2）。★ 開いているカードは行を書かずに下ろし、以後の行は 0。
+#[tauri::command]
+fn revoke_s1_probe_consent(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    if !crate::s1::is_s1() {
+        return Err("この画面はこの記録では使いません。".to_string());
+    }
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    // ★ 印を消すのと駆動役を止めるのを同じロックの中で（駆動スレッドが間に枠を作り直さない）
+    let res = {
+        let mut g = s1_driver_lock();
+        let res = crate::submission::remove_s1_probe_consent();
+        if let (true, Some(d)) = (res.is_ok(), g.as_mut()) {
+            let fx = d.revoke();
+            s1_apply_locked(
+                &app,
+                &log_tx,
+                d,
+                fx,
+                Some(crate::s1_driver::S1CardView::None),
+            );
+        }
+        res
+    };
+    if res.is_ok() {
+        tracing::info!("stage 1: consent to the questions revoked");
+    }
+    res
+}
+
+/// 段 1 のコマンドの共通の門（段 1・一時停止でない）。
+fn s1_answer_gate() -> Result<(), String> {
+    if !crate::s1::is_s1() {
+        return Err("この画面はこの記録では使いません。".to_string());
+    }
+    if crate::recording::is_paused() {
+        return Err("記録を止めているあいだは回答を記録できません。".to_string());
+    }
+    Ok(())
+}
+
+/// 段 1 のプローブへの回答（3 問を 1 枚: 摩擦・前進・6 択）。★ `realtime_label` と `activity_label` を同じ `probe_id` で 2 行。
+#[tauri::command]
+fn record_probe_response(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    probe_id: String,
+    q1_friction: u8,
+    q2_progress: u8,
+    category: String,
+    latency_ms: u64,
+) -> Result<(), String> {
+    s1_answer_gate()?;
+    // ★ 目盛りの外は丸めずに拒む（日の問いの `motivation` と扱いをそろえる）
+    if !(1..=5).contains(&q1_friction) || !(1..=5).contains(&q2_progress) {
+        return Err(format!("invalid scale: q1={q1_friction} q2={q2_progress}"));
+    }
+    let category = crate::logger::ActivityCategory::parse(&category)
+        .ok_or_else(|| format!("invalid category: {:?}", category))?;
+    let consent = crate::o1::activity_label_allowed(
+        crate::s1::is_s1(),
+        crate::submission::s1_probe_consent_acknowledged(),
+    )
+    .ok_or_else(|| "問いへの同意がありません。".to_string())?;
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    let now = epoch_ms();
+    with_s1_driver(&app, &log_tx, |d| {
+        let Some(card) = d.probe_card(&probe_id).cloned() else {
+            return (
+                Err("このカードはもう閉じています。".to_string()),
+                Vec::new(),
+            );
+        };
+        let probe = ProbeRef::RandomProbe {
+            probe_id: card.probe_id.clone(),
+        };
+        let realtime = LogEntry::realtime_label_answered(
+            now,
+            &probe,
+            q1_friction,
+            q2_progress,
+            latency_ms,
+            card.window_start_ms,
+            card.window_end_ms,
+        );
+        // ★ 1 行目が送れなければカードを残す（再押下でやり直せる）
+        if let Err(e) = log_tx.try_send(realtime) {
+            return (Err(log_send_error(e)), Vec::new());
+        }
+        let activity = LogEntry::activity_label_answered(
+            &consent,
+            now,
+            Some(card.probe_id.as_str()),
+            category,
+            latency_ms,
+            card.window_start_ms,
+            card.window_end_ms,
+        );
+        // ⚠️ 2 行目が送れなくてもカードは閉じる（やり直すと 1 行目が二重になる）
+        let res = log_tx.try_send(activity).map_err(log_send_error);
+        (res, d.close_probe(&card.probe_id))
+    })
+    .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
+}
+
+/// 段 1 のプローブを答えずに閉じる（`dont_remember`・`dismissed` だけ。`superseded` は調停器だけが書く）。
+#[tauri::command]
+fn record_probe_skip(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    probe_id: String,
+    skip_reason: String,
+    latency_ms: u64,
+) -> Result<(), String> {
+    s1_answer_gate()?;
+    let reason = match SkipReason::parse(&skip_reason) {
+        Some(r @ (SkipReason::DontRemember | SkipReason::Dismissed)) => r,
+        _ => return Err(format!("invalid skip_reason: {:?}", skip_reason)),
+    };
+    let consent = crate::o1::activity_label_allowed(
+        crate::s1::is_s1(),
+        crate::submission::s1_probe_consent_acknowledged(),
+    )
+    .ok_or_else(|| "問いへの同意がありません。".to_string())?;
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    let now = epoch_ms();
+    with_s1_driver(&app, &log_tx, |d| {
+        let Some(card) = d.probe_card(&probe_id).cloned() else {
+            return (
+                Err("このカードはもう閉じています。".to_string()),
+                Vec::new(),
+            );
+        };
+        let probe = ProbeRef::RandomProbe {
+            probe_id: card.probe_id.clone(),
+        };
+        let realtime = LogEntry::realtime_label_skipped(
+            now,
+            &probe,
+            reason,
+            latency_ms,
+            card.window_start_ms,
+            card.window_end_ms,
+        );
+        if let Err(e) = log_tx.try_send(realtime) {
+            return (Err(log_send_error(e)), Vec::new());
+        }
+        let activity = LogEntry::activity_label_skipped(
+            &consent,
+            now,
+            Some(card.probe_id.as_str()),
+            latency_ms,
+            card.window_start_ms,
+            card.window_end_ms,
+        );
+        let res = log_tx.try_send(activity).map_err(log_send_error);
+        (res, d.close_probe(&card.probe_id))
+    })
+    .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
+}
+
+/// 段 1 の日の終わりの問い（答える・閉じる）。`motivation` が 1..5 なら答えた、`None` なら閉じた
+/// （終了の補助のカードなら `quit`）。★ 終了の補助のカードなら、書いた後に終了する。
+#[tauri::command]
+fn record_day_question(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    card_id: u64,
+    motivation: Option<u8>,
+    latency_ms: Option<u64>,
+    duration_ms: Option<u64>,
+) -> Result<(), String> {
+    use crate::analysis::probe_arbiter::DayClosedBy;
+    s1_answer_gate()?;
+    if motivation.is_some_and(|m| !(1..=5).contains(&m)) {
+        return Err(format!("invalid motivation: {:?}", motivation));
+    }
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    let now = epoch_ms();
+    let (res, quit) = with_s1_driver(&app, &log_tx, |d| {
+        let Some(card) = d.day_card().filter(|c| c.card_id == card_id) else {
+            return (
+                (Err("このカードはもう閉じています。".to_string()), false),
+                Vec::new(),
+            );
+        };
+        let closed_by = match (motivation, card.quit_flow) {
+            (Some(_), _) => DayClosedBy::Answer,
+            (None, true) => DayClosedBy::Quit,
+            (None, false) => DayClosedBy::Dismiss,
+        };
+        let Some(row) =
+            d.day_row_for_close(card_id, now, motivation, closed_by, latency_ms, duration_ms)
+        else {
+            return (
+                (Err("このカードはもう閉じています。".to_string()), false),
+                Vec::new(),
+            );
+        };
+        if let Err(e) = log_tx.try_send(s1_day_question_entry(row)) {
+            return ((Err(log_send_error(e)), false), Vec::new());
+        }
+        (
+            (Ok(()), card.quit_flow),
+            d.commit_day_close(card_id, row.answered),
+        )
+    })
+    .unwrap_or_else(|| (Err("段 1 の駆動役が動いていません。".to_string()), false));
+    if res.is_ok() && quit {
+        let app = app.clone();
+        thread::spawn(move || shutdown_and_exit(&app));
+    }
+    res
+}
+
+/// デバッグ用（`GSE_DEBUG=1` のときだけ）: 段 1 のプローブのカードを出す（画面の確かめ用）。
+/// `stratum` は `random`・`low_operation_end`・`resumption`。★ 調停器の外で出すので、照合の対象ではない。
+#[tauri::command]
+fn debug_force_s1_probe(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    stratum: String,
+) -> Result<(), String> {
+    use crate::analysis::probe_arbiter::Stratum;
+    use crate::analysis::probe_scheduler::ProbeId;
+    use rand::SeedableRng;
+    ensure_debug_enabled()?;
+    s1_answer_gate()?;
+    let stratum = match stratum.as_str() {
+        "random" => Stratum::Random,
+        "low_operation_end" => Stratum::LowOperationEnd,
+        "resumption" => Stratum::Resumption,
+        _ => return Err(format!("invalid stratum: {:?}", stratum)),
+    };
+    let now = epoch_ms();
+    let probe_id = ProbeId::generate(&mut rand::rngs::StdRng::seed_from_u64(now))
+        .as_str()
+        .to_string();
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    with_s1_driver(&app, &log_tx, |d| {
+        ((), d.debug_show_probe(now, stratum, probe_id))
+    })
+    .ok_or_else(|| "段 1 の駆動役が動いていません。".to_string())
+}
+
+/// デバッグ用（`GSE_DEBUG=1` のときだけ）: 段 1 の日の問いのカードを出す。
+#[tauri::command]
+fn debug_force_s1_day_question(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    delayed: bool,
+) -> Result<(), String> {
+    ensure_debug_enabled()?;
+    s1_answer_gate()?;
+    let now = epoch_ms();
+    let off = s1_utc_offset_secs();
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    with_s1_driver(&app, &log_tx, |d| ((), d.debug_show_day(now, off, delayed)))
+        .ok_or_else(|| "段 1 の駆動役が動いていません。".to_string())
+}
+
 /// ⚠️★★★ O1 の**ローテート 1 回**を実行する (宣言の変更 / 日次ローテートの共通経路)。
 ///
 /// ★ ADR-016 **判断 4b-1** が要求する 3 点を **1 アクションで**行う:
@@ -2026,6 +2861,8 @@ fn o1_rotate(
         .map_err(log_send_error)?;
     // EH3: 新しいファイルにもその日の条件の行を出し直させる（EH3 でなければ誰も読まない）。
     EH3_REEMIT_GEN.fetch_add(1, Ordering::AcqRel);
+    // 段 1: 新しいファイルの起点で問いの枠を作り直させる（段 1 でなければ誰も読まない）。
+    S1_FRAME_GEN.fetch_add(1, Ordering::AcqRel);
 
     // ⚠️★★ **ローテートはここで成立している。** ★ 基準を先に引き直す ——
     //   引き直さないと、下の `SessionMeta` が落ちたときに日次スレッドが 60 秒ごとに
@@ -2123,13 +2960,22 @@ fn declare_task_kind(
 /// ⚠️ 「止める」方向の行は **`set_paused` の前**に送る —— ★ 後に送ると自分自身が
 /// 一時停止ゲートに落ちて、**止めた事実が記録されない**。
 #[tauri::command]
-fn set_recording_paused(paused: bool, log: State<Arc<Mutex<LogState>>>) -> bool {
+fn set_recording_paused(
+    app: tauri::AppHandle,
+    paused: bool,
+    log: State<Arc<Mutex<LogState>>>,
+) -> bool {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
     // ★ 先に「遷移するのか」を知る必要があるが、⚠️ 判定と適用の間に別スレッドが
     //   割り込む経路は無い (UI からの単一コマンド) ので `swap` 1 回で足りる。
+    // 段 1: 止める方向は `set_paused` の前にカードを伏せる（止めた後は行を書けない）。
+    if paused && !crate::recording::is_paused() {
+        let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+        s1_on_pause_requested(&app, &log_tx);
+    }
     let previous = crate::recording::set_paused(paused);
     if previous != paused {
         // ⚠️ `recording_pause` は `is_writable_while_paused` が通す行種なので、
@@ -3893,6 +4739,11 @@ fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>) {
     tracing::info!("shutdown requested");
     // 通常のモードの招待: 終了の処理で許可と図像を下ろす（提示中に終了して再開しても引き継がない）。
     close_normal_invitation();
+    // 段 1: 開いている日の問いを `End` の前に `closed_by = quit` で書く（どの終了経路でも）。
+    {
+        let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+        s1_finish_before_end(app, &log_tx);
+    }
     // EH3: 肖像の「終わり」（A-seed なら seed）を書いてから `End` を送る。待ち合わせはこの関数を呼んだ
     //   スレッド（メインのことがある）ではなく、下のバックグラウンドのスレッドで行う。
     let portrait_end = crate::eh3::is_eh3() && WALL_TX.get().is_some();
@@ -4192,13 +5043,12 @@ pub fn run() {
         crate::s1::resolve_with_eh3(s1_detected, o1_source.is_some(), eh3_detected);
     crate::s1::set_mode(s1_mode);
     if let Some(src) = s1_mode {
-        // ⚠️ 2026-11-06（M5 の 1 本目）時点では、問いを出す駆動役はまだ無い（M5 の 2 本目）。
-        //   印があればモードは立ち `meta` に `s1_mode` が刻まれるが、問いは出ない。
-        //   → 駆動役を作るときにこの文を「問いを出す」に改める（2026-11-06 code-reviewer MEDIUM）。
+        // ★ 駆動役（M5 の 2 本目）が問いを出す。出すのは本人が問いに同意した後だけ。
         tracing::warn!(
-            "STAGE 1 MODE ENABLED (source={}): this build records the mode only; the probe and \
-             end-of-day question driver is NOT wired yet (M5 part 2). Nudge and invitations stay OFF.",
-            src.as_str()
+            "STAGE 1 MODE ENABLED (source={}): probes and the end-of-day question are shown once \
+             the participant consents to the questions (consent={}). Nudge and invitations stay OFF.",
+            src.as_str(),
+            crate::submission::s1_probe_consent_acknowledged()
         );
     }
     let eh3_mode = crate::eh3::resolve(eh3_kept, o1_source.is_some());
@@ -4283,6 +5133,7 @@ pub fn run() {
     let log_tx_ime_poll = log_tx.clone();
     let log_tx_for_monitor = log_tx.clone();
     let log_tx_probe = log_tx.clone();
+    let log_tx_s1 = log_tx.clone();
     let log_tx_g1 = log_tx.clone();
     let log_tx_liveness = log_tx.clone();
     // ★ O1 (R3-a): 非打鍵チャネルのドレインスレッド用。
@@ -4366,11 +5217,8 @@ pub fn run() {
         let mut eh3_reemit_gen = EH3_REEMIT_GEN.load(Ordering::Acquire);
         // EH3: 肖像の層（壁紙）。スリープの通知は肖像の終わりと始まりにだけ使う（記録しない）。
         let mut portrait = crate::eh3::assignment().map(PortraitRunner::new);
-        let power_rx = portrait.as_ref().map(|_| {
-            let (tx, rx) = crossbeam_channel::bounded::<crate::input::power::PowerEvent>(8);
-            crate::input::power::start(tx);
-            rx
-        });
+        // ★ 受け口は 1 本（肖像と段 1 は同時に立たないが、それに頼らない形にする）。
+        let power_rx = start_power_hub(portrait.is_some(), crate::s1::is_s1());
         if let Some((a, tracker)) = eh3_days.as_mut() {
             let now = now_ms();
             let off = utc_offset.get(now);
@@ -4469,6 +5317,8 @@ pub fn run() {
                     is_press: k.is_press,
                 });
                 if k.is_press && !crate::recording::is_paused() {
+                    // 段 1: 特徴量に流れる押下だけを駆動役へ（段 1 でなければ口が無く何もしない）。
+                    s1_send_press(k.timestamp);
                     if let Some((a, tracker)) = eh3_days.as_mut() {
                         let off = utc_offset.get(k.timestamp);
                         if let Some(d) = tracker.on_press(k.timestamp, off, a) {
@@ -5008,7 +5858,9 @@ pub fn run() {
             // ★ ドレインスレッド: 観測 → `LogEntry`。⚠️ 判断も集計もしない (そのまま流すだけ)。
             let log_tx_observe = log_tx_for_observe;
             // EH3: GSE 自身の窓への遷移と、そこから戻る遷移は記録しない（判断 6 #3）。O1 では従来どおり。
-            let eh3_focus_filter = crate::eh3::is_eh3();
+            // 段 1 も同じ（カードを押したこと自体が層化の `resumption` の引き金にならないように。
+            //   行に残る遷移と駆動役が見る遷移を一致させる・計画の design §1）。
+            let eh3_focus_filter = crate::eh3::is_eh3() || crate::s1::is_s1();
             // 起動の直後は前面がどこか分からないので、最初の 1 本は GSE からの遷移かもしれないとみなす。
             // 観測を落としたとき（チャネルが満杯）も同じく分からなくなるので、次の 1 本を出さない。
             let mut last_focus_own = eh3_focus_filter;
@@ -5032,6 +5884,10 @@ pub fn run() {
                                 // ⚠️ 送れなくても**待たない** (★ ログが詰まって観測が滞留するのを避ける)。
                                 let _ = log_tx_observe
                                     .try_send(LogEntry::FocusTransition { timestamp: ev.t });
+                                // 段 1: 行と同じ遷移を駆動役へ（一時停止の間は行が落ちるので送らない）。
+                                if !crate::recording::is_paused() {
+                                    s1_send_focus(ev.t);
+                                }
                             }
                         }
                         Err(_) => break,
@@ -5723,20 +6579,25 @@ pub fn run() {
                 // EH3: ESM と日誌はアプリの外で取るので、アプリに通知の経路を作らない
                 //   （`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 3 #3）。
                 let disabled_by_eh3 = crate::eh3::is_eh3();
-                let probes_disabled = disabled_by_env || disabled_by_g1.is_some() || disabled_by_eh3;
+                // 段 1: 問いは段 1 の駆動役（`s1_driver`）が出す。今のスレッドは起こさない。
+                let disabled_by_s1 = crate::s1::is_s1();
+                let probes_disabled =
+                    disabled_by_env || disabled_by_g1.is_some() || disabled_by_eh3 || disabled_by_s1;
                 if probes_disabled {
                     // ★ 実施ログに必ず 1 行残す。実機で「止まっているつもり」を防ぐ番兵であり、
                     // 実施後の客観検証は NDJSON 側 (probe_assignment 行 0) で行う。
                     tracing::warn!(
-                        "probe scheduler DISABLED (env={}, g1_mode={:?}, eh3={}) \
+                        "probe scheduler DISABLED (env={}, g1_mode={:?}, eh3={}, s1={}) \
                          (G1 controlled-friction experiment, preregistration.md 2.6 / 5.4; \
-                         or EH3, where ESM and diaries are collected outside the app). \
+                         or EH3, where ESM and diaries are collected outside the app; \
+                         or stage 1, where the stage-1 driver asks instead). \
                          No scheduled probe_assignment / probe_triggered will be produced. \
                          NOTE: the self-marker hotkey is user-initiated and is NOT gated here; \
                          G1 forbids pressing it (protocol.md).",
                         disabled_by_env,
                         disabled_by_g1,
-                        disabled_by_eh3
+                        disabled_by_eh3,
+                        disabled_by_s1
                     );
                 }
                 let app_handle = app.handle().clone();
@@ -5868,6 +6729,25 @@ pub fn run() {
                 } // if !probes_disabled
             }
 
+            // 段 1（ADR-043・M5 の 2 本目）: 問いの駆動スレッド。★ 段 1 のときだけ起こす
+            //   （EH3 と同時には立たない・`s1::resolve_with_eh3`）。`GSE_DISABLE_PROBES` は見ない
+            //   （Windows の自動起動は launcher を通らず env が乗らないので、尊重すると手で起動した日と
+            //   自動起動の日で問いの有無が割れる・計画の判断 6）。止めるときは `s1.mode` を外す。
+            if crate::s1::is_s1() {
+                if crate::analysis::probe_scheduler::probes_disabled_by_env(
+                    std::env::var("GSE_DISABLE_PROBES").ok().as_deref(),
+                ) {
+                    tracing::warn!(
+                        "GSE_DISABLE_PROBES is set but IGNORED in stage 1 (remove s1.mode to stop the questions)"
+                    );
+                }
+                let (press_tx, press_rx) = crossbeam_channel::bounded::<u64>(1024);
+                let (focus_tx, focus_rx) = crossbeam_channel::bounded::<u64>(256);
+                let _ = S1_PRESS_TX.set(press_tx);
+                let _ = S1_FOCUS_TX.set(focus_tx);
+                spawn_s1_driver(app.handle().clone(), log_tx_s1, press_rx, focus_rx);
+            }
+
             // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
             // macOS: Cmd+Shift+Option+F/I/S、Windows/Linux: Ctrl+Shift+Alt+F/I/S。
             // 失敗は warn に落として起動を継続する(録画ラベリングなしでも運用可)。
@@ -5934,7 +6814,8 @@ pub fn run() {
                     tracing::info!("Overlay window pre-created (hidden)");
                     // EH3: 画面共有・録画からの受動的除外（共有の状態は検出しない・ADR-026 PC-8 / R-I11）。
                     //   ⚠️ 削減であって遮断ではない（仮想カメラ・物理撮影は防げない）。
-                    if crate::eh3::is_eh3() {
+                    // 段 1 も同じ（6 択のカードが画面共有に映ると、研究に参加していることが相手に見える）。
+                    if crate::eh3::is_eh3() || crate::s1::is_s1() {
                         if let Err(e) = w.set_content_protected(true) {
                             tracing::warn!("overlay content protection could not be set: {}", e);
                         }
@@ -5988,6 +6869,10 @@ pub fn run() {
                     tracing::error!("Failed to convert overlay to NSPanel: {}", e);
                 }
             }
+
+            // 段 1: 問いに同意していれば overlay を出す（NSPanel 化の後・画面外 1×1 に置いてから）。
+            //   ★ O1 は `start_session` を押さないので、今は overlay が一度も `show()` されない。
+            show_s1_overlay(app.handle());
 
             // ★★ 常駐トレイ。⚠️ **窓を閉じると UI ごと消えるのに計測は生きている**という穴を塞ぐ
             //   (`tray.rs` のモジュールコメント参照)。★ 失敗しても起動は止めない
@@ -6069,6 +6954,16 @@ pub fn run() {
             record_session_meta,
             record_realtime_answer,
             record_realtime_skip,
+            // 段 1（M5 の 2 本目）
+            get_s1_mode,
+            get_s1_card,
+            acknowledge_s1_probe_consent,
+            revoke_s1_probe_consent,
+            record_probe_response,
+            record_probe_skip,
+            record_day_question,
+            debug_force_s1_probe,
+            debug_force_s1_day_question,
             record_self_marker,
             record_vignette_response,
         ])
@@ -6972,5 +7867,129 @@ mod invitation_reset_tests {
             assert!(!out.triggered && !out.presented, "{s}");
         }
         assert!(fresh.tick(&input(resume + 30_000, 0.9)).presented);
+    }
+}
+
+/// 段 1（M5 の 2 本目）の本文の検査。★ `lib.rs` の本番のコード（最初の `#[cfg(test)]` より前・
+/// コメントでない行）だけを見る（検査の文字列そのものに当たって空回りしないように）。
+#[cfg(test)]
+mod s1_driver_wiring_tests {
+    fn production_code() -> String {
+        // ★ Windows の checkout は改行が CRLF になりうる（autocrlf）ので、LF にそろえてから切る
+        let lib = include_str!("lib.rs").replace("\r\n", "\n");
+        let end = lib.find("\n#[cfg(test)]\n").expect("test module marker");
+        lib[..end]
+            .lines()
+            .filter(|l| {
+                let t = l.trim_start();
+                !(t.starts_with("//") || t.starts_with("/*") || t.starts_with('*'))
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn squash(s: &str) -> String {
+        s.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    /// 引き継ぎ §2 の 3: 6 択の門には段 1 の判定と段 1 の同意の印を渡し、`o1::is_o1()` を渡さない。
+    #[test]
+    fn s1_esm_gate_passes_stage1_not_o1() {
+        let code = squash(&production_code());
+        let needle = "activity_label_allowed(";
+        let calls: Vec<&str> = code
+            .match_indices(needle)
+            .map(|(i, _)| &code[i..])
+            .collect();
+        // ★ 対照: 送出元の 3 か所（差し替え・回答・未回答）が見つかる（0 件なら探し方が壊れている）
+        assert_eq!(calls.len(), 3, "6 択の門の呼び出しの数が想定と違う");
+        for call in calls {
+            assert!(
+                call.starts_with(
+                    "activity_label_allowed(crate::s1::is_s1(),crate::submission::s1_probe_consent_acknowledged(),"
+                ) || call.starts_with(
+                    "activity_label_allowed(crate::s1::is_s1(),crate::submission::s1_probe_consent_acknowledged())"
+                ),
+                "6 択の門に段 1 以外の引数が渡っている: {}",
+                &call[..call.len().min(120)]
+            );
+        }
+        assert!(
+            !code.contains("activity_label_allowed(crate::o1::is_o1()")
+                && !code.contains("activity_label_allowed(o1::is_o1()"),
+            "6 択の門に O1 の判定が渡っている（O1 だけでは 6 択を書かない・ADR-043 D8）"
+        );
+    }
+
+    /// 6 択の行を組むのは、同意の門を通す 3 つの関数の中だけ。
+    #[test]
+    fn activity_label_rows_are_built_only_behind_the_s1_gate() {
+        let code = production_code();
+        let allowed = [
+            "fn emit_s1_superseded(",
+            "fn record_probe_response(",
+            "fn record_probe_skip(",
+        ];
+        let mut found = 0;
+        for ctor in ["activity_label_answered(", "activity_label_skipped("] {
+            for (i, _) in code.match_indices(ctor) {
+                found += 1;
+                let before = &code[..i];
+                let owner = before
+                    .rfind("\nfn ")
+                    .map(|k| &before[k + 1..])
+                    .unwrap_or_default();
+                assert!(
+                    allowed.iter().any(|f| owner.starts_with(f)),
+                    "6 択の行が門の外で組まれている: {}",
+                    &owner[..owner.len().min(60)]
+                );
+            }
+        }
+        assert_eq!(found, 3, "6 択の行の構築の数が想定と違う（対照）");
+    }
+
+    /// `power::start` は 1 回しか登録できない（2 回目は黙って何もしない）ので、`lib.rs` で 1 か所だけ呼ぶ。
+    #[test]
+    fn power_start_is_called_once() {
+        let code = production_code();
+        assert_eq!(code.matches("crate::input::power::start(").count(), 1);
+    }
+
+    /// 段 1 では今のプローブのスレッドを起こさない（問いは段 1 の駆動役が出す）。
+    #[test]
+    fn legacy_probe_thread_is_stopped_in_stage1() {
+        let code = squash(&production_code());
+        assert!(code.contains("letdisabled_by_s1=crate::s1::is_s1();"));
+        assert!(code.contains("||disabled_by_eh3||disabled_by_s1;"));
+    }
+
+    /// 段 1 は招待も Nudge も出さない（計画の `s1_never_shows_invitation_or_nudge`）。
+    /// ★ 段 1 は O1 の上にだけ立ち（`s1::resolve`）、招待の状態機械は O1 では作らず、
+    ///   Nudge の宣言（`record_session_meta`）は O1 で拒まれる。その 3 つが本文にあることを固定する。
+    #[test]
+    fn s1_never_shows_invitation_or_nudge() {
+        assert_eq!(
+            crate::s1::resolve(Some(crate::s1::S1Source::Marker), false, false),
+            None,
+            "段 1 は O1 の上にだけ立つ"
+        );
+        let code = squash(&production_code());
+        assert!(
+            code.contains("Noneif!o1_always_on&&g1_mode().is_none()=>{"),
+            "招待の状態機械を O1 で作らない分岐が見つからない"
+        );
+        assert!(
+            !code.contains("is_s1()&&NORMAL_INVITATION_ALLOWED"),
+            "段 1 で招待を許す経路がある"
+        );
+    }
+
+    /// `superseded` は調停器だけが書く値で、段 1 の未回答のコマンドは受けない。
+    #[test]
+    fn record_probe_skip_accepts_only_person_reasons() {
+        let code = squash(&production_code());
+        assert!(code
+            .contains("Some(r@(SkipReason::DontRemember|SkipReason::Dismissed))=>r,_=>returnErr("));
     }
 }
