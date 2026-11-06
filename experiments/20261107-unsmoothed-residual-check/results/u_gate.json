@@ -1,0 +1,24 @@
+{
+ "coauthor": {
+  "units": 875,
+  "rows": 588227,
+  "rows_mismatched": 0,
+  "units_split_mismatched": 0,
+  "units_without_raw": 0,
+  "n_rows": 19141,
+  "dt_order_mismatched_units": 0,
+  "writers": 43,
+  "passed": true
+ },
+ "cs1": {
+  "units": 177,
+  "rows": 2794277,
+  "rows_mismatched": 0,
+  "units_split_mismatched": 0,
+  "units_without_raw": 0,
+  "n_rows": 92752,
+  "dt_order_mismatched_units": 0,
+  "writers": 31,
+  "passed": true
+ }
+}

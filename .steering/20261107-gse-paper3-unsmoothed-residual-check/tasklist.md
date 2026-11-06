@@ -12,21 +12,22 @@
 - [x] 判断 1〜5（列・残差・範囲・読みの形）を AskUserQuestion で決める
 - [x] /reimagine で設計を比べ、v2 を採る（判断 6）
 - [x] conditions.md と SEED を書く
-- [ ] conditions.md と SEED をコードより前にコミットする
+- [x] conditions.md と SEED をコードより前にコミットする
 
 ## 実装
-- [ ] kit: `symbolizer.py` に `last_raw`、`variants.py`（u・n の規則）、README・selftest
-- [ ] `build_variants.py`（Mac で新しい中間と P-U の門）
-- [ ] `load.py`・`fit.py`（列を選ぶ読み込み・範囲を絞った当てはめ・npz）
-- [ ] `residual.py`（擬似残差と自己相関）
-- [ ] `report.py`・`repro_check.py`・`run.sh`・`mutate.sh`
-- [ ] `selftest.py`（P-KIT〜P-PIN と変異 m41〜m51）
+- [x] kit: `symbolizer.py` に `last_raw`、`variants.py`（u・n の規則）、README・selftest
+- [x] `build_variants.py`（Mac で新しい中間と P-U の門）
+- [x] `load.py`・`fit.py`（列を選ぶ読み込み・範囲を絞った当てはめ・npz）
+- [x] `residual.py`（擬似残差と自己相関）
+- [x] `report.py`・`repro_check.py`・`run.sh`・`mutate.sh`
+- [x] `selftest.py`（P-KIT〜P-PIN と変異 m41〜m51）
 
 ## テスト
-- [ ] 合成の selftest がすべて通る
-- [ ] 名指しの変異がすべて赤になる
-- [ ] Mac の合成で時間を測り、見積もりを条件の末尾に足す
-- [ ] Mac で中間を作り、P-U（全行）が通る
+- [x] 合成の selftest がすべて通る
+- [x] 名指しの変異がすべて赤になる
+- [x] Mac の合成で時間を測り、見積もりを条件の末尾に足す
+- [x] Mac で中間を作り、P-U（全行）が通る
+- [x] 配管の合成の通し（`e2e_synth.py`・判断 8）が通る
 
 ## レビュー
 - [ ] code-reviewer と /cross-review（計算の前）

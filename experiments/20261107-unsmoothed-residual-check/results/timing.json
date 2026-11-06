@@ -1,0 +1,24 @@
+{
+ "coauthor_writer_ratio": {
+  "tau_extend_sec": 268.88422989845276,
+  "this_sec": 60.53785705566406,
+  "ratio": 0.22514469174531687
+ },
+ "cs1_writer_ratio": {
+  "tau_extend_sec": 496.8680987358093,
+  "this_sec": 126.59641814231873,
+  "ratio": 0.25478878290721485
+ },
+ "residual_one_model_one_writer_sec": 0.12036609649658203,
+ "tau_extend_hp_z2_sec": {
+  "pools": 5190.0260190963745,
+  "writers": 1700.1304054260254
+ },
+ "estimate": {
+  "o_sec": 5684.194547302804,
+  "u_sec": 5684.194547302804,
+  "n_sec": 192.2536084058312,
+  "selftests_sec": 900,
+  "total_hours": 3.4612896397253996
+ }
+}

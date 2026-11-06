@@ -199,7 +199,11 @@ def grid_symbol(x, y, c):
 
 
 class Symbolizer:
-    """State machine over ticks and key events for one recording (one session or work block)."""
+    """State machine over ticks and key events for one recording (one session or work block).
+
+    After a tick that returns a row, the attribute last_raw holds the raw values (x_raw, y_raw)
+    of that tick before smoothing. It is read by variants.py and does not change the rows.
+    """
 
     def __init__(self, t0, c):
         self.c = c
@@ -264,6 +268,7 @@ class Symbolizer:
         if feat.f1 > 0.0 and s < c["silence_typing_max_s"]:
             self.context = feat.copy()
             x_raw, y_raw = latent_axes(feat, c)
+            self.last_raw = (x_raw, y_raw)
             self.ex = c["typing_alpha"] * x_raw + c["typing_keep"] * self.ex
             self.ey = c["typing_alpha"] * y_raw + c["typing_keep"] * self.ey
             sym = grid_symbol(self.ex, self.ey, c)
@@ -285,6 +290,7 @@ class Symbolizer:
                 alpha = row["alpha"]
                 break
         x_raw, y_raw = latent_axes(feat, c)
+        self.last_raw = (x_raw, y_raw)
         self.ex = alpha * x_raw + (1.0 - alpha) * self.ex
         self.ey = alpha * y_raw + (1.0 - alpha) * self.ey
         return (now, self.ex, self.ey, grid_symbol(self.ex, self.ey, c), alpha, path)

@@ -13,6 +13,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from symbolizer import grid_symbol, load_constants, symbolize, with_releases  # noqa: E402
+from variants import thinned_mask, unsmoothed_symbol, variant_rows  # noqa: E402
 from adapters import coauthor, cs1_2021  # noqa: E402
 from adapters.categories import char_category  # noqa: E402
 
@@ -118,6 +119,44 @@ def test_branch_coverage():
     assert alphas == {0.3, 0.15, 0.18, 0.25}, alphas
     assert run_symbols > 0 and dense > 0, (run_symbols, dense)
     print("   coverage: run-symbol rows %d, cases with buffer overflow inside the window %d" % (run_symbols, dense))
+
+
+def test_variants_match_symbolize():
+    """variant_rows returns the rows of symbolize (bit for bit) and u follows its rule, on every synthetic case."""
+    with gzip.open(os.path.join(HERE, "conformance", "data", "inputs.json.gz"), "rt", encoding="utf-8") as f:
+        cases = json.load(f)["cases"]
+    run = C["backspace_run_symbol"]
+    differ = 0
+    for t0, presses in cases:
+        presses = [tuple(p) for p in presses]
+        ref = symbolize(t0, presses, C)
+        got = variant_rows(t0, presses, C)
+        assert len(ref) == len(got)
+        for r, g in zip(ref, got):
+            t, o, u, xr, yr, x, y, alpha, path = g
+            assert (t, o, alpha, path) == (r[0], r[3], r[4], r[5])
+            assert x.hex() == r[1].hex() and y.hex() == r[2].hex()
+            assert u == (run if o == run else grid_symbol(xr, yr, C))
+            differ += u != o
+    assert differ > 0, "u never differs from o on the synthetic cases"
+
+
+def test_unsmoothed_symbol_edges():
+    g = C["grid_bins"]
+    for i in range(g + 1):
+        v = i / g
+        band = min(max(int(v * g // 1), 0), g - 1)
+        assert unsmoothed_symbol(0, v, v, C) == band * g + band, v
+    assert unsmoothed_symbol(0, -0.3, 1.7, C) == g - 1
+    assert unsmoothed_symbol(0, 1.0, -1e-9, C) == (g - 1) * g
+    assert unsmoothed_symbol(C["backspace_run_symbol"], 0.0, 0.0, C) == C["backspace_run_symbol"]
+
+
+def test_thinned_mask():
+    t = [5000, 6000, 35000, 36000, 65500, 95000, 95500, 155000]
+    assert thinned_mask(t) == [False, False, True, False, False, True, False, True]
+    assert thinned_mask([]) == []
+    assert thinned_mask([1000]) == [False]
 
 
 def test_check_rejects_count_mismatch():

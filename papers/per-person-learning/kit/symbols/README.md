@@ -32,6 +32,28 @@ other non-typing keys are ignored.
 Floating-point expressions are evaluated in a fixed order, so the output, including x and y,
 is reproducible bit for bit.
 
+## Variants without smoothing and without overlapping windows
+
+`variants.py` derives two further columns from the same rows, for checking how much of the
+dependence between consecutive symbols the symbolization itself produces.
+
+- **u (unsmoothed)**: the grid symbol of the raw values `x_raw` and `y_raw` of the same tick, before
+  the exponential smoothing, with the same 5 x 5 grid. A row whose symbol is the deletion-run symbol
+  (25) keeps 25. The rows are the same as those of the symbols (same times, same number).
+- **n (non-overlapping)**: within one recording (a CoAuthor session or a CS1 work block), with `s`
+  the time of the first row, only the rows at `s + 30 s * j` (j = 1, 2, ...) are kept, using their
+  u symbols. The 30 s windows of the kept rows do not overlap. When no row exists at such a time,
+  that j is skipped.
+
+`variant_rows(t0, presses)` returns `(t_ms, o, u, x_raw, y_raw, x, y, alpha, path)`, where `o`,
+`x`, `y`, `alpha` and `path` are the values returned by `symbolize` for the same input.
+`thinned_mask(times)` returns the rows of column n for the row times of one recording. The symbolizer
+keeps the raw values of the last tick in the attribute `last_raw`; this does not change its rows.
+
+Both variants still carry memory across windows: during pauses, the features depend on the time
+since the last press and on the context of the preceding typing. Column n is therefore not free
+of every source of dependence between symbols.
+
 ## Input contract
 
 `symbolize(t0, presses)` expects non-negative integer times in milliseconds, presses sorted
@@ -42,8 +64,9 @@ implementation. One row is produced for every second from `t0` to the last event
 
 ## Checks
 
-- `python3 selftest.py` runs unit checks of the adapters and the symbolizer and then the
-  conformance check.
+- `python3 selftest.py` runs unit checks of the adapters, the symbolizer and the variants (the
+  rows of `variant_rows` equal those of `symbolize` on the 300 synthetic cases, bit for bit) and then
+  the conformance check.
 - `python3 conformance/check.py` symbolizes 300 synthetic key-press sequences
   (`conformance/data/inputs.json.gz`, regenerated from seed 20261107 by
   `conformance/generate_inputs.py`) and compares every row, with x and y bit for bit, with
