@@ -1289,6 +1289,51 @@ else
   fi
 fi
 
+# --- 11a3: ⚠️★★★ ロックの中の区間が重ならないこと (2026-11-06・Codex の指摘) ---
+#   ★ 11a・11a2 は「両方 exit 0」しか見ないので、2 本が同時にロックの中にいても通ってしまう。
+#   → git を包み、`git worktree add` の間だけ印ファイルを noclobber で作る。既に在れば重なり。
+#     mkdir -p (既にあっても 0) の下で 3 本 × 4 ラウンド。
+R11V="${TMP}/r11v/repo"; mkdir -p "${R11V}"
+OVL="${TMP}/r11v-overlap"; MARK="${TMP}/r11v-mark"; : > "${OVL}"
+if ! setup_fake_repo "${R11V}"; then
+  ng "11a3: 準備できなかった (★ 判定できない)"
+else
+  round=1; all_ok=1
+  while [ "${round}" -le 4 ]; do
+    pids=""
+    for k in a b c; do
+      (
+        mkdir() { command mkdir -p "$@"; }
+        git() {
+          if [ "${1:-}" = "worktree" ] && [ "${2:-}" = "add" ]; then
+            if ! ( set -C; : > "${MARK}" ) 2>/dev/null; then echo "overlap" >> "${OVL}"; fi
+            sleep 0.3
+            command git "$@"; local grc=$?
+            command rm -f "${MARK}"
+            return "${grc}"
+          fi
+          command git "$@"
+        }
+        export -f mkdir git
+        export MARK OVL
+        cd "${R11V}" && bash scripts/loop-spawn.sh --no-exec "v${round}${k}" t
+      ) >"${TMP}/r11v-${round}${k}.log" 2>&1 &
+      pids="${pids} $!"
+    done
+    for p in ${pids}; do
+      rc=0; wait "${p}" || rc=$?
+      [ "${rc}" -eq 0 ] || { all_ok=0; ng "11a3: round ${round} で spawn が rc=${rc}"; }
+    done
+    round=$((round + 1))
+  done
+  n_ovl="$(grep -c overlap "${OVL}" 2>/dev/null)" || n_ovl=0
+  if [ "${n_ovl}" -ne 0 ]; then
+    ng "11a3: ロックの中の区間が ${n_ovl} 回重なった"
+  elif [ "${all_ok}" -eq 1 ]; then
+    ok "11a3: mkdir -p の下で 3 本 × 4 ラウンド、git worktree add の区間が 1 回も重ならず、全部 exit 0"
+  fi
+fi
+
 # --- 11b: ⚠️★★★ git worktree add を失敗させたとき、branch が残らないこと ---
 #   ★ 失敗のさせ方: 作成先パスに **同名の実ファイル**を事前に置く (★ Windows もファイル名で
 #     衝突させられるので両 OS で同じ fixture を作れる。パーミッションでの再現は移植性が無い)。
@@ -1405,7 +1450,10 @@ run_fakerm_scenario() { # run_fakerm_scenario <repo-dir> <spawn-src> <id> <out-p
   (
     cd "${r}" || exit 1
     rm() { return 1; }
-    export -f rm
+    # ★ 2026-11-06: ロックは mv で外してから消す形 (discard_dir) になったので、「消せない」状況を保つには
+    #   mv も失敗させる (検査の意図「消せない状態が続いてもスピンせず止まる」は変えない)。
+    mv() { return 1; }
+    export -f rm mv
     # ⚠️★★★ 起票 (2026-09-26 の裁定・項目 7): **exec を明示する。**
     #   ★ exec 最適化の保証が無い bash (macOS 3.2) では、`(...)` サブシェルの最後のコマンドが
     #     単純な `env ... bash ...` でも新たな子プロセスへ fork されうる。

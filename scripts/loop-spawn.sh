@@ -805,8 +805,15 @@ awk -v t="${LOCK_TIMEOUT}" 'BEGIN{ exit !(t+0 > 0) }' \
   || die "LOOP_SPAWN_LOCK_TIMEOUT は 0 より大きい数値にしてください: [$(sanitize_disp "${LOCK_TIMEOUT}")]"
 
 # claim_dir <dir> → <dir> を作り、その中の pid ファイルを noclobber (O_EXCL) で作る。
-#   戻り値: 0 = 取れた / 1 = 取れなかった (他の印がある・持ち主が放した直後 → 待って取り直す)
-#           2 = 書けない (pid が普通のファイルでない等 → 呼び手が fail-closed にする)
+#   戻り値: 0 = 印を取れた (pid を書けたかは呼び手の読み戻しで見る)
+#           1 = 取れなかった (他の印がある・持ち主が放した直後・曖昧なときは全部ここ → 待つ)
+#           2 = pid が在るのに普通のファイルでない (誰の印でもない残骸 → 呼び手が fail-closed にする)
+#   ★ 印の作成 (noclobber の `: >`) と pid の書き込みを分ける。作成できた時点で自分の印と確定するので、
+#     書き込みに失敗しても (ENOSPC 等) 空の印を「他人のもの」と取り違えて永久に待たない
+#     (呼び手の読み戻しが不一致になり、自分の印を片づけて止まる)。
+#   ⚠️ 2 を「pid が無い・ディレクトリが無い」に広げない。持ち主が放している途中 (pid を消した後・
+#     ディレクトリを消す前) に当たると、他人のロックを残骸と取り違えて消してしまう (Codex・code-reviewer の
+#     HIGH・実測で二重保持を確認)。
 #   ⚠️★★★ 2026-11-06: mkdir の成否だけをロックにしない。ubuntu 26.04 の既定の mkdir
 #     (uutils coreutils 0.10.0) は、同時に呼ばれると既にあるディレクトリにも 0 を返す
 #     (CI の対照で 300 回中 258 回、2 本とも成功した。python の os.mkdir・bash の noclobber・
@@ -816,18 +823,34 @@ awk -v t="${LOCK_TIMEOUT}" 'BEGIN{ exit !(t+0 > 0) }' \
 #     取れなかった側はディレクトリを消さない (持ち主のものだから)。
 claim_dir() {
   mkdir "$1" 2>/dev/null || return 1
-  ( set -C; printf '%s' "$$" > "$1/pid" ) 2>/dev/null && return 0
-  [ -d "$1" ] || return 1
-  [ -f "$1/pid" ] && return 1
-  return 2
+  if ( set -C; : > "$1/pid" ) 2>/dev/null; then
+    printf '%s' "$$" > "$1/pid" 2>/dev/null || true
+    return 0
+  fi
+  if { [ -e "$1/pid" ] || [ -L "$1/pid" ]; } && [ ! -f "$1/pid" ]; then
+    return 2
+  fi
+  return 1
+}
+
+# discard_dir <dir> → <dir> を別名へ一度に移して (rename は不可分) から消す。移せなければ 1。
+#   ★ 2026-11-06: `rm -rf <dir>` は pid を消してからディレクトリを消すので、その間に元の場所で
+#     別のプロセスが印を取りうる (uutils の mkdir は既にあっても 0 を返す)。先に元の場所から外せば、
+#     元の場所に「印の無い持ち主のディレクトリ」が見える瞬間が無くなる。
+discard_dir() {
+  local gone="$1.gone.$$.${RANDOM}"
+  mv "$1" "${gone}" 2>/dev/null || return 1
+  rm -rf "${gone}" 2>/dev/null || true
 }
 
 release_spawn_lock() {
   # ⚠️★★★ 判断 9 (C-M1/C-M2 の後始末): reap 用ロックが自分の手に残っていれば先に片づける
   #   (★ mkdir "${LOCK}.reap" と rmdir "${LOCK}.reap" の間で中断されると残骸になる —— ここが最後の網)。
   if [ "${REAP_HELD}" -eq 1 ]; then
-    rm -f "${LOCK}.reap/pid" 2>/dev/null || true
-    rmdir "${LOCK}.reap" 2>/dev/null || true
+    # ★ 自分の印のときだけ外す (他人の除去用ロックを消さない)。
+    if [ "$(cat "${LOCK}.reap/pid" 2>/dev/null || true)" = "$$" ]; then
+      discard_dir "${LOCK}.reap" || true
+    fi
     REAP_HELD=0
   fi
   if [ "${LOCK_HELD}" -eq 1 ]; then
@@ -838,7 +861,7 @@ release_spawn_lock() {
     local held_pid
     held_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
     if [ "${held_pid:-}" = "$$" ]; then
-      rm -rf "${LOCK}" 2>/dev/null || true
+      discard_dir "${LOCK}" || true
     else
       echo "loop-spawn: ⚠️ ロック (${LOCK}) の pid ([$(sanitize_disp "${held_pid:-空}")]) が自分 ($$) と一致しないため解放しません" >&2
       echo "            ★ 手で確認:  cat \"${LOCK}/pid\"" >&2
@@ -897,7 +920,8 @@ acquire_spawn_lock() {
             #   ⚠️ reap を取れなければここでは何もしない (★ 下の i 加算 / sleep で普通に待つ)。
             reap_rc=0; claim_dir "${LOCK}.reap" || reap_rc=$?
             # ★ 書けない (2) なら自分が作った除去用ロックを残さない (残すと以後の stale 除去が止まる)。
-            if [ "${reap_rc}" -eq 2 ]; then rm -rf "${LOCK}.reap" 2>/dev/null || true; fi
+            # ★ 2 は「pid が普通のファイルでない残骸」だけ (claim_dir の注)。誰の印でもないので外してよい。
+            if [ "${reap_rc}" -eq 2 ]; then discard_dir "${LOCK}.reap" || true; fi
             if [ "${reap_rc}" -eq 0 ]; then
               # ⚠️★★★ 判断 9 (C-M1/C-M2 の後始末): ここから rmdir までの間に中断されると
               #   `${LOCK}.reap` が残骸になる。★ フラグを立てておき、EXIT trap
@@ -905,15 +929,14 @@ acquire_spawn_lock() {
               REAP_HELD=1
               reap_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
               if [ "${reap_pid:-}" = "${lock_pid}" ] && ! kill -0 "${lock_pid}" 2>/dev/null; then
-                rm -rf "${LOCK}" 2>/dev/null || true
+                discard_dir "${LOCK}" || true
               fi
               # ⚠️★★★ reap は必ず解放する。★ 取った側がこの中で死ぬと reap の残骸が残り、
               #   以後の stale 除去ができなくなる (許容する —— 待ち切れば die し、
               #   die メッセージで reap ディレクトリの手動削除を案内する。
               #   ⚠️ ★ ここで中断されても EXIT trap が REAP_HELD を見て後始末する)。
-              # ⚠️ `set -e` の下なので rm の失敗で黙って抜けないよう `|| true` を付ける (11g は rm を失敗させる)。
-              rm -f "${LOCK}.reap/pid" 2>/dev/null || true
-              rmdir "${LOCK}.reap" 2>/dev/null && REAP_HELD=0
+              # ★ 自分の除去用ロックを外す。外せなければ REAP_HELD=1 のまま (EXIT trap がもう一度試みる)。
+              discard_dir "${LOCK}.reap" && REAP_HELD=0
             fi
           fi
           ;;
@@ -926,8 +949,8 @@ acquire_spawn_lock() {
     if [ "${i}" -gt "${max_i}" ]; then
       die "loop-spawn.lock を ${LOCK_TIMEOUT} 秒待っても取得できませんでした: ${LOCK}
             ⚠️ 他の loop-spawn.sh が動いていないか確認してください。
-            ★ 完全に止まっているなら手で削除:  rmdir \"${LOCK}\"
-            ⚠️ stale 除去用ロック ${LOCK}.reap が残っている場合は、そちらも手で削除してください:  rmdir \"${LOCK}.reap\""
+            ★ 完全に止まっているなら手で削除:  rm -rf \"${LOCK}\"
+            ⚠️ stale 除去用ロック ${LOCK}.reap が残っている場合は、そちらも手で削除してください:  rm -rf \"${LOCK}.reap\""
     fi
     sleep "${LOCK_POLL}"
   done
@@ -944,7 +967,9 @@ acquire_spawn_lock() {
   #     (二重に rm -rf しようとして事故ることはない)。
   written_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
   if [ "${written_pid:-}" != "$$" ]; then
-    rm -rf "${LOCK}" 2>/dev/null || true
+    # ★ ここに来るのは「自分の印を取れたが pid を書けなかった」(claim_dir=0) か「pid が普通のファイルで
+    #   ない残骸」(claim_dir=2) だけ。どちらも他のプロセスの印ではないので外してよい。
+    discard_dir "${LOCK}" || rm -rf "${LOCK}" 2>/dev/null || true
     die "loop-spawn.lock (${LOCK}) に pid を書き込めませんでした (読み戻し=[$(sanitize_disp "${written_pid:-空}")])。
           ⚠️ pid が書けないと release 時の pid 一致確認も stale 判定もできず、ロックが永久に残ります。
           ★ fail-closed のため、作成したロックディレクトリを削除して止まります。"
