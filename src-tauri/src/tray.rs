@@ -70,6 +70,14 @@ pub fn measure_title(state: MeasureState) -> &'static str {
     }
 }
 
+/// 招待の「印の説明と設定」をトレイに出すか（純関数）。
+///
+/// EH3 は常に出す（起動時に作る項目・今のまま）。通常のモードは、招待が許されているセッションの間
+/// （`NORMAL_INVITATION_ALLOWED` が真の間）だけ出す。第 1 週・セッションが無い・O1・G1 では出さない。
+pub fn invitation_item_visible(eh3: bool, normal_allowed: bool) -> bool {
+    eh3 || normal_allowed
+}
+
 /// いまの状態を Atomic から読む。
 ///
 /// ⚠️★★ 「フックが生きている」は **2 つの AND** である:
@@ -145,6 +153,18 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
     )?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "GSE を終了", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
+    // 通常のモード用: 招待が許されている間だけ後から差し込む項目（EH3 は下の静的な項目を使う）。
+    let dynamic_invitation = if crate::eh3::is_eh3() {
+        None
+    } else {
+        Some(MenuItem::with_id(
+            app,
+            MENU_INVITATION,
+            "印の説明と設定",
+            true,
+            None::<&str>,
+        )?)
+    };
     let menu = if crate::eh3::is_eh3() {
         let invitation =
             MenuItem::with_id(app, MENU_INVITATION, "印の説明と設定", true, None::<&str>)?;
@@ -190,6 +210,10 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         .name("gse-tray".to_string())
         .spawn(move || {
             let mut last = initial;
+            // 通常のモード: 項目をいま差し込んでいるか
+            let mut invitation_shown = false;
+            // 差し込みの失敗は最初の 1 回だけ警告する(毎秒の連投を避ける・内容は書かない)
+            let mut insert_failure_warned = false;
             loop {
                 std::thread::sleep(Duration::from_millis(1000));
                 // ★ 終了処理が始まったら抜ける。⚠️ 落ちるまでの数百 ms のあいだ
@@ -197,6 +221,21 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                 if crate::is_shutting_down() {
                     tracing::info!("tray updater stopping (shutdown in progress)");
                     return;
+                }
+                // ⚠️ 項目の出し入れは記録しない（applog にも出さない・R-I1）。
+                if let Some(item) = dynamic_invitation.as_ref() {
+                    let want =
+                        invitation_item_visible(false, crate::normal_invitation_allowed_now());
+                    if want && !invitation_shown {
+                        // 状態表示・区切りの次（静的な並びの「印の説明と設定」と同じ位置）
+                        invitation_shown = menu.insert(item, 2).is_ok();
+                        if !invitation_shown && !insert_failure_warned {
+                            insert_failure_warned = true;
+                            tracing::warn!("tray invitation item could not be inserted");
+                        }
+                    } else if !want && invitation_shown && menu.remove(item).is_ok() {
+                        invitation_shown = false;
+                    }
                 }
                 let next = current_state(&session_active);
                 if next == last {
@@ -291,6 +330,15 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// 招待の項目の出し入れ: EH3 は常に、通常のモードは許されている間だけ。
+    #[test]
+    fn invitation_item_visibility() {
+        assert!(invitation_item_visible(true, false));
+        assert!(invitation_item_visible(true, true));
+        assert!(invitation_item_visible(false, true));
+        assert!(!invitation_item_visible(false, false));
     }
 
     /// 3 状態が**互いに違う文言**であること（同じだと区別できない）。

@@ -1060,6 +1060,88 @@
           ]
         }
       }
+    },
+    {
+      "description": "通常のモードで招待を許すセッションの条件（契機の種類と値・推定器の版）。\n\n`session_meta` とは別の行。招待を許すセッションの開始時（条件が決まった時点）に 1 行出す。EH3 は出さない （EH3 の条件は `eh3_day`）。`condition` ごとに持つ欄が決まっている: `estimator` は `p_stuck`・`hold_ms`、 `rising` は `delta`・`window_ms`、`random` は `per_active_hour`・`seed`・`seed_effective`、`none` は持たない。 1 つのファイルに複数行ありうる（セッションの宣言が再び呼ばれたとき。後の行がその時点からの条件）。 立ったが出さなかった契機は記録しない。提示は `invitation_present` で読む。\n\n時刻キーは `t`。",
+      "type": "object",
+      "required": [
+        "condition",
+        "hmm_version",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "condition": {
+          "$ref": "#/definitions/InvitationConditionDto"
+        },
+        "delta": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "hmm_version": {
+          "type": "string"
+        },
+        "hold_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "p_stuck": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "per_active_hour": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "seed": {
+          "description": "設定の seed(2^53 - 1 以下)。",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "seed_effective": {
+          "description": "セッションの開始時刻(`session_start` 行の `t`)と設定の seed から導いた実効 seed(u64 を 10 進の文字列で)。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "invitation_condition"
+          ]
+        },
+        "window_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     }
   ],
   "definitions": {
@@ -1202,6 +1284,16 @@
         "none",
         "nudge",
         "defer"
+      ]
+    },
+    "InvitationConditionDto": {
+      "description": "招待の契機の種類。NDJSON 文字列は \"estimator\" / \"rising\" / \"random\" / \"none\"。",
+      "type": "string",
+      "enum": [
+        "estimator",
+        "rising",
+        "random",
+        "none"
       ]
     },
     "InvitationTriggerDto": {

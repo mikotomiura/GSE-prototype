@@ -401,7 +401,9 @@ impl Condition {
 }
 
 /// ラベルプール (label_pool)。`calibration_blind` = blind 較正で集めたラベル (X1 判定に使用)、
-/// `post_intervention` = 介入可視環境で集めたラベル (合算せず別管理)。
+/// `post_intervention` = 第2週の条件で集めたラベル (合算せず別管理)。
+/// ⚠️ 介入の有無は `intervention_enabled` で分ける。ADR-040 D1 (2026-10-31) 以降の第2週は
+/// `intervention_enabled=false` で、それ以前のこのプールは Nudge が出る環境で集めた。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelPool {
     CalibrationBlind,
@@ -1161,6 +1163,16 @@ pub enum LogEntry {
     },
     /// EH3 の招待を出した時刻（理由を載せない・解除の時刻は記録しない）。
     InvitationPresent { timestamp: u64 },
+    /// 通常のモードで招待を許すセッションの条件（契機の種類と値・推定器の版）。
+    ///
+    /// `session_meta` とは別の行。セッションの開始時（条件が決まった時点）に 1 行出す。EH3 は出さない
+    /// （EH3 は `eh3_day` が条件を持つ）。値域は `invitation::TriggerKind` で閉じている。
+    InvitationCondition {
+        timestamp: u64,
+        kind: crate::analysis::invitation::TriggerKind,
+        /// セッションの開始時刻(`session_start` 行の `t`)。無作為の実効 seed を導く。
+        session_start_ms: u64,
+    },
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
     ///
@@ -1217,6 +1229,7 @@ impl LogEntry {
             LogEntry::SecureInput { .. } => "secure_input",
             LogEntry::Eh3Day { .. } => "eh3_day",
             LogEntry::InvitationPresent { .. } => "invitation_present",
+            LogEntry::InvitationCondition { .. } => "invitation_condition",
             // ★ ここから下は**行を書かない制御エントリ**である
             //   (`BlockEnd` / `Rotate` は `meta`(session_end/session_start) を副作用で書くが、
             //   ⚠️ それは `meta` 行であってこのエントリ自身の行ではない)。
@@ -1654,6 +1667,48 @@ fn format_eh3_day_line(timestamp: u64, day: u32, condition: crate::eh3::Conditio
 /// `invitation_present` 行の本文（改行なし）。時刻しか書けない形にしてある（理由・状態・回数を持たない）。
 fn format_invitation_present_line(timestamp: u64) -> String {
     format!(r#"{{"type":"invitation_present","t":{}}}"#, timestamp)
+}
+
+/// `invitation_condition` 行の本文（改行なし）。契機の種類と値・推定器の版だけを持つ
+/// （本文・打鍵・人の設定は持たない）。
+fn format_invitation_condition_line(
+    timestamp: u64,
+    kind: crate::analysis::invitation::TriggerKind,
+    session_start_ms: u64,
+    hmm_version: &str,
+) -> String {
+    use crate::analysis::invitation::TriggerKind;
+    // 数値は serde_json で書く（有限でない値は `null` になり、NaN の文字列を出さない）
+    let num = |x: f64| serde_json::to_string(&x).unwrap_or_else(|_| "null".to_string());
+    let extra = match kind {
+        TriggerKind::Estimator { p_stuck, hold_ms } => {
+            format!(r#","p_stuck":{},"hold_ms":{}"#, num(p_stuck), hold_ms)
+        }
+        TriggerKind::Rising { delta, window_ms } => {
+            format!(r#","delta":{},"window_ms":{}"#, num(delta), window_ms)
+        }
+        TriggerKind::Random {
+            per_active_hour,
+            seed,
+        } => format!(
+            // 設定の seed は 2^53 以下に制限してある(JS で丸められない)。導いた実効 seed は u64 全体なので
+            // 文字列で書く。
+            r#","per_active_hour":{},"seed":{},"seed_effective":"{}""#,
+            num(per_active_hour),
+            seed,
+            crate::analysis::invitation::effective_seed(seed, session_start_ms)
+        ),
+        TriggerKind::Off {} => String::new(),
+    };
+    // hmm_version は定数（semver）。念のため JSON 文字列として書く
+    let hmm = serde_json::to_string(hmm_version).unwrap_or_else(|_| "null".to_string());
+    format!(
+        r#"{{"type":"invitation_condition","t":{},"condition":"{}"{},"hmm_version":{}}}"#,
+        timestamp,
+        kind.condition_name(),
+        extra,
+        hmm,
+    )
 }
 
 /// `meta`(session_start) 行を書く。★ **新しいファイルを開くたびに必ず呼ぶ**
@@ -2355,6 +2410,23 @@ impl SessionLogger {
                                 );
                                 dirty = true;
                             }
+                            LogEntry::InvitationCondition {
+                                timestamp,
+                                kind,
+                                session_start_ms,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_invitation_condition_line(
+                                        timestamp,
+                                        kind,
+                                        session_start_ms,
+                                        crate::analysis::engine::HMM_VERSION
+                                    )
+                                );
+                                dirty = true;
+                            }
                             LogEntry::BlockEnd => {
                                 // ★ 閉じるだけ。次のファイルは開かない (11 本目の空ファイル対策)。
                                 if !block_closed {
@@ -3021,6 +3093,82 @@ mod tests {
         }
         let line = format_invitation_present_line(1_700_000_000_000);
         assert_eq!(keys(&line), ["t", "type"].map(String::from).into());
+    }
+
+    #[test]
+    fn invitation_condition_line_carries_only_the_condition() {
+        use crate::analysis::invitation::{Trigger, TriggerKind};
+        let line = |k: TriggerKind| {
+            format_invitation_condition_line(1_700_000_000_000, k, 1_699_999_999_000, "9.9.9")
+        };
+        let obj = |l: &str| -> serde_json::Map<String, serde_json::Value> {
+            serde_json::from_str::<serde_json::Value>(l)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .clone()
+        };
+        let keys = |m: &serde_json::Map<String, serde_json::Value>| -> Vec<String> {
+            let mut k: Vec<String> = m.keys().cloned().collect();
+            k.sort();
+            k
+        };
+        let m = obj(&line(Trigger::MAIN.into()));
+        assert_eq!(
+            keys(&m),
+            [
+                "condition",
+                "hmm_version",
+                "hold_ms",
+                "p_stuck",
+                "t",
+                "type"
+            ]
+        );
+        assert_eq!(m["condition"], "estimator");
+        assert_eq!(m["type"], "invitation_condition");
+        assert_eq!(m["hmm_version"], "9.9.9");
+        assert_eq!(m["hold_ms"], 30_000);
+        let m = obj(&line(TriggerKind::Rising {
+            delta: 0.3,
+            window_ms: 10_000,
+        }));
+        assert_eq!(
+            keys(&m),
+            [
+                "condition",
+                "delta",
+                "hmm_version",
+                "t",
+                "type",
+                "window_ms"
+            ]
+        );
+        let m = obj(&line(TriggerKind::Random {
+            per_active_hour: 6.0,
+            seed: 42,
+        }));
+        assert_eq!(
+            keys(&m),
+            [
+                "condition",
+                "hmm_version",
+                "per_active_hour",
+                "seed",
+                "seed_effective",
+                "t",
+                "type"
+            ]
+        );
+        assert_eq!(m["seed"], 42);
+        // 導いた seed は u64 全体なので文字列で書く(JS で丸めない)
+        assert_eq!(
+            m["seed_effective"],
+            crate::analysis::invitation::effective_seed(42, 1_699_999_999_000).to_string()
+        );
+        let m = obj(&line(TriggerKind::Off {}));
+        assert_eq!(keys(&m), ["condition", "hmm_version", "t", "type"]);
+        assert_eq!(m["condition"], "none");
     }
 
     #[test]
@@ -3712,6 +3860,11 @@ mod tests {
                 condition: crate::eh3::Condition::PortraitSeed,
             },
             LogEntry::InvitationPresent { timestamp: 1 },
+            LogEntry::InvitationCondition {
+                timestamp: 1,
+                kind: crate::analysis::invitation::TriggerKind::default(),
+                session_start_ms: 1,
+            },
             LogEntry::Key {
                 vk_code: 0x41,
                 timestamp: 1,
