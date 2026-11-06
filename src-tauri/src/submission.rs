@@ -94,6 +94,17 @@ pub const O1_CONSENT_FILE_NAME: &str = "o1_consent_ack";
 /// ⚠️ **参加者 ID とは別ファイル**である —— ★ 参加者 ID は人を指し、これは導入を指す。
 pub const O1_INSTALL_ID_FILE_NAME: &str = "o1_install_id";
 
+/// 段 1 の問い（C4 のプローブと日の終わりの問い）への本人の同意の印（`~/.gse/s1_probe_consent`・2026-11-06）。
+///
+/// ★ 登録の画面で本人が問いへの同意の項目を押したときだけ書く（ADR-043 D7・計画の判断 5）。
+/// 中身は時刻と版だけ。誰が何に同意したかは研究者側の同意文書が持つ（O1 の確認と同じ考え方）。
+/// ⚠️ 無い間は、段 1 でも問いを出さない（駆動役が調停器を作らない・M5 の 2 本目）。
+pub const S1_PROBE_CONSENT_FILE_NAME: &str = "s1_probe_consent";
+
+/// 段 1 の問いへの同意の版。★ 問いの中身（頻度の上限・6 択・日の問い）が変わったら上げる。
+/// 本人の試し（R5）用の版。他の参加者向けは段 1 の同意文書（R4）の版に合わせて上げる。
+pub const S1_PROBE_CONSENT_VERSION: &str = "s1-self-trial-1";
+
 /// home ディレクトリ。`USERPROFILE` → `HOME` の順で引く (logger.rs `fallback_log_dir` と一致。
 /// Windows git-bash で両方設定された場合に解決先が割れないよう順序を揃える)。
 pub fn home_dir() -> Option<PathBuf> {
@@ -332,6 +343,53 @@ pub fn write_o1_consent_ack(now_ms: u64) -> Result<(), String> {
         ),
     )
     .map_err(|e| format!("確認を保存できません: {e}"))
+}
+
+/// ⚠️★★★ **段 1 の問いへの本人の同意の印があるか**（`o1::activity_label_allowed` の第 2 引数）。
+pub fn s1_probe_consent_acknowledged() -> bool {
+    home_dir()
+        .map(|h| h.join(".gse").join(S1_PROBE_CONSENT_FILE_NAME))
+        .is_some_and(|p| s1_probe_consent_acknowledged_at(&p))
+}
+
+/// `s1_probe_consent_acknowledged` の内側（パスを受け取る・検査用に分けた）。
+/// ★ 印は「ファイルがあり、今の版で書かれている」ときだけ有効。版が違えば同意し直してもらう。
+fn s1_probe_consent_acknowledged_at(path: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    serde_json::from_str::<serde_json::Value>(&text)
+        .ok()
+        .and_then(|v| v.get("consent_version")?.as_str().map(str::to_owned))
+        .is_some_and(|v| v == S1_PROBE_CONSENT_VERSION)
+}
+
+/// ⚠️★★★ **段 1 の問いへの本人の同意を記録する**（★ 中身は時刻と版だけ）。
+pub fn write_s1_probe_consent(now_ms: u64) -> Result<(), String> {
+    let path = home_dir()
+        .map(|h| h.join(".gse").join(S1_PROBE_CONSENT_FILE_NAME))
+        .ok_or("保存先 (~/.gse) を解決できませんでした。")?;
+    write_s1_probe_consent_at(&path, now_ms)
+}
+
+/// `write_s1_probe_consent` の内側（パスを受け取る・検査用に分けた）。
+fn write_s1_probe_consent_at(path: &Path, now_ms: u64) -> Result<(), String> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("保存先を作成できません: {e}"))?;
+    }
+    // ★ 一時ファイルに書いてから置き換える（書きかけの印を残さない・`eh3::save_ledger` と同じ作法）
+    let tmp = path.with_extension("tmp");
+    std::fs::write(
+        &tmp,
+        format!(
+            "{{\"acknowledged_at\":{now_ms},\"consent_version\":\"{S1_PROBE_CONSENT_VERSION}\"}}\n"
+        ),
+    )
+    .map_err(|e| format!("同意を保存できません: {e}"))?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("同意を保存できません: {e}")
+    })
 }
 
 /// G1 参加者 ID を保存する。妥当でない ID は **書かずに** `Err` を返す (fail-closed)。
@@ -1045,6 +1103,27 @@ mod tests {
             "gse-install-id-{tag}-{}-{nanos}",
             std::process::id()
         ))
+    }
+
+    /// 段 1 の同意の印: 無い → 無効、書く → 有効、中身は時刻と版だけ、版が違えば無効。
+    #[test]
+    fn s1_probe_consent_round_trip_and_version() {
+        let dir = unique_tmp_dir("s1consent");
+        let path = dir.join(".gse").join(S1_PROBE_CONSENT_FILE_NAME);
+        assert!(!s1_probe_consent_acknowledged_at(&path), "無い間は無効");
+        write_s1_probe_consent_at(&path, 1_700_000_000_000).unwrap();
+        assert!(s1_probe_consent_acknowledged_at(&path));
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let keys: Vec<&String> = v.as_object().unwrap().keys().collect();
+        assert_eq!(keys.len(), 2, "中身は時刻と版だけ: {keys:?}");
+        assert_eq!(v["acknowledged_at"], 1_700_000_000_000u64);
+        assert_eq!(v["consent_version"], S1_PROBE_CONSENT_VERSION);
+        std::fs::write(&path, r#"{"acknowledged_at":1,"consent_version":"old"}"#).unwrap();
+        assert!(!s1_probe_consent_acknowledged_at(&path), "版が違えば無効");
+        std::fs::write(&path, "not json").unwrap();
+        assert!(!s1_probe_consent_acknowledged_at(&path), "壊れていれば無効");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

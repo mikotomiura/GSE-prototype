@@ -47,6 +47,8 @@ pub mod recording;
 // ⚠️★★★ O1 (R3): 被験者による **区間指定削除** (ADR-014 D7-iii / 判断 3 の根拠 3)。
 //   ★ OS API を呼ばない純粋なファイル層なので `input/` にも `analysis/` にも入れない。
 pub mod redaction;
+// 段 1（ADR-043）の「段 1 モード」判定（OS API 非依存）。★ O1 の上に載せる層（EH3 と同じ作り方）。
+pub mod s1;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -3351,7 +3353,8 @@ fn record_realtime_skip(
     }
     let skip_reason = SkipReason::parse(&skip_reason)
         .ok_or_else(|| format!("invalid skip_reason: {:?}", skip_reason))?;
-    if matches!(skip_reason, SkipReason::None) {
+    // ★ `superseded` は段 1 の調停器だけが書く値（UI が名乗ると本人の未回答と差し替えが混ざる）。
+    if matches!(skip_reason, SkipReason::None | SkipReason::Superseded) {
         return Err("skip_reason must be dont_remember or dismissed".to_string());
     }
     log.lock()
@@ -4166,7 +4169,39 @@ pub fn run() {
              (EH3 runs only on top of O1 collection)."
         );
     }
-    let eh3_mode = crate::eh3::resolve(eh3_detected, o1_source.is_some());
+    // 段 1（ADR-043・C4 のプローブと日の終わりの問い）の判定 —— EH3 を確定する前に読む。
+    //   段 1 も O1 の上にだけ立てる層（`s1::resolve`）。EH3 の印と同時なら両方を落として素の O1 にする
+    //   （EH3 は招待を出し、段 1 は出さない。どちらかを勝たせると配り間違いを静かに記録し続ける・
+    //   `.steering/20261105-gse-m5-probe-wiring-plan/decisions.md` 判断 7）。
+    //   ⚠️ `eh3::set_mode` は `OnceLock` なので、落とすならこの順で決める（本タスクの判断 7）。
+    let s1_detected = crate::s1::detect_from_env();
+    let s1_eh3_conflict = crate::s1::conflicts_with_eh3(s1_detected, eh3_detected.is_some());
+    if s1_eh3_conflict {
+        tracing::error!(
+            "BOTH s1.mode and eh3.mode are present (s1={:?}). Stage 1 and EH3 are both DISABLED \
+             (the run continues as plain O1 if O1 is active). Remove one marker.",
+            s1_detected
+        );
+    } else if s1_detected.is_some() && o1_source.is_none() {
+        tracing::warn!(
+            "s1.mode marker is present but O1 mode is not active; stage 1 is DISABLED \
+             (stage 1 runs only on top of O1 collection)."
+        );
+    }
+    let (s1_mode, eh3_kept) =
+        crate::s1::resolve_with_eh3(s1_detected, o1_source.is_some(), eh3_detected);
+    crate::s1::set_mode(s1_mode);
+    if let Some(src) = s1_mode {
+        // ⚠️ 2026-11-06（M5 の 1 本目）時点では、問いを出す駆動役はまだ無い（M5 の 2 本目）。
+        //   印があればモードは立ち `meta` に `s1_mode` が刻まれるが、問いは出ない。
+        //   → 駆動役を作るときにこの文を「問いを出す」に改める（2026-11-06 code-reviewer MEDIUM）。
+        tracing::warn!(
+            "STAGE 1 MODE ENABLED (source={}): this build records the mode only; the probe and \
+             end-of-day question driver is NOT wired yet (M5 part 2). Nudge and invitations stay OFF.",
+            src.as_str()
+        );
+    }
+    let eh3_mode = crate::eh3::resolve(eh3_kept, o1_source.is_some());
     crate::eh3::set_mode(eh3_mode);
     init_wall_channel();
     if let Some((src, _)) = eh3_mode {

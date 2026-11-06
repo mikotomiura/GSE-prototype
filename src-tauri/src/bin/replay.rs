@@ -1172,6 +1172,15 @@ enum ReplayEvent {
     /// 読み飛ばし専用。通常のモードで招待を許すセッションの条件（記録のみ・推論へ流さない）。
     #[serde(rename = "invitation_condition")]
     InvitationCondition(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。段 1 の問いの枠（記録のみ・推論へ流さない）。`--probes` で読む（M5 の 3 本目）。
+    #[serde(rename = "probe_frame")]
+    ProbeFrame(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。段 1 の出さなかった候補（記録のみ・推論へ流さない）。
+    #[serde(rename = "probe_suppressed")]
+    ProbeSuppressed(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。段 1 の日の終わりの問い（記録のみ・推論へ流さない）。
+    #[serde(rename = "day_question")]
+    DayQuestion(#[allow(dead_code)] serde_json::Value),
     /// ⚠️★★★ **O1 の監査 criterion**（ADR-031 D1）。★ 読み飛ばし専用。
     ///
     /// ⚠️★★★ **2026-09-14 に足し忘れて実測で踏んだ。**★ `activity_label` 行を 1 本足した
@@ -1283,6 +1292,10 @@ impl ReplayEvent {
             ReplayEvent::Eh3Day(_) => None,
             ReplayEvent::InvitationPresent(_) => None,
             ReplayEvent::InvitationCondition(_) => None,
+            // 段 1 の 3 行種も記録のみで推論へ流さない。
+            ReplayEvent::ProbeFrame(_) => None,
+            ReplayEvent::ProbeSuppressed(_) => None,
+            ReplayEvent::DayQuestion(_) => None,
             // ⚠️★★★ 監査 criterion（ADR-031）。★ 記録のみで推論へ流さない。
             ReplayEvent::ActivityLabel(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
@@ -4189,6 +4202,10 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::Eh3Day(_)
             | ReplayEvent::InvitationPresent(_)
             | ReplayEvent::InvitationCondition(_)
+            // 段 1 の 3 行種も読み飛ばす。
+            | ReplayEvent::ProbeFrame(_)
+            | ReplayEvent::ProbeSuppressed(_)
+            | ReplayEvent::DayQuestion(_)
             // ⚠️★★★ 監査 criterion (ADR-031)。★ 記録のみで推論へ流さない。
             | ReplayEvent::ActivityLabel(_)
             | ReplayEvent::SessionMeta { .. }
@@ -6897,6 +6914,18 @@ not json\n";
             (
                 "invitation_condition",
                 r#"{"type":"invitation_condition","t":1,"condition":"none","hmm_version":"0.5.0"}"#,
+            ),
+            (
+                "probe_frame",
+                r#"{"type":"probe_frame","t":1,"frame_seed":42,"anchor_ms":1,"arbiter_version":"s1-arbiter-1"}"#,
+            ),
+            (
+                "probe_suppressed",
+                r#"{"type":"probe_suppressed","t":1,"candidate_ts":1,"stratum":"random","reason":"away"}"#,
+            ),
+            (
+                "day_question",
+                r#"{"type":"day_question","t":2,"shown_ts":1,"in_eod_window":false,"target_day":20000,"trigger":"pickup","delayed":true,"answered":false,"closed_by":"dismiss","items_version":"dq-draft-1","motivation":null,"latency_ms":null,"duration_ms":null}"#,
             ),
         ];
 

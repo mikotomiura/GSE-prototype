@@ -94,6 +94,14 @@ pub enum LogEntryDto {
         #[serde(skip_serializing_if = "Option::is_none")]
         #[schemars(regex(pattern = r"^[0-9a-f]{16}$"))]
         o1_install_id: Option<String>,
+        /// 段 1（ADR-043・C4 のプローブと日の終わりの問い）モードの引き金 (`"marker"` | `"env"`)。**start 形状のみ**。
+        ///
+        /// 段 1 は O1 の上に載せた層なので、段 1 のときは `o1_mode` も出る。O1 の記録と分けるのはこの
+        /// フィールドである。EH3 と同時には出ない（両方の印があれば両方を落とす）。
+        /// 段 1 の実施時にしか出ない（印の無い O1 の NDJSON は従来と byte 単位で同一）。
+        /// `Option` である（旧ログには無い・ADR-005）。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        s1_mode: Option<String>,
         /// EH3（肖像と招待の参加者内比較）モードの引き金 (`"marker"` | `"env"`)。**start 形状のみ**。
         ///
         /// EH3 は O1 の収集の器に載せた層なので、EH3 のときは `o1_mode` も出る。O1 の記録と分けるのはこの
@@ -536,6 +544,105 @@ pub enum LogEntryDto {
         #[serde(skip_serializing_if = "Option::is_none")]
         seed_effective: Option<String>,
     },
+    /// 段 1 の問いの枠（seed・起点・調停器の版と定数）。`meta.s1_mode` があるときだけ出る。
+    ///
+    /// 記録のファイルを開いたとき（と、同意の印ができたとき）に 1 行出す。無作為の候補の時刻の列は
+    /// `frame_seed` と `anchor_ms` だけで決まり、記録から再現できる。系の設定だけで、行動も申告も持たない。
+    /// ★ 区間指定削除で消さない（`meta`・`invitation_condition` と同じ側）。数値は探索用の仮の定数。
+    ///
+    /// 時刻キーは `t`。
+    ProbeFrame {
+        t: u64,
+        /// 2^53 − 1 以下。
+        frame_seed: u64,
+        anchor_ms: u64,
+        arbiter_version: String,
+        lambda_per_ms: f64,
+        gap_min_ms: u64,
+        cap_window_ms: u64,
+        cap_count: u64,
+        max_gap_ms: u64,
+        away_idle_ms: u64,
+        warmup_ms: u64,
+        strata_enabled: bool,
+        strat_low_op_min_gap_ms: u64,
+        strat_resume_min_gap_ms: u64,
+        strat_guard_after_any_ms: u64,
+        strat_cap_count: u64,
+        strat_cap_window_ms: u64,
+        strat_yield_before_random_ms: u64,
+        no_ask_enabled: bool,
+        no_ask_block_ms: u64,
+        no_ask_fraction: f64,
+        eod_window_start_min: u32,
+        eod_window_end_min: u32,
+        eod_idle_ms: u64,
+        eod_yield_before_random_ms: u64,
+    },
+    /// 段 1 の問いの候補を出さなかった記録。`meta.s1_mode` があるときだけ出る。
+    ///
+    /// `t` は判定した時刻、`candidate_ts` は候補の時刻（無作為は枠の候補・層化は引き金の押下）。
+    /// 区間指定削除では `candidate_ts` 〜 `t` の区間で消える。
+    ProbeSuppressed {
+        t: u64,
+        candidate_ts: u64,
+        stratum: ProbeStratumDto,
+        reason: ProbeSuppressReasonDto,
+    },
+    /// 段 1 の日の終わりの問い（ADR-048 D3）。`meta.s1_mode` があるときだけ出る。カードが閉じた時刻に 1 行。
+    ///
+    /// `target_day` は現地の日の番号（4:00 区切り・1970-01-01 からの日数）。時差は書かない
+    /// （現地の分も書かない。UTC の時刻と並べると時差が分の精度で出るため）。
+    /// `motivation` は 1..5 の 1 項目（答えていなければ `null`）。自由記述・理由を持たない。
+    /// 区間指定削除では `shown_ts` 〜 `t` の区間で消える。
+    DayQuestion {
+        t: u64,
+        shown_ts: u64,
+        /// 問いを出したとき現地の時刻が時間帯の中だったか（現地の分そのものは書かない・時差が出るため）。
+        in_eod_window: bool,
+        target_day: i64,
+        trigger: DayQuestionTriggerDto,
+        delayed: bool,
+        answered: bool,
+        closed_by: DayQuestionClosedByDto,
+        items_version: String,
+        motivation: Option<u8>,
+        latency_ms: Option<u64>,
+        duration_ms: Option<u64>,
+    },
+}
+
+/// 段 1 の候補を出さなかった理由。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProbeSuppressReasonDto {
+    Away,
+    Warmup,
+    Gap,
+    Cap,
+    Yielded,
+    CardOpen,
+    NoAsk,
+}
+
+/// 段 1 の日の終わりの問いの契機。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DayQuestionTriggerDto {
+    EveningIdle,
+    Quit,
+    PauseResume,
+    Pickup,
+}
+
+/// 段 1 の日の終わりの問いのカードが閉じた理由。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DayQuestionClosedByDto {
+    Answer,
+    Dismiss,
+    DayEnd,
+    Quit,
 }
 
 /// 招待の契機の種類。NDJSON 文字列は "estimator" / "rising" / "random" / "none"。
@@ -710,13 +817,15 @@ pub enum ProbeSourceDto {
     SelfMarker,
 }
 
-/// `realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip。
+/// `realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip、
+/// `superseded` = 段 1 で層化のカードが無作為の問いに差し替えられた（調停器だけが書く）。
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SkipReasonDto {
     None,
     DontRemember,
     Dismissed,
+    Superseded,
 }
 
 /// `vignette_response` の想定象限。教示の正解ラベル (`idle` を含む)。
