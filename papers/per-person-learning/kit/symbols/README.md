@@ -35,8 +35,8 @@ is reproducible bit for bit.
 ## Input contract
 
 `symbolize(t0, presses)` expects non-negative integer times in milliseconds, presses sorted
-by time (ties keep their order), and categories from `constants.json`. Unsorted input and
-unknown categories raise `ValueError`. Presses before `t0` are discarded, as in the original
+by time (ties keep their order), and categories from `constants.json`. Other time values,
+unsorted input and unknown categories raise `ValueError`. Presses before `t0` are discarded, as in the original
 implementation. One row is produced for every second from `t0` to the last event (pauses of
 2 s or more included), so the run time grows with the time span of a recording.
 

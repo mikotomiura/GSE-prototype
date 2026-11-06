@@ -92,7 +92,8 @@ def test_edge_inputs():
     assert one and all(r[5] == "silence" for r in one) and one[0][0] == 2000, one[:2]
     ties = symbolize(0, [(1000, "alphabetic")] * 50 + [(1500, "space")], C)
     assert all(0 <= r[3] <= 25 for r in ties)
-    for bad in ([(1, "Alphabetic")], [(2000, "alphabetic"), (1000, "alphabetic")]):
+    for bad in ([(1, "Alphabetic")], [(2000, "alphabetic"), (1000, "alphabetic")], [(float("inf"), "alphabetic")],
+                [(-5, "alphabetic")], [(1.5, "alphabetic")], [(True, "alphabetic")]):
         try:
             symbolize(0, bad, C)
         except ValueError:
@@ -120,14 +121,17 @@ def test_branch_coverage():
 
 
 def test_check_rejects_count_mismatch():
+    with gzip.open(os.path.join(HERE, "conformance", "data", "expected.json.gz"), "rt", encoding="utf-8") as f:
+        full = json.load(f)["expected"]
     with tempfile.TemporaryDirectory() as td:
-        empty = os.path.join(td, "e.json")
-        with open(empty, "w") as f:
-            json.dump({"expected": []}, f)
-        r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "conformance", "check.py"),
-                            os.path.join(HERE, "conformance", "data", "inputs.json.gz"), empty],
-                           capture_output=True)
-        assert r.returncode != 0
+        for name, exp in (("empty", []), ("one_short", full[:-1])):
+            path = os.path.join(td, name + ".json")
+            with open(path, "w") as f:
+                json.dump({"expected": exp}, f)
+            r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "conformance", "check.py"),
+                                os.path.join(HERE, "conformance", "data", "inputs.json.gz"), path],
+                               capture_output=True, text=True)
+            assert r.returncode != 0 and "case count mismatch" in r.stdout, (name, r.returncode, r.stdout)
 
 
 def test_regenerate_inputs():

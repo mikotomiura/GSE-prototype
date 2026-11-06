@@ -1,6 +1,6 @@
 #!/bin/bash
 # 変異で赤を見る（公開しない）。kit を一時の dir に写し、1 か所ずつ壊して合成の適合の検査を回す。
-# 捕捉 = 変異が当たり（ファイルが変わり）、検査の JSON の mismatched_cases が 0 より大きい。
+# 捕捉 = 変異が当たり（ファイルが変わり）、検査が rc=1 で終わり、JSON の mismatched_cases が 0 より大きい。
 # 先に無変異の対照（rc=0・mismatched_cases=0）を確かめる。生存・未適用・異常終了があれば非 0 で終える。
 # 等価と分かっている変異（EQUIV）は生存を期待する。
 set -u
@@ -32,7 +32,7 @@ PY
   python3 -I "$W/conformance/check.py" "$IN" "$EX" > "$W/out.txt" 2>&1
   local rc=$? m; m=$(mism "$W/out.txt")
   local got
-  if [ "$m" -gt 0 ] 2>/dev/null; then got=caught; elif [ $rc -eq 0 ] && [ "$m" = "0" ]; then got=survived; else got=error; fi
+  if [ $rc -eq 1 ] && [ "$m" -gt 0 ] 2>/dev/null; then got=caught; elif [ $rc -eq 0 ] && [ "$m" = "0" ]; then got=survived; else got=error; fi
   echo "$name: $got (expected $expect) rc=$rc mismatched=$m"
   [ "$got" = "$expect" ] || fail=1
   rm -rf "$W"

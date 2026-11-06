@@ -302,6 +302,10 @@ def symbolize(t0, presses, c=None):
     the same time, and no tick is processed after the last event. One row is produced for
     every second from t0 to the last event, so the work grows with the time span.
     """
+    def is_time(v):
+        return type(v) is int and v >= 0
+    if not is_time(t0) or not all(is_time(p[0]) for p in presses):
+        raise ValueError("times must be non-negative integers (ms)")
     if any(b[0] < a[0] for a, b in zip(presses, presses[1:])):
         raise ValueError("presses must be sorted by time")
     c = c or load_constants()

@@ -10,5 +10,5 @@
 - [x] 変異で赤を見る（当たったことも確かめる）
 - [x] 実データの照合（層 1・層 2 を別々に・件数だけ）
 - [x] 公開物の規約の検査（GSE の名前・パス・内部の番号なし）
-- [ ] code-reviewer＋/cross-review（Codex を加える）
-- [ ] コミット（push と PR は研究者が確かめてから）
+- [x] /cross-review 2 巡（Codex を加えた・code-reviewer は cross-reviewer の中で走った）
+- [x] コミット（push と PR は研究者が確かめてから）
