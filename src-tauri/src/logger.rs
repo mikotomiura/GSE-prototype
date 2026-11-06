@@ -319,9 +319,9 @@ impl SkipReason {
         Self::Superseded,
     ];
 
-    /// ★ `ALL` の網羅をコンパイラと検査に守らせるための印（`ActivityCategory::exhaustive_marker` と同じ作り）。
-    /// 値を足すとこの `match` が非網羅でビルドが落ち、印を足して `ALL` を忘れると
-    /// `skip_reason_all_is_exhaustive` が赤になる。
+    /// ★ `ALL` の網羅をコンパイラに思い出させるための印（`ActivityCategory::exhaustive_marker` と同じ作り）。
+    /// 値を足すとこの `match` が非網羅でビルドが落ちる。そのとき `ALL` も一緒に直す
+    /// （直し忘れを機械で止める保証は無い・`skip_reason_all_is_exhaustive` の doc）。
     #[cfg(test)]
     fn exhaustive_marker(self) -> usize {
         match self {
@@ -4240,24 +4240,17 @@ mod tests {
         );
     }
 
-    /// `SkipReason::ALL` は全ての値を、印の順に 1 回ずつ持つ。
+    /// `SkipReason::ALL` は、網羅の印の順に値を 1 回ずつ持つ。
+    ///
+    /// ⚠️ 保証の範囲（2026-11-06 /cross-review 3 巡目 Codex P2）: 値を足すと `exhaustive_marker` の
+    /// `match` がコンパイルで止まる。そこで `ALL` を直し忘れると、新しい値の印が `ALL` の長さと
+    /// 食い違うので、この検査で新しい値を 1 つ書いて確かめる必要がある。マクロなしに列挙型の値を
+    /// 数え上げる方法が無いので、`ActivityCategory::ALL` と同じ水準にとどめる。
     #[test]
     fn skip_reason_all_is_exhaustive() {
         for (i, r) in SkipReason::ALL.iter().enumerate() {
             assert_eq!(r.exhaustive_marker(), i, "{r:?}");
         }
-        // 印の最大値 + 1 と ALL の長さが一致（印を足して ALL を忘れると、ここで長さが合わない）
-        let max = [
-            SkipReason::None,
-            SkipReason::DontRemember,
-            SkipReason::Dismissed,
-            SkipReason::Superseded,
-        ]
-        .iter()
-        .map(|r| r.exhaustive_marker())
-        .max()
-        .unwrap();
-        assert_eq!(max + 1, SkipReason::ALL.len());
     }
 
     /// 差し替えは `superseded` で書かれ、`dismissed` に正規化されない。

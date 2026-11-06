@@ -278,6 +278,10 @@ impl DayClosedBy {
 }
 
 /// いま開いているカード（駆動役が画面の状態から渡す）。
+///
+/// ⚠️ 駆動役の約束: `ShowDayQuestion` を受けた次の tick からは、閉じるまで必ず `Day`
+/// （無作為の問いに伏せている間は `Random`）を渡す。表示の遅れで `None` を渡さない
+/// （`None` を受けると調停器は日の問いの覚えを捨てる）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenCard {
     /// 無作為の問いのカード（未回答）。
@@ -333,7 +337,8 @@ pub enum Action {
         delayed: bool,
         in_window: bool,
     },
-    /// 日の終わりの問いのカードを閉じる（日の切れ目）。★ 調停器は自分の覚えを既に捨てているので、
+    /// 日の終わりの問いのカードを閉じる（日の切れ目）。駆動役は、持っていない `card_id` の指示は無視する。
+    /// ★ 調停器は自分の覚えを既に捨てているので、
     /// 駆動役はこのカードについて `on_closed` を呼ばなくてよい（呼んでも通し番号が違えば何も起きない）。
     /// `card_id` は、調停器が覚えていなかったカード（駆動役だけが開いていると言った）なら `None`。
     CloseDayQuestion {
@@ -655,6 +660,14 @@ impl DayQuestion {
             return;
         }
         let today = input.local_day;
+        // ★ 駆動役が「画面にカードは無い」と言っているのに覚えが残っていたら、覚えを捨てる
+        //   （`on_closed` の呼び忘れで日の問いが日の切れ目まで止まり続けない・2 巡目 Claude MEDIUM）。
+        //   伏せられている間は駆動役が `Random` を渡すので、ここには来ない。
+        //   ★ 日の切れ目の処理より先に行う（取りこぼした覚えから `day_end` の行を二重に出さない・3 巡目 Claude MEDIUM）。
+        //   一時停止の間は駆動役の画面の値を信じない（覚えを持ったまま再開を待つ）。
+        if !input.paused && open_card.is_none() {
+            self.showing = None;
+        }
         // 日の切れ目: 出したまま閉じていない日の問いのカードを閉じ、予約と持ち越しを捨てる。
         // ★ カードは自分で覚えておく（`showing`）。無作為の問いに伏せられている間は駆動役が
         //   `open_card = Random` を渡すので、それを見ていると伏せたカードを閉じられない
@@ -688,12 +701,6 @@ impl DayQuestion {
         self.last_local_day = Some(today);
         if input.paused {
             return;
-        }
-        // ★ 駆動役が「画面にカードは無い」と言っているのに覚えが残っていたら、覚えを捨てる
-        //   （`on_closed` の呼び忘れで日の問いが日の切れ目まで止まり続けない・2 巡目 Claude MEDIUM）。
-        //   伏せられている間は駆動役が `Random` を渡すので、ここには来ない。
-        if open_card.is_none() {
-            self.showing = None;
         }
         // 切れ目で閉じたカードはこの tick では開いていないものとして扱う
         let mut open = if day_changed_now && matches!(open_card, Some(OpenCard::Day { .. })) {
@@ -832,13 +839,10 @@ impl DayQuestion {
         local_minute: u32,
         open_card: Option<OpenCard>,
     ) -> Option<Action> {
-        if open_card.is_none() {
-            // 駆動役が「カードは無い」と言っている（覚えの残りを捨てる・tick と同じ扱い）
-            self.showing = None;
-        }
-        if open_card.is_some() || self.showing.is_some() || !config.in_eod_window(local_minute) {
+        if open_card.is_some() || !config.in_eod_window(local_minute) {
             return None;
         }
+        // ★ 取りこぼした覚えには止められない（出すカードが覚えを上書きする）
         self.same_day_ask(local_day, DayTrigger::Quit, true)
     }
 
@@ -1012,12 +1016,12 @@ impl Arbiter {
 
         // ② 層化（① の枠は読むだけ）。★ 一時停止の再開・スリープの復帰では、前の押下を忘れる
         //   （止めていた・眠っていた時間を「低操作」と読まない・2026-11-06 /cross-review の Claude MEDIUM）。
-        //   ★ その tick では引き金を立てず、束の最後の押下を新しい起点にするだけにする。束には止める前の
-        //   押下が混じりうる（Codex 2 巡目 P2）ので、束の中の空きを途切れと読まない。
+        //   ★ その tick では引き金を立てず、起点も持たない（次の押下を起点にする）。束には止める前の
+        //   押下が混じりうるし、止める前の押下だけのこともある（Codex 2・3 巡目 P2）ので、
+        //   束のどの押下も起点にしない。代償は、復帰の直後の 1 回の引き金の機会。
         let rebaseline = input.resumed || input.power_resumed;
         if rebaseline {
             self.strata.forget_last_press();
-            self.strata.last_press_ms = input.key_presses_ms.last().copied();
         }
         if self.config.strata_enabled && !rebaseline {
             if let Some((t, stratum)) = self.strata.detect(
@@ -1532,7 +1536,7 @@ mod tests {
             )),
             "{acts:?}"
         );
-        // 起点は束の最後の押下: 次の押下までの空きが短ければ引き金は立たない
+        // 起点は持たない: 次の押下では引き金は立たない
         let acts = arb.tick(&input(back + 20 * SEC, &[back + 20 * SEC], &[]));
         assert!(
             !acts.iter().any(|a| matches!(
@@ -1542,6 +1546,34 @@ mod tests {
                     ..
                 } | Action::Suppress {
                     stratum: Stratum::LowOperationEnd,
+                    ..
+                }
+            )),
+            "{acts:?}"
+        );
+    }
+
+    /// 復帰の束が止める前の押下だけでも、その押下を起点にしない（Codex 3 巡目 P2）。
+    #[test]
+    fn strata_resume_batch_with_only_stale_press() {
+        let mut arb = new_arb(44, ArbiterConfig::default());
+        let p0 = T0 + 10 * MIN;
+        arb.tick(&input(p0, &[p0], &[]));
+        let back = p0 + 5 * MIN;
+        let stale = [p0 + SEC];
+        let mut inp = input(back, &stale, &[]);
+        inp.power_resumed = true;
+        arb.tick(&inp);
+        let p1 = back + 40 * SEC;
+        let acts = arb.tick(&input(p1, &[p1], &[]));
+        assert!(
+            !acts.iter().any(|a| matches!(
+                a,
+                Action::FireProbe {
+                    stratum: Stratum::LowOperationEnd | Stratum::Resumption,
+                    ..
+                } | Action::Suppress {
+                    stratum: Stratum::LowOperationEnd | Stratum::Resumption,
                     ..
                 }
             )),
@@ -2335,7 +2367,32 @@ mod tests {
         );
         assert_eq!(shows(&out).len(), 1);
         assert!(dq.showing.is_some());
-        // 夕方、駆動役は「カードは無い」と言う → 覚えを捨て、当日の問いを出せる
+        // 駆動役は「カードは無い」と言う → 覚えを捨てる（★ この行が捨てる処理を縛る）
+        dq.tick(
+            &cfg(),
+            &day_input(next + SEC, DAY0 + 1, 500, &[]),
+            None,
+            far,
+            &mut out,
+        );
+        assert!(dq.showing.is_none(), "覚えが残っている");
+        // 次の日の切れ目で、取りこぼした覚えから閉じる指示を出さない
+        let mut out_cut = Vec::new();
+        let mut dq_cut = dq.clone();
+        dq_cut.tick(
+            &cfg(),
+            &day_input(next + 24 * 3_600_000, DAY0 + 2, 300, &[]),
+            None,
+            far,
+            &mut out_cut,
+        );
+        assert!(
+            !out_cut
+                .iter()
+                .any(|a| matches!(a, Action::CloseDayQuestion { .. })),
+            "{out_cut:?}"
+        );
+        // 夕方、当日の問いを出せる
         dq.tick(
             &cfg(),
             &day_input(
@@ -2385,6 +2442,38 @@ mod tests {
             &mut out2,
         );
         assert!(dq2.showing.is_some());
+    }
+
+    /// 終了の補助も、駆動役が「カードは無い」と言えば取りこぼした覚えに止められない。
+    #[test]
+    fn on_quit_drops_stale_showing() {
+        let mut dq = DayQuestion::new(DayState::default());
+        let mut out = Vec::new();
+        dq.tick(
+            &cfg(),
+            &day_input(T0, DAY0, 1100, &[T0]),
+            None,
+            u64::MAX,
+            &mut out,
+        );
+        // 前の日の覚えが取りこぼされて残っている
+        dq.showing = Some((99, DAY0 - 1));
+        assert!(
+            dq.on_quit(&cfg(), DAY0, 1130, Some(OpenCard::Random))
+                .is_none(),
+            "開いていれば尋ねない"
+        );
+        let a = dq.on_quit(&cfg(), DAY0, 1130, None);
+        assert!(
+            matches!(
+                a,
+                Some(Action::ShowDayQuestion {
+                    trigger: DayTrigger::Quit,
+                    ..
+                })
+            ),
+            "{a:?}"
+        );
     }
 
     /// 再開の持ち越しは時間帯の中だけ（時間帯を出たら捨てる）。
