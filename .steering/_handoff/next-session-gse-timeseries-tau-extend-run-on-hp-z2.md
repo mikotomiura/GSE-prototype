@@ -87,4 +87,4 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/timeseries_tau_extend_run.log"; echo "
   1. `git -C <職場の PC の checkout> fetch origin` の後、`git checkout exp/gse-timeseries-tau-extend` と `git pull --ff-only` で `bd039ec3` に揃える（職場の PC 側にコミットを足さない）。
   2. `C:/Users/SDS02/gse-public-data` と、書き手ごとの値 `timeseries_tau_extend_writer_values.*.json` は消さずに残す（次の候補の計算に使う可能性がある）。人が開いて読まない。
   3. Drive の `GSE_ML-run_results` の zip とログは消さない。
-- 次の候補（まだ回さない）: τ の候補に事前分布の最頻値を足す計算（引き継ぎ `next-session-gse-timeseries-after-tau-extend.md` §2 の 1）。回すかどうかは研究者が決める。回す場合は、Mac で条件とコードを先にコミットし、職場の PC 向けの新しい引き継ぎを Drive に置く。このメモの手順では回さない。
+- 次の候補（まだ回さない）: τ の候補に事前分布の最頻値を足す計算。2026-11-06 に研究者が「論文 3 の前に回す」と決めた。Mac が条件とコードを先にコミットし、合成の検査を通した後に、職場の PC 向けの新しい引き継ぎをこのフォルダに置く（計画は `.steering/_handoff/next-session-gse-tau-mode-candidate.md`）。共通の母数は保存されていないので、計算は今回と同じ規模（約 2 時間）の見込み。新しい引き継ぎが置かれるまで、このメモの手順では何も回さない。
