@@ -237,7 +237,7 @@ def p_oth(seed):
 
 # ---------------------------------------------------------------- 足す対照: 列・並べ替え・幅・D
 def rust_bin(v, q_):
-    """engine.rs の (x * q).floor().min(q − 1) as usize（Rust の float → usize は負と NaN を 0 に飽和）を 1 つずつ写した参照。"""
+    """engine.rs の (x * q).floor().min(q − 1) as usize（Rust の float → usize は負を 0 に飽和）を 1 つずつ写した参照（NaN は扱わない）。"""
     x = min(math.floor(v * q_), q_ - 1)
     return 0 if x < 0 else int(x)
 
@@ -361,13 +361,21 @@ def p_d(seed):
 HMM3 = [("hmm", 3)]
 
 
-def writers_from(models, rng, n_w=8, n_u=20, L=300):
-    return [[unit_of(s) for s in H.sample(models[w], [L] * n_u, rng)] for w in range(n_w)]
+def writers_from(models, rng, n_us=(40, 40, 20, 20, 20, 20, 20, 20), L=300):
+    """書き手ごとの単位の数 n_us（40 の 2 人は P30 にも入る・P-OTHER のパネルの照らし・code-reviewer MEDIUM-2）。"""
+    return [[unit_of(s) for s in H.sample(models[w], [L] * n, rng)] for w, n in enumerate(n_us)]
 
 
 def shuffled(writers, rng):
-    return [[dict(u, seqs=[rng.permutation(s) for s in u["seqs"]], pflag=[np.asarray(f) for f in u["pflag"]])
-             for u in ss] for ss in writers]
+    out = []
+    for ss in writers:
+        nu = []
+        for u in ss:
+            perms = [rng.permutation(len(s)) for s in u["seqs"]]
+            nu.append(dict(u, seqs=[np.asarray(s)[p] for s, p in zip(u["seqs"], perms)],
+                           pflag=[np.asarray(f)[p] for f, p in zip(u["pflag"], perms)]))
+        out.append(nu)
+    return out
 
 
 def cell(D, k, name):
@@ -377,7 +385,7 @@ def cell(D, k, name):
 def part_vals(Do, Dp, k, name):
     o, p = cell(Do, k, name), cell(Dp, k, name)
     return dict(G_o=med(o["tau_other"]["all/self_minus_pool_same"]), G_p=med(p["tau_other"]["all/self_minus_pool_same"]),
-                G0_o=med(o["tau_0"]["all/self_minus_pool_same"]), D_o=med(o["deficit"]["all"]), D_p=med(p["deficit"]["all"]),
+                G0_o=med(o["G0r"]["all"]), D_o=med(o["deficit"]["all"]), D_p=med(p["deficit"]["all"]),
                 S0_o=med(o["S0"]["all"]))
 
 
@@ -407,22 +415,25 @@ def pers_models(rng, n_w):
 
 
 def p_other(X, writers):
-    """S0 を書き手ごとに作り直して照らす: v ≠ w・同じパネル・同じ k・v の τ = 0 の母数（v の評価で本人 τ = 0 と一致）。"""
-    res, S0, fits = X["results"], X["S0"], X["fits"]
-    ws = list(res)
-    dev, self_dev, cnt = 0.0, 0.0, 0
-    for k in (1, 5, 15):
+    """S0 を書き手ごとに作り直して照らす: v ≠ w・同じパネル（P15 の k = 1・5・15 と P30 の k = 30）・同じ k・
+    v の τ = 0 の乱数の開始点の解（v の評価で self0r と一致）。P30 は単位 40 の 2 人だけ。"""
+    res, S0, fits, ns = X["results"], X["S0"], X["fits"], X["ns"]
+    dev, self_dev, cnt, p30 = 0.0, 0.0, 0, 0
+    for k, nmin in ((1, 20), (5, 20), (15, 20), (30, 35)):
+        ws = [w for w in res if ns[w] >= nmin]
         for w in ws:
             ev = ml.eval_of(writers[w], 5)
             pool = res[w]["em"]["pool"]["hmm3"]
-            vals = [ev.ll(fits[v]["hmm3"][str(k)]["0"])[0] - pool[0] for v in ws if v != w]
+            vals = [ev.ll(fits[v]["hmm3"][str(k)]["0r"])[0] - pool[0] for v in ws if v != w]
             dev = max(dev, abs(float(np.median(vals)) - S0[w][str(k)]["hmm3"][0]))
             cnt += 1
+            p30 += k == 30
         for v in ws:
-            a = ml.eval_of(writers[v], 5).ll(fits[v]["hmm3"][str(k)]["0"])
-            b = res[v]["em"]["k"][str(k)]["self"]["hmm3"]["0"]
+            a = ml.eval_of(writers[v], 5).ll(fits[v]["hmm3"][str(k)]["0r"])
+            b = res[v]["em"]["k"][str(k)]["self0r"]["hmm3"]
             self_dev = max(self_dev, abs(a[0] - b[0]))
-    return dict(passed=bool(dev < 1e-12 and self_dev < 1e-12 and cnt > 0), max_abs_dev=dev, v_model_dev=self_dev, cells=cnt)
+    ok = dev < 1e-12 and self_dev < 1e-12 and cnt > 0 and p30 == 2
+    return dict(passed=bool(ok), max_abs_dev=dev, v_model_dev=self_dev, cells=cnt, p30_cells=p30)
 
 
 def p_leak(X, writers, truths):

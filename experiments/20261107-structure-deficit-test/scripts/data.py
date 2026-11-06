@@ -236,6 +236,7 @@ PENALTY = 25  # engine.rs の backspace 連打の記号
 
 def axis_bin(v, q):
     """engine.rs の (x * 5.0).floor().min(4.0) as usize を q に一般化（負は 0 に飽和・Rust の float → usize の cast）。
+    NaN は quantize が先に止める（Rust の f64::min(NaN, 4.0) は 4.0 を返すが、numpy は NaN を運ぶ）。
     m31 は上の端を q にする（q の記号がはみ出す）。"""
     b = np.floor(np.asarray(v, dtype=np.float64) * q)
     b = np.minimum(b, q if "m31" in MUT else q - 1)
@@ -246,6 +247,8 @@ def axis_bin(v, q):
 def quantize(rows, q):
     """rows（n × 3: ewma_x・ewma_y・obs）→ 記号（0〜q²）。obs = 25 は q²（m32 は格子の記号のまま）。"""
     rows = np.asarray(rows, dtype=np.float64)
+    if np.isnan(rows).any():
+        raise ValueError("feat 行の ewma か obs に NaN がある（件数だけを報告する）")  # Rust と numpy で扱いが違うので止める
     sym = axis_bin(rows[:, 0], q) * q + axis_bin(rows[:, 1], q)
     if "m32" not in MUT:
         sym = np.where(rows[:, 2].astype(np.int64) == PENALTY, q * q, sym)

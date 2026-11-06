@@ -39,7 +39,7 @@ def vals(S, ds, pn, k, q_, name):
         return None
     so, sp = o["structs"][name], p["structs"][name]
     return dict(G_o=med(so["tau_other"]["all/self_minus_pool_same"]), G_p=med(sp["tau_other"]["all/self_minus_pool_same"]),
-                G0_o=med(so["tau_0"]["all/self_minus_pool_same"]), G0_p=med(sp["tau_0"]["all/self_minus_pool_same"]),
+                G0_o=med(so["G0r"]["all"]), G0_p=med(sp["G0r"]["all"]),
                 D_o=med(so["deficit"]["all"]), D_p=med(sp["deficit"]["all"]), S0_o=med(so["S0"]["all"]),
                 S0_p=med(sp["S0"]["all"]))
 
@@ -48,7 +48,8 @@ def main(path, out):
     S = json.load(open(path, encoding="utf-8"))
     L = ["# 表（report.py が summary.json から作る・手で書き換えない）", "",
          "run_id: `%s`。値は書き手ごとの差の中央値（全記号・nats/記号）。G = 本人（τ 他人）− 同じ構造の共通、"
-         "G0 = 本人（τ = 0）− 共通、D = r1 − 共通（足りなさ）、S0 = 他の人の τ = 0 の当てはめ − 共通（v の中央値の、w の中央値）。"
+         "G0 = 本人（τ = 0 の乱数の開始点の解）− 共通、D = r1 − 共通（足りなさ）、S0 = 他の人の τ = 0 の乱数の開始点の解 − 共通"
+         "（v の中央値の、w の中央値・G0 と S0 は同じ土台・判断 11）。"
          "o = そのまま、p = 並べ替え。部分 1・2 の判定は forms.py（conditions D5）。" % S.get("run_id"), ""]
     L += ["## 表 1 —— 構造 × 列（主のセルと k = 1）", ""]
     for ds, cells in ALL.items():
@@ -76,10 +77,10 @@ def main(path, out):
                 continue
             p1 = forms.cell_part1([forms.part1(v) for v in vs])
             p2 = forms.cell_part2([forms.part2(v) for v in vs])
-            fm = forms.form(p1, p2)
+            fm = forms.form(p1, p2) if None not in (p1, p2) else "伏せ（算出できない）"
             fs.append(fm)
             L.append("| %s | %s k = %s | %s | %s | %s |" % (ds, pn, k, p1, p2, fm))
-        ov = forms.overall(fs) if None not in fs else "未"
+        ov = forms.overall(fs) if all(x in ("A", "A'", "B", "C") for x in fs) else "未・伏せを含む"
         L.append("| %s | 全体 | | | %s |" % (ds, ov))
     L += ["", "CS1 は前の試験で hmm3 の G がもともと小さく、力が弱い（conditions D5）。", ""]
     L += ["## 表 3 —— 記述: 6 構造の D と G・G0 の Kendall の τ_b（判定に使わない）", "",

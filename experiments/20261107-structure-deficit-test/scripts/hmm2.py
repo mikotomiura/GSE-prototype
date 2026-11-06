@@ -296,14 +296,17 @@ def em_from(m, D, pr):
     return m, objective(m, D, pr) / D.nobs, it, conv, dec
 
 
-def fit(starts, D, pr):
-    """開始点 [(名前, 母数)] から、目的がいちばん大きいものを採る。"""
+def fit(starts, D, pr, keep_all=False):
+    """開始点 [(名前, 母数)] から、目的がいちばん大きいものを採る。keep_all なら開始点ごとの解 {名前: 母数} も返す
+    （structure-deficit-test の S0・判断 11: 乱数の開始点の解を、勝者とは別に取っておく）。"""
     res = [(name,) + em_from(m, D, pr) for name, m in starts]
     objs = [r[2] for r in res]
     order = np.argsort(objs)[::-1]
     best = res[order[0]]
     diag = dict(winner=best[0], gap12=float(objs[order[0]] - objs[order[1]]) if len(res) > 1 else None,
                 nonconv=sum(not r[4] for r in res), decreases=sum(r[5] for r in res), iters=[r[3] for r in res])
+    if keep_all:
+        return best[1], diag, {r[0]: r[1] for r in res}
     return best[1], diag
 
 

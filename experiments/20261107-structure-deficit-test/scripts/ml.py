@@ -166,10 +166,14 @@ def eval_of(units, H_):
 
 
 def fit_self_all(kind, K, D, pool_m, sb, rng, h, T):
-    """本人の当てはめ（有限の τ）: τ = 0（開始点 = w を除く共通の解・乱数 1 つ）と τ > 0（共通の解・本人 τ = 0 の解）。"""
+    """本人の当てはめ（有限の τ）: τ = 0（開始点 = w を除く共通の解・乱数 1 つ）と τ > 0（共通の解・本人 τ = 0 の解）。
+    out["0r"] は τ = 0 の乱数の開始点（本人の学習の記号の r1・r0 と本人の乱数の流れだけから作る）の解（判断 11・S0 と G0r）。
+    勝者の選びと乱数の流れは前の試験と同じ（開始点ごとの解を取っておくだけ）。"""
     out, diag = {}, {}
-    m0, d0 = H.fit([("pool", pool_m), ("rand", H.random_model(kind, K, rng, r1=T, r0=h))], D, H.base_prior(kind, K))
+    m0, d0, alls = H.fit([("pool", pool_m), ("rand", H.random_model(kind, K, rng, r1=T, r0=h))], D, H.base_prior(kind, K),
+                         keep_all=True)
     out[0], diag[0] = m0, d0
+    out["0r"] = alls["rand"]
     for tau in TAUS_FIT[1:]:
         m, d = H.fit([("pool", pool_m), ("self0", m0)], D, H.make_prior(kind, K, tau, sb))
         out[tau], diag[tau] = m, d
@@ -210,10 +214,12 @@ def em_writer(units, H_, ks, fit_ks, pools, rng, structs=None, keep="0"):
                 D = H.Data(seqs_of(tr), chunk=H.CHUNK)
                 _, h, T = H.r0_r1(seqs_of(tr))
                 fits, diag = fit_self_all(kind, K, D, pool_m, sb, rng, h, T)
-                res["fits"].setdefault(name, {})[str(k)] = ({"0": fits[0]} if keep == "0" else
-                                                            {str(t): fits[t] for t in TAUS_FIT})
+                kept = {"0r": fits["0r"]} if keep == "0" else {str(t): fits[t] for t in TAUS_FIT}
+                kept["0r"] = fits["0r"]
+                res["fits"].setdefault(name, {})[str(k)] = kept
                 rk = res["k"][str(k)]
                 rk["self"][name] = {str(t): ev.ll(fits[t]) for t in TAUS_FIT}
+                rk.setdefault("self0r", {})[name] = ev.ll(fits["0r"])
                 rk["self"][name][INF] = ev.ll(pool_m)
                 rk["diag"][name] = {str(t): dict(winner=diag[t]["winner"], gap12=diag[t]["gap12"],
                                                  nonconv=diag[t]["nonconv"], decreases=diag[t]["decreases"])
@@ -449,6 +455,16 @@ def pool_r1_values(results, ws, k, name, j, sign=1):
     return [None if a is None or b is None else sign * (a - b) for a, b in zip(ps, rs)]
 
 
+def g0r_values(results, ws, k, name, j):
+    """G0r = 本人の τ = 0 の乱数の開始点の解 − w を除く共通（S0 と同じ土台・判断 11）。"""
+    out = []
+    for w in ws:
+        a = results[w]["em"]["k"][str(k)]["self0r"][name][j]
+        b = results[w]["em"]["pool"][name][j]
+        out.append(None if a is None or b is None else a - b)
+    return out
+
+
 def s0_values(S0, ws, k, name, j):
     return [S0.get(w, {}).get(str(k), {}).get(name, [None, None])[j] for w in ws]
 
@@ -471,6 +487,8 @@ def summarize_em(results, S0, cfg, ns, rng, structs=None):
     structs = STRUCTS if structs is None else structs
     S = {}
     for pn, ws in panel_members(results, cfg, ns).items():
+        if 0 < len(ws) < N_MIN:
+            raise SystemExit("パネルの人数が %d 人未満（伏せの規則・本計算では起きない見込み）" % N_MIN)
         P = {}
         for k in cfg["panels"][pn][1]:
             if not ws:
@@ -492,6 +510,8 @@ def summarize_em(results, S0, cfg, ns, rng, structs=None):
                                  for j, lab in enumerate(("all", "pressed"))}
                 St["S0"] = {lab: delta_stats(s0_values(S0, ws, k, name, j), rng)
                             for j, lab in enumerate(("all", "pressed"))}
+                St["G0r"] = {lab: delta_stats(g0r_values(results, ws, k, name, j), rng)
+                             for j, lab in enumerate(("all", "pressed"))}
                 St["diag"] = em_diag(results, ws, k, name)
                 E["structs"][name] = St
             E["kendall"] = kendall_cells(E, structs)
@@ -518,7 +538,7 @@ def kendall_cells(E, structs):
 
 # ---------------------------------------------------------------- S0 の段（他人の当てはめの評価）
 def others_jobs(ds, results, fits, pools_val, cfg, ns, chosen=None, pools_m=None, structs=None):
-    """書き手 w ごとに、同じパネル・同じ k の他の書き手 v の τ = 0 の本人の母数を集める。
+    """書き手 w ごとに、同じパネル・同じ k の他の書き手 v の τ = 0 の乱数の開始点の解を集める（判断 11）。
     m37 は v = w を入れる。m38 は v の τ 他人で選んだ τ の母数（∞ は v を除く共通）を使う（chosen・pools_m が要る）。"""
     pk = panel_of_k(cfg)
     members = panel_members(results, cfg, ns)
@@ -540,7 +560,7 @@ def others_jobs(ds, results, fits, pools_val, cfg, ns, chosen=None, pools_m=None
                         t = chosen[(pk[k], k, name)][v]
                         ms.append(pools_m[v][name][0] if t == INF else fits[v][name][str(k)][t])
                     else:
-                        ms.append(fits[v][name][str(k)]["0"])
+                        ms.append(fits[v][name][str(k)]["0r"])
                 by[name] = ms
             others[str(k)] = by
         jobs.append(dict(ds=ds, w=w, others=others, pool=pools_val[w]))
@@ -622,6 +642,20 @@ def run_one(ds, path, seed, q_, order, jobs, raw=None, ex_writers=None, structs=
 
 
 # ---------------------------------------------------------------- 本計算
+def raw_in_repo(raw):
+    """書き手ごとの値の置き場が repo（この worktree、またはどこかの git の作業ツリー）の中か。大文字小文字をそろえて比べる。"""
+    import subprocess
+    nc = lambda p: os.path.normcase(os.path.realpath(p))
+    repo = nc(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
+    d = os.path.dirname(os.path.abspath(raw)) or "."
+    if nc(raw).startswith(repo + os.sep) or nc(d) == repo:
+        return True
+    while not os.path.isdir(d):
+        d = os.path.dirname(d)
+    r = subprocess.run(["git", "-C", d, "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True)
+    return r.returncode == 0 and r.stdout.strip() == "true"
+
+
 def q_gate_all(paths, seed, only_ds=None):
     """P-Q（V1）: 全データの全 feat 行で、q = 5 の作り直しが中間の obs と一致するか。"""
     out = {}
@@ -633,8 +667,7 @@ def q_gate_all(paths, seed, only_ds=None):
 
 def run(paths, seed, out, jobs, only_ds=None, run_id=None, groups=None):
     raw = os.environ.get("GSE_ML_RAW")
-    repo = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
-    if raw and os.path.realpath(raw).startswith(repo + os.sep):
+    if raw and raw_in_repo(raw):
         sys.exit("GSE_ML_RAW が repo の中を指している（書き手ごとの値は repo の外だけ）")
     qg = q_gate_all(paths, seed, only_ds)
     dump_json(dict(run_id=run_id, datasets=qg), os.path.join(out, "q_gate.json"), indent=1)
