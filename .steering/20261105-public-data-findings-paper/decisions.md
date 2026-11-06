@@ -330,3 +330,9 @@
 - **伝えたデメリットとメリット**: 係数は補足で既に全部公開するので新しく漏れる中身はほぼない／今後のユーザー検証で参加者が規則を読めるが論文でも公表される／保守は固定の切り出しなので本体と切り離す。メリットは 4/4 の止め手が消える・推定器が DOI で引ける・自分の道具の否定的な結果をコードごと出す信頼・JOSS は公開済みのソフトウェアも受け付ける。
 - **切り出しの見積もり（一次で見た範囲）**: `src/bin/replay.rs` は 7,428 行で、`analysis::`（feat_offline・features・engine・heads・loop_step・metrics・anonymize・intervention・intervention_eval・calibration_eval）に加えて `logger`・`capabilities`・`schema_dto` を参照する。論文に要るのは 1 段目（推定の行）と `--features`（onset と観測区間）だけなので、`analysis/` の OS 非依存の部分と、この 2 つだけを持つ薄い replay を別の crate に組み、出力が今の gse-replay（SHA-256 26cae610…33bb3）と全件一致することを門にする。別のタスクで行う。
 - **影響範囲**: 論文 1 の公開物・考察の Materials・限界・要旨の置き字。
+
+## 判断 38: attack-me（manuscript round 3・major）の直し方（2026-11-07）
+
+- **記録**: `attack-me/manuscript-paper1/round-3/verdict.md`（b0ecbb88）。R1・R2・R3 minor（初めて）・E「直してから回す」・Codex major。3/4 は題名の ±0.025 と Materials の約束の強さ、E は一般化の貢献と計器の鈍さ。
+- **研究者の採否（AskUserQuestion・いずれも推奨案）**: (1) 題名は登録の帯（[0.45, 0.55]）で書き、0.025 は本文で事後の記述と同じ文で言う（判断 36 の題を改める）。(2) 主の貢献は結果のまま、JEDM の範囲の要件は「比べの相手（同じ書き手の短い休止）と事前の帯で判定する比較を示した一例」という橋で満たす（E の案。手順の効果は主張しない）。(3) 追加の計算は φ の張り付きの集計（R1）と、s − u = 30 s の停滞に限った打鍵の水準の AUC（R2）。学習器の再標本は増やさず「200 回の分解能で」と限る。門は広げず、Materials の文を門の範囲に限る。(4) 公開物に、条件の英語の要約と、取り置きを再計算する入口（期待する集計値つき）を足す。Materials の文は公開物の実体に合わせて限る。
+- **影響範囲**: 原稿・`experiments/20261107-findings-paper1-round3-checks/`（新しい探索）・公開 repo（次の版）。
