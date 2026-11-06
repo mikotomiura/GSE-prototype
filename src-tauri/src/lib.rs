@@ -2178,21 +2178,36 @@ fn run_s1_effects(
             Effect::SaveDayState(state) => {
                 match crate::s1_day_state::state_path() {
                     Some(p) => {
-                        if let Err(e) = crate::s1_day_state::save(&p, &state) {
-                            tracing::warn!("stage 1: day state not saved (retry next tick): {e}");
-                            outcome.save_failed = true;
+                        match crate::s1_day_state::save(&p, &state) {
+                            Ok(()) => S1_SAVE_WARNED.store(false, Ordering::Relaxed),
+                            Err(e) => {
+                                // ★ 警告は続けて失敗している間は最初の 1 回だけ（毎秒出さない）
+                                if !S1_SAVE_WARNED.swap(true, Ordering::Relaxed) {
+                                    tracing::warn!(
+                                        "stage 1: day state not saved (retrying every tick): {e}"
+                                    );
+                                }
+                                outcome.save_failed = true;
+                            }
                         }
                     }
-                    None => tracing::warn!("stage 1: day state path (home dir) is unavailable"),
+                    None => {
+                        if !S1_SAVE_WARNED.swap(true, Ordering::Relaxed) {
+                            tracing::warn!("stage 1: day state path (home dir) is unavailable");
+                        }
+                        outcome.save_failed = true;
+                    }
                 }
                 None
             }
         };
         if let Some(entry) = entry {
             if let Err(e) = log_tx.try_send(entry) {
+                // ★ 枠の行がロガーの満杯で送れなければ、枠を作り直す（以後の行が seed の無い記録にならない
+                //   ように）。受け口が閉じた（ロガーが止まった）ときはやり直さない（毎秒作り直さない）。
+                outcome.frame_failed |=
+                    is_frame && matches!(e, crossbeam_channel::TrySendError::Full(_));
                 tracing::warn!("stage 1: row not sent: {}", log_send_error(e));
-                // ★ 枠の行が送れなければ枠を作り直す（以後の行が seed の無い記録にならないように）
-                outcome.frame_failed |= is_frame;
             }
         }
     }
@@ -2203,6 +2218,9 @@ fn run_s1_effects(
     }
     outcome
 }
+
+/// 段 1: 状態ファイルの保存の失敗を警告したか（続けて失敗している間は 1 回だけ出す）。
+static S1_SAVE_WARNED: AtomicBool = AtomicBool::new(false);
 
 /// 段 1: 出来事の実行の結果（駆動役にやり直しを知らせる）。
 #[derive(Debug, Default, Clone, Copy)]
@@ -2322,6 +2340,11 @@ fn spawn_s1_driver(
             {
                 let mut g = s1_driver_lock();
                 let Some(d) = g.as_mut() else { continue };
+                // ★ ロックを取った直後にもう一度見る（`shutdown` が日の問いの行を書いて `End` を送った後に、
+                //   tick の行を `End` の後ろへ送らないように）
+                if is_shutting_down() {
+                    return;
+                }
                 for t in press_rx.try_iter() {
                     d.push_press(t);
                 }
@@ -2341,7 +2364,20 @@ fn spawn_s1_driver(
                 if consent && anchor != 0 && !env.paused && d.frame_gen() != Some(gen) {
                     let seed = frame_seed_from_entropy(rand::random());
                     tracing::info!("stage 1 frame: seed={seed} anchor_ms={anchor} gen={gen}");
-                    fx.extend(d.start_frame(gen, anchor, seed, ArbiterConfig::default()));
+                    // ★ 枠の行はこの回の他の行より先に、単独で送る。送れなければこの秒は調停器を回さず、
+                    //   次の秒に枠を作り直す（同じ回の後ろの行が seed の無い記録にならないように・
+                    //   2026-11-07 /cross-review 2 巡目の両者一致）。
+                    let mut frame_fx = std::mem::take(&mut fx);
+                    frame_fx.extend(d.start_frame(gen, anchor, seed, ArbiterConfig::default()));
+                    let view = d.visible_card(env.paused);
+                    let outcome = run_s1_effects(&app, &log_tx, frame_fx, &view);
+                    if outcome.save_failed {
+                        d.mark_unsaved();
+                    }
+                    if outcome.frame_failed {
+                        d.forget_frame();
+                        continue;
+                    }
                 }
                 fx.extend(d.tick(&env, &mut || {
                     ProbeId::generate(&mut id_rng).as_str().to_string()

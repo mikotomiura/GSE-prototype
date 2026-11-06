@@ -70,10 +70,25 @@ leak_name_hits () { grep -iE '(^|/)[go]1[-_]submit[^/]*\.json$' || true; }
 #     ファイル（`input/hook.rs` など 5 本・security-checker が実測）の送出元が門から消える（fail-open）。
 #   ★ 改行の CR を先に落とす（CRLF の checkout でも切り出せるように）。コメントの行も除く。
 rust_production_src () {
+  # ★ 2026-11-07（/cross-review 2 巡目・両者一致）: 境目を狭めた。
+  #   - 終わりは列 0 の `}` だけの行（テストの中の列 0 の `}",` のような文字列で止まらない）。
+  #   - `#[cfg(test)]` と `mod` の間の属性の行を許す。`pub` / `pub(crate)` の `mod` も除く。
+  #   - `mod tests;`（外のファイル）と 1 行で閉じる `mod x {}` は、その行だけを除く。
+  #   - 想定外の形は除かずに残す（数えすぎる側＝承認を求める側へ倒す）。
   awk '
     { sub(/\r$/, "") }
-    skip { if ($0 ~ /^}/) skip = 0; next }
-    pending { pending = 0; if ($0 ~ /^mod[ \t]/) { if ($0 !~ /}[ \t]*$/) skip = 1; next } }
+    skip { if ($0 ~ /^}[ \t]*$/) skip = 0; next }
+    pending {
+      line = $0; sub(/[ \t]*\/\/.*$/, "", line)
+      if (line ~ /^[ \t]*#\[/) next
+      pending = 0
+      if (line ~ /^(pub(\([^)]*\))?[ \t]+)?mod[ \t]/) {
+        if (line ~ /;[ \t]*$/) next
+        if (line ~ /\{[ \t]*$/) { skip = 1; next }
+        if (line ~ /\}[ \t]*$/) next
+      }
+      print; next
+    }
     /^#\[cfg\(test\)\][ \t]*$/ { pending = 1; next }
     { print }
   ' "$1" | grep -vE '^[[:space:]]*(//|/\*|\*)' || true
@@ -963,6 +978,12 @@ selftest () {
   # ★ テストのモジュールの後ろに本番のコードが続くファイル（`input/hook.rs` 型）の O1 の門も数える。
   build; printf '#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n\npub fn after_tests() { activity_label_allowed(%s, true); }\n' "$o1_gate_arg" > "$fix/w/src-tauri/src/zz_after_tests.rs"
   expect_red "同意の ESM 追補が未承認" "テストのモジュールの後ろの本番のコードに O1 の判定"
+  # ★ `mod tests;`（外のファイルのテストのモジュール）の後ろの本番のコードも数える。
+  build; printf '#[cfg(test)]\nmod tests;\n\npub fn after_decl() { activity_label_allowed(%s, true); }\n}\n' "$o1_gate_arg" > "$fix/w/src-tauri/src/zz_after_decl.rs"
+  expect_red "同意の ESM 追補が未承認" "外のファイルのテストのモジュールの宣言の後ろの本番のコード"
+  # ★ テストの中の列 0 の `}",`（文字列）で除外を止めない（止まるとテストの中の呼び出しを本番と数え、免除を壊す）。
+  build; printf '#[cfg(test)]\nmod tests {\n    fn t() { let _ = "x\n}",\n        ; activity_label_allowed(%s, true); }\n}\n' "$o1_gate_arg" > "$fix/w/src-tauri/src/zz_test_string.rs"
+  expect_green "6 択 ESM の送出元は段 1 だけ" "テストの中の列 0 の }\" で除外を止めない"
   # ★ 第 2 引数の後ろに式を続けた呼び出しは段 1 だけとみなさない。
   build; prepend_emitter_ "fn wired_s1_or() { activity_label_allowed(${s1_gate_arg_early}, crate::submission::s1_probe_consent_acknowledged() || true); }"
   expect_red "同意の ESM 追補が未承認" "6 択の門の第 2 引数の後ろに式"
