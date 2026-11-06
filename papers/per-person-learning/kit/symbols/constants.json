@@ -1,0 +1,54 @@
+{
+  "description": "Constants of the keystroke symbolization. The symbolizer reads every numeric value from this file. Supplementary Table S2 is generated from it.",
+  "tick_ms": 1000,
+  "buffer_capacity_events": 600,
+  "window_ms": 30000,
+  "pause_threshold_ms": 2000,
+  "flight_time_max_ms": 2000.0,
+  "burst_gap_ms": 200,
+  "synthetic_release_ms": 100,
+  "silence_typing_max_s": 2.0,
+  "silence_reset_ms": 10000,
+  "silence_reset_presses": 3,
+  "normalization_kappa": 2.0,
+  "beta": {"f1": 150.0, "f3": 0.06, "f4": 5.0, "f5": 2.0, "f6": 0.08},
+  "x_weights": {"f3": 0.30, "f6": 0.25, "f1": 0.25, "f5": 0.20},
+  "y_weights": {"f4": 0.40, "f1_complement": 0.35, "f5_complement": 0.25},
+  "smoothing_initial": {"x": 0.1, "y": 0.8},
+  "typing_alpha": 0.3,
+  "typing_keep": 0.7,
+  "silence_alpha": [
+    {"min_silence_s": 25.0, "alpha": 0.25},
+    {"min_silence_s": 15.0, "alpha": 0.18},
+    {"min_silence_s": 0.0, "alpha": 0.15}
+  ],
+  "transition_floor": {
+    "start_s": 8.0,
+    "span_s": 30.0,
+    "no_context_f3_start_s": 10.0,
+    "no_context_f3_span_s": 40.0,
+    "no_context_min_s": 10.0,
+    "no_context_f6_min": 0.15,
+    "no_context_f3_min": 0.20
+  },
+  "silence_observation": {
+    "f1": 2000.0,
+    "context_start_s": 2.0,
+    "context_span_s": 30.0,
+    "no_context_f6_start_s": 10.0,
+    "no_context_f6_span_s": 40.0,
+    "no_context_f3_start_s": 15.0,
+    "no_context_f3_span_s": 50.0,
+    "no_context_min_s": 10.0,
+    "no_context_f6_min": 0.15,
+    "no_context_f3_min": 0.20
+  },
+  "grid_bins": 5,
+  "backspace_run_threshold": 14,
+  "backspace_run_symbol": 25,
+  "key_categories": {
+    "feature": ["alphabetic", "numeric", "punctuation", "sentence_punctuation", "tab", "backspace", "delete", "space", "enter"],
+    "deletion": ["backspace", "delete"],
+    "ignored": ["navigation", "escape", "other", "modifier", "function"]
+  }
+}
