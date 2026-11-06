@@ -135,3 +135,9 @@
 - H2: 2 つの信号とも分岐 4（揃えない AUC `d_p_stuck` 0.497〔0.491〜0.503〕・`d_ewma_x` 0.494〔0.489〜0.500〕）。H2 は支持されない。H1 支持 × H2 分岐 4 なので、揃えた比べの同等だけを報告し、対比は主張しない（P0）。
 - H3（記述）: 門は 2 つの学習器とも通った（届いた AUC 0.5800・失敗 0）。ロジスティック回帰 0.567（0.550〜0.578）・勾配ブースティング 0.540（0.525〜0.558）で、どちらも分岐 2（記述）。揃えない窓の対照は 2 つとも下限 0.55 を超えなかった（0.529・0.526）。
 - 主の 1 文（P0 の書き方）: 「CS1 の取り置きで、揃えた比べの手前の上がりは [0.45, 0.55] の幅に収まった（誤って同等とする割合は、見た書き手での較正の調べた配置の中で最大 5.2%〔Wilson の 95% 区間 3.6〜7.5%〕で、帰無の全体での上限ではない）。`d_p_stuck` は推定の床に多く、手前の変化についての主張は `d_ewma_x` と床にない対の感度に依る」。
+
+# 結果と来歴の登録（OSF の 5 つ目の登録・2026-11-06）
+
+- OSF: プロジェクト `https://osf.io/cm4ru` から Open-Ended Registration `https://osf.io/uj6cy`（題 "Results of the holdout run: matched comparison of the keystroke run-up to stalls (paper 1)"）。`date_registered` 2026-11-06T02:48:02Z（日本時間 11:48）。研究者に提出の直前に確かめてから immediate で提出し、管理者の承認のメールの承認のリンク（本文の並びで取り消しのリンクと見分けた）を開いて承認した。公開（`public: true`・承認待ちなし・embargo なし）。ライセンス CC BY 4.0・分野 Educational Assessment, Evaluation, and Research。
+- 添えたファイル（登録に写された版の SHA-256 を API で読み、手元の値と全桁で照合した）: `confirm_holdout.json` 3a73346f…d72018・`provenance_holdout.json` f7f70567…e68f66・`holdout_writers_check.json` d610d535…c83379・`results_holdout-4a30ce6e.zip` d8b2935d…ef3876（4a30ce6e から `git archive` で `results_holdout` を切り出したもの・13 項目）。どれも集計の値だけで、書き手ごとの値は含まない。
+- 要約には事前登録・逸脱 1・開始の記録の URL、完走のコミット、各ファイルの SHA-256、分岐の結果（H1 支持・H2 分岐 4・H3 分岐 2 の記述）を書いた。

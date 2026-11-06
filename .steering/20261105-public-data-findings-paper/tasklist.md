@@ -56,7 +56,7 @@
 - [x] /cross-review（7b5d28f4 以降・照合のスクリプトの偽陰性と DONE の初期化を直した）
 - [x] OSF で凍結（プロジェクト cm4ru・1 つ目の登録 https://osf.io/mrkxt）
 - [x] 2 段の本計算（開始 https://osf.io/hfvy7 → 変換の照合で中断 → 逸脱 1 https://osf.io/fqgcp → 開始 https://osf.io/ajg2x → 完走 4a30ce6e・H1 支持）
-- [ ] 結果と来歴を OSF の 5 つ目の登録に（Chrome の拡張が切れて未了）
+- [x] 結果と来歴を OSF の 5 つ目の登録に（https://osf.io/uj6cy・2026-11-06）
 - [x] 付録 F の探索（CS1 2021 年版・KLiCKe）・引きの種の幅の記述
 - [ ] 付録 F の CoAuthor（橋渡しの実装が要る・未計算）
 - [ ] 原稿（JEDM）
