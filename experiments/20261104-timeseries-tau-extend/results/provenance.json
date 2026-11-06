@@ -1,0 +1,64 @@
+{
+ "git_head": "4ce624aca4a153ea2f8186807f411b5115578999",
+ "git_dirty_paths": [],
+ "run_id": "20261106T124141-314",
+ "files_sha256": {
+  "20261103-coauthor-per-person\\scripts\\check_same.py": "bc7b90a708bdf297c391b6a4e0a7f5d43fa1d292e0805d06934b29272753f90b",
+  "20261104-coauthor-ml-improve\\results\\summary.json": "a47abf9d7131f9168fe577f130b0705132d0d2b27115497e17559c90560c65eb",
+  "20261104-coauthor-ml-improve\\scripts\\build_cs1_obs.py": "625ba9dec72045f2691aa951e633b84ceac3e48173599a037f2c828cf9e1128f",
+  "20261104-coauthor-ml-improve\\scripts\\check_mutations.py": "d6f5a72046ed3dc27d3068c285d5bdbd4d2e815e020fc4c2026fa3a2fce65c53",
+  "20261104-coauthor-ml-improve\\scripts\\check_same_cs1.py": "1fa99f6595ea14d6848469bababf314f4447e25819e0ad8e7c384a7278418d22",
+  "20261104-coauthor-ml-improve\\scripts\\data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+  "20261104-coauthor-ml-improve\\scripts\\hmm2.py": "2e7ed5b9eae1d64db4a2e0488949e4a81c141f71310a002e0298e4ca84b068c2",
+  "20261104-coauthor-ml-improve\\scripts\\hmm_b.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a",
+  "20261104-coauthor-ml-improve\\scripts\\logit.py": "a9e947af246a7dd3dde7cd4e4b9b25cd592e005f00f170845b742ce76955f43d",
+  "20261104-coauthor-ml-improve\\scripts\\manifest.py": "7ac76ebf0887703c65afb44066f395f8df5206395e1224870b5ef26570f1a86b",
+  "20261104-coauthor-ml-improve\\scripts\\ml.py": "61a8f52e1696d4f3d2c8dc6868d0f70acdeab4ed7f34a44e4178de69b8edc83d",
+  "20261104-coauthor-ml-improve\\scripts\\report.py": "9a1f2ac8dc655eeb60ee2fb689b9c8b95499f5ab2f9c00b2c90396f79e08d7e4",
+  "20261104-coauthor-ml-improve\\scripts\\selftest.py": "e5abc08d49bb2df09f063cad0d3bf6ebb5fbef25c67d8889b33768335526165b",
+  "20261104-coauthor-ml-improve\\scripts\\timing.py": "627d66fd3d689f6e176ac23bc7ef0815c9224b2f09d6feabcedb39a0cfba3233",
+  "20261104-cs1-landscape\\scripts\\build_cs1.py": "99c2ef97bc32587776603d28358b504db69e6064bffe24cf0ff7f65aa013a5af",
+  "20261104-timeseries-tau-extend\\SEED": "38edc78db92da3832bffae3b969e11c7c014fb3a812f0882b5f16a82feba6828",
+  "20261104-timeseries-tau-extend\\conditions.md": "cde63d5e05d22c84bba6524ef28cc7d05fc6f31524750f0833069c96e5090a33",
+  "20261104-timeseries-tau-extend\\mutate.sh": "be9aa625452c0924c2614e6eb63520d2fb2bf72e4879195df9cb7ffc3c8ff980",
+  "20261104-timeseries-tau-extend\\run.sh": "0ed4cf05d86503af2576c13d9e419b4bd43b32c31ca96deb111074d3b6041cc8",
+  "20261104-timeseries-tau-extend\\scripts\\build_cs1_obs.py": "625ba9dec72045f2691aa951e633b84ceac3e48173599a037f2c828cf9e1128f",
+  "20261104-timeseries-tau-extend\\scripts\\check_mutations.py": "b56d6e944d70a2e90df7f5f134f675109d88fefa299c8b048000d56b94558d93",
+  "20261104-timeseries-tau-extend\\scripts\\check_same_cs1.py": "1fa99f6595ea14d6848469bababf314f4447e25819e0ad8e7c384a7278418d22",
+  "20261104-timeseries-tau-extend\\scripts\\data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+  "20261104-timeseries-tau-extend\\scripts\\hmm2.py": "d71f4c206789b2dd33e2acc1569ac69a75006be2d33de227f7f094456a3966bc",
+  "20261104-timeseries-tau-extend\\scripts\\hmm_b.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a",
+  "20261104-timeseries-tau-extend\\scripts\\manifest.py": "7ac76ebf0887703c65afb44066f395f8df5206395e1224870b5ef26570f1a86b",
+  "20261104-timeseries-tau-extend\\scripts\\ml.py": "93a3935cef367f1702d2aa4d51715b428945be3dd29a1962aa7aaecaaf64701c",
+  "20261104-timeseries-tau-extend\\scripts\\report.py": "c11a1b1e8fa873fa2a0829a8d1d727791f2f50a7edbb5b7f8c85190d2784825e",
+  "20261104-timeseries-tau-extend\\scripts\\repro_check.py": "921ade88123bfaaa310def220cc01adfc7895fbc9b6addaea53e9cb78196708a",
+  "20261104-timeseries-tau-extend\\scripts\\selftest.py": "711535bbc3e991b1a7248c03a0e9fda241065fa7a74cd6795109ea1022d8f5a5",
+  "20261104-timeseries-tau-extend\\scripts\\subset_old.py": "8df6dccd86ae374fd433d12c64ebdd98f786db9e1f74767657d10a6ace965f12",
+  "20261104-timeseries-tau-extend\\scripts\\timing.py": "16a6221800181e44739fee54d9fdf2f5ba64ed39e66e3fcf8412e04df72e865d"
+ },
+ "coauthor_inputs": {
+  "files": 1157,
+  "sha256_of_sha256_list": "6a1e24954c65f2e0b2dfd24abacde3be3539fd0e33924fa801d731325c64a9f7"
+ },
+ "cs1_inputs": {
+  "files": 177,
+  "sha256_of_sha256_list": "25f106f7342a40e6856d30e0d722f62c3e992c7f4386328c2c73b57579783bec"
+ },
+ "cs1_holdout_sha256": null,
+ "gse_replay_sha256": null,
+ "input_manifest_sha256": "e0163f1b48e94273a9d2e30fe6e6c76de642eae82311a6ca7c125896a3d74406",
+ "raw_checked_on_mac": {
+  "checked_on": "Mac 2026-11-04",
+  "sha256": {
+   "coauthor/raw/coauthor.zip": "8d7380ca3811c671e774e43bfb9f5d3265e2a5d425788a066a612831aa1e418b",
+   "cs1/raw/2021/keystrokes.csv": "950a587bb3a410efc4aad0e64974d6442806345fddd13af76676dfb8006a22b6",
+   "klicke/bin/gse-replay": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+   "cs1/holdout.json": "a5a32fcefeb97b038afd170e2672262fd5a71230d5e851319eaa076b606bdc47"
+  }
+ },
+ "jobs": 16,
+ "platform": "Windows-10-10.0.26200-SP0",
+ "machine": "AMD64",
+ "python": "3.11.9",
+ "numpy": "2.4.4"
+}

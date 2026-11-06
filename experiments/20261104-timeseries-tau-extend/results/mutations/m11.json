@@ -1,0 +1,14 @@
+{
+ "run_id": "20261106T124141-314",
+ "mutate": [
+  "m11"
+ ],
+ "P-INF": {
+  "passed": false,
+  "eval_equal_to_excl_pool": false,
+  "fold_rel_dev": 0.0028610536352907654,
+  "min_abs_full_minus_excl": 0.0049829407400201475
+ },
+ "seconds": 51.1430778503418,
+ "all_passed": false
+}
