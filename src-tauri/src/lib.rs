@@ -47,6 +47,8 @@ pub mod recording;
 // ⚠️★★★ O1 (R3): 被験者による **区間指定削除** (ADR-014 D7-iii / 判断 3 の根拠 3)。
 //   ★ OS API を呼ばない純粋なファイル層なので `input/` にも `analysis/` にも入れない。
 pub mod redaction;
+// 段 1（ADR-043）の「段 1 モード」判定（OS API 非依存）。★ O1 の上に載せる層（EH3 と同じ作り方）。
+pub mod s1;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -4166,6 +4168,35 @@ pub fn run() {
              (EH3 runs only on top of O1 collection)."
         );
     }
+    // 段 1（ADR-043・C4 のプローブと日の終わりの問い）の判定 —— EH3 を確定する前に読む。
+    //   段 1 も O1 の上にだけ立てる層（`s1::resolve`）。EH3 の印と同時なら両方を落として素の O1 にする
+    //   （EH3 は招待を出し、段 1 は出さない。どちらかを勝たせると配り間違いを静かに記録し続ける・
+    //   `.steering/20261105-gse-m5-probe-wiring-plan/decisions.md` 判断 7）。
+    //   ⚠️ `eh3::set_mode` は `OnceLock` なので、落とすならこの順で決める（本タスクの判断 7）。
+    let s1_detected = crate::s1::detect_from_env();
+    let s1_eh3_conflict = crate::s1::conflicts_with_eh3(s1_detected, eh3_detected.is_some());
+    if s1_eh3_conflict {
+        tracing::error!(
+            "BOTH s1.mode and eh3.mode are present (s1={:?}). Stage 1 and EH3 are both DISABLED \
+             and this run behaves as plain O1. Remove one marker.",
+            s1_detected
+        );
+    } else if s1_detected.is_some() && o1_source.is_none() {
+        tracing::warn!(
+            "s1.mode marker is present but O1 mode is not active; stage 1 is DISABLED \
+             (stage 1 runs only on top of O1 collection)."
+        );
+    }
+    let s1_mode = crate::s1::resolve(s1_detected, o1_source.is_some(), eh3_detected.is_some());
+    crate::s1::set_mode(s1_mode);
+    if let Some(src) = s1_mode {
+        tracing::warn!(
+            "STAGE 1 MODE ENABLED (source={}): probes and the end-of-day question run on top of \
+             O1 collection; Nudge and invitations stay OFF.",
+            src.as_str()
+        );
+    }
+    let eh3_detected = if s1_eh3_conflict { None } else { eh3_detected };
     let eh3_mode = crate::eh3::resolve(eh3_detected, o1_source.is_some());
     crate::eh3::set_mode(eh3_mode);
     init_wall_channel();

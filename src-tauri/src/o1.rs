@@ -226,24 +226,29 @@ pub fn label_row_allowed(o1_mode: bool) -> bool {
 
 /// ⚠️★★★ **6 択 ESM（`activity_label`）を記録してよいか**（純関数・2026-09-14）。
 ///
-/// ★ ADR-031 **D1 / D5 保証 3**。⚠️ `o1_mode` だけでは通さない ——
-/// **同意の ESM 追補が承認されていること**を対にする。
+/// ★ ADR-031 **D1 / D5 保証 3**、ADR-043 D8。⚠️ 段 1 のモードだけでは通さない ——
+/// **本人が問いに同意した印**を対にする。
+///
+/// ## ⚠️★★★ 2026-11-06 に引数の意味を変えた（M5 の 1 本目・`.steering/20261106-gse-m5-s1-core/`）
+///
+/// 旧版は `(o1_mode, consent_approved)` だった。M5 で 6 択を出すのは **段 1**（O1 の上に載る層・`s1.rs`）
+/// だけであり、素の O1 では出さない（ADR-043 D8・O1 の同意文書は 6 択を列挙していない）。
+/// → ★ 第 1 引数は `s1::is_s1()`、第 2 引数は `submission::s1_probe_consent_acknowledged()`
+/// （登録の画面で本人が問いへの同意の項目を押したときだけ書かれる印・計画の判断 5）。
+/// ⚠️ 式（`a && b`）は変えていない。**`o1::is_o1()` を渡すと O1 の全員で通ってしまう。**
 ///
 /// ## ⚠️ なぜ `label_row_allowed` と分けるのか
 ///
 /// ★ あちらは「**同意が列挙していないから O1 では通さない**」（`!o1_mode`）。
-/// ⚠️ `activity_label` は **O1 で取ると決めたもの**なので、同じ式に混ぜると
+/// ⚠️ `activity_label` は **段 1 で取ると決めたもの**なので、同じ式に混ぜると
 /// **門の意味が反転する**（★ 通す側へ倒れる）。
 ///
 /// ## ⚠️★★★ 呼び出し側へ（★ ADR-031 M5）
 ///
-/// ★ `consent_approved` は**ビルド時の定数や `true` 直書きにしない**。
-/// ⚠️ 承認は `consent-draft-o1.md` の `<!-- o1-esm-consent: approved -->` と
-/// `Form_O1` の同意項目の**両方**で成立する運用上の事実であり、
-/// ★ 配布物のゲート（`scripts/check-o1-release-readiness.sh`）が門である。
-/// → ★ **M5 では「O1 だから通す」と書かないこと。**
-pub fn activity_label_allowed(o1_mode: bool, consent_approved: bool) -> Option<EsmConsent> {
-    (o1_mode && consent_approved).then_some(EsmConsent(()))
+/// ★ `consent_ack` は**ビルド時の定数や `true` 直書きにしない**（実行時の事実だけ）。
+/// ★ 他の参加者向けの配布物では、段 1 の同意文書の承認の印を配布物のゲートが求める（M5 の 3 本目）。
+pub fn activity_label_allowed(stage1_mode: bool, consent_ack: bool) -> Option<EsmConsent> {
+    (stage1_mode && consent_ack).then_some(EsmConsent(()))
 }
 
 /// ⚠️★★★ **6 択 ESM を記録してよいことの「証拠」**（★ 2026-09-14・`/cross-review` HIGH-2）。
@@ -826,24 +831,37 @@ pub fn detect_from_env() -> Option<O1Source> {
 mod tests {
     use super::*;
 
-    /// ⚠️★★★ **6 択 ESM は「O1 だから」では通らない**（ADR-031 D1 / D5 保証 3）。
+    /// ⚠️★★★ **6 択 ESM は段 1 かつ本人の同意の印があるときだけ通る**（ADR-031 D1 / D5 保証 3・ADR-043 D8）。
     ///
-    /// ★ 4 通りすべてを見る（⚠️ 片側だけ見ると「常に false」でも緑になる）。
+    /// ★ 2026-11-06 に旧 `activity_label_needs_both_o1_and_consent` を書き換えた（第 1 引数の意味が
+    /// O1 から段 1 に変わった）。★ 4 通りすべてを見る（⚠️ 片側だけ見ると「常に false」でも緑になる）。
     #[test]
-    fn activity_label_needs_both_o1_and_consent() {
+    fn activity_label_some_only_for_s1_with_ack() {
         assert!(
             activity_label_allowed(true, true).is_some(),
-            "★ O1 かつ承認済みなら通る"
+            "★ 段 1 かつ同意の印ありなら通る"
         );
         assert!(
             activity_label_allowed(true, false).is_none(),
-            "⚠️★★★ 承認前は通さない（★ 被験者向け文書は契約）"
+            "⚠️★★★ 同意の印が無ければ通さない（★ 被験者向け文書は契約）"
         );
         assert!(
             activity_label_allowed(false, true).is_none(),
-            "⚠️ O1 でなければ通さない"
+            "⚠️ 段 1 でなければ通さない"
         );
         assert!(activity_label_allowed(false, false).is_none());
+    }
+
+    /// ⚠️★★★ 素の O1 は、同意の印があっても 6 択を通さない（ADR-043 D8）。
+    ///
+    /// 第 1 引数に `is_o1()` を渡す書き方を防ぐため、O1 だが段 1 ではない組を名指しで見る。
+    /// 呼び出し側が段 1 の判定を渡していることは、送出元を作る M5 の 2 本目で本文の検査に置く。
+    #[test]
+    fn activity_label_none_for_o1_even_with_consent() {
+        let o1_active = true;
+        let s1_active = crate::s1::resolve(None, o1_active, false).is_some();
+        assert!(!s1_active, "印の無い O1 は段 1 ではない");
+        assert!(activity_label_allowed(s1_active, true).is_none());
     }
 
     use std::path::PathBuf;

@@ -1609,11 +1609,38 @@ fn keyboard_layout_fragment() -> String {
 /// ★ 値域は `O1Source` で型に閉じているので、⚠️ 外部由来の文字列が JSON を壊す経路は無い
 /// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
 fn o1_mode_fragment() -> String {
-    let mut s = o1_meta_fragment(crate::o1::mode(), crate::o1::install_id().as_deref());
-    s.push_str(&eh3_meta_fragment(
+    mode_meta_fragments(
+        crate::o1::mode(),
+        crate::o1::install_id().as_deref(),
+        crate::s1::mode(),
         crate::eh3::mode().zip(crate::eh3::assignment().map(|a| a.trigger)),
-    ));
+    )
+}
+
+/// `o1_mode_fragment` の純関数部分。★ キーの順は `o1_mode` → `o1_install_id` → `s1_mode` → `eh3_*`。
+///
+/// ★ 段 1 と EH3 は同時に立たない（`s1::resolve`）が、順は両方あっても固定しておく。
+fn mode_meta_fragments(
+    o1: Option<crate::o1::O1Source>,
+    install_id: Option<&str>,
+    s1: Option<crate::s1::S1Source>,
+    eh3: Option<(crate::eh3::Eh3Source, crate::eh3::TriggerStage)>,
+) -> String {
+    let mut s = o1_meta_fragment(o1, install_id);
+    s.push_str(&s1_meta_fragment(s1));
+    s.push_str(&eh3_meta_fragment(eh3));
     s
+}
+
+/// `meta` に足す段 1 の断片（★ 段 1 でなければ空文字列 = 従来と 1 バイトも変わらない）。
+///
+/// ★ `o1_mode` / `o1_install_id` の直後・`eh3_*` の前（段 1 は O1 の上でだけ立つ・`s1::resolve`）。
+/// 値域は `S1Source` で閉じているので、外部由来の文字列が JSON を壊す経路は無い。
+fn s1_meta_fragment(mode: Option<crate::s1::S1Source>) -> String {
+    match mode {
+        Some(src) => format!(r#","s1_mode":"{}""#, src.as_str()),
+        None => String::new(),
+    }
 }
 
 /// `meta` に足す EH3 の断片 (★ 非 EH3 なら空文字列 = 従来と 1 バイトも変わらない)。
@@ -3169,6 +3196,50 @@ mod tests {
         let m = obj(&line(TriggerKind::Off {}));
         assert_eq!(keys(&m), ["condition", "hmm_version", "t", "type"]);
         assert_eq!(m["condition"], "none");
+    }
+
+    /// ⚠️★★★ 印 `s1.mode` が無い O1 の `meta` の断片は、段 1 を足す前と 1 バイトも変わらない。
+    #[test]
+    fn o1_meta_unchanged_without_s1_marker() {
+        use crate::eh3::{Eh3Source, TriggerStage};
+        use crate::o1::O1Source;
+        let id = Some("0123456789abcdef");
+        // 段 1 を足す前の組み立て（o1 → eh3）と同じ文字列になること
+        for o1 in [None, Some(O1Source::Marker), Some(O1Source::Env)] {
+            for eh3 in [None, Some((Eh3Source::Marker, TriggerStage::Main))] {
+                let before = format!("{}{}", o1_meta_fragment(o1, id), eh3_meta_fragment(eh3));
+                assert_eq!(mode_meta_fragments(o1, id, None, eh3), before);
+            }
+        }
+        assert_eq!(s1_meta_fragment(None), "");
+    }
+
+    /// 段 1 の断片は `o1_install_id` の直後・`eh3_*` の前に入り、`meta` 行が JSON として読める。
+    #[test]
+    fn s1_meta_fragment_order() {
+        use crate::eh3::{Eh3Source, TriggerStage};
+        use crate::o1::O1Source;
+        use crate::s1::S1Source;
+        assert_eq!(
+            mode_meta_fragments(
+                Some(O1Source::Marker),
+                Some("0123456789abcdef"),
+                Some(S1Source::Marker),
+                None
+            ),
+            r#","o1_mode":"marker","o1_install_id":"0123456789abcdef","s1_mode":"marker""#
+        );
+        // 実際には同時に立たないが、順は固定しておく
+        let both = mode_meta_fragments(
+            Some(O1Source::Env),
+            None,
+            Some(S1Source::Env),
+            Some((Eh3Source::Env, TriggerStage::Proto)),
+        );
+        assert!(both.starts_with(r#","o1_mode":"env","s1_mode":"env","eh3_mode""#));
+        let line = format!(r#"{{"type":"meta","session_start":1{both}}}"#);
+        let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
+        assert_eq!(v["s1_mode"], "env");
     }
 
     #[test]
