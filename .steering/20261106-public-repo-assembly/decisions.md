@@ -33,3 +33,11 @@
   - Claude のみ: 陽性対照が終了コード 1 だけを見ていた（例外で落ちても通る）。期待する `FOUND` の行を確かめる。検出器ごとに 1 件ずつ混ぜる（27 件）。対照は `git archive HEAD` の写しで回す（コミットした中身を検査する）。`verify.sh` の Rust の版（1.85→1.88）と、図の照合を verify に入れた。README の検査の書き方を「形の検査・意味は見ない」に限り、estimator の README が CC BY であることを書いた。
 - **採らなかった**: Codex の「age の鍵の形が自分に当たる」（cross-reviewer がフィルタを通すために 1 行を置き換えたことによる偽陽性。実ファイルは実行時に組み立てていて当たらない）。KLiCKe の数字の id を本文の中から探す案（数字は数え上げと区別できない。表の形の検査で拾う）。
 - **研究者に確かめること**: 最初のコミットの本文の `Claude-Session:` の行（共有すれば会話が見える）を公開する前に外すか。取り置きの抽選の手順を README に書くこと（事前登録で公開済み・データを持つ人は引き直せる）。experiments の記録の中の ADR の要旨と GSE の内部の言葉（研究者が実験の記録は入れてよいとした範囲）。
+
+## 判断 4: 公開（GitHub・Zenodo）と原稿の直し（2026-11-07）
+
+- **研究者の採否（AskUserQuestion）**: GitHub に公開の repo を作って push する／公開 repo のコミットの本文から `Claude-Session:` の行を外す／Zenodo の DOI は私が Chrome で取る／Zenodo が CITATION.cff を読めないときは `.zenodo.json` を置く。
+- **公開**: <https://github.com/mikotomiura/stall-runup-equivalence>（v0.1.0 = b3bdc9a）。Zenodo: 全版 10.5281/zenodo.24014042・0.1.0 は 10.5281/zenodo.24014043（ライセンスの表示は MIT。2 つめ以降の許諾は notes と LICENSE-docs）。Zenodo の zip（770,841 バイト）を取り、`git archive v0.1.0` とファイル単位で同じこと・漏れの検査が 0 件（取り置きの一覧つき）を確かめた。GitHub の README と 2 つの図（動く図を含む）の表示を Chrome で確かめた。
+- **Zenodo の失敗 4 回**: GitHub 連携が CITATION.cff を読めず "Citation metadata load failed"（理由は示されない）。cffconvert では 4 回とも規格どおり。試したのは references を外す・ライセンスを 2 つに・公開日を UTC に（当時 UTC はまだ 11-06）。4 回で止めて研究者に聞き、`.zenodo.json` を置いて 5 回目で公開された。原因は特定していない。失敗の 4 件は Zenodo の連携の画面に残る（公開物ではない）。
+- **原稿の直し**: 要旨の置き字を DOI に（要旨は texcount で 300 語）。Materials を「archive（DOI・version 0.1.0）に、評価・探索・変換のコード、seed・環境・manifest、先にコミットした条件と集計の結果、版を固定した推定器と replay（見た書き手の全呼び出しでバイト一致の門つき）」に。限界の「推定器が公開できなければ外から再現できない」を「ファイルを得て公開のコードと推定器を回し直せば再現できる」に。補足の係数の節の「公開しない」を「archive で公開」に。`papers/public-data-findings/README.md` の「置き場は未定」を DOI に。組むと誤り 0・overfull 1（直す前と同じ。2 つの URL を並べた版は 2 になったので 1 つに戻した）。
+- **公開 repo の paper/ は直す前の版**（v0.1.0 の写し）。原稿を次に直して出すとき（attack-me round 3 の後など）に、assemble.sh で写し直して版を上げる。

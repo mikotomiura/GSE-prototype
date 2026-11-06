@@ -8,4 +8,5 @@ the run-up to a stall in character production from the run-up to a matched short
 
 The preregistration, the deviation, the start records and the results are public on the Open Science Framework
 (<https://osf.io/mrkxt>, <https://osf.io/fqgcp>, <https://osf.io/ajg2x>, <https://osf.io/uj6cy>). The public data are not
-redistributed here. Where the code of the evaluation procedure will be released is to be decided before submission.
+redistributed here. The code, the estimator and the aggregate results are archived at
+<https://doi.org/10.5281/zenodo.24014042> (GitHub: <https://github.com/mikotomiura/stall-runup-equivalence>).

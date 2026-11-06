@@ -23,12 +23,12 @@
 - [x] 指摘への対応（decisions.md）
 
 ## 公開（研究者の確認の後）
-- [ ] GitHub の repo の作成・push
-- [ ] Zenodo の公開・DOI
-- [ ] 要旨の置き字と Materials を DOI に（別の commit）
+- [x] GitHub の repo の作成・push
+- [x] Zenodo の公開・DOI
+- [x] 要旨の置き字と Materials を DOI に（別の commit）
 
 ## 完了処理
-- [ ] Skill の対応表（design.md）との照合
+- [x] Skill の対応表（design.md）との照合
 - [x] design.md の最終化・decisions.md
 - [ ] git commit（[skip ci]・push は研究者）
 - [ ] 引き継ぎ（attack-me round 3 の要否）
