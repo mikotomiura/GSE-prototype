@@ -66,4 +66,15 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/timeseries_tau_extend_run.log"; echo "
 
 ## 7 HP Z2 での実行の記録（職場の PC のセッションが追記）
 
-（未記入）
+- 実行: 2026-11-06（HP Z2・git-bash）。`run_id` `20261106T124141-314`（`summary.json` と `provenance.json` で一致）。終了コード 0。
+- 版: Python 3.11.9（`python`）・numpy 2.4.4（前回と同じ）。JOBS=16。AC のスリープ・休止は 0 のままだった。
+- データ: 前回展開した `C:/Users/SDS02/gse-public-data` をそのまま使った。manifest の SHA-256 は一致。
+- 各段の時刻（ファイルの更新時刻から）:
+  - 開始 12:41:41 → manifest の照合・P-D1 の門 2 つ 12:41〜12:42（緑）
+  - selftest（17 対照・`repro_check.py --selftest` を含む）12:42〜12:53 頃（約 11 分・すべて緑）
+  - 変異 11 個 12:53〜13:02（約 9 分・すべてが名指しの対照を赤にした）
+  - 本計算（CoAuthor → CS1・EM だけ）13:02〜14:56（約 1 時間 54 分）
+  - provenance・P-REPRO 14:57 → 終了 14:57:01
+- P-REPRO（`results/repro_check.json`）: `passed` true・`cells` 4224・`mismatched` 0・`max_rel_diff` 0.0（`tolerance_rel` 1e-09）。
+- 止まった段・赤: なし。
+- 結果のコミット `1c3259d9`（push 済み・PR は出していない）。`results/mutations/*.log` は .gitignore で除かれ、`.exit` と `.json` だけが入った。
