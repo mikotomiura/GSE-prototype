@@ -39,4 +39,10 @@
 ## 完了
 - [x] `docs/functional-design.md` の追記（Step H）と glossary の要否
 - [x] 2 本目の引き継ぎ（`config_gated` への移し・登録の画面・JST と UTC の検査・駆動役）
-- [ ] `/finish-task`（`/cross-review`）・push と PR は研究者に確かめる
+- [x] `/finish-task`（`/cross-review`）・push と PR は研究者に確かめる
+
+## 完了の記録（2026-11-06）
+
+- /cross-review は 3 巡（判断 11〜13）。4 巡目は研究者の判断で回さない。
+- schema parity check は drift（gse-dataset は EH3・R1・段 1 の行種を欠く）。研究者の判断で R3 は 3 本目でまとめて行う。
+- ⚠️ `/finish-task` の parity check の手順は zsh で走らせると schema の変更を見落として「skip」と出る（クォートしない `$SCHEMA_PATHS` を zsh は分けない）。bash で走らせ直した。別タスクの候補。
