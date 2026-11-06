@@ -7,15 +7,17 @@
 GSE doesn't read your mind. It reads *keystroke dynamics* (key timing and key type only; no text is stored) — and decides
 whether to offer an invitation to step away from the screen now, or to stay out of the way. The invitation never measures whether you started or finished.
 
-> **Status:** in the normal mode the shipping intervention is still **Nudge**. The full-screen Wall and Monk Mode
+> **Status:** GSE itself shows **no intervention by default**. Nudge remains in the code but is off by default
+> ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). The full-screen Wall and Monk Mode
 > were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)). The invitation to physical return
-> (the PC side of Physical Anchor) is implemented as a glyph in the EH3 study mode. Walking promotion and its measurement are
+> (the PC side of Physical Anchor) runs as a glyph in the EH3 study mode and in the normal mode's week 2 (session declaration "第2週 (招待)"; not in week 1, O1 or G1). Walking promotion and its measurement are
 > not pursued (2026-11-03); what follows the invitation is read from work after a candidate away gap (typing resumes, whether
 > an external answer is received, window focus changes, and pointer activity) ([ADR-024](docs/adr/ADR-024-resumption-outcome-without-estimator.md)).
 >
 > **Direction as of 2026-10-31:** Nudge will no longer be shown as an intervention in GSE itself; the core intervention
-> becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). The default change is a
-> separate task, so the shipping behaviour above still holds until then. The invitation glyph currently runs only in the EH3 study mode.
+> becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). Nudge is now off by default;
+> the invitation is wired into the normal mode's week 2 with a swappable trigger (estimator / rising / random / none, chosen in
+> the researcher's `~/.gse/invitation_trigger.json`; fail-closed) and reproducible offline with `gse-replay --invitation`.
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)

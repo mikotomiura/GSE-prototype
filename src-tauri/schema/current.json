@@ -88,6 +88,13 @@
             "null"
           ]
         },
+        "s1_mode": {
+          "description": "段 1（ADR-043・C4 のプローブと日の終わりの問い）モードの引き金 (`\"marker\"` | `\"env\"`)。**start 形状のみ**。\n\n段 1 は O1 の上に載せた層なので、段 1 のときは `o1_mode` も出る。O1 の記録と分けるのはこの フィールドである。EH3 と同時には出ない（両方の印があれば両方を落とす）。 段 1 の実施時にしか出ない（印の無い O1 の NDJSON は従来と byte 単位で同一）。 `Option` である（旧ログには無い・ADR-005）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "session_end": {
           "type": [
             "integer",
@@ -1060,6 +1067,362 @@
           ]
         }
       }
+    },
+    {
+      "description": "通常のモードで招待を許すセッションの条件（契機の種類と値・推定器の版）。\n\n`session_meta` とは別の行。招待を許すセッションの開始時（条件が決まった時点）に 1 行出す。EH3 は出さない （EH3 の条件は `eh3_day`）。`condition` ごとに持つ欄が決まっている: `estimator` は `p_stuck`・`hold_ms`、 `rising` は `delta`・`window_ms`、`random` は `per_active_hour`・`seed`・`seed_effective`、`none` は持たない。 1 つのファイルに複数行ありうる（セッションの宣言が再び呼ばれたとき。後の行がその時点からの条件）。 立ったが出さなかった契機は記録しない。提示は `invitation_present` で読む。\n\n時刻キーは `t`。",
+      "type": "object",
+      "required": [
+        "condition",
+        "hmm_version",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "condition": {
+          "$ref": "#/definitions/InvitationConditionDto"
+        },
+        "delta": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "hmm_version": {
+          "type": "string"
+        },
+        "hold_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "p_stuck": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "per_active_hour": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "seed": {
+          "description": "設定の seed(2^53 - 1 以下)。",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "seed_effective": {
+          "description": "セッションの開始時刻(`session_start` 行の `t`)と設定の seed から導いた実効 seed(u64 を 10 進の文字列で)。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "invitation_condition"
+          ]
+        },
+        "window_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    {
+      "description": "段 1 の問いの枠（seed・起点・調停器の版と定数）。`meta.s1_mode` があるときだけ出る。\n\n記録のファイルを開いたとき（と、同意の印ができたとき）に 1 行出す。無作為の候補の時刻の列は `frame_seed` と `anchor_ms` だけで決まり、記録から再現できる。系の設定だけで、行動も申告も持たない。 ★ 区間指定削除で消さない（`meta`・`invitation_condition` と同じ側）。数値は探索用の仮の定数。\n\n時刻キーは `t`。",
+      "type": "object",
+      "required": [
+        "anchor_ms",
+        "arbiter_version",
+        "away_idle_ms",
+        "cap_count",
+        "cap_window_ms",
+        "eod_idle_ms",
+        "eod_window_end_min",
+        "eod_window_start_min",
+        "eod_yield_before_random_ms",
+        "frame_seed",
+        "gap_min_ms",
+        "lambda_per_ms",
+        "max_gap_ms",
+        "no_ask_block_ms",
+        "no_ask_enabled",
+        "no_ask_fraction",
+        "strat_cap_count",
+        "strat_cap_window_ms",
+        "strat_guard_after_any_ms",
+        "strat_low_op_min_gap_ms",
+        "strat_resume_min_gap_ms",
+        "strat_yield_before_random_ms",
+        "strata_enabled",
+        "t",
+        "type",
+        "warmup_ms"
+      ],
+      "properties": {
+        "anchor_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "arbiter_version": {
+          "type": "string"
+        },
+        "away_idle_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "cap_count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "cap_window_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "eod_idle_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "eod_window_end_min": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "eod_window_start_min": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "eod_yield_before_random_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "frame_seed": {
+          "description": "2^53 − 1 以下。",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "gap_min_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "lambda_per_ms": {
+          "type": "number",
+          "format": "double"
+        },
+        "max_gap_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "no_ask_block_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "no_ask_enabled": {
+          "type": "boolean"
+        },
+        "no_ask_fraction": {
+          "type": "number",
+          "format": "double"
+        },
+        "strat_cap_count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "strat_cap_window_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "strat_guard_after_any_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "strat_low_op_min_gap_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "strat_resume_min_gap_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "strat_yield_before_random_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "strata_enabled": {
+          "type": "boolean"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "probe_frame"
+          ]
+        },
+        "warmup_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    {
+      "description": "段 1 の問いの候補を出さなかった記録。`meta.s1_mode` があるときだけ出る。\n\n`t` は判定した時刻、`candidate_ts` は候補の時刻（無作為は枠の候補・層化は引き金の押下）。 区間指定削除では `candidate_ts` 〜 `t` の区間で消える。",
+      "type": "object",
+      "required": [
+        "candidate_ts",
+        "reason",
+        "stratum",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "candidate_ts": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "reason": {
+          "$ref": "#/definitions/ProbeSuppressReasonDto"
+        },
+        "stratum": {
+          "$ref": "#/definitions/ProbeStratumDto"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "probe_suppressed"
+          ]
+        }
+      }
+    },
+    {
+      "description": "段 1 の日の終わりの問い（ADR-048 D3）。`meta.s1_mode` があるときだけ出る。カードが閉じた時刻に 1 行。\n\n`target_day` は現地の日の番号（4:00 区切り・1970-01-01 からの日数）。時差は書かない （現地の分も書かない。UTC の時刻と並べると時差が分の精度で出るため）。 `motivation` は 1..5 の 1 項目（答えていなければ `null`）。自由記述・理由を持たない。 区間指定削除では `shown_ts` 〜 `t` の区間で消える。",
+      "type": "object",
+      "required": [
+        "answered",
+        "closed_by",
+        "delayed",
+        "in_eod_window",
+        "items_version",
+        "shown_ts",
+        "t",
+        "target_day",
+        "trigger",
+        "type"
+      ],
+      "properties": {
+        "answered": {
+          "type": "boolean"
+        },
+        "closed_by": {
+          "$ref": "#/definitions/DayQuestionClosedByDto"
+        },
+        "delayed": {
+          "type": "boolean"
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "in_eod_window": {
+          "description": "問いを出したとき現地の時刻が時間帯の中だったか（現地の分そのものは書かない・時差が出るため）。",
+          "type": "boolean"
+        },
+        "items_version": {
+          "type": "string"
+        },
+        "latency_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "motivation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "shown_ts": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "target_day": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "trigger": {
+          "$ref": "#/definitions/DayQuestionTriggerDto"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "day_question"
+          ]
+        }
+      }
     }
   ],
   "definitions": {
@@ -1156,6 +1519,26 @@
         "baseline"
       ]
     },
+    "DayQuestionClosedByDto": {
+      "description": "段 1 の日の終わりの問いのカードが閉じた理由。",
+      "type": "string",
+      "enum": [
+        "answer",
+        "dismiss",
+        "day_end",
+        "quit"
+      ]
+    },
+    "DayQuestionTriggerDto": {
+      "description": "段 1 の日の終わりの問いの契機。",
+      "type": "string",
+      "enum": [
+        "evening_idle",
+        "quit",
+        "pause_resume",
+        "pickup"
+      ]
+    },
     "DismissReasonDto": {
       "description": "`intervention_response` の理由 (reason)。 Nudge dismiss (WBS 0.8 / v0.4 §9): `not_stuck` = Need 誤り、`want_to_struggle` = Opportunity 誤り、 `just_close` = 単に閉じる、`silent` = 理由未選択 (フェードアウト)。 ⚠️★★★ Wall 応答 (`early_unlock` / `completed` / `idle_timeout`) は 2026-08-23 に削除した。",
       "type": "string",
@@ -1204,6 +1587,16 @@
         "defer"
       ]
     },
+    "InvitationConditionDto": {
+      "description": "招待の契機の種類。NDJSON 文字列は \"estimator\" / \"rising\" / \"random\" / \"none\"。",
+      "type": "string",
+      "enum": [
+        "estimator",
+        "rising",
+        "random",
+        "none"
+      ]
+    },
     "InvitationTriggerDto": {
       "description": "EH3 の招待の契機の段。NDJSON 文字列は \"main\" / \"proto\"（`eh3::TriggerStage::as_str`）。",
       "type": "string",
@@ -1237,13 +1630,27 @@
         "resumption"
       ]
     },
+    "ProbeSuppressReasonDto": {
+      "description": "段 1 の候補を出さなかった理由。",
+      "type": "string",
+      "enum": [
+        "away",
+        "warmup",
+        "gap",
+        "cap",
+        "yielded",
+        "card_open",
+        "no_ask"
+      ]
+    },
     "SkipReasonDto": {
-      "description": "`realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip。",
+      "description": "`realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip、 `superseded` = 段 1 で層化のカードが無作為の問いに差し替えられた（調停器だけが書く）。",
       "type": "string",
       "enum": [
         "none",
         "dont_remember",
-        "dismissed"
+        "dismissed",
+        "superseded"
       ]
     },
     "TaskKindDto": {

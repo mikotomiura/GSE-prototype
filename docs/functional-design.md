@@ -234,6 +234,17 @@ O1 の自然作業のセッション NDJSON から、1 Hz の特徴行（stall o
   落とした量は `provenance.input_gap_trim`。この前処理なし（`--set idle_trim_input_gap_ms=0`）、無入力の末尾の前処理なし（`idle_trim_max_ms=0`・v1.3 では長い無入力の前処理は掛かったまま）、両方なしの 3 本を並べて報告する（v1.3 §7.4）。
 - **振る舞い上の制約**: 出力は `gse-dataset` へ共有しない（`scripts/check_no_feature_output.sh`）。`features.rs` / `engine.rs` は変えない。
 
+### 2.x+3 段 1 のモードと問いの調停器（ADR-043・ADR-031 M5）— 実装の途中
+
+段 1（本人の試しと確認の段）は、O1 の収集の器の上に載る層である（EH3 と同じ作り方）。O1 の提出・自動起動・導入 ID・区間の削除をそのまま共有し、問いだけを足す。
+問いは C4 のプローブ（無作為の枠が主・層化は補い・6 択の申告）と日の終わりの問い（ADR-048 D3）。計画は `.steering/20261105-gse-m5-probe-wiring-plan/`。
+
+- **2026-11-06 時点（M5 の 1 本目・`.steering/20261106-gse-m5-s1-core/`）**: モードの判定（`s1.rs`・印 `s1.mode`・env `GSE_S1_MODE=1`・O1 のときだけ・EH3 の印と同時なら両方を落とす）、純粋な調停器（`analysis/probe_arbiter.rs`）、行種 `probe_frame`・`probe_suppressed`・`day_question` と `meta.s1_mode`・`skip_reason` の `superseded` がある。
+  ⚠️ 問いを出す駆動役と画面はまだ無い（M5 の 2 本目）。印があっても問いは出ず、`meta` に `s1_mode` が刻まれるだけ。capabilities は新しい行種を宣言しない（送出元が無いため）。
+- **調停の順**: 無作為の枠 → 層化 → 日の問い。無作為の候補の時刻の列は `frame_seed` と起点だけで決まり、層化と日の問いは枠を読むだけ（記録から再現できる）。推定器の出力を入力に持たない（ADR-031 D2）。頻度と閾値は探索用の仮の定数（確定は R6′）。
+- **6 択の門**: `o1::activity_label_allowed(段 1, 本人の同意の印)`。素の O1 では同意があっても通さない（ADR-043 D8）。同意の印は `~/.gse/s1_probe_consent`（時刻と版だけ）。
+- **プライバシー**: 新しい行は数値・真偽・固定の文字列だけ。`day_question` は現地の分を書かず、時間帯の中かの真偽だけ（時差を出さない）。区間の削除で `probe_frame` は残し（系の設定だけ）、他の 2 行種は 2 つの時刻を両端とする区間で消える。
+
 ## 3. ユースケース
 
 ### UC-1: 通常の作業セッション
@@ -245,8 +256,8 @@ O1 の自然作業のセッション NDJSON から、1 Hz の特徴行（stall o
   1. ユーザーがセッションを開始する
   2. GSE がキーストロークの収集を開始する
   3. ユーザーが通常通りキーボード作業を行う
-  4. GSE が 1Hz でユーザーの認知状態を推定する
-  5. ダッシュボードに Flow/Incubation/Stuck の確率が表示される
+  4. GSE が 1Hz でユーザーの作業上の状態を推定する
+  5. ダッシュボードに推定の 3 つの確率（列 `p_flow`・`p_inc`・`p_stuck`）が表示される（2026-11-05: 3 状態の名前は主張と画面で使わない・ADR-046 D1。列名は識別子。2026-11-05 時点の実装の `src/components/Dashboard.tsx` は Incubation・Stuck の名前を表示している。研究者向けの表示かは要確認で、直すのは別タスク）
   6. ユーザーが作業を完了し、アプリを終了する
 - **事後条件**: セッションログが NDJSON ファイルとして保存される
 
@@ -397,7 +408,7 @@ O1 の自然作業のセッション NDJSON から、1 Hz の特徴行（stall o
 
 - キーストロークのリアルタイム収集（Windows: WH_KEYBOARD_LL / macOS: CGEventTap）
 - macOS TCC 権限管理（Input Monitoring / Accessibility の自動検出・フォールバック・リセット）
-- 3 状態認知推定（Flow / Incubation / Stuck）の 1Hz 更新
+- 3 状態の HMM の推定（列 `p_flow`・`p_inc`・`p_stuck`）の 1Hz 更新（2026-11-05: 名前は識別子で、状態の主張ではない・ADR-046 D1。推定は契機を作らない・ADR-047 D2）
 - 日本語 IME 対応（文脈依存ベースライン切替）
 - Nudge 介入（視覚フィードバック）
 - セッションログの NDJSON 永続化

@@ -180,7 +180,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 ### 4.4 analysis::engine — HMM エンジン
 
-- **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う
+- **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う（2026-11-05 注: HMM 0.5.0 は段 1 の終わりまで固定し、`p_stuck` の役は固定の比べの床と H3 の手がかりに限る・ADR-044。推定は招待の契機を作らない・ADR-047 D2。3 状態の名前は主張に使わない・ADR-046 D1）
 - **依存先**: analysis::features, **analysis::heads**（§4.4b）
 - **インターフェース**: `new_for_domain()`, `set_domain()`, `head_id()`, `update()`, `update_silence()`, `register_keystroke()`, `state_probs()`
 - **状態管理**: HMM 内部状態（forward 確率、EWMA 軸値、display_probs、**走行中の head**）を Mutex で保護
@@ -451,6 +451,16 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
   ★ 分岐はすべて `o1::*` の純関数の中に閉じており、非 O1 では `session_active` と**同値**である
 - 詳細: `.steering/20260827-o1-collection-enablement/` / ADR-014 D6・D8 / ADR-016 判断 4b
 
+### 招待の契機と通常のモードの配線（ADR-040 D4・2026-11-01）
+
+招待の状態機械（`analysis/invitation.rs`）は、出す規則（1 区間 1 回・失効 60 秒・閉じた後 30 分・1 日の上限・時間帯・研究の条件・一時停止）を共有し、差し替えるのは「この tick で契機が立ったか」だけである（`TriggerKind`: `estimator` / `rising` / `random` / `none`）。
+
+- EH3: 契機は割り当ての段（`eh3::TriggerStage`）のまま。新しい設定ファイルは読まない。
+- 通常のモード（EH3・O1・G1 でない走行）: `lib.rs` の `InvitationRunner` を作り、契機は研究者の設定 `~/.gse/invitation_trigger.json`（`invitation_trigger.rs`・本人の画面には出さない）で選ぶ。無い→推定器の既定、読めない・未知の欄・値の欠け・範囲外→招待を出さない。研究の条件は `NORMAL_INVITATION_ALLOWED`（セッション開始の宣言 `invitationEnabled`＝第 2 週だけ真・設定が読めた・条件の行を送れた、のすべてが揃ったときだけ真。`start_session` と宣言の入口で偽に戻す）。
+- 無作為の契機(`random`): 整数秒 `s` ごとに `SplitMix64(実効 seed ^ s)` の最初の値が `per_active_hour/3600` 未満なら立つ。実効 seed は設定の `seed`(2^53 - 1 以下)とセッションの開始時刻(`session_start` 行の `t`)から `SplitMix64(seed ^ session_start)` で導く。秒の番号で引くので、tick が欠けても列がずれず、記録の `session_start` 行と設定から実機と同じ秒を再現できる(`gse-replay --invitation` は `session_start` 行の `t` から導く。設定 64 KiB・記録の 1 行 1 MiB が上限・`p_stuck` の欠けた `feat` 行は exit 1)。`rising` は非有限の `p_stuck` で履歴を捨てる。`hold_ms`・`window_ms` は 1 時間以下。設定ファイルは通常のファイルで 64 KiB 以下。
+- 記録: 通常のモードで招待を許すセッションの開始時に `invitation_condition` 行（契機の種類と値・`hmm_version`。`random` は設定の `seed` と導いた `seed_effective`(u64 を文字列で)）を 1 行(宣言が再び呼ばれたときは複数行)。提示は `invitation_present`。立ったが出さなかった契機は記録しない。
+- 再現: `gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs N]`（`feat` 行の `p_stuck` と `key` 行の押下の時刻だけを読む）。
+
 ### EH3 の層（招待と肖像・2026-10-11）
 
 EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く。EH3 でないときの記録と挙動は変わらない。
@@ -485,7 +495,9 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 ### フロー 2: Opportunity 判定と Lv1 Nudge 介入
 
 > ⚠️★★★ **2026-08-23 改訂**: 旧フローは **Lv2 Wall**（QR → Zen Timer → `POST /unlock`）を記述していたが、
-> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。通常モードで出る介入は Nudge である（2026-11-03 更新: PC 側の身体回帰の招待は EH3 モードで実装済み・`analysis/invitation.rs`。散歩の促進とその計測は行わず、身体回帰の後は離席候補明けの作業上の状態（打鍵の再開と受領の有無・フォーカスの遷移・ポインタ）で見る〔2026-11-03 研究者の言・ADR-024・ADR-023 D4・ADR-016〕。通常モードの Nudge は本体では出さないと決めた・ADR-040）。
+> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。通常モードで出る介入は Nudge だった（2026-11-03 更新: PC 側の身体回帰の招待は EH3 モードで実装済み・`analysis/invitation.rs`。散歩の促進とその計測は行わず、身体回帰の後は離席候補明けの作業上の状態（打鍵の再開と受領の有無・フォーカスの遷移・ポインタ）で見る〔2026-11-03 研究者の言・ADR-024・ADR-023 D4・ADR-016〕）。
+> ⚠️ **2026-10-31 改訂**: ADR-040 D1 で **Nudge も既定で無効**にした（`lib.rs` の `INTERVENTION_ENABLED` の初期値と、開始画面の第2週の `interventionEnabled` を false）。
+> 下のフローは介入が有効なとき（研究者が戻したとき）の経路であり、判断のロジックは `gse-replay --intervention` の評価に残す（D2）。招待は EH3 モードと、通常のモードの第 2 週で動く（上の「招待の契機と通常のモードの配線」）。
 
 1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
 2. Main Window が 500ms ごとに `get_intervention_decision` を invoke
