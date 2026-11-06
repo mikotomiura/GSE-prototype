@@ -65,7 +65,8 @@
 - [x] attack-me outline round 2（major・判断 28）→ v3
 - [x] attack-me outline round 3（major・C2 を手順と限界へ・判断 29）→ v4
 - [x] 文献 [V465]（判断 30）→ attack-me outline round 4（major・査読者 3 人 minor・E 直してから・判断 31）→ v5
-- [ ] attack-me outline round 5
+- [x] attack-me outline round 5（major・査読者 3 人と Codex は minor・E 直してから）→ 研究者の判断で閉じた → v6（判断 32）
+- [ ] 草稿の前に数えるもの（条件を先にコミット・判断 32）: 複数の文字の編集の出来事の割合・信号の全時間の挙動・3 区分の実効の書き手
 - [ ] 原稿（JEDM・英語・MacTeX）
 - [ ] round 6 に渡す未決: 境界の較正で、138 人を復元で引く版は誤って同等とする割合が信号ごとに 3.0〜4.8%（名目の 2.5% を超える）。非復元の版は 0.2〜1.6%。判定は 2 つの信号の両方なので合わせた割合はこれより小さいが、どちらの引き方を読むかは決めていない
 - [x] 草案 v7（E と監査役の本文の指摘・外枠・付録 F）
