@@ -30,5 +30,5 @@
 ## 完了処理
 - [x] Skill の対応表（design.md）との照合
 - [x] design.md の最終化・decisions.md
-- [ ] git commit（[skip ci]・push は研究者）
-- [ ] 引き継ぎ（attack-me round 3 の要否）
+- [x] git commit（[skip ci]・push は研究者）
+- [x] 引き継ぎ（attack-me round 3 の要否）
