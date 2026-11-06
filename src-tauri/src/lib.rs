@@ -4179,7 +4179,7 @@ pub fn run() {
     if s1_eh3_conflict {
         tracing::error!(
             "BOTH s1.mode and eh3.mode are present (s1={:?}). Stage 1 and EH3 are both DISABLED \
-             and this run behaves as plain O1. Remove one marker.",
+             (the run continues as plain O1 if O1 is active). Remove one marker.",
             s1_detected
         );
     } else if s1_detected.is_some() && o1_source.is_none() {
@@ -4196,7 +4196,8 @@ pub fn run() {
         //   印があればモードは立ち `meta` に `s1_mode` が刻まれるが、問いは出ない。
         //   → 駆動役を作るときにこの文を「問いを出す」に改める（2026-11-06 code-reviewer MEDIUM）。
         tracing::warn!(
-            "STAGE 1 MODE ENABLED (source={}): this build records the mode only; the probe and              end-of-day question driver is NOT wired yet (M5 part 2). Nudge and invitations stay OFF.",
+            "STAGE 1 MODE ENABLED (source={}): this build records the mode only; the probe and \
+             end-of-day question driver is NOT wired yet (M5 part 2). Nudge and invitations stay OFF.",
             src.as_str()
         );
     }

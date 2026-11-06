@@ -181,6 +181,11 @@ mod tests {
             (None, None),
             "O1 でなければ段 1 は立たない"
         );
+        assert_eq!(
+            resolve_with_eh3(Some(S1Source::Marker), false, eh3),
+            (None, None),
+            "O1 でなくても両方の印があれば両方を落とす（EH3 も O1 の外では立たない）"
+        );
         // ★ 呼び出し側（`lib.rs`）がこの関数の戻り値を EH3 に渡していることを、本文で確かめる。
         const LIB: &str = include_str!("lib.rs");
         assert!(
