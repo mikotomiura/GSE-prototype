@@ -11,11 +11,11 @@
 - [x] 文献のラウンド（個人化が一般のモデルに勝つと主張する研究・部分的なプール）で C1・C3 の新規性を確定する
 - [x] 先行研究を貢献の比べる先に付ける（外枠は著者年・カードは [V386]〜[V400]）
 - [ ] コミット（push と PR は研究者が確かめてから）
-- [ ] 残りの本文（Pardos & Heffernan 2010・Yudelson 2016・Chung 2013・Aarts & Haslbeck 2025）
+- [x] 残りの本文（Yudelson 2016・Chung 2013・Aarts & Haslbeck 2025 は取得・照合。Pardos & Heffernan 2010 は抄録だけ〔[V422] provisional〕）
 - [x] Step 2〜5 の計画（節の構成・本文と補足資料の配置・語数の予算 7,000 語）
 - [x] 記号化の書き直し（別タスク・判断 9・.steering/20261107-gse-paper3-symbol-reimpl/）
 - [x] attack-me outline round 1（major・判断 10〜13）
-- [ ] 文献の調べ 1 ラウンド（判断 12）
+- [x] 文献の調べ 1 ラウンド（判断 12・判断 14・`docs/literature/20261107-per-person-shrinkage-prior-art.md`・[V401]〜[V424]）
 - [ ] 新しい小さな試験（平滑の無い記号・擬似残差の検査）の条件を先にコミット（判断 11・/start-task）
 - [ ] 構造の足りなさの試験の結果を待つ（別のセッション・職場の PC）
 - [ ] 当てはめのコードの公開の準備（判断 13）
