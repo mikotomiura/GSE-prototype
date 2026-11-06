@@ -14,8 +14,7 @@ already be different, and a signal computed from keystrokes should rise before t
 In this paper the stop is defined narrowly, as a \emph{stall in character production}: after net production of
 characters in the preceding 30~s, net production stops for longer than a threshold personalised to each writer's
 inter-keystroke intervals, and the pause that starts at the last character input lasts at least 30~s
-(Section~\ref{sec:data}). In the CS1 holdout the stall was recognised a median of 48~s after that last input, and
-typing resumed after a median of 97~s. Asking for help, wheel spinning and the need for a proactive hint are higher-level questions; a stall is one
+(Section~\ref{sec:data}). Asking for help, wheel spinning and the need for a proactive hint are higher-level questions; a stall is one
 candidate that can be observed at the scale of seconds without any information beyond keystrokes. We do not claim that
 a stall is being stuck, and we did not check the correspondence between stalls and those higher-level constructs.
 
@@ -27,15 +26,17 @@ tutor that relies mostly on the structure of the problem domain \cite{maniktala2
 ending an exercise with zero points, from keystroke-level editing features in its earliest stage
 \cite{kofune2026struggling}, and early detection of wheel spinning across tutors \cite{zhang2019wheel}. Whether a signal
 computed from keystrokes alone distinguishes the seconds before a stall from comparable moments has not been
-established. The comparison partner matters here. The reports above split every window by whether the event follows in
-the next $N$ seconds, so the negatives include windows in the middle of fluent typing. A stall, however, begins with a
+established. The comparison partner matters here. Of the reports above, those that anticipate an event split every
+window by whether the event follows in the next $N$ seconds \cite{barron2026tutortrace}, and the others predict the
+outcome of a whole exercise or problem; in neither are the negatives matched to the moment of the event, and windows in
+the middle of fluent typing count as negatives. A stall, however, begins with a
 pause, and so does every short pause that does not become a stall; comparing the run-up to a stall with the run-up to a
 short pause matched within the same writer and context is one natural choice of control that removes the difference
 between pausing and typing. In essay writing, which we had analysed before this study, the same matched comparison gave
 values inside the band that we later used for the test (Section~\ref{sec:res-main}); this weakens the expectation,
-and it is one reason the test was set up as an equivalence test. A converted reading of the band on seen writers points
-the same way: a difference at its edge would change little in the firings of a threshold trigger
-(Appendix~\ref{app:threshold}).
+and it is one reason the test was set up as an equivalence test. A theoretical reason points the same way: under the
+view that planning proceeds in parallel with typing, planning that cannot be completed in parallel appears in the pause
+itself rather than in the typing before it \cite{roeser2025typing,olive2002concurrent}.
 
 The signals we test come from a keystroke state estimator: a three-state hidden Markov model that, every second,
 combines five quantities computed over a 30~s window of keystrokes (the median flight time, the correction ratio, the
@@ -53,23 +54,21 @@ We preregistered the test on a random holdout of an introductory programming (CS
 holdout was drawn before any analysis of these data, and the confirmation was computed in a single completed run after
 the rules had been frozen (Appendix~\ref{app:prereg}). Programming is the confirmatory setting because it is the only
 dataset for which a holdout had been preregistered; the essay-writing data had already been seen. Because an output of a
-computation before the freeze had revealed the direction on seen writers, the result is a confirmation and not a test of
-a prediction that could fail. The main result is the following. In the CS1 holdout (139 students), the AUC of the matched comparison, computed on
+computation before the freeze had revealed that, under an older definition, the AUC on seen writers lay inside the band
+(slightly above 0.50), the result is a confirmation and not a test of a prediction that could fail; in the holdout the
+estimates fell slightly below 0.50 instead. The main result is the following. In the CS1 holdout (139 students), the AUC of the matched comparison, computed on
 the 30-second change of each signal, fell within the band $[0.45, 0.55]$ set in advance (the false-equivalence rate is at
 most 5.2\% [Wilson 95\% interval 3.6--7.5\%] among the configurations examined in the calibration on seen writers, and
 is not an upper bound over the whole null). All four point estimates lay slightly below 0.5. The essay-writing side
 gave similar descriptive results.
 
-The contribution is a preregistered equivalence check: on this input, the discrimination AUC of the 30-second change
-at $u$ of the estimator's two signals stayed within the band set in advance, between the run-up to a stall and the
-run-up to a short pause that did not become one. Two explorations bound how this can be read. Changes injected into the
-30~s before seen stalls moved the signals outside the band only when they were far larger than the observed difference
-between stalls and pauses, and on the same pairs, learners on standard keystroke quantities ranked stalls above the
-estimator's signals (Section~\ref{sec:res-bounds}). We also describe parts that can be reused with other detectors
-without claiming any effect for them: the procedure that matches stalls and pauses within writer, boundary type and
-stratum, judges them against a band set in advance on a holdout, and calibrates the rate of false equivalence, together
-with its code. The procedure was also run on three other datasets, with the adaptations each input required
-(Section~\ref{sec:res-explore}).
+The contribution is a preregistered equivalence check of one estimator on one input: the discrimination AUC of the
+30-second change at $u$ of its two signals stayed within the band set in advance, and its intervals excluded differences
+larger than about 0.025 from 0.5. Explorations outside the registration bound this result. Changes of the observed size
+in the 30~s before seen stalls barely moved the signals, and simple keystroke quantities ranked stalls higher through
+the amount of preceding typing rather than through a change (Section~\ref{sec:res-bounds}). The procedure used here
+(matching within writer, boundary type and stratum, a band set in advance on a holdout, and a calibration of the rate of
+false equivalence) is released with its code as the parts of this one example; we claim no effect for it.
 
 Section~\ref{sec:related} places the study in work on detecting struggle in CS1, on measuring keystroke pauses and on
 evaluating detectors. Section~\ref{sec:data} describes the data, the stall and the estimator, and

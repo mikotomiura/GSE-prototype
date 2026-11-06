@@ -17,31 +17,13 @@ the study (Appendix~\ref{app:definitions}). An insertion of one character with a
 character's kind, a deletion with a recorded key became a backspace, and an undo or redo with a key became a non-text
 key press. Edits without a recorded key, pastes, cuts and drags did not become key presses but were kept as events, and so were
 runs of the program and switches between tasks; only runs, pastes and switches define the event stratum. Because the data have no key release, the release was placed 100~ms
-after each press, so the estimator's flight time is the inter-keystroke interval minus 100~ms, a definition that differs
-from that of recorded releases in writing data. Table~\ref{tab:mapping} shows how the edits of the holdout writers were
-distributed. Every insertion with a recorded key was a single character. Edits of several characters were rare as
-events (1.4\% of edit rows) but carried 53.7\% of the inserted characters, mostly through pastes; none of them reached
-the estimator as key presses.
+after each press but no later than 1~ms before the next press, so the estimator's flight time is the inter-keystroke
+interval minus 100~ms when the interval exceeds 100~ms, 1~ms for shorter intervals and 0 for simultaneous presses, a
+definition that differs from that of recorded releases in writing data. Table~\ref{tab:mapping} (Appendix~\ref{app:definitions}) shows how the edits of the holdout
+writers were distributed. Every insertion with a recorded key was a single character. Insertions of several characters were rare
+(1.4\% of edit rows) but carried 53.7\% of the inserted characters, mostly through pastes; none of them reached the
+estimator as key presses.
 
-\begin{table}
-  \caption{How the edit rows of the holdout writers were mapped to the estimator's input (exploration on the holdout,
-  counted after the confirmatory run; 1,490,503 edit rows). Shares of characters are of all inserted characters.}
-  \label{tab:mapping}
-  \centering\small
-  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.9cm} r r}
-    \toprule
-    Edit row & Becomes & Rows & Characters \\
-    \midrule
-    Insertion of one character, key recorded & key press of its kind & 78.2\% & 46.3\% \\
-    Deletion of one character, key recorded & backspace & 19.5\% & -- \\
-    Deletion of two or more characters, key recorded & backspace (one press) & 0.37\% & -- \\
-    Undo or redo & non-text key press (key recorded) or event & 0.46\% & -- \\
-    Insertion of whitespace only, no key (automatic indentation) & event & 1.0\% & 4.6\% \\
-    Paste & event & 0.37\% & 49.0\% \\
-    Other (cut, drag, checkpoint, other insertions without key) & event or nothing & 0.11\% & $<$0.1\% \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
 
 \subsection{Pauses and stalls}
 
@@ -57,9 +39,8 @@ pause that starts at $u$ lasts at least 30~s, $u$ is earlier than $s$, and condi
 net production in the preceding 30~s). A stall is therefore not simply 30~s without character input: condition A must
 first become true and then stay true for $\theta$, so the onset lies well after $u$. In the holdout's main stratum
 [E-H], the onset came a median of 48.5~s after $u$ (10th and 90th percentiles 35.2 and 77.6~s), and the next character
-input a median of 97.2~s after $u$ (78.6\% of stalls lasted 60~s or more). Pauses at the edge of the observation
-rarely mattered: of 9,133 distinct $u$ of onsets, 22 had no later character input in the assignment and 51 had the next
-one in a later work block. The 0.99 quantile was inherited from the earlier definition and was not chosen
+input a median of 97.2~s after $u$ (78.6\% of stalls lasted 60~s or more; a few very long stops raise the mean to 247~s and
+428~s; Appendix~\ref{app:definitions} gives the edges of observation). The 0.99 quantile was inherited from the earlier definition and was not chosen
 in this study; the 30~s length of a stall and the 2~s lower limit of the controls below are fixed.
 
 What happens inside a pause is not used to match stalls and controls. In the holdout's main stratum

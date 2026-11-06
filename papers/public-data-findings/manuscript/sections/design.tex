@@ -8,10 +8,13 @@ pause that did not become one. Controls are the starts $u$ of pauses of at least
 writer, collected across the writer's assignments. A control is excluded if it falls in $[s - 30\,\mathrm{s}, t_0]$ of
 any onset in the same assignment, if condition A is true at its $u$, or if it lies less than 60~s after the start of its
 work block; the same 60~s rule applies to stalls. Each stall and control is assigned a \emph{boundary type}, whether the
-character at $u$ is a newline, and a \emph{stratum}: the event stratum if a run, paste or switch occurred in
+character at $u$ is a newline (registered as the coarsest position in code, a line break; finer positions are an
+exploration in Section~\ref{sec:res-explore}), and a \emph{stratum}: the event stratum if a run, paste or switch occurred in
 $[u - 30\,\mathrm{s}, u]$, and the no-event stratum otherwise. Only information up to $u$ is used for the stratum. For
 each stall, up to five controls are drawn without replacement from the candidates of the same writer, boundary type and
-stratum. The confirmatory test uses the no-event stratum; the event stratum is described.
+stratum. The confirmatory test uses the no-event stratum; the event stratum is described. The comparison is thus stratified
+within writer, boundary type and stratum rather than matched one to one, and the exclusion of controls near a later
+onset uses information after $u$ that a running trigger would not have.
 
 \subsection{Statistic}
 
@@ -44,6 +47,11 @@ variance. After the band was set, we converted it into the behaviour of a thresh
 difference in AUC between two models in learning analytics \cite{gardner2018evaluating}; that precedent compares a
 different quantity.
 
+Some rules of the main analysis were fixed after a leak had shown that, under an older definition, the AUC on seen
+writers lay inside the band (Appendix~\ref{app:prereg}): among them, the stratum window $[u - 30\,\mathrm{s}, u]$,
+condition A on both stalls and controls, requiring $\varepsilon = 0$ as well, and the precision rule. With the older
+stratum window alone, the holdout gave 0.505 and 0.500 (Section~\ref{sec:res-main}), also inside the band.
+
 For each signal and each $\varepsilon$, the result is \emph{equivalent} if the 95\% interval lies inside the band. This
 is the form of the two one-sided tests procedure at one-sided 2.5\% \cite{lakens2017equivalence}. An interval that
 crosses 0.55 or 0.45 is undecidable on that side, and an interval entirely above 0.55 or below 0.45 is a difference
@@ -61,7 +69,8 @@ because the holdout is a random sample, the maximum over the configurations exam
 interval 3.6--7.5\%), above the nominal one-sided 2.5\%; without replacement it was at most 1.4\%. The draws were about as
 concentrated as the holdout (a median of 43 effective writers, against 50.5 in the holdout). Configurations that place
 the $\varepsilon = 0$ AUC on the boundary were not examined, so the value is not an upper bound over the whole null, and
-the decision rule was not changed after seeing it (Appendix~\ref{app:calibration}).
+the decision rule was not changed after seeing it (Appendix~\ref{app:calibration}). In the holdout every interval ended at
+least 0.025 inside the edges of the band, so the decision does not hinge on the exact level.
 
 \subsection{Secondary and descriptive analyses}
 
@@ -91,16 +100,12 @@ before any value was computed (Appendix~\ref{app:prereg}).
     {[C]} & Confirmatory decision on the CS1 holdout (preregistered rules, deviation, start records and results
     registration). \\
     {[C-D]} & Quantities on the same holdout that the preregistration promised to report but that do not enter the
-    decision (sensitivity analyses, the learners, levels, threshold table, event stratum, pause interiors, the spread
-    over the seed of the control draw). \\
-    {[D]} & Descriptions on data seen before the rules were frozen (KLiCKe, earlier values for CoAuthor, the 319 seen
-    CS1 writers, the conversion of the band). \\
-    {[E]} & Exploration outside the registration on seen data (the positive control on the 319 seen CS1 writers, 31
-    seen writers of the 2021 CS1 edition, KLiCKe, seen CoAuthor writers), run after the confirmation with conditions
-    committed beforehand. \\
-    {[E-H]} & Exploration outside the registration on the holdout, after it had been opened (the comparison of the
-    signals with the learners, three-way matching on position, the lengths of stalls, the quantities counted for the
-    description of the input and of the estimator). \\
+    decision. \\
+    {[D]} & Descriptions on data seen before the rules were frozen. \\
+    {[E]} & Exploration outside the registration on seen data, run after the confirmation with conditions committed
+    beforehand. \\
+    {[E-H]} & Exploration outside the registration on the holdout, after it had been opened, with conditions committed
+    beforehand. \\
     \bottomrule
   \end{tabularx}
 \end{table}

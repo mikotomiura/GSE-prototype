@@ -109,12 +109,36 @@ from the data analysed here. The friction axis is smoothed exponentially with co
 data, before this study. Keystrokes are ordered by client timestamp and, within ties, by event identifier. The release is
 placed 100~ms after the press and cut 1~ms before the next press.
 
+\begin{table}[h]
+  \caption{How the edit rows of the holdout writers were mapped to the estimator's input (exploration on the holdout,
+  counted after the confirmatory run; 1,490,503 edit rows). Shares of characters are of all inserted characters.}
+  \label{tab:mapping}
+  \centering\small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.9cm} r r}
+    \toprule
+    Edit row & Becomes & Rows & Characters \\
+    \midrule
+    Insertion of one character, key recorded & key press of its kind & 78.2\% & 46.3\% \\
+    Deletion of one character, key recorded & backspace & 19.5\% & -- \\
+    Deletion of two or more characters, key recorded & backspace (one press) & 0.37\% & -- \\
+    Undo or redo & non-text key press (key recorded) or event & 0.46\% & -- \\
+    Insertion of whitespace only, no key (automatic indentation) & event & 1.0\% & 4.6\% \\
+    Paste & event & 0.37\% & 49.0\% \\
+    Other (cut, drag, checkpoint, other insertions without key) & event or nothing & 0.11\% & $<$0.1\% \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
 \paragraph{Stall definition.} Condition A is evaluated at the key press times, at those times plus 30~s and at $s +
 \theta$. $\theta$ is the nearest-rank 0.99 quantile of intervals between adjacent key presses of any kind within the
 same observation segment, accumulated over segments in the assignment, and undefined below 100 intervals. Observation
 segments break where 1~Hz estimate rows are more than 2~s apart, after the replay tool trims rows without input before
 gaps of 60~s or more and across gaps of 30 minutes or more. In the seen 2019 writers, $\theta$ at the end of an
-assignment had a median of 27.7~s (quartiles 20.8--36.8~s; 316 writers) [D].
+assignment had a median of 27.7~s (quartiles 20.8--36.8~s; 316 writers in the earlier analysis of these data) [D].
+Edges of observation [E-H]: of 9,133 distinct $u$ of onsets in the holdout, 22 had no later character input in the
+assignment and 51 had the next one in a later work block. The distance from $u$ to the onset had a mean of 247~s against
+a median of 48.5~s, because a few onsets come long after the last character input. The 338 seen writers with an assignment had 1,078
+assignments, and the 319 kept writers 1,042.
 
 \section{Coefficients of the estimator}
 \label{app:coefficients}
@@ -149,7 +173,10 @@ Transition matrix (rows: from):
 \[
 \begin{pmatrix} 0.75 & 0.17 & 0.08 \\ 0.12 & 0.80 & 0.08 \\ 0.06 & 0.18 & 0.76 \end{pmatrix}.
 \]
-The forward probabilities are normalised at each step. The reported probability is a further exponential smoothing of
+With $\pi_t$ the forward probabilities, $A$ the transition matrix and $e_j(o)$ the emission weight of state $j$ for
+observation $o$, each update is $\pi_{t,j} \propto e_j(o_t) \sum_i \pi_{t-1,i} A_{ij}$, normalised over $j$; because
+the emission weights are not normalised per state, this is a weighted filter rather than the forward algorithm of a
+proper hidden Markov model. The reported probability is a further exponential smoothing of
 them with coefficient 0.40 (0.60 at the backspace observation); the Stuck-state probability in this paper is that
 reported value, and the friction axis is the smoothed $x$. Emission weights (rows $b_x = 0, \ldots, 4$ from low to high
 friction, columns $b_y = 0, \ldots, 4$ from low to high engagement; the rows of the full matrix are not normalised):
@@ -200,12 +227,12 @@ $\varepsilon = 0$ fell in the same category as those with $\varepsilon = 0.001$.
     Not at floor, start point $u - 30$ s & 2,090 & 0.498 (0.476--0.519) & 0.498 (0.478--0.517) & equiv. \\
     Not at floor, end point $u$ & 1,573 & 0.465 (0.443--0.486) & 0.466 (0.448--0.482) & undec. (lower) \\
     Signal change over 15 s & 4,554 & 0.491 (0.480--0.502) & 0.485 (0.473--0.496) & equiv. \\
-    Signal change over 60 s & 4,553 & 0.496 (0.486--0.507) & 0.495 (0.485--0.505) & equiv. \\
+    Signal change over 60 s & 4,553 & 0.496 (0.486--0.506) & 0.495 (0.485--0.505) & equiv. \\
     $\theta$ accumulated across assignments & 4,445 & 0.487 (0.477--0.498) & 0.487 (0.476--0.497) & equiv. \\
     Stall quantile $q = 0.995$ & 2,935 & 0.490 (0.476--0.503) & 0.487 (0.473--0.501) & equiv. \\
     Condition A window $W = 15$ s & 5,937 & 0.493 (0.483--0.503) & 0.490 (0.479--0.5005) & equiv. \\
     Condition A window $W = 60$ s & 2,976 & 0.494 (0.480--0.507) & 0.493 (0.479--0.508) & equiv. \\
-    Event stratum (described) & -- & 0.495 (0.477--0.515) & 0.496 (0.477--0.516) & equiv. \\
+    Event stratum (described) & 1,590 & 0.495 (0.477--0.515) & 0.496 (0.477--0.516) & equiv. \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -274,7 +301,7 @@ after uniform jitter) until its own AUC reached 0.58; both learners then gave a 
 \paragraph{Results.} Main: logistic regression 0.567 (0.5497--0.578), gradient boosting 0.540 (0.525--0.558). Unmatched
 windows (up to 50 positives per writer and five negatives each, weights balanced within writers): 0.529 (0.512--0.546)
 and 0.526 (0.511--0.541). Burst threshold at $1 \times \theta$: 0.568 (0.5519--0.581) and 0.551 (0.530--0.563).
-Excluding stalls and controls with windows of fewer than three presses or no intervals (3,000 stalls): 0.548
+Excluding stalls and controls with windows of fewer than three presses or no intervals (3,008 stalls kept): 0.548
 (0.522--0.555) and 0.511 (0.489--0.532). The lower bound above 0.55 at $1 \times \theta$ is not reported as the
 discovery of a difference. Gradient boosting with a nested grid search (50 resamples): 0.567
 (0.544--0.576). The gate was not applied to the sensitivity analyses.
@@ -303,7 +330,8 @@ The signal at 0.50 was judged equivalent in every draw, so the proportion for th
 proportion; with both signals at the boundary it was 0.6\% or less with replacement. With $\varepsilon = 0.001$ alone,
 the Stuck-state probability at 0.45 reached 3.6\% with replacement. At AUC 0.50 every draw was judged equivalent, and
 insufficient precision never occurred. In the seen writers as a whole the top 10\% held 46\% of pairs and the effective number of
-writers was 97 of 312; in the holdout these were 42\% and 50.5 of 139. The draws of 138 writers, rebuilt afterwards from
+writers was 97 of 312; in the holdout these were 42\% and 50.5 of 139. The draws of 138 writers (146 holdout writers scaled by the share of seen writers with 10 minutes of observation,
+319 of 338), rebuilt afterwards from
 the same random stream [E], were about as concentrated as the holdout: with replacement, a median of 43.4 effective
 writers (2.5th to 97.5th percentiles 32.3--58.2) and a median top-10\% share of 46\%; without replacement, 43.5
 (35.2--55.3).
