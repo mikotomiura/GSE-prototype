@@ -58,8 +58,11 @@
 - [x] 2 段の本計算（開始 https://osf.io/hfvy7 → 変換の照合で中断 → 逸脱 1 https://osf.io/fqgcp → 開始 https://osf.io/ajg2x → 完走 4a30ce6e・H1 支持）
 - [x] 結果と来歴を OSF の 5 つ目の登録に（https://osf.io/uj6cy・2026-11-06）
 - [x] 付録 F の探索（CS1 2021 年版・KLiCKe）・引きの種の幅の記述
-- [ ] 付録 F の CoAuthor（橋渡しの実装が要る・未計算）
-- [ ] 原稿（JEDM）
+- [x] 付録 F の CoAuthor（橋渡し X6・X7・門 G1/G2・/cross-review の直し ed548609）
+- [x] 外枠を結果の後に確定（判断 24）→ attack-me outline round 1（major）→ 直し（判断 25）
+- [ ] 関連研究の 3 つの柱の /literature-review（未登録の文献だけ）
+- [ ] attack-me outline round 2
+- [ ] 原稿（JEDM・英語・MacTeX）
 - [ ] round 6 に渡す未決: 境界の較正で、138 人を復元で引く版は誤って同等とする割合が信号ごとに 3.0〜4.8%（名目の 2.5% を超える）。非復元の版は 0.2〜1.6%。判定は 2 つの信号の両方なので合わせた割合はこれより小さいが、どちらの引き方を読むかは決めていない
 - [x] 草案 v7（E と監査役の本文の指摘・外枠・付録 F）
 - [ ] attack-me round 6（回す前に研究者に聞く）→ 英語版 → OSF で凍結
