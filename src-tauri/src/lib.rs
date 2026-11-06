@@ -1143,7 +1143,7 @@ pub(crate) fn show_invitation_settings_window(app: &tauri::AppHandle) -> Result<
     Ok(())
 }
 
-/// 説明と設定の窓のラベル（`capabilities/default.json` の `windows` にも載せる）。
+/// 説明と設定の窓のラベル（`capabilities/invitation-settings.json` の `windows` にも載せる）。
 const INVITATION_SETTINGS_LABEL: &str = "invitation-settings";
 
 /// 本体の窓のラベル（`tauri.conf.json` に label が無いので Tauri の既定の "main"）。
@@ -5966,7 +5966,9 @@ pub fn run() {
         //   `lib.rs` は実行時に `overlay` 窓を作るので、main を閉じても
         //   「全部の窓が閉じた」に到達せず、★ Tauri は終了しない。
         //   2026-08-08 に **3 時間動き続けていた実例**（CPU 157 分・記録継続中）を見つけた。
-        //   ★ overlay の × は無視する（そもそも枠が無いが、将来 close されても道連れにしない）。
+        //   ★ 本体（`main`）以外の × は無視する（`close_request_shuts_down`）。overlay は枠が無く、
+        //   招待の説明と設定の窓は自分の handler で隠す。2026-11-06 までは overlay だけを除いていたので、
+        //   設定の窓の × でアプリ全体が終わっていた。
         .on_window_event(|window, event| {
             if !matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
                 return;
@@ -6054,6 +6056,26 @@ mod close_request_tests {
         assert!(
             !close_request_shuts_down("some-future-window"),
             "今後足す窓の × でも道連れにしない"
+        );
+    }
+
+    /// `tauri.conf.json` の本体の窓の label が `MAIN_WINDOW_LABEL` と一致すること。
+    /// conf で label を変えると本体の × で終わらなくなり、2026-08-08 の「閉じても動き続ける」が戻る。
+    #[test]
+    fn main_window_label_matches_tauri_conf() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("tauri.conf.json");
+        let windows = conf["app"]["windows"]
+            .as_array()
+            .expect("app.windows が配列であること");
+        // label を書かない窓は Tauri の既定で "main" になる。
+        let main_count = windows
+            .iter()
+            .filter(|w| w["label"].as_str().unwrap_or("main") == MAIN_WINDOW_LABEL)
+            .count();
+        assert_eq!(
+            main_count, 1,
+            "tauri.conf.json の窓のうち label が {MAIN_WINDOW_LABEL:?} のもの（label 無しを含む）がちょうど 1 つ"
         );
     }
 }
