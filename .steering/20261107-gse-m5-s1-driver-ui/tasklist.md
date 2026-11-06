@@ -38,8 +38,32 @@
 
 ## V 確かめと点検
 
-- [ ] V1 code-reviewer ＋ security-checker（並列）・指摘への対応
-- [ ] V2 画面の確かめ（macOS）: 同意の前は出ない・見える・押せる・背後を奪わない・伏せと出し直し・一時停止・「答えずに終了」が 60 秒以内・取り消し・NDJSON の行
-- [ ] V3 引き継ぎ §2 の 1〜8 の照合
-- [ ] V4 docs（`functional-design.md`・`glossary.md` に新しい語があれば）
+- [x] V1 code-reviewer ＋ security-checker（並列）・指摘への対応
+- [x] V2 画面の確かめ（macOS）: 同意の前は出ない・見える・押せる・背後を奪わない・伏せと出し直し・一時停止・「答えずに終了」が 60 秒以内・取り消し・NDJSON の行
+- [x] V3 引き継ぎ §2 の 1〜8 の照合
+- [x] V4 docs（`functional-design.md`・`glossary.md` に新しい語があれば）
 - [ ] V5 `/finish-task`（push と PR は研究者に確かめてから・`[skip ci]` を付けない）
+
+## 引き継ぎ §2 の照合（V3・2026-11-07）
+
+| # | 約束 | どこで満たしたか |
+|---|---|---|
+| 1 | capabilities の `emitterless` → 段 1 のときだけ `config_gated`・検査を消す | `capabilities.rs` の `s1_line_types`・`s1_line_types_are_declared_only_in_s1`。`activity_label_has_no_emitter_until_it_is_wired` は消した |
+| 2 | 起動ログの文を「問いを出す」に | `lib.rs` の `STAGE 1 MODE ENABLED`（同意の有無も出す） |
+| 3 | 6 択の門に段 1 の判定と段 1 の同意の印・`o1::is_o1()` を渡さないことを本文で縛る | `s1_esm_gate_passes_stage1_not_o1`・`activity_label_rows_are_built_only_behind_the_s1_gate`・O1 の配布の門 |
+| 4 | `local_day`・`local_minute`・JST/UTC の検査・押下・遷移・一時停止・復帰 | `s1_driver::local_clock` と `local_clock_jst_crosses_the_4am_cutoff`・`local_clock_utc_at_the_same_instant`。押下は分析スレッドの `out.key`、遷移は observe の絞り込みの後、`PAUSE_EPOCH`、電源の受け口 |
+| 5 | `in_window` → `in_eod_window`・現地の分を書かない | `s1_driver::DayRowData`・`lib.rs` の `s1_day_question_entry` |
+| 6 | `superseded` の 2 行を段 1 の側で書く | `lib.rs` の `emit_s1_superseded`・`record_probe_skip` は拒む |
+| 7 | security-checker の LOW 2 件 | 判断 1（`t = anchor_ms`）・判断 2（取り消しを同じ画面に・行なし） |
+| 8 | 日の問いの伏せと出し直し・`card_id`・`on_closed` | `S1Driver::open_card_for_arbiter`・`visible_card`・`commit_day_close`。実機で伏せと出し直しを確かめた |
+
+## 画面の確かめ（V2・macOS・2026-11-07・AX）
+
+- 同意の前はデバッグの口でもカードが出ず、行は 0。同意でローテートし、新しいファイルの先頭近くに `probe_frame`（`t = anchor_ms`）。
+- プローブのカードは overlay に出て押せる（研究者も画面で答えた）。回答で `realtime_label` と `activity_label` が同じ `probe_id` で 2 行。
+- 日の問いの上に無作為を出すと日の問いが伏せられ、プローブを閉じると戻る。日の問いは「答える」（`answer`・4）と「答えない」（`dismiss`）の両方で閉じる。
+- 一時停止の間はカードが出ず、確かめ用の口も拒む。再開で日の問いが戻る。
+- 取り消しで開いているカードが行なしで下ろされ、以後の行は 0。
+- 現地を 18:52 に見せかけた起動で、トレイの「GSE を終了」→「答えて終了／答えずに終了」のカード→何も押さずに 61 秒で終了。記録の最後は `day_question`（`quit`）→ `meta`。
+- 画面の取得には overlay が写らない（段 1 の overlay は画面共有・録画から外す設定・設計どおり）。背後のクリックは、窓がカードの実寸（`overlay_audit` の w/h）に縮むことで奪わない。
+- Windows は CI と研究者の手（未実施）。
