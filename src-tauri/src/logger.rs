@@ -310,6 +310,27 @@ impl SkipReason {
             _ => None,
         }
     }
+
+    /// 全列挙（★ 読む側の検査がここを単一の出所にする・`calibration_eval::SkipReasonKind`）。
+    pub const ALL: [Self; 4] = [
+        Self::None,
+        Self::DontRemember,
+        Self::Dismissed,
+        Self::Superseded,
+    ];
+
+    /// ★ `ALL` の網羅をコンパイラと検査に守らせるための印（`ActivityCategory::exhaustive_marker` と同じ作り）。
+    /// 値を足すとこの `match` が非網羅でビルドが落ち、印を足して `ALL` を忘れると
+    /// `skip_reason_all_is_exhaustive` が赤になる。
+    #[cfg(test)]
+    fn exhaustive_marker(self) -> usize {
+        match self {
+            Self::None => 0,
+            Self::DontRemember => 1,
+            Self::Dismissed => 2,
+            Self::Superseded => 3,
+        }
+    }
 }
 
 /// `vignette_response` の想定象限 (expected_quadrant)。尺度理解テストの正解ラベル。
@@ -4217,6 +4238,26 @@ mod tests {
             v["frame_seed"].as_u64(),
             Some(crate::analysis::probe_arbiter::FRAME_SEED_MAX)
         );
+    }
+
+    /// `SkipReason::ALL` は全ての値を、印の順に 1 回ずつ持つ。
+    #[test]
+    fn skip_reason_all_is_exhaustive() {
+        for (i, r) in SkipReason::ALL.iter().enumerate() {
+            assert_eq!(r.exhaustive_marker(), i, "{r:?}");
+        }
+        // 印の最大値 + 1 と ALL の長さが一致（印を足して ALL を忘れると、ここで長さが合わない）
+        let max = [
+            SkipReason::None,
+            SkipReason::DontRemember,
+            SkipReason::Dismissed,
+            SkipReason::Superseded,
+        ]
+        .iter()
+        .map(|r| r.exhaustive_marker())
+        .max()
+        .unwrap();
+        assert_eq!(max + 1, SkipReason::ALL.len());
     }
 
     /// 差し替えは `superseded` で書かれ、`dismissed` に正規化されない。

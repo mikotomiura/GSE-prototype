@@ -1410,27 +1410,10 @@ mod tests {
     use super::*;
 
     /// ⚠️ `logger::SkipReason` が書く値はすべて読める（知らない値の行は replay が黙って捨てる）。
-    ///
-    /// ★ 列挙は `match` で作る。`SkipReason` に値を足すと、ここが非網羅でコンパイルできなくなり、
-    ///   列を足し忘れたまま緑になることが無い（2026-11-06 /cross-review の Codex P3）。
+    /// ★ 列挙は `SkipReason::ALL`（網羅は `logger::tests::skip_reason_all_is_exhaustive` が守る）。
     #[test]
     fn skip_reason_kind_knows_every_logger_value() {
-        use crate::logger::SkipReason;
-        fn all() -> [SkipReason; 4] {
-            let pick = |r: SkipReason| match r {
-                SkipReason::None
-                | SkipReason::DontRemember
-                | SkipReason::Dismissed
-                | SkipReason::Superseded => r,
-            };
-            [
-                pick(SkipReason::None),
-                pick(SkipReason::DontRemember),
-                pick(SkipReason::Dismissed),
-                pick(SkipReason::Superseded),
-            ]
-        }
-        for r in all() {
+        for r in crate::logger::SkipReason::ALL {
             assert!(SkipReasonKind::parse(r.as_str()).is_some(), "{:?}", r);
         }
     }

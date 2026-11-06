@@ -100,3 +100,21 @@
 | Claude のみ（LOW） | ログの文字列の行継続の欠け・衝突のログの文・スリープ明けの検査の言い切り・`resolve_with_eh3` の 5 通り目 | 直した |
 
 - 2 本目の駆動役への注: 無作為が出たとき日の問いのカードは駆動役が伏せて保ち、無作為に答えた後で出し直す（調停器は出し直しの指示を出さない。`showing` が残っているので、駆動役は出し直すべきカードを調停器の状態とそろえられる）。引き継ぎ §2 に足す。
+
+## 判断 12: /cross-review 2 巡目への対応
+
+- 判断日時: 2026-11-06
+- 範囲: `51425183..81a6a2dc -- src-tauri/src`（1 巡目の直しの差分）。Codex の使用量 24934 / 1 回はメインの台帳へ写した。
+
+| 分類 | 指摘 | 対応 |
+|---|---|---|
+| Claude HIGH | 日の切れ目の tick で閉じたカードと同じ対象の日の拾い直しを出し直したとき、前のカードの `on_closed(日)` が新しいカードの覚えまで消す（1 巡目の直しが戻る経路） | カードに通し番号 `card_id` を付け、`ShowDayQuestion`・`CloseDayQuestion`・`on_closed` を番号で照合する。検査は `day_end_closes_open_card_then_pickup` に、前の番号を閉じても新しい覚えが残り、伏せたまま次の切れ目で閉じることを足した |
+| Claude MEDIUM | 覚えが無いが駆動役は日の問いのカードを開いていると言うとき、切れ目で閉じない | 駆動役の `open_card` に日の問いがあれば `card_id: None` で閉じる |
+| Claude MEDIUM | `on_closed` の呼び忘れで覚えが残ると、日の問いが切れ目まで止まる | 駆動役が「カードは無い」と言えば覚えを捨てる（伏せている間は `Random` なので捨てない）。検査 `stale_showing_is_dropped_when_driver_reports_no_card`（対照つき） |
+| Codex P2 | 復帰の束に止める前の押下が混じると、層化が止めていた時間を途切れと読む | 本物だった（ウォームアップで発火は抑えられていたが、`probe_suppressed` に誤った行が残る）。再開と復帰の tick では層化の引き金を立てず、束の最後の押下を新しい起点にするだけにする。検査 `strata_ignore_stale_press_mixed_into_resume_batch` は抑制の行も見る |
+| Codex P2 | `on_closed` が届かないと日の問いが止まる | 上の MEDIUM の対応と、引き継ぎの契約（閉じる経路すべてで番号を返す） |
+| Codex P3・Claude LOW | 網羅の検査が手書き | `SkipReason::ALL` と網羅の印（`ActivityCategory` と同じ作り）・`skip_reason_all_is_exhaustive` |
+| Claude LOW | 再開の持ち越しが何時間でも・時間帯の外でも効く | 時間帯の中だけにする。検査 `resume_pending_dropped_outside_window` |
+| Claude LOW | `local_at` の前提 | doc に「同じ `now_ms` から求めた日と分を渡す」 |
+
+- 直した処理のうち 2 点（再開の tick で層化を止める・番号で照合する）は、壊すと名指しの検査が赤になることを確かめた。

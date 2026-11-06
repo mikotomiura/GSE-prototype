@@ -26,7 +26,7 @@
 5. `Action::ShowDayQuestion { in_window }` を `DayQuestionRow::in_eod_window` に写す。`shown_local_minute` は書かない（1 本目の判断 9・時差を出さない）。
 6. `Action::SupersedeOpenStrat` で、開いている層化のカードの `realtime_label` と `activity_label` を `skip_reason = "superseded"` で書く。UI の `record_realtime_skip` は `superseded` を拒むので、段 1 の新しいコマンド（`record_probe_skip`）の側で書く。
 7. security-checker の LOW 2 件を決める: (a) 同意の時点で出す `probe_frame` の行の `t` を、本人が押した時刻ではなく `anchor_ms`（ファイルを開いた時刻）にそろえるか。`probe_frame` は区間の削除で消えないので、`t` が本人の操作の時刻だと削除した区間の中の操作の事実が残る。推奨は `anchor_ms` にそろえる。(b) 同意の取り消し（印のファイルを消す）を登録の画面と一緒に置く。
-8. 無作為が出たとき、日の問いのカードは駆動役が伏せて保ち、無作為に答えた後で出し直す（調停器は出し直しの指示を出さない。調停器は `DayQuestion` の中で出したまま閉じていない対象の日を覚えていて、日の切れ目で `CloseDayQuestion { day_end }` を出す）。カードを閉じたら必ず `day_question_mut().on_closed(target_day, answered)` を呼ぶ（呼ばないと次の日の問いが出ない）。
+8. 無作為が出たとき、日の問いのカードは駆動役が伏せて保ち、無作為に答えた後で出し直す（調停器は出し直しの指示を出さない。調停器は `DayQuestion` の中で出したまま閉じていない対象の日を覚えていて、日の切れ目で `CloseDayQuestion { day_end }` を出す）。日の問いのカードは通し番号 `card_id` で扱う: `ShowDayQuestion { card_id, .. }` を受けたら番号を持ち、閉じたら（回答・閉じる・終了・待ちの切れのすべてで）`day_question_mut().on_closed(card_id, target_day, answered)` を呼ぶ。`CloseDayQuestion { day_end }` のカードは調停器が既に覚えを捨てているので呼ばなくてよい。`open_card` は画面の実際（伏せている間は `Random`）を正しく渡す（「無い」と言うと調停器は覚えを捨てる）。
 9. schema parity: gse-dataset の schema は EH3・R1・段 1 の行種を欠いている（2026-11-06 時点・R3 未了）。研究者の判断で R3 は 3 本目でまとめて行う。
 10. 段 1 の回答率（S1-A4・A7）を出すとき（3 本目の `--probes` でも）、`superseded` を本人の未回答と分ける。`calibration_eval` の回答率は Phase1 用で、`superseded` を未回答に数える（1 本目では変えていない）。
 
