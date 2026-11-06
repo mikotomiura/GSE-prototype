@@ -5,8 +5,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 E=experiments/20261105-findings-paper1-prefreeze
 cd "$REPO_ROOT"
 shasum -a 256 \
-  "$E/run-confirm-holdout.sh" "$E/build-variants.sh" "$E/requirements-confirm.txt" \
-  "$E/scripts/confirm_p1.py" "$E/scripts/prefreeze.py" "$E/scripts/rebuild_onsets.py" \
+  "$E/run-confirm-holdout.sh" "$E/deviation-1.md" "$E/build-variants.sh" "$E/requirements-confirm.txt" \
+  "$E/scripts/confirm_p1.py" "$E/scripts/prefreeze.py" "$E/scripts/rebuild_onsets.py" "$E/scripts/check_holdout_writers.py" \
   experiments/20261104-cs1-landscape/scripts/build_cs1.py experiments/20261104-cs1-landscape/scripts/analyze_cs1.py \
   experiments/20261102-public-data-landscape/scripts/analyze_landscape.py \
   experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 確認（凍結の後に 1 回だけ）: CS1 2019 年版の取り置きの書き手だけの中間を作り、確認の解析を回す。事前登録 v10 の P3・P11。
+# 確認（凍結の後に 1 回だけ）: CS1 2019 年版の取り置きの書き手だけの中間を作り、確認の解析を回す。事前登録 v10 の P3・P11（逸脱 1 の照合の直しを含む）。
 # 凍結の前には走らせない。2 段に分ける（判断 18 の 3）。1 回だけの保証を手元の git の履歴の外（OSF の時刻）に置くため。
 #
 #   1 段目: run-confirm-holdout.sh start <OSF の登録の URL> <登録に書いた confirm-manifest.sha256 の SHA-256>
@@ -138,8 +138,8 @@ SKIP="$CS1/skip_seen_2019.json"
 rm -rf "$WORK"
 "$PY" -I "$REPO_ROOT/experiments/20261104-cs1-landscape/scripts/build_cs1.py" 2019 "$K19" "$BIN" "$SKIP" "$WORK" "${JOBS:-6}"
 cp "$WORK/build_summary.json" "$OUT/build_summary_holdout.json"
-# 取り置きの書き手が全員読まれたか（変換で読んだ書き手の数 = 取り置きの一覧の人数）
-"$PY" -I -c "import json,sys;b=json.load(open(sys.argv[1]));h=json.load(open(sys.argv[2]))['2019'];sys.exit(0 if b['writers_read']==len(h) else '取り置きの書き手の数が合わない: %d / %d'%(b['writers_read'],len(h)))" "$WORK/build_summary.json" "$CS1/holdout.json"
+# 取り置きの書き手の照合（逸脱 1・2026-11-06）: 読んだ書き手は全員取り置き、読まれなかった取り置きの書き手は課題を作る行が 0 件
+"$PY" -I "$EXP_DIR/scripts/check_holdout_writers.py" "$K19" "$CS1/holdout.json" "$WORK" "$OUT/holdout_writers_check.json"
 # 4. 感度の中間（陽性対照つき）
 STEP=build_variants
 bash "$EXP_DIR/build-variants.sh" "$WORK" "$PY" "$BIN" "${JOBS:-6}"
