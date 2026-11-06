@@ -10,7 +10,11 @@
 /Users/johnd/GSE-prototype-paper3/.steering/_handoff/next-session-gse-paper3-after-attack-me-r1.md を読み、論文 3 の文献の調べを /literature-review で 1 ラウンド回してください（worktree /Users/johnd/GSE-prototype-paper3）。決めることは AskUserQuestion で聞いてください。push と PR は私が確かめてから。
 ```
 
-2. 新しい小さな試験（判断 11）: 文献の調べの後で、同じ形の入口の文で「§3 の試験を /start-task から」と頼む。
+2. 新しい小さな試験（判断 11）: 文献の調べは 2026-11-07 に済んだ（下の §1 の最後の項）。次の入口の文:
+
+```
+/Users/johnd/GSE-prototype-paper3/.steering/_handoff/next-session-gse-paper3-after-attack-me-r1.md を読み、§3 の新しい小さな試験（平滑の無い記号の対照と擬似残差の検査）を /start-task から始めてください（worktree /Users/johnd/GSE-prototype-paper3）。条件と SEED はコードより前にコミットし、設計は /reimagine で比べてください。決めることは AskUserQuestion で聞いてください。push と PR は私が確かめてから。
+```
 3. 外枠の直しと round 2: 文献の調べと試験の条件が済んだ後。
 
 ## 1 ここまでに済んだこと
@@ -19,6 +23,7 @@
 - 文献のラウンド 1 回（[V386]〜[V400]・`docs/literature/20261107-per-person-gain-comparison-baselines.md`）。
 - 記号化の書き直し（`papers/per-person-learning/kit/symbols/`・作業記録 `.steering/20261107-gse-paper3-symbol-reimpl/`）: 元の replay と、合成 300 本・CoAuthor 1,157 セッション・CS1 2021 の 177 課題で記号と x・y の bit まで一致。/cross-review 2 巡。
 - attack-me outline round 1: major revision（R1〜R3・Codex が major、編集者は「直してから回す」）。
+- 文献の調べ 1 ラウンド（判断 12・判断 14・2026-11-07）: `docs/literature/20261107-per-person-shrinkage-prior-art.md`・[V401]〜[V424]・コミット 515712eb。τ の MAP は話者適応の MAP の離散 HMM 版で、多水準 HMM の特殊な場合ではない。「他人で選ぶ・同じ人の後の時点で測る」は入力の言語モデルの個人化の流儀で C3 の新規性に数えない。HMM と 1 次のマルコフの同じデータの中の比べは [V408] がある。外枠への持ち込みは判断 14（外枠はまだ直していない）。
 
 ## 2 文献の調べ（判断 12）で探すこと
 
