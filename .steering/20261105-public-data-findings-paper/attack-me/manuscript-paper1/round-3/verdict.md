@@ -1,0 +1,63 @@
+# verdict（manuscript round 3・対象 草稿 v3＋DOI commit 7fc19bc6）
+
+## 1. 判定: major revision（E が「直してから回す」・R1・R2・R3 minor・Codex major）
+
+有効な査読 4 本（R1・R2・R3・E。接地はどれも 2 本以上〔E は一次＋1 本〕から逐語）。Codex major（既知の未決 19 件を添えた）。推移: round 1 major → round 2 major → round 3 major。ただし査読者 3 人は初めて minor に下がり、止め手は E（一般化の貢献が無い・主結果が計器の鈍さでも説明できる）。round 2 の 4/4（公開）は E・R2 で解消、R1・R3 で一部（門の範囲の書き方）。
+
+## 2. 一致した指摘（分母 = 有効な査読 4 本。Codex は別枠）
+
+| # | 指摘 | 一致 | Codex | 裏取り |
+|---|---|---|---|---|
+| A | 題名が事後の ±0.025 を「preregistered」と並べて結果として掲げる（補足 S4 は「not a decision」） | R1・R2・R3（3/4）＋監査 2-A（本文でも事後と言わずに excluded） | — | 真（main.tex 27-28・supplement 250-251）。題名は判断 36 で研究者が決めたもの |
+| B | Materials の再現の約束が公開物の実体より強い（門は CS1 2019・変種・CoAuthor・KLiCKe だけで CS1 2021 と陽性対照の呼び出しを含まない・参照の build を配らず読者は回し直せない・取り置きの手順はそのまま回らない・条件は日本語・時刻の裏づけは非公開の履歴・manifest の 3 件は非公開） | R1・R2・R3（3/4）＋監査 2-C | 1（独立再実行の完全な入口が無い） | 真（estimator/README の表・README 119-127） |
+| C | 但し書きの繰り返し（5.2% が 6 回など）・序論の結果の段が 2 つ・要旨の括弧 | E・R2・R1（nit）（3/4） | d 項目 | 真 |
+| D | 要旨が 300 語ちょうど | R1・R2・R3・E（4/4・nit/minor） | — | 真（texcount 300） |
+| E | 実務の換算「about one point」が基準率（AUC 0.70 でも 12.9〜18.4%）・換算の条件（90 分位・2 s・事象の無い層）・幅（0.1〜1.8 点）・30 秒の変化への限定を落とす | R2・R3（2/4）＋監査 1-A（一定のずらしのモデルが抄録と結論に無い） | — | 真（abstract 14-16・conclusion 8-10。discussion 15 にだけ constant の語） |
+| F | 「observed size」は大きさも向きも違う（観測は 605/598 ≈ 1.011 で停滞の前が速く訂正が少ない・注入は遅く訂正を足す） | R1・R3（2/4） | — | 真（results 154-156） |
+| G | 学習器が「主に打鍵の量に依った」は単変量の AUC だけ（帰属の分析が無い） | R3・R2（関連: ラベルの作り方の依存）（2/4） | 4（同じ） | 真（results 194-196） |
+| H | 主結果が計器の鈍さでも説明できると自分で書き、一般化の貢献（JEDM の範囲の要件）を何で満たすかが本文に無い | E（1/4・止め手）＋R1 の b（尺度の床と天井） | — | 真（discussion 29-31・limitations 10-11・intro 65-71） |
+
+1 人だけ（裏取り）:
+- R1 尺度づけ φ の床と天井と合成の離しが 1.1 倍の変化を潰している可能性（φ1 は飛行 150 ms 以下で 0・450 ms 超で 1。30 秒の変化が厳密に 0 の行が 26.9%・21.3%）→ 真（式は補足 S3）・計算の提案（[E-H] の集計）。
+- R1 陽性対照の文「the Stuck-state probability stayed inside the band even when the intervals were tripled」→ 真・誤り（作り直した版 0.562 は帯の上・対照を固定した版 0.553〔0.5458〜0.5597〕は 0.55 をまたぐ）。
+- R1 訂正の少なさを 0.5 を下回る候補に（S4）→ 真。
+- R1 情動の検出の 4 件が抄録に依る → 既知の未決 18（Codex 別枠）と同じ論点・R1 には初出。
+- R1 申告の見出しの大文字が雛形と違う → 真（nit）。
+- R2 停滞の定義（条件 A は直前 30 秒の挿入と削除の差）が直前の産出量に依存するのに、補足 S9「the stall clock itself carries no information about typing」→ 真（supplement 370-372）。学習器の「少ない打鍵」の一部がラベルの作り方による可能性は未検討 → 計算の提案（s − u = 30 s の停滞に限る）。
+- R2 版の DOI ではなく全版の DOI → 真（discussion 60・abstract 17）。
+- R2 公開データの二次利用の倫理と利用条件の段が無い → 真。
+- R2 S10 の注記・247/428 の区別 → 真（nit）。
+- R3 学習器の区間は 200 回の再標本（0.55 との境は 0.0003）→ 真（results 189・supplement 294）。
+- R3 OSF で確かめられる記録と自己申告の記録の区別 → 真。
+- R3 "matched" の語が要旨・題・キーワード・README に残る → 真（design は stratified と明記）。
+- E 一般化の貢献（F1）・計器の鈍さ（F2）・定義の前に語と数値（F4）・本文の細部（F5）・小見出しと陽性対照の位置（F6）・地位のラベル（F7）・題の主語（F8）→ 真。
+
+Codex だけ: 1 独立再実行の入口（取り置きの再計算の完全なコマンドと期待値）→ 真（README は seen までの手順）／2 HMM と forward algorithm の記述と補足の「重みを正規化しないフィルタ」の矛盾 → 真（data 56-57・intro 41 vs supplement 177-179。監査 3-A と一致）／3 観測の端のラベル生成の規則（右打切り・ブロック越境・複数 onset）→ 真（S2 は件数だけ）／4 学習器の帰属 → G と同じ。
+
+監査だけ: 1-B 「推定器は大きな変化には反応する」が抄録・序論・結論に無い／1-C 対照 ≥ 5・10 秒が結果だけ／1-D 抄録に「逆向き」の言葉が無い／2-B 抄録の学習器の地位の混在／3-B supplement 304「3,008 stalls kept」vs JSON 3,000 → 真（3,008 は対照の無い 8 件を落とす前）／3-C 247 と 428／3-E 序論が基準値の「調整」を落とす／3-5 requirement.md の「作文の打鍵向けに係数を手で定めた HMM」（内部の記録）。
+
+## 3. 直す順
+
+- 研究者の判断が要る:
+  - A 題名（判断 36 で決めた題を、登録の帯で書く題に戻すか）。
+  - H 主の貢献の形（E の F1・F2）: (a) 結果を主のまま、JEDM の範囲の要件は「比べの相手の選び方を示した一例」という橋で満たす／(b)「この型の計器は小さな差に鈍い」を知見として立てる／(c) 学習器との比べを主に据える。
+  - 計算の提案: R1 φ の張り付きの集計（[E-H]）／R2 s − u = 30 s の停滞に限った打鍵の水準の AUC／R3 学習器の再標本を増やす／R3 M2 門に CS1 2021 と陽性対照の呼び出しを足す。どれを回すか（条件を先にコミット）。
+  - B 公開物: 探索の条件の英語の要約を公開物に足すか。取り置きを再計算する入口（Codex 1）を足すか。
+- 文の直し（判断は要らない）: 陽性対照の ×3 の文・forward algorithm の記述（本文を補足の言い方に）・3,008→3,000・247 と 428・S9 の文・observed size の大きさと向き・抄録と結論の実務の文（ずらしのモデル・条件・幅・基準率・30 秒の変化に限る）・Materials の範囲（門の範囲・参照の build・条件は日本語・時刻の裏づけ・manifest の 3 件）・版の DOI・申告の見出し・README の Table S4・S10 の注記・学習器の帰属を弱め 200 回と書く・観測の端の規則・但し書きを限界に寄せて序論の結果の段を 1 つに・要旨を 280 語前後に・倫理と利用条件の段・"matched" の語。
+
+## 4. 意図の監査役
+- 4a: 上の 1-A・1-B・2-A・3-A が重い。
+- 4b. 編集者 E: 直してから回す（一般化の貢献・計器の鈍さで情報量が打ち消される・但し書き・序論と抄録の順）。→ 判定は major 以上。
+- 4c. 本文の分量: 7,424 語（前回 7,033・+391）。測った版 7fc19bc6（前回は 2a0e46f0 の round 2 の測定値）。
+
+## 5. 逸脱・注入
+- 応答 5 本と Codex は secrets-filter を通した（すべて rc 0）。応答はメインが要約して round の dir に置いた。応答に出る絶対パスは一覧・tmp/sources・引き継ぎの中だけ。依頼文はファイルの絶対パスで渡した。注入の疑い: なし。
+- round 2 は役ごとの引き継ぎを作っていなかった（panel.md に記録）。この round は作った。引き継ぎの「対応」のうち、記録に明記の無いものは「記録に明記なし（本文で判定してほしい）」とした。
+- 投稿規程の JEDM の 2 ページは curl で取り直して照合した。テンプレートの説明は 2026-11-06 の zip で照合（この round では取り直していない）。
+
+## 6. 接地の引用の照合（査読者ごとに 1 件以上）
+- 空白とハイフンを詰めて逐語の一致を確かめた: R1 roeser2025「a break in output with duration that exceeds an a priori threshold」・guo2020「students vary widely in their typing facility」／R2 gardner2018「should be separable」の文・pelanek2015「To be important, differences between models should either have impact on student practice」／R3 lakens2017「equivalence bounds are prespecified」・kapoor2023「Temporal leakage」／E jedm_about「Are the presentation, organization and length satisfactory」・mensh2017「Focus on a single message」。捏造は見つからなかった。
+
+## 7. 研究者に問うこと
+- A 題名・H 主の貢献の形・計算の提案のどれを回すか・B 公開物に足すもの。
+- 次の round（推移は major 3 回。査読者 3 人は minor に下がり、止め手は E の一般化の貢献）。
