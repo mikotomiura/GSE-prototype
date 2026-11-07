@@ -74,3 +74,7 @@
 - [x] 草案 v7（E と監査役の本文の指摘・外枠・付録 F）
 - [ ] attack-me round 6（回す前に研究者に聞く）→ 英語版 → OSF で凍結
 - [ ] 計算（Mac）
+- [x] 投稿の準備: 規程の照合・カバーレター・項目の一覧（`paper-write/submission-prep.md`・判断 42）・草稿 v8
+- [ ] 公開 repo の写しを v8 にして版を上げる（push・release は研究者に確かめる）
+- [ ] プレプリント（Zenodo・公開は確かめてから）→ カバーレターの PREPRINT の行
+- [ ] 投稿（研究者・Submit の前に校正刷り）
