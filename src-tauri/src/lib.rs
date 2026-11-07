@@ -2057,6 +2057,7 @@ fn s1_day_question_entry(r: crate::s1_driver::DayRowData) -> LogEntry {
         motivation: r.motivation,
         latency_ms: r.latency_ms,
         duration_ms: r.duration_ms,
+        debug: r.debug,
     })
 }
 
@@ -2092,7 +2093,7 @@ fn emit_s1_superseded(log_tx: &Sender<LogEntry>, t: u64, card: &crate::s1_driver
         card.window_end_ms,
     );
     for entry in [realtime, activity] {
-        if let Err(e) = log_tx.try_send(entry) {
+        if let Err(e) = log_tx.try_send(entry.with_s1_debug(card.debug)) {
             tracing::warn!("stage 1: superseded row not sent: {}", log_send_error(e));
         }
     }
@@ -2160,11 +2161,13 @@ fn run_s1_effects(
                 scheduled_ts,
                 session_elapsed_ms,
                 stratum,
+                debug,
             } => Some(LogEntry::ProbeAssignment {
                 probe_id,
                 scheduled_ts,
                 session_elapsed_ms,
                 stratum: stratum.into(),
+                debug,
             }),
             Effect::Superseded { t, card } => {
                 emit_s1_superseded(log_tx, t, &card);
@@ -2606,7 +2609,7 @@ fn record_probe_response(
             card.window_end_ms,
         );
         // ★ 1 行目が送れなければカードを残す（再押下でやり直せる）
-        if let Err(e) = log_tx.try_send(realtime) {
+        if let Err(e) = log_tx.try_send(realtime.with_s1_debug(card.debug)) {
             return (Err(log_send_error(e)), Vec::new());
         }
         let activity = LogEntry::activity_label_answered(
@@ -2619,7 +2622,9 @@ fn record_probe_response(
             card.window_end_ms,
         );
         // ⚠️ 2 行目が送れなくてもカードは閉じる（やり直すと 1 行目が二重になる）
-        let res = log_tx.try_send(activity).map_err(log_send_error);
+        let res = log_tx
+            .try_send(activity.with_s1_debug(card.debug))
+            .map_err(log_send_error);
         (res, d.close_probe(&card.probe_id))
     })
     .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
@@ -2664,7 +2669,7 @@ fn record_probe_skip(
             card.window_start_ms,
             card.window_end_ms,
         );
-        if let Err(e) = log_tx.try_send(realtime) {
+        if let Err(e) = log_tx.try_send(realtime.with_s1_debug(card.debug)) {
             return (Err(log_send_error(e)), Vec::new());
         }
         let activity = LogEntry::activity_label_skipped(
@@ -2675,7 +2680,9 @@ fn record_probe_skip(
             card.window_start_ms,
             card.window_end_ms,
         );
-        let res = log_tx.try_send(activity).map_err(log_send_error);
+        let res = log_tx
+            .try_send(activity.with_s1_debug(card.debug))
+            .map_err(log_send_error);
         (res, d.close_probe(&card.probe_id))
     })
     .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
@@ -6705,6 +6712,7 @@ pub fn run() {
                                     //   (ADR-031 D2 の `low_operation_end` / `resumption` は
                                     //   §Migration M5 で配線する)。★ ここで嘘の層を書かない。
                                     stratum: crate::logger::ProbeStratum::Random,
+                                    debug: false,
                                 });
                                 // (3) frontend へ emit (回答カード表示は Task C)。
                                 if let Err(e) = app_handle.emit(

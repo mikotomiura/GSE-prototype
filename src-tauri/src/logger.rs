@@ -706,6 +706,21 @@ fn format_session_meta_line(
     )
 }
 
+/// 段 1 の研究者の画面の確かめ用のカードの行に `"debug":true` を足す（M5 の 3 本目の判断 3）。
+///
+/// ★ 偽のときは 1 バイトも変えない（本物の行の byte 固定の検査がそのまま効く）。
+/// 行は書式関数が作る `{...}` の 1 行なので、末尾の `}` の前に足す。
+fn mark_debug(line: String, debug: bool) -> String {
+    if !debug {
+        return line;
+    }
+    match line.strip_suffix('}') {
+        Some(head) => format!(r#"{head},"debug":true}}"#),
+        // ★ 書式関数は必ず `}` で閉じる。閉じていなければ印を付けずに返す（行を壊さない）
+        None => line,
+    }
+}
+
 /// `LogEntry::ProbeAssignment` の NDJSON 1 行を生成する純粋関数。
 fn format_probe_assignment_line(
     probe_id: &str,
@@ -878,6 +893,8 @@ pub struct DayQuestionRow {
     pub latency_ms: Option<u64>,
     /// 最初の操作から送信まで。
     pub duration_ms: Option<u64>,
+    /// 研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+    pub debug: bool,
 }
 
 /// 日の終わりの問いの項目の文の仮の版（S-DQ の候補の表からの仮の文・妥当性は無いものとして扱う・S1-F7）。
@@ -1103,6 +1120,8 @@ pub enum LogEntry {
         /// ⚠️★★★ **`Option` にしない** —— ★ `Random` を含む 3 値を常に書くので、
         /// **キーの不在がそのまま「本フィールドを持たない古いビルド」を意味する**。
         stratum: ProbeStratum,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+        debug: bool,
     },
     /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
     /// 不変条件は `realtime_label_answered` / `realtime_label_skipped` で保証する:
@@ -1119,6 +1138,8 @@ pub enum LogEntry {
         latency_ms: u64,
         analysis_window_start_ms: u64,
         analysis_window_end_ms: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+        debug: bool,
     },
     /// v0.3 較正スモーク: 尺度理解テスト回答 (ビネット 8 問)。
     /// 常に回答あり (q1/q2 は 1..=5)。`expected_quadrant` は教示の正解ラベル。
@@ -1173,6 +1194,8 @@ pub enum LogEntry {
         /// → ★ `redaction::line_interval` がこの 2 つを見て**区間の交差**で落とす。
         recall_window_start_ms: u64,
         recall_window_end_ms: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+        debug: bool,
     },
     /// ⚠️★★★ **記録の一時停止 / 再開の遷移マーカー** (O1 / ADR-014 **D7-ii**)。
     ///
@@ -1279,6 +1302,23 @@ pub enum LogEntry {
 }
 
 impl LogEntry {
+    /// 段 1 の研究者の画面の確かめ用のカードの行に印を立てる（M5 の 3 本目の判断 3）。
+    ///
+    /// ★ 組み立て関数（`realtime_label_*`・`activity_label_*`）の引数を増やさずに印を付ける。
+    /// 印を持たない行種はそのまま返す。`debug` が偽なら何も変えない。
+    pub fn with_s1_debug(mut self, debug: bool) -> Self {
+        if debug {
+            match &mut self {
+                LogEntry::ProbeAssignment { debug: d, .. }
+                | LogEntry::RealtimeLabel { debug: d, .. }
+                | LogEntry::ActivityLabel { debug: d, .. } => *d = true,
+                LogEntry::DayQuestion(row) => row.debug = true,
+                _ => {}
+            }
+        }
+        self
+    }
+
     /// このエントリが NDJSON に書く `"type"` の値。★ **制御用の内部エントリは `None`**。
     ///
     /// ## ⚠️★★★ なぜ要るのか
@@ -1349,6 +1389,7 @@ impl LogEntry {
             latency_ms,
             analysis_window_start_ms,
             analysis_window_end_ms,
+            debug: false,
         }
     }
 
@@ -1383,6 +1424,7 @@ impl LogEntry {
             latency_ms,
             analysis_window_start_ms,
             analysis_window_end_ms,
+            debug: false,
         }
     }
 
@@ -1411,6 +1453,7 @@ impl LogEntry {
             latency_ms,
             recall_window_start_ms,
             recall_window_end_ms,
+            debug: false,
         }
     }
 
@@ -1436,6 +1479,7 @@ impl LogEntry {
             latency_ms,
             recall_window_start_ms,
             recall_window_end_ms,
+            debug: false,
         }
     }
 
@@ -2469,15 +2513,19 @@ impl SessionLogger {
                                 scheduled_ts,
                                 session_elapsed_ms,
                                 stratum,
+                                debug,
                             } => {
                                 let _ = writeln!(
                                     writer,
                                     "{}",
-                                    format_probe_assignment_line(
-                                        &probe_id,
-                                        scheduled_ts,
-                                        session_elapsed_ms,
-                                        stratum
+                                    mark_debug(
+                                        format_probe_assignment_line(
+                                            &probe_id,
+                                            scheduled_ts,
+                                            session_elapsed_ms,
+                                            stratum
+                                        ),
+                                        debug
                                     ),
                                 );
                                 dirty = true;
@@ -2490,18 +2538,22 @@ impl SessionLogger {
                                 latency_ms,
                                 recall_window_start_ms,
                                 recall_window_end_ms,
+                                debug,
                             } => {
                                 let _ = writeln!(
                                     writer,
                                     "{}",
-                                    format_activity_label_line(
-                                        timestamp,
-                                        probe_id.as_deref(),
-                                        category,
-                                        answered,
-                                        latency_ms,
-                                        recall_window_start_ms,
-                                        recall_window_end_ms
+                                    mark_debug(
+                                        format_activity_label_line(
+                                            timestamp,
+                                            probe_id.as_deref(),
+                                            category,
+                                            answered,
+                                            latency_ms,
+                                            recall_window_start_ms,
+                                            recall_window_end_ms
+                                        ),
+                                        debug
                                     ),
                                 );
                                 dirty = true;
@@ -2517,21 +2569,25 @@ impl SessionLogger {
                                 latency_ms,
                                 analysis_window_start_ms,
                                 analysis_window_end_ms,
+                                debug,
                             } => {
                                 let _ = writeln!(
                                     writer,
                                     "{}",
-                                    format_realtime_label_line(
-                                        timestamp,
-                                        probe_id.as_deref(),
-                                        source,
-                                        q1_friction,
-                                        q2_progress,
-                                        answered,
-                                        skip_reason,
-                                        latency_ms,
-                                        analysis_window_start_ms,
-                                        analysis_window_end_ms,
+                                    mark_debug(
+                                        format_realtime_label_line(
+                                            timestamp,
+                                            probe_id.as_deref(),
+                                            source,
+                                            q1_friction,
+                                            q2_progress,
+                                            answered,
+                                            skip_reason,
+                                            latency_ms,
+                                            analysis_window_start_ms,
+                                            analysis_window_end_ms,
+                                        ),
+                                        debug
                                     ),
                                 );
                                 dirty = true;
@@ -2680,7 +2736,11 @@ impl SessionLogger {
                                 dirty = true;
                             }
                             LogEntry::DayQuestion(row) => {
-                                let _ = writeln!(writer, "{}", format_day_question_line(&row));
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    mark_debug(format_day_question_line(&row), row.debug)
+                                );
                                 dirty = true;
                             }
                             LogEntry::BlockEnd => {
@@ -4167,10 +4227,61 @@ mod tests {
             motivation: Some(4),
             latency_ms: Some(2_500),
             duration_ms: Some(1_200),
+            debug: false,
         }
     }
 
     /// 段 1 の 3 行種の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る）。
+    /// M5 の 3 本目の判断 3: 印は真のときだけ末尾に足し、偽なら 1 バイトも変えない。
+    #[test]
+    fn mark_debug_appends_only_when_true() {
+        let line = format_probe_assignment_line("p-1", 2000, 1000, ProbeStratum::Random);
+        assert_eq!(mark_debug(line.clone(), false), line);
+        assert_eq!(
+            mark_debug(line, true),
+            r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random","debug":true}"#
+        );
+        let day = format_day_question_line(&sample_day_question_row());
+        let marked = mark_debug(day.clone(), true);
+        assert!(marked.ends_with(r#","debug":true}"#));
+        let v: serde_json::Value = serde_json::from_str(&marked).expect("JSON のまま");
+        assert_eq!(v["debug"], serde_json::Value::Bool(true));
+        assert_eq!(mark_debug("not json".to_string(), true), "not json");
+    }
+
+    /// `with_s1_debug` は印を持つ 4 行種だけに立て、偽なら何も変えない。
+    #[test]
+    fn with_s1_debug_marks_only_the_four_row_types() {
+        let probe = ProbeRef::RandomProbe {
+            probe_id: "p-1".to_string(),
+        };
+        let rt = || LogEntry::realtime_label_skipped(1, &probe, SkipReason::Dismissed, 0, 0, 1);
+        assert!(matches!(
+            rt().with_s1_debug(true),
+            LogEntry::RealtimeLabel { debug: true, .. }
+        ));
+        assert!(matches!(
+            rt().with_s1_debug(false),
+            LogEntry::RealtimeLabel { debug: false, .. }
+        ));
+        let gate = crate::o1::activity_label_allowed(true, true).expect("門を通る");
+        let act = LogEntry::activity_label_skipped(&gate, 1, Some("p-1"), 0, 0, 1);
+        assert!(matches!(
+            act.with_s1_debug(true),
+            LogEntry::ActivityLabel { debug: true, .. }
+        ));
+        let LogEntry::DayQuestion(row) =
+            LogEntry::DayQuestion(sample_day_question_row()).with_s1_debug(true)
+        else {
+            panic!("行種が変わった");
+        };
+        assert!(row.debug);
+        assert!(matches!(
+            LogEntry::SessionStart { timestamp: 1 }.with_s1_debug(true),
+            LogEntry::SessionStart { timestamp: 1 }
+        ));
+    }
+
     #[test]
     fn s1_rows_format_byte_equal() {
         use crate::analysis::probe_arbiter::{ArbiterConfig, SuppressReason};
@@ -5617,6 +5728,7 @@ mod tests {
             latency_ms,
             analysis_window_start_ms,
             analysis_window_end_ms,
+            debug: _,
         } = entry
         else {
             panic!("expected RealtimeLabel");
@@ -5859,6 +5971,7 @@ mod tests {
             scheduled_ts: 2000,
             session_elapsed_ms: 1000,
             stratum: ProbeStratum::Random,
+            debug: false,
         })
         .unwrap();
         tx.send(LogEntry::activity_label_answered(

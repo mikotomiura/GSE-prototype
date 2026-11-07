@@ -801,6 +801,13 @@
         "type"
       ],
       "properties": {
+        "debug": {
+          "description": "段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "probe_id": {
           "type": "string"
         },
@@ -859,6 +866,13 @@
         },
         "answered": {
           "type": "boolean"
+        },
+        "debug": {
+          "description": "段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "latency_ms": {
           "type": "integer",
@@ -979,6 +993,13 @@
         },
         "category": {
           "$ref": "#/definitions/ActivityCategoryDto"
+        },
+        "debug": {
+          "description": "段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "latency_ms": {
           "type": "integer",
@@ -1364,6 +1385,13 @@
         },
         "closed_by": {
           "$ref": "#/definitions/DayQuestionClosedByDto"
+        },
+        "debug": {
+          "description": "段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "delayed": {
           "type": "boolean"
