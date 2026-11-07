@@ -49,3 +49,9 @@
 - **再計算の結果**: 公開した推定器（`estimator/` から組んだ `gse-replay`・SHA-256 1839c83e…3e80b・macOS arm64・並列 4）で回し、`confirm_holdout.json` は公開のものとバイト単位で同じ（3a73346f…72018）。1 回目は selftest で止まった（`OMP_NUM_THREADS=1` が要る）ので、スクリプトで export するよう直した。
 - **検査**: `tools/verify.sh ~/gse-public-data` が 0（manifest・cargo test 228 件・provenance・図の照合 18 行・漏れの検査 211 ファイル 0 件・陽性対照 27 件）。原稿は誤り 0・overfull 1（前と同じ・補足の 2 pt）。
 - **公開（研究者の採否・AskUserQuestion）**: push して release を作る／原稿は出してから版の DOI に差し替える。main = e9a595a（v0.2.0）→ 29464a6（DOI を README と CITATION に）。Zenodo: 0.2.0 は 10.5281/zenodo.24025183（zip 802,068 バイト・MIT・OSF の 2 件）。公開 repo の `paper/` の DOI は 0.1.0 のまま（その版の DOI は版の中に書けない）。次に版を上げるときに写し直す。
+
+## 判断 6: 版 0.2.1（X18・X19・原稿 v6）（2026-11-07）
+
+- 研究者の採否（論文の判断 40 (3)）: 直した後に push して release v0.2.1 を作り、原稿の DOI を差し替える。
+- 中身: `experiments/20261107-findings-paper1-round4-checks/`（X18）・`...-round5-checks/`（X19）・原稿 v6・推定器の README に門の初回の不一致の原因は確かめていないと書いた・`tools/rerun-holdout.sh` が不一致のとき違う項目を出す・README の表と探索に回し直しの照合が無いこと・条件の英語の要約に round 4・5 と時刻・図の行名（q = 0.995 に warm-up 200）。
+- 検査: `tools/verify.sh ~/gse-public-data` が 0（222 ファイル 0 件・陽性対照 27・図の照合 18 行）。v0.2.1 = 3e58363・main 49348db。Zenodo 10.5281/zenodo.24025995 の zip はタグとファイル単位で同じ・漏れの検査 0 件。

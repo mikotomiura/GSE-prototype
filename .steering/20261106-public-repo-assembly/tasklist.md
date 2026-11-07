@@ -40,3 +40,7 @@
 - [x] `assemble.sh` に round 3 の探索を足して写し直し・`tools/verify.sh` が 0
 - [x] push・release v0.2.0・Zenodo の DOI を確かめる（研究者の確認の後）
 - [x] 原稿の DOI を 0.2.0 に
+
+## 版 0.2.1（判断 6）
+- [x] X18・X19 と原稿 v6 を写し直す・README・要約・CITATION・.zenodo.json
+- [x] verify が 0・push・release v0.2.1・Zenodo の zip を照合・原稿の DOI を差し替え
