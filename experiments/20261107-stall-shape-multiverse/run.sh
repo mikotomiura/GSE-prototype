@@ -18,14 +18,15 @@ REPO_ROOT="$(cd "$EXP_DIR/../.." && pwd)"
 python3 -I -c 'import os,sys;a,b=(os.path.realpath(x) for x in sys.argv[1:]);sys.exit(1 if a==b or a.startswith(b+os.sep) else 0)' "$CACHE" "$REPO_ROOT" \
   || { echo "CACHE が repo の中を指している" >&2; exit 1; }
 mkdir -p "$CACHE" "$OUT"
-"$PY" -I "$SC/core.py" --selftest                                # K2
-"$PY" -I "$SC/mutate.py" "$PY"                                    # K3
-"$PY" -I "$SC/prep.py" "$DATA_DIR" "$CACHE"                       # D・K4（照合が合わなければ止まる）
-"$PY" -I "$SC/k1_match.py" "$DATA_DIR" "$CACHE" "$OUT/k1_match.json"   # K1（B0 が replay と違えば止まる）
+"$PY" -I -B "$SC/core.py" --selftest                             # K2
+"$PY" -I -B "$SC/analyze.py" --selftest                          # K2（φ・M3）
+"$PY" -I -B "$SC/mutate.py" "$PY"                                    # K3
+"$PY" -I -B "$SC/prep.py" "$DATA_DIR" "$CACHE"                       # D・K4（照合が合わなければ止まる）
+"$PY" -I -B "$SC/k1_match.py" "$DATA_DIR" "$CACHE" "$OUT/k1_match.json"   # K1（B0 が replay と違えば止まる）
 t0=$(date +%s)
-"$PY" -I "$SC/run_configs.py" "$CACHE" "$JOBS"                    # C3 の 90 通り
+"$PY" -I -B "$SC/run_configs.py" "$CACHE" "$JOBS"                    # C3 の 90 通り
 secs=$(( $(date +%s) - t0 ))
-"$PY" -I "$SC/c3b.py" "$DATA_DIR" "$CACHE"                        # C3b
-"$PY" -I "$SC/analyze.py" "$CACHE" "$OUT" "$SEED"                 # C1・C2・C3・§J
+"$PY" -I -B "$SC/c3b.py" "$DATA_DIR" "$CACHE"                        # C3b
+"$PY" -I -B "$SC/analyze.py" "$CACHE" "$OUT" "$SEED"                 # C1・C2・C3・§J
 cp "$CACHE/prep_summary.json" "$OUT/prep_summary.json"
-"$PY" -I "$SC/provenance.py" "$CACHE" "$OUT/provenance.json" "$JOBS" "$SEED" "$secs"
+"$PY" -I -B "$SC/provenance.py" "$CACHE" "$OUT/provenance.json" "$JOBS" "$SEED" "$secs"

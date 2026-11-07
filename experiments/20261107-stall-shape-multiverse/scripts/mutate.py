@@ -25,6 +25,16 @@ MUTANTS = {
     "resume_unbounded": ("if k < len(ins_t) and ins_t[k] <= b else None", "if k < len(ins_t) else None"),
     "day_gap": ("if bl[i][0] - bl[i - 1][1] >= DAY_GAP_MS:", "if bl[i][0] - bl[i - 1][1] >= 1:"),
     "runmax": ("if i >= 0 and runmax[i] >= p:", "if i >= 0 and ep[i][1] >= p:"),
+    # 2 系統レビュー（2026-11-07）で生き残った変異
+    "gap_strict": ("np.diff(t) >= gap_ms", "np.diff(t) > gap_ms"),
+    "no_continuation": ("if not ca[j]:", "if False:"),
+    "start_at_a": ("start = a + W", "start = a"),
+    "no_rise": ("if ca[i] and not prev:", "if ca[i]:"),
+    "theta_future": ("th = theta.at(x)", "th = theta.at(b)"),
+    "overlap_plus1": ("return sum(max(0, min(y, b) - max(x, a)) for x, y in iv)",
+                      "return sum(max(0, min(y, b) - max(x, a)) + 1 for x, y in iv)"),
+    "len_from_s": ("None if r is None else r - t0", "None if r is None else r - s"),
+    "region_left": ("bisect.bisect_right(starts, x) - 1)", "bisect.bisect_left(starts, x) - 1)"),
 }
 
 

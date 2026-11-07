@@ -72,7 +72,7 @@ def main(data, cache):
                          "row_share": rows / max(1, sum(acc[w]["all"][0] for w in ws))}
     res["ratio_cs1_2019_over_klicke"] = {
         g: (res["CS1 2019"][g]["writer_median"] / res["KLiCKe"][g]["writer_median"]
-            if res["KLiCKe"][g]["writer_median"] else None) for g in GS}
+            if res["KLiCKe"][g]["writer_median"] is not None and res["KLiCKe"][g]["writer_median"] > 0 else None) for g in GS}
     json.dump(res, open(os.path.join(cache, "c3b.json"), "w"), indent=1, ensure_ascii=False)
     print("c3b done")
 

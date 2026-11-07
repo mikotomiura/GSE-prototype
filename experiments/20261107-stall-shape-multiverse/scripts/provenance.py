@@ -14,6 +14,23 @@ import scipy
 import statsmodels
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+EXP_ROOT = os.path.normpath(os.path.join(HERE, "../.."))
+
+
+def imported_files():
+    """scripts が他の実験から読み込む .py を、import をたどってすべて集める（芋づるの先も含む）。"""
+    sys.path.insert(0, HERE)
+    import core  # noqa: F401
+    import prep  # noqa: F401  build_cs1 の場所を sys.path に足す
+    import build_cs1  # noqa: F401  prep の中で遅れて import されるもの
+    out = set()
+    for m in list(sys.modules.values()):
+        f = getattr(m, "__file__", None)
+        if f and f.endswith(".py"):
+            f = os.path.realpath(f)
+            if f.startswith(EXP_ROOT + os.sep) and os.path.dirname(f) != HERE:
+                out.add(f)
+    return sorted(out)
 
 
 def sha(p):
@@ -34,6 +51,8 @@ def main(cache, out, jobs, seed, secs):
         "pandas": pandas.__version__, "statsmodels": statsmodels.__version__,
         "cache_sha256": {n: sha(os.path.join(cache, n)) for n in ("units.pkl", "configs.pkl", "c3b.json", "prep_summary.json")},
         "scripts_sha256": {n: sha(os.path.join(HERE, n)) for n in sorted(os.listdir(HERE)) if n.endswith(".py")},
+        # 他の実験から import するもの（芋づるの先も含む）
+        "imported_sha256": {os.path.relpath(q, EXP_ROOT): sha(q) for q in imported_files()},
         "jobs": int(jobs), "run_configs_seconds": int(secs),
         "note": "結果は並列の数によらない。中間は repo の外にあり、ここには SHA-256 だけを置く",
     }

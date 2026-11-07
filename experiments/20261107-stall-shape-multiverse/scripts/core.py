@@ -259,6 +259,37 @@ def selftest():
     d5 = detect(u5, B0)
     if not (len(d5) == 1 and d5[0][2] is None and episodes(d5) == [(d5[0][0], 199_000 + 100_000)]):
         fails.append("区間の外の文字を再開に数えた: %s" % (d5,))
+    # --- 2 系統レビューで生き残った変異を捕まえる対照 ---
+    # 空白がちょうど gap_ms なら切る（≥）
+    if key_segments(np.array([0, 1000, 301_000]), 300_000) != [(0, 1000)]:
+        fails.append("空白ちょうど 5 分で切れない")
+    # 区間の始まりから W 経つまでは立たない（区間の前の押下は見えないので）
+    late = synth([(20_000 + i * 1000, "i") for i in range(280)], iv=[(0, 299_000)])
+    if detect(late, dict(B0, theta=("fix", 10_000))):
+        fails.append("区間の始まりから W 経つ前に立った")
+    # θ の間に条件が崩れたら立たない（継続の確かめ）。崩れた後の立ち上がりで 1 件だけ立つ
+    brk = base + [(234_000, "i")] + [(234_000 + 90_000 + i * 1000, "i") for i in range(5)]
+    db = detect(synth(brk), dict(B0, theta=("fix", 10_000)))
+    if not (len(db) == 1 and db[0][0] == 264_000):
+        fails.append("θ の間に崩れた止まりの扱いが見込みと違う: %s" % (db,))
+    # 止まりの中で条件が真のまま次の瞬間が来ても、立ち上がりでなければ立たない
+    dl = base + [(239_000, "d")] + [(289_000 + i * 1000, "i") for i in range(5)]
+    dd = detect(synth(dl), dict(B0, theta=("fix", 10_000)))
+    if len(dd) != 1:
+        fails.append("立ち上がりでない瞬間で立った: %s" % (dd,))
+    # θ は s までの間隔だけで決まる（因果）。止まりの後に長い間隔が続いても最初の止まりの θ は 1 秒
+    fut = base + [(289_000 + i * 5000, "i") for i in range(300)]
+    df = detect(synth(fut), B0)
+    if not (df and df[0][1] - df[0][0] == 1000):
+        fails.append("θ が後の間隔を見た: %s" % (df[:1],))
+    # 露出の重なり・停滞の長さ（再開 − t0）・まとまりの開始ちょうどの割り当て
+    if overlap([(0, 10), (20, 30)], 5, 25) != 10:
+        fails.append("overlap が見込みと違う")
+    rows, lens = unit_rows(u, st, B0)
+    if not (lens and lens[0][1] == 289_000 - (199_000 + 31_000) and rows[0][1] == u["iv"][0][1] - u["iv"][0][0]):
+        fails.append("unit_rows の長さか露出が見込みと違う: %s %s" % (rows, lens))
+    if region_index(reg, 50_000) != 1:
+        fails.append("まとまりの開始ちょうどが前のまとまりに入った")
     print("selftest:", "OK" if not fails else "FAIL")
     for f in fails:
         print("  -", f)

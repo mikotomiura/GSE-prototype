@@ -187,13 +187,17 @@ def fit_counts(rows, levels, endog=None):
     y = np.array([r[6] for r in rows], float) if endog is None else endog
     X = np.column_stack([np.ones(len(rows)), np.log(e)])
     Z, ident = count_design(rows, levels)
+    # ずれ 9: 分散成分の事前の SD を既定の 1 ではなく 2 にした（弱くした）。K5 も同じ設定で回す
     m = PoissonBayesMixedGLM(y, X, Z, ident, vcp_p=2.0, fe_p=2.0)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         # ずれ 2: 既定の BFGS は乱効果の数の 2 乗の行列を持ち実データで終わらない。合成で BFGS と小数 2 桁まで一致を確かめた
         f = m.fit_vb(fit_method="L-BFGS-B", minim_opts={"maxiter": 20000})
     sd = np.exp(np.asarray(f.vcp_mean))
-    return {"sd": {n: float(s) for (n, _), s in zip(levels, sd)}, "log_exposure_slope": float(f.fe_mean[1])}
+    ok = getattr(f, "optim_retvals", None)
+    return {"sd": {n: float(s) for (n, _), s in zip(levels, sd)}, "log_exposure_slope": float(f.fe_mean[1]),
+            "converged": bool(ok.success) if ok is not None else None,
+            "finite": bool(np.all(np.isfinite(sd)))}
 
 
 def fit_lengths(lens, nested, endog=None):
@@ -214,7 +218,7 @@ def fit_lengths(lens, nested, endog=None):
     for n, v in zip(f.model.exog_vc.names, f.vcomp):
         out[n] = float(math.sqrt(max(0.0, v)))
     out["stall"] = float(math.sqrt(f.scale))
-    return {"sd": out}
+    return {"sd": out, "converged": bool(f.converged)}
 
 
 def shares(sd, keys):
@@ -282,6 +286,17 @@ def run_c1(res, rng):
 
 # ---------- §J ----------
 
+def m3_ratio(c3b):
+    """60 秒以内に揃えた比 ÷ 揃えない比。比が定義できなければ None（0 は 0 として扱う）。"""
+    if not c3b:
+        return None
+    g = c3b.get("ratio_cs1_2019_over_klicke", {})
+    a, b = g.get("all"), g.get("le60")
+    if a is None or b is None or a <= 0:
+        return None
+    return b / a
+
+
 def judge(c3, c1, c3b, boot):
     ids = list(c3)
     n = len(ids)
@@ -294,11 +309,7 @@ def judge(c3, c1, c3b, boot):
         flips = sum((c3[i][d]["phi"][key] is not None and base is not None and
                      (c3[i][d]["phi"][key] >= PHI_CUT) != (base >= PHI_CUT)) for i in ids)
         m2["%s %s" % (d, lev)] = flips / n
-    m3 = None
-    if c3b:
-        g = c3b.get("ratio_cs1_2019_over_klicke", {})
-        if g.get("all") and g.get("le60"):
-            m3 = g["le60"] / g["all"]
+    m3 = m3_ratio(c3b)
     m4 = {}
     for d in DATASETS:
         low = [i for i in ids if min(c3[i][d]["agree_b0_in_cfg"] or 0, c3[i][d]["agree_cfg_in_b0"] or 0) < 0.5]
@@ -339,6 +350,35 @@ def judge(c3, c1, c3b, boot):
     return res
 
 
+def selftest():
+    """φ が数え上げ（ポアソン）で 1 前後・過分散で 1 を超えること、M3 の 0 の扱い。"""
+    fails = []
+    rng = np.random.default_rng(0)
+    nw, per = 200, 6
+    w = np.repeat(np.arange(nw), per)
+    e = rng.uniform(0.5, 2.0, nw * per)
+    lam = rng.gamma(4.0, 1.0, nw)[w]
+    n = rng.poisson(lam * e).astype(float)
+    pb, pa = phi(w, e, n, True), phi(w, e, n, False)
+    if not (0.85 < pb < 1.15):
+        fails.append("ポアソンで φ(b) が 1 前後にならない: %.3f" % pb)
+    if not pa > 1.5:
+        fails.append("書き手の率が違うのに φ(a) が 1.5 を超えない: %.3f" % pa)
+    n2 = rng.negative_binomial(2, 2 / (2 + lam * e)).astype(float)
+    if not phi(w, e, n2, True) > 1.5:
+        fails.append("負の二項で φ(b) が 1.5 を超えない")
+    if m3_ratio({"ratio_cs1_2019_over_klicke": {"all": 4.0, "le60": 0.0}}) != 0.0:
+        fails.append("M3 の比 0 を欠測にした")
+    if m3_ratio({"ratio_cs1_2019_over_klicke": {"all": None, "le60": 1.0}}) is not None:
+        fails.append("M3 の比が定義できないのに値を返した")
+    if level_table([], "writer")[0] != []:
+        fails.append("空の行で落ちる")
+    print("analyze selftest:", "OK" if not fails else "FAIL")
+    for f in fails:
+        print("  -", f)
+    return not fails
+
+
 def main(cache, out, seed, *flags):
     rng = np.random.default_rng(int(seed))
     res = pickle.load(open(os.path.join(cache, "configs.pkl"), "rb"))
@@ -370,4 +410,6 @@ def main(cache, out, seed, *flags):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--selftest"]:
+        sys.exit(0 if selftest() else 1)
     main(*sys.argv[1:])
