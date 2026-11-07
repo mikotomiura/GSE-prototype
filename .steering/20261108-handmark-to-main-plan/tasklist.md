@@ -22,5 +22,6 @@
 - [x] PR 0 の残り（glossary・理論・[P485]〜[P554]）の引き継ぎ
 
 ## 完了
+- [x] /cross-review 1 巡目（判断 7）
 - [ ] code-reviewer と /cross-review（Codex を加える。O1・段 1 の記録の本文を送らない）
 - [ ] /finish-task（push・PR は研究者に確かめてから）
