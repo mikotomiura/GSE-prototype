@@ -116,3 +116,83 @@
 
 - 検査の時刻: 小さな時刻（1000 など）を使う検査が、絶対の下限で別の理由により赤・緑になっていたので、現実の時刻に直した（`overlapping_inputs_are_refused` は「重なる」の文で確かめる）。
 - 全体の検査 lib 1091・gse-replay 81・ゴールデン 6 本 rc=0・clippy（再検査を強制）緑。
+
+## 判断 9: 本人用の印は `s1.mode` の中身に置く（PR 2）
+
+- 判断日時: 2026-11-07
+- 背景: 計画の判断 5（本人の試しは同意文書の承認を求めず、本人用の印のある配布物は他の参加者向けの門で弾く）。`s1.rs` は印の中身を読まない。
+- 選択肢: A `s1.mode` に `audience=self` の 1 行／B 別のファイル（`s1-self.mode` など）／C 門の引数だけ
+- 採用: A（研究者・推奨どおり）
+- 理由: 印が 1 つのファイルに入り、コピーの途中で本人用の印だけが抜け落ちない。アプリのコードを変えない。C は配布物が他の人に渡ったときに検出できず判断 5 が成り立たない。
+- トレードオフ: アプリは中身を読まないので、門を通さずに渡すことは防げない（運用で門を通す）。
+- 影響範囲: `make-common-app-zip.sh`・`check-s1-release-readiness.sh`。
+
+## 判断 10: 組み立てに `--mode s1`（本人用だけ）を足す（PR 2）
+
+- 判断日時: 2026-11-07
+- 背景: 組み立ては `--mode g1|o1` だけで、R5（本人の試し）の配布物を作る手段が無い。
+- 選択肢: A `--mode s1` を足す／B 門と launcher だけにして、研究者が O1 の配布物に手で印を置く
+- 採用: A（研究者・推奨どおり）
+- 理由: B では O1 の launcher（`GSE_DISABLE_PROBES=1` を付ける）が残る事故を門でしか防げない。A は組み立ての展開後の検査でも印と launcher を確かめられる。
+- トレードオフ: 775 行の既存のスクリプトと selftest、O1 の門の `s1.mode` の検査を直す。参加者向けの組み立ては R9 で作る。
+- 影響範囲: `make-common-app-zip.sh`・`launch-s1-windows.bat`・`check-o1-release-readiness.sh`。
+
+## 判断 11: PR 2 の点検（code-reviewer ∥ security-checker）への対応
+
+| 出所 | 指摘 | 対応 |
+|---|---|---|
+| 両者一致 HIGH（両者が再現: `chmod 000`・CRC の壊れた zip） | 配布物を読む python が途中で例外を出すと、後ろの KEY が出ず、空の値の比べが緑に倒れる（実体と launcher の検査が素通り） | python を `try/except` で包み、最後に `DONE=1`、例外は `ERR=`。呼び出し側は `DONE=1` が無ければ赤で次の配布物へ。launcher の検査も同じ。`BINS` は 1 以上を肯定形で求める。selftest 5 に 2 件 |
+| 両者一致 MEDIUM | 環境変数の名前を大文字小文字で区別していた（小文字の `set` で緑） | 門の python と組み立ての selftest 7d を大文字小文字を区別しない比べに。対照に小文字を足した |
+| security HIGH | 印の名前の大文字小文字（`EH3.mode`）・末尾の点と空白を見ない | 名前を小文字にして末尾の点と空白を落として比べ、根にある小文字の完全一致でない印は赤 |
+| security MEDIUM | 根以外の階層の印（`.app` の中など）・`.cmd`・下の階層の launcher を見ない | 全階層の印を赤、全階層の `.bat`/`.cmd` を見る |
+| security MEDIUM | zip の同名のメンバー・`..`・制御文字・巨大なメンバー・シンボリックリンク | 名前の異常（重複・`..`・先頭 `/`・`\`・`:`・制御文字・リンク）を赤、1 GiB を超えるメンバーは読まずに赤、実体は 1 MiB ずつ読んで探す |
+| security MEDIUM | 承認の印をコードのフェンスの中や複数回でも満たせる | フェンスの外にちょうど 1 回。版との結び付け（本文の sha256）は R4 の同意文書を作るときに決める（見送り・design の限界に書いた） |
+| security MEDIUM・code-reviewer MEDIUM | `audience=` はラベルにすぎない・配布物のバイナリとタグを結んでいない | 見送り: 門の冒頭の限界に書いた（アプリは中身を読まない・バイナリは段 1 の文字列の有無だけを見る） |
+| code-reviewer MEDIUM | `git log` が失敗すると「古くない」で緑 | 失敗を赤に |
+| security LOW | タグの新しさの範囲が狭い（`Cargo.lock`・`tauri.conf.json`・`package-lock.json`） | `src-tauri` の全体・`src`・`package.json`・`package-lock.json`。対照に `package-lock.json` |
+| 両者 LOW | 書き出しの検出が `> "$M/…"` の形だけ・分岐の行の後ろに別の文を続けても通る | 段 1 と O1 の両方の門で `${M}` と `tee`/`cp`/`touch`/`mv` を拾い、許す行を 2 行の完全一致に。組み立ての 7c は探す行を実行時に組み立てる（門が 7c の行を書き出しと数えたため） |
+| code-reviewer LOW | O1 の門で組み立てが無いと緑 | 赤に |
+| security LOW | `s1.mode` の中身を長さの上限なしに出す | 印字できる文字の先頭 80 文字に |
+| code-reviewer LOW | `__MACOSX/` を含む zip は根が取れず赤 | 無視する（対照に 1 件） |
+| code-reviewer LOW | 本人用の同意の `ok` が件数を水増しする | 見送り（設計どおり） |
+
+- 段 1 の門の selftest 55/0（selftest 5 に 16 件）。組み立ての selftest 23/0。
+
+## 判断 12: PR 2 の /cross-review 1 巡目（Claude ∥ Codex）への対応
+
+| 出所 | 指摘 | 対応 |
+|---|---|---|
+| 両者一致（Codex P1・Claude LOW） | 配布物の自動送信に要るファイル（`gse-submit.exe`・`pubkey.txt`・`g1-submit.json`・macOS の `.app` の中の `gse-submit`）の欠けを見ない | 有無を見る（中身は読まない・secret を含む）。対照 3 件 |
+| Codex P1 | zip の中のシンボリックリンク（`external_attr`）を見ない | 名前の異常として赤。対照 1 件 |
+| Codex P2 | タグの新しさが古い `origin/main` に寄る・タグが main の祖先かを見ない | `origin/main` と `main` の両方で数えて和を取る・どちらかの祖先でなければ赤。対照 1 件 |
+| Codex P2 | 配布物の launcher が空・別物でも通る | 根の `.bat`/`.cmd` は repo の段 1 の launcher とバイト一致を求める。対照 1 件 |
+| Claude MEDIUM | `--mode s1` でも終わりの案内が「Drive に置くのは上の zip」で、他のモードの zip も並ぶ | s1 では「本人の試しの配布物・共通の Drive に置かない・使う前に門を通す（コマンドつき）」に差し替え、並べる zip を今回のモードに絞る。冒頭の説明にも s1 の例外を 1 行 |
+| Claude LOW | `--dist` が 1 本で通り、片方の OS が検査されない | 既定で Windows と macOS の両方を求め、片方だけなら `--os-only windows|macos`。対照 4 件 |
+| Claude LOW | タグの新しさの範囲に `index.html`・`vite.config.ts`・`tsconfig*.json`・`public/`・`rust-toolchain.toml` が無い | 足した。対照 1 件 |
+| Claude LOW | `v` で始まらないタグも候補にする | `v*` に絞る。対照 1 件 |
+| Claude LOW | launcher の確かめが case の枝を見ない | s1 の枝を切り出して探し、o1・g1 の枝に段 1 の launcher が無いことも見る。対照 1 件 |
+| Claude LOW | 同意の印のフェンスに `~~~` が無い | 足した。対照 1 件 |
+| Claude LOW | launcher の中断の文言が `s1.mode` の有無に合わない | 「このフォルダに eh3.mode があります（段 1 の配布物には入れません）」 |
+| Claude LOW | g1 の macOS の展開後の検査が `s1.mode`・`eh3.mode` を見ない | 足した（Windows の zip の検査とそろえる） |
+| Claude LOW | design-map の「main に入った」は merge の前は事実でない | 「3 本目の PR 2 まで作った」に |
+
+- 段 1 の門の selftest 69/0（selftest 6 に 14 件）。組み立て 23/0。移植性 12/0。O1 の門の本体は前後で文言 1 行だけ。O1 の門の selftest は判断 11 の後に 78/0（その後 O1 の門は変えていない。組み立ての変更は案内と g1 の展開後の検査で、O1 の門が見る書き出しの行は変わらない）。
+
+## 判断 13: PR 2 の /cross-review 2 巡目（Claude ∥ Codex）への対応
+
+| 出所 | 指摘 | 対応 |
+|---|---|---|
+| Codex P1 | 検査したタグと配布物のバイナリが結び付いていない（1 巡目で見送った件） | 組み立てが段 1 の配布物に `s1-release-tag.txt`（組んだタグ 1 行）を書き、門は [2] で選んだタグと一致を求める。組み立ての展開後の検査と Windows の zip の検査もこのファイルを見る。ハッシュで資産と照らすことはしない（ネットワークが要る・限界に書いた） |
+| Codex P2 | フォルダの中の名前の改行で出力の行を偽れる | フォルダの名前も制御文字を拒み、出す名前は逃がす。対照 2 件（偽の `HAS_EH3=0` の行があっても本物の `eh3.mode` を見逃さない） |
+| Codex P2 | `.app` の中の正しいリンクまで拒む | 見送り: 実際に配った O1 の macOS の zip（22 メンバー）と Windows の zip にリンクは 0 個。リンクは今のまま全部赤（止まる側）。Framework を同梱してリンクが入ったら見直す |
+| Claude MEDIUM | 手元の `origin/main` と `main` が両方古いと、タグの新しさが誤って緑 | `git ls-remote origin refs/heads/main` と手元の `origin/main` を比べ、違えば「先に git fetch origin」で赤。origin が無い・読めないときも赤。selftest は bare の origin を置いて 4 件 |
+| Claude LOW | 案内のコマンドが相対パス | `$REPO/scripts/...` |
+| Claude LOW | 必須ファイルが 0 バイトでも通る・macOS の `.app` の中の鍵を求めない | 0 バイトは無いとみなし、`Contents/Resources/resources/pubkey.txt` を足した。対照 2 件 |
+| Claude LOW | 根の別の入口（`.ps1`・`.vbs`・`.lnk` など）と macOS のセットアップの中身を見ない | 別の入口は赤、macOS のセットアップは repo の原本とバイト一致。対照 3 件 |
+| Claude LOW | 最も新しいタグが試し用の枝にあると、祖先の正しいタグを見ずに赤 | 祖先である最も新しい `v*` のタグを選び、飛ばしたタグは注意として出す。対照 2 件 |
+| Claude LOW | `src-tauri/tests` だけの変更でも「古い」 | 見送り（数えすぎる側）。限界をコメントに書いた |
+| Claude LOW | `branch_` の awk の枝の終わり | 次の枝の行・`esac` でも閉じる |
+| Claude LOW | `"$M"/s1.mode`（引用が `/` の前で閉じる形）を拾わない | 段 1 と O1 の両方の門で拾う。対照 1 件 |
+
+- 実物の O1 の zip に門を当てて見つけた誤って赤: ditto の zip は UTF-8 の印を立てず、名前も NFD なので、`初回セットアップ_mac.sh` を見つけられなかった。名前を UTF-8 で読み直し NFC にそろえる。対照 1 件（印を落とした NFD の zip が緑）。
+- 段 1 の門の selftest 85/0。組み立て 23/0。移植性 12/0。O1 の門の本体は前後で文言 1 行だけ。

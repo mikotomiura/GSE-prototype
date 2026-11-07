@@ -49,7 +49,7 @@
 ### V 点検と完了
 - [x] V1 code-reviewer ＋ security-checker（並列）・指摘への対応
 - [x] V2 docs（`functional-design.md`・`glossary.md`・`development-guidelines.md` §3 の再生のモード）
-- [ ] V3 `/finish-task`（/cross-review・push と PR は研究者に確かめてから）
+- [x] V3 `/finish-task`（PR 1 は #392 で merge 済み・PR 2 は G4）
 
 ## T5 の記録（2026-11-07）
 
@@ -59,7 +59,21 @@
 
 ## PR 2: 門・launcher・文書（PR 1 の後・design.md の末尾に設計を足す）
 
-- [ ] G1 `scripts/check-s1-release-readiness.sh` と selftest
-- [ ] G2 段 1 の launcher
-- [ ] G3 `docs/architecture.md`・`docs/architecture/gse-design-map.md`
-- [ ] G4 `/finish-task`
+- [x] G0 設計（design.md の PR 2 の節・decisions 判断 9・10・研究者の承認 2026-11-07）
+- [x] G1 `scripts/check-s1-release-readiness.sh` と selftest
+- [x] G2 段 1 の launcher `launch-s1-windows.bat`（BOM・chcp・CRLF・`GSE_DISABLE_PROBES` を付けない・`eh3.mode` で中断）
+- [x] G2b `make-common-app-zip.sh --mode s1`（印 2 つ・タグと実体の検査・展開後の検査・selftest）
+- [x] G2c O1 の門の `s1.mode` の判定を段 1 の分岐に合わせる・selftest
+- [x] G2d 検査: 3 本の selftest・O1 の門の本体の前後の差分・`check-shell-portability.sh`
+- [x] G2e code-reviewer ＋ security-checker（並列）
+- [x] G3 `docs/architecture.md`・`docs/architecture/gse-design-map.md`
+- [x] G4 `/finish-task`（/cross-review 2 巡・判断 12・13。push と PR は研究者に確かめてから）
+
+## PR 2 の記録（2026-11-07）
+
+- /cross-review 2 巡目の後（判断 13）: 段 1 の門の selftest 85/0・O1 の門の selftest 78/0・組み立て 23/0・移植性 12/0。実物の O1 の zip（macOS・Windows）に門を当て、O1 の配布物として正しく赤（s1.mode・launcher・実体・タグ）で、それ以外は緑。
+- 点検の後: 段 1 の門の selftest 55/0・O1 の門の selftest 78/0（PR 1 の 72 に 6 件）・組み立て 23/0・移植性 12/0（判断 11）。
+- 点検の前: 段 1 の門の selftest 39/0。組み立ての selftest 23/0（足した検査は複製を壊して赤を確かめた）。移植性の検査 12/0。
+- 段 1 の門の本体（`--audience self --dist <無い>`）は exit 1: 段 1 を含むタグが無い・配布物が無い（正しい赤）。
+- O1 の門の本体は変更の前後で `s1.mode` の行の文言だけが変わる（前後とも exit 1・他の未達は変わらない）。
+- 門が本物の launcher を赤にした: O1 の launcher から写した 2 行目の日本語のコメントが `chcp 65001` より前にあった。段 1 の launcher は chcp を 2 行目へ上げた。O1 の launcher（`launch-o1-windows.bat`）も同じ並びだが、配布中のものなので触らない（研究者に知らせる）。
