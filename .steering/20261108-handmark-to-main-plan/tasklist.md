@@ -23,5 +23,6 @@
 
 ## 完了
 - [x] /cross-review 1 巡目（判断 7）
+- [x] /cross-review 2 巡目（判断 8）
 - [ ] code-reviewer と /cross-review（Codex を加える。O1・段 1 の記録の本文を送らない）
 - [ ] /finish-task（push・PR は研究者に確かめてから）
