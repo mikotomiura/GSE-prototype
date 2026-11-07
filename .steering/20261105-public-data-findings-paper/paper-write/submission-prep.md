@@ -48,3 +48,10 @@
 1. 推定器を著者が設計したことを原稿にも書く → `sections/data.tex` の「The designer named the states」を「The author designed the estimator before this study and named its states」に（草稿 v8）。組むと誤り 0・未定義の参照と引用 0・overfull 1（v7 と同じ）。本文 7,463 語（+7）。
 2. プレプリントは Zenodo で投稿の前に出す（公開は押す前に研究者に確かめる）。DOI が付いたらカバーレターの PREPRINT の行を埋める。
 3. 投稿する版は v8（v7＋上の直し）。公開 repo の `paper/` を v8 に写し直して版を上げる（push と release の前に確かめる）。
+
+## プレプリントの下書き（Zenodo・2026-11-07）
+
+- 下書き 24026330（`unsubmitted`・予約の DOI 10.5281/zenodo.24026330）。PDF は Chrome の投稿の画面から上げ（Miura-2026-stall-runup-equivalence-preprint.pdf・323,529 バイト・md5 cc6cff37…が手元と一致・SHA-256 452f77ae…）、メタデータは deposit API で入れた（token はプロセスの中で読むだけ）。未公開の下書きはこの 1 件だけ。
+- メタデータ: publication / preprint・CC BY 4.0・著者 Miura, Mikoto（Independent Researcher・ORCID）・題は原稿のまま・要旨は原稿の要旨から LaTeX の記号を外した文・版「v1 (manuscript before peer review)」・注記「Preprint; not peer reviewed.」・キーワード 5 つ・関連の識別子 9 件（公開 repo 0.2.2 の DOI と GitHub を isSupplementedBy、OSF の登録 5 件と CS1 の Dataverse 2 件を references。すべて解決を確かめた）。形は KeepCount のプレプリント（23858734）に揃えた。投稿先の誌名は書いていない（公開の時点では未投稿のため）。
+- カバーレター: PREPRINT の行を予約の DOI で埋め、「既発表でない」に「プレプリントを除き」を足した（1 頁・約 470 語）。
+- 公開（publish）は研究者に確かめてから。公開の後、外から `/api/records/24026330` で open と DOI の解決を確かめる。

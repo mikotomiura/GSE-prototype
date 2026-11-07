@@ -34,15 +34,16 @@ exploration.
 
 Declarations.
 
-- The manuscript has not been published and is not under consideration by another journal. It does not extend a
-  conference paper.
+- The manuscript has not been published, apart from the preprint below, and is not under consideration by another
+  journal. It does not extend a conference paper.
 - Competing interests: I designed the estimator that the manuscript evaluates. I have no financial interest in it, the
   work received no funding, and I have no relationship with the editors of the kind listed in the journal's competing
   interest guidelines.
 - The use of generative AI software tools in the writing is declared in the section before the references, in the
   wording the journal requires.
 - I am submitting the manuscript without anonymisation, because the preregistration and the archive name the author.
-- PREPRINT: [to be filled in before submission]
+- A preprint of this manuscript, not peer reviewed, is posted on Zenodo (https://doi.org/10.5281/zenodo.24026330), as
+  the journal's copyright notice permits.
 
 I am the sole author, and I meet the journal's authorship criteria.
 
