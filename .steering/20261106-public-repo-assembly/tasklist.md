@@ -32,3 +32,11 @@
 - [x] design.md の最終化・decisions.md
 - [x] git commit（[skip ci]・push は研究者）
 - [x] 引き継ぎ（attack-me round 3 の要否）
+
+## 版 0.2.0（判断 5）
+- [x] `tools/rerun-holdout.sh`・`tools/rerun_confirm.py`（公開の推定器でバイト一致）
+- [x] `docs/conditions-summary.md`（英語の要約）
+- [x] README（英・日）・CITATION.cff・`.zenodo.json`・LICENSE-docs
+- [x] `assemble.sh` に round 3 の探索を足して写し直し・`tools/verify.sh` が 0
+- [x] push・release v0.2.0・Zenodo の DOI を確かめる（研究者の確認の後）
+- [x] 原稿の DOI を 0.2.0 に

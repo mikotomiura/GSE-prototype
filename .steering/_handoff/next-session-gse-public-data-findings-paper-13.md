@@ -1,5 +1,6 @@
 # 次のセッション —— 公開データの知見の論文 1: 公開 repo と DOI の後（attack-me round 3 の要否・著者の返事）
 
+> 使用済み（2026-11-07・§2 の 2 と 3 は済んだ。続きは `next-session-gse-public-data-findings-paper-14.md`）。
 > 作成: 2026-11-07。worktree `/Users/johnd/GSE-prototype-public-findings`・枝 `docs/public-data-findings-paper`（push は研究者の手元・docs だけなので [skip ci]）。前の引き継ぎ `next-session-gse-public-data-findings-paper-12.md` の §2 の 1 は済んだ。
 
 ## §1 状態
@@ -14,7 +15,7 @@
 
 ## §2 やること（研究者に順を確かめてから）
 
-1. 著者の返事が来たら、その扱いを先にする（一覧を足すなら公開 repo に足して版を上げる・`check_release.py` の取り置きの検査は一覧そのものを見つけたとして赤になるので、足す場所を許可する形に直す）。
+1. 著者の返事が来たら、その扱いを先にする。手順は `next-session-gse-public-data-findings-paper-11.md` の §2 の 1（返事で推定の行・id の一覧の扱いを決め、考察の Materials と限界を直す）。加えて公開 repo について（一覧を足すなら公開 repo に足して版を上げる・`check_release.py` の取り置きの検査は一覧そのものを見つけたとして赤になるので、足す場所を許可する形に直す）。
 2. attack-me round 3 を回すか。止める理由だった「推定器と replay が未公開」は閉じた。回すなら同じ panel・Codex あり・既知の未決は round 2 の `tmp/codex-input.md` の 18 件を組み直し、推定器の公開で閉じた件を外す。公開 repo の README と DOI を査読者に渡す。
 3. 原稿を直したら `assemble.sh` で写し直し、`tools/verify.sh ~/gse-public-data` を通して v0.1.1 などを出す（Zenodo は `.zenodo.json` の版と日付も直す）。
 

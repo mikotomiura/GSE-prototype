@@ -41,3 +41,11 @@
 - **Zenodo の失敗 4 回**: GitHub 連携が CITATION.cff を読めず "Citation metadata load failed"（理由は示されない）。cffconvert では 4 回とも規格どおり。試したのは references を外す・ライセンスを 2 つに・公開日を UTC に（当時 UTC はまだ 11-06）。4 回で止めて研究者に聞き、`.zenodo.json` を置いて 5 回目で公開された。原因は特定していない。失敗の 4 件は Zenodo の連携の画面に残る（公開物ではない）。
 - **原稿の直し**: 要旨の置き字を DOI に（要旨は texcount で 300 語）。Materials を「archive（DOI・version 0.1.0）に、評価・探索・変換のコード、seed・環境・manifest、先にコミットした条件と集計の結果、版を固定した推定器と replay（見た書き手の全呼び出しでバイト一致の門つき）」に。限界の「推定器が公開できなければ外から再現できない」を「ファイルを得て公開のコードと推定器を回し直せば再現できる」に。補足の係数の節の「公開しない」を「archive で公開」に。`papers/public-data-findings/README.md` の「置き場は未定」を DOI に。組むと誤り 0・overfull 1（直す前と同じ。2 つの URL を並べた版は 2 になったので 1 つに戻した）。
 - **公開 repo の paper/ は直す前の版**（v0.1.0 の写し）。原稿を次に直して出すとき（attack-me round 3 の後など）に、assemble.sh で写し直して版を上げる。
+
+## 判断 5: 版 0.2.0（取り置きを再計算する入口・条件の英語の要約・原稿 v4）（2026-11-07）
+
+- **背景**: attack-me manuscript round 3 の B（Materials の再現の約束が公開物の実体より強い・3/4）と Codex 1（独立再実行の入口が無い）。研究者の採否は論文の判断 38 (4)（条件の英語の要約と、取り置きを再計算する入口を公開物に足す）。
+- **足したもの**: `tools/rerun-holdout.sh`（`run-confirm-holdout.sh` と同じ段を、著者の実行だけが通れる git の履歴と OSF の記録の検査を除いて回し、`confirm_holdout.json` が公開のものとバイト単位で同じときだけ 0）・`tools/rerun_confirm.py`（変えていない `confirm_p1.py` を呼び、`holdout_gate` だけを外す）・`docs/conditions-summary.md`（条件の文書すべての英語の要約・最初のコミットの時刻つき・正本は日本語。サブエージェントが書き、内部の語が無いことと漏れの検査 0 件を確かめた）・`experiments/20261107-findings-paper1-round3-checks/`・原稿 v4（`paper/`）。README（英・日）は題・要約へのリンク・表 6（S4 節）・再計算の節・門の範囲（CS1 2019・KLiCKe・CoAuthor。2021 と陽性対照は比べていない）を直した。CITATION.cff と `.zenodo.json` は版 0.2.0・題・要旨（"matched" を外す）。LICENSE-docs に要約と `.zenodo.json` を足した。
+- **再計算の結果**: 公開した推定器（`estimator/` から組んだ `gse-replay`・SHA-256 1839c83e…3e80b・macOS arm64・並列 4）で回し、`confirm_holdout.json` は公開のものとバイト単位で同じ（3a73346f…72018）。1 回目は selftest で止まった（`OMP_NUM_THREADS=1` が要る）ので、スクリプトで export するよう直した。
+- **検査**: `tools/verify.sh ~/gse-public-data` が 0（manifest・cargo test 228 件・provenance・図の照合 18 行・漏れの検査 211 ファイル 0 件・陽性対照 27 件）。原稿は誤り 0・overfull 1（前と同じ・補足の 2 pt）。
+- **公開（研究者の採否・AskUserQuestion）**: push して release を作る／原稿は出してから版の DOI に差し替える。main = e9a595a（v0.2.0）→ 29464a6（DOI を README と CITATION に）。Zenodo: 0.2.0 は 10.5281/zenodo.24025183（zip 802,068 バイト・MIT・OSF の 2 件）。公開 repo の `paper/` の DOI は 0.1.0 のまま（その版の DOI は版の中に書けない）。次に版を上げるときに写し直す。
