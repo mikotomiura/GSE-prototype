@@ -52,6 +52,10 @@ pub const APP_START_WINDOW_MS: u64 = 10_000;
 pub const MAX_BEFORE_START_MS: u64 = 60_000;
 /// 入力の全体の時間の幅の上限。
 pub const MAX_TOTAL_SPAN_MS: u64 = 40 * 86_400_000;
+/// 時刻の絶対の下限（2020-01-01 UTC）と上限（2100-01-01 UTC）。★ `session_start` そのものが壊れて
+/// u64 の最大値の近くにあると、相対の幅の検査を通り抜けて tick が止まらなくなる（/cross-review 2 巡目の Codex）。
+pub const MIN_EPOCH_MS: u64 = 1_577_836_800_000;
+pub const MAX_EPOCH_MS: u64 = 4_102_444_800_000;
 
 // ---------------------------------------------------------------------------
 // 行
@@ -402,14 +406,25 @@ pub fn order_inputs(mut files: Vec<InputFile>) -> Result<Vec<InputFile>> {
     // ★ 壊れた時刻（ビット化けなど）で再生の tick が止まらなくならないように、時刻の欄を全部縛る。
     //   ファイルの幅では縛らない（一時停止の間はローテートが回らないので、正しい記録でも 1 本が何日にもなる・
     //   /cross-review の security-checker MEDIUM）。上の端は入力の全体の幅（下の 40 日）で縛る。
+    //   ★ ファイルの始まりより前を拒むのは、その行が起きた時刻（`row_time`）だけ。参照の時刻（`shown_ts`・
+    //   `candidate_ts` など）は前のファイルの出来事を指しうる（ローテートの前に出した日の問いに後で答えた・
+    //   /cross-review 2 巡目の Codex）ので、絶対の範囲と全体の幅だけで縛る。
     for f in &files {
         let start = f.session_start().unwrap_or(0);
+        if !(MIN_EPOCH_MS..=MAX_EPOCH_MS).contains(&start) {
+            return Err(format!("{}: meta.session_start {start} が範囲の外", f.name));
+        }
         for t in f.rows.iter().flat_map(all_times) {
-            if t.saturating_add(MAX_BEFORE_START_MS) < start
+            if !(MIN_EPOCH_MS..=MAX_EPOCH_MS).contains(&t)
                 || t > start.saturating_add(MAX_TOTAL_SPAN_MS)
             {
+                return Err(format!("{}: 行の時刻 {t} が範囲の外", f.name));
+            }
+        }
+        for t in f.rows.iter().filter_map(row_time) {
+            if t.saturating_add(MAX_BEFORE_START_MS) < start {
                 return Err(format!(
-                    "{}: 行の時刻 {t} が meta.session_start {start} から外れている",
+                    "{}: 行の時刻 {t} が meta.session_start {start} より前",
                     f.name
                 ));
             }
@@ -763,7 +778,7 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
     }
     // ★ 最初の枠より前の一時停止の行は、駆動役では調停器の無い tick で縁が進んでいる（枠の最初の tick を
     //   再開として扱わない）。ループの前に状態だけ進める
-    while pause_i < tl.pauses.len() && tl.pauses[pause_i].0 < wall.saturating_sub(1_000) {
+    while pause_i < tl.pauses.len() && tl.pauses[pause_i].0 <= wall.saturating_sub(1_000) {
         paused = tl.pauses[pause_i].1;
         epoch += 1;
         pause_i += 1;
@@ -1058,6 +1073,8 @@ pub enum Class {
     UnverifiedPowerResume,
     UnverifiedAppStart,
     UnverifiedTail,
+    /// 取り消しの後とも記録の後ろが落ちたとも見分けられない（鍵の後に押下が無い）。
+    UnverifiedTailNoActivity,
     /// 両方にあるが中身（発火と抑制・理由）が違う。
     Differ,
     /// 再生にあり記録に無い（記録の欠け）。
@@ -1402,8 +1419,14 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
                 .presses
                 .get(tl.presses.partition_point(|&p| p <= k))
                 .is_some_and(|&p| p <= f.end_ms);
-            if last_rec.is_some_and(|t| k > t) && presses_after {
-                return Class::UnverifiedTail;
+            // ★ 鍵の後に押下が無いと、取り消してすぐ離席・終了したのか、記録の後ろが落ちたのか見分けられない。
+            //   どちらとも決めず別に数える（/cross-review 2 巡目の code-reviewer）
+            if last_rec.is_some_and(|t| k > t) {
+                return if presses_after {
+                    Class::UnverifiedTail
+                } else {
+                    Class::UnverifiedTailNoActivity
+                };
             }
         }
     }
@@ -1422,8 +1445,6 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
 pub struct Counts {
     #[serde(rename = "match")]
     pub matched: usize,
-    /// `match` のうち、位相によって一致しない位相もあったもの（内訳・`match` に含まれる）。
-    pub match_phase_sensitive: usize,
     pub differ: usize,
     pub missing: usize,
     pub extra: usize,
@@ -1442,6 +1463,7 @@ pub struct Unverified {
     pub power_resume: usize,
     pub app_start: usize,
     pub tail: usize,
+    pub tail_no_activity: usize,
 }
 
 impl Counts {
@@ -1461,6 +1483,7 @@ impl Counts {
             Class::UnverifiedPowerResume => self.unverified.power_resume += 1,
             Class::UnverifiedAppStart => self.unverified.app_start += 1,
             Class::UnverifiedTail => self.unverified.tail += 1,
+            Class::UnverifiedTailNoActivity => self.unverified.tail_no_activity += 1,
         }
     }
 }
@@ -1519,6 +1542,10 @@ pub struct ProbesReport {
     pub utc_offset_secs: Option<i32>,
     pub day_state_given: bool,
     pub tick_phases_ms: Vec<u64>,
+    /// 照合の基準にした位相（一致の数が最も多いもの）。
+    pub base_phase_ms: u64,
+    /// 位相ごとの一致の数（`tick_phases_ms` の順）。
+    pub matched_by_phase: Vec<usize>,
     pub inputs: Vec<String>,
     /// JSON として読めず飛ばした行の数（全ファイルの合計）。
     pub skipped_lines: usize,
@@ -1557,19 +1584,25 @@ pub fn replay_probes(files: &[InputFile], opts: &ReplayOptions) -> ProbesReport 
                 .push(r.matched());
         }
     }
+    // ★ 一致の数が最も多い位相を基準にする。駆動役の 1 回の走行の位相は 1 つ（ゆっくりずれる）なので、
+    //   項目ごとに位相を選ぶと、交互に tick がずれるような系統的なずれが一致に隠れる（/cross-review 2 巡目の
+    //   Claude ∥ Codex の両者一致）。基準の位相で割れ、他の位相でだけ一致した項目は `boundary_tick`。
+    let matched_by_phase_count: Vec<usize> = runs
+        .iter()
+        .map(|run| run.iter().filter(|r| r.matched()).count())
+        .collect();
+    let base = matched_by_phase_count
+        .iter()
+        .enumerate()
+        .max_by_key(|&(i, &n)| (n, std::cmp::Reverse(i)))
+        .map_or(0, |(i, _)| i);
     let mut counts = Counts::default();
     let mut by_kind: BTreeMap<Kind, Counts> = BTreeMap::new();
     let mut items = Vec::new();
-    for raw in &runs[0] {
+    for raw in &runs[base] {
         let flags = &matched_by_phase[&raw.id()];
         let stable = flags.len() == runs.len() && flags.iter().all(|&m| m == flags[0]);
-        // ★ どれかの位相で一致すれば一致（記録の tick の位相は分からないので、説明できる位相があれば足りる）。
-        //   位相に敏感な一致は別に数える（/cross-review の Codex P1: 位相 0 だけを見ると非対称になる）
-        let any_match = flags.iter().any(|&m| m);
-        if any_match && !stable {
-            counts.match_phase_sensitive += 1;
-        }
-        let class = if any_match {
+        let class = if raw.matched() {
             Class::Match
         } else {
             classify(&tl, opts, raw, stable)
@@ -1617,7 +1650,7 @@ pub fn replay_probes(files: &[InputFile], opts: &ReplayOptions) -> ProbesReport 
                 .min(),
         })
         .collect();
-    let lag_check = lag_check(&tl, &runs[0]);
+    let lag_check = lag_check(&tl, &runs[base]);
     ProbesReport {
         mode: "probes",
         replay_version: REPLAY_VERSION,
@@ -1625,6 +1658,8 @@ pub fn replay_probes(files: &[InputFile], opts: &ReplayOptions) -> ProbesReport 
         utc_offset_secs: opts.utc_offset_secs,
         day_state_given: opts.day_state.is_some(),
         tick_phases_ms: TICK_PHASES_MS.to_vec(),
+        base_phase_ms: TICK_PHASES_MS[base],
+        matched_by_phase: matched_by_phase_count,
         inputs: files.iter().map(|f| f.name.clone()).collect(),
         skipped_lines: files.iter().map(|f| f.skipped_lines).sum(),
         frames,
@@ -1814,10 +1849,10 @@ pub fn day_question_presses(files: &[InputFile], utc_offset_secs: i32) -> Vec<Da
 /// 回答の時刻 `t` から `cutoff` まで、記録がローテートの鎖で途切れずに続いているか
 /// （/cross-review の Codex P2: 最後の時刻だけを見ると、途中の空白を見逃す）。
 fn covers(files: &[InputFile], t: u64, cutoff: u64) -> bool {
-    let Some(mut i) = files
-        .iter()
-        .position(|f| f.session_start().unwrap_or(0) <= t && f.last_ms().unwrap_or(0) >= t)
-    else {
+    let Some(mut i) = files.iter().position(|f| {
+        f.session_start().unwrap_or(0) <= t.saturating_add(MAX_BEFORE_START_MS)
+            && f.last_ms().unwrap_or(0) >= t
+    }) else {
         return false;
     };
     loop {
@@ -2419,7 +2454,7 @@ mod tests {
 
     /// /cross-review の code-reviewer MEDIUM: 記録の後ろが落ちた（押下も続かない）なら、取り消しでなく欠け。
     #[test]
-    fn a_truncated_tail_without_presses_is_missing() {
+    fn a_tail_without_presses_is_counted_apart_from_revocation() {
         let (_, mut files) = run(&base(), &jst());
         let cut = T0 + 120 * MIN;
         for f in files.iter_mut() {
@@ -2433,7 +2468,9 @@ mod tests {
             });
         }
         let r = replay_probes(&files, &jst());
-        assert!(r.counts.missing >= 1, "{:?}", r.counts);
+        // 押下も止まると取り消しと見分けられない。取り消し（tail）とは別に数える
+        assert!(r.counts.unverified.tail_no_activity >= 1, "{:?}", r.counts);
+        assert_eq!(r.counts.unverified.tail, 0, "{:?}", r.counts);
     }
 
     /// code-reviewer MEDIUM: 枠に判定の行が 1 行も無いなら、取り消し（tail）ではなく欠け。
@@ -2533,8 +2570,9 @@ mod tests {
     /// security-checker MEDIUM: 壊れた時刻の行・長すぎる入力は拒む（再生を止まらなくしない）。
     #[test]
     fn broken_times_and_too_long_inputs_are_refused() {
-        let text = "{\"type\":\"meta\",\"session_start\":1000}\n{\"type\":\"key\",\"t\":1000000000000000,\"category\":\"a\",\"press\":true}\n";
-        let f = parse_file("x", text).unwrap();
+        // 始まりは正しく、1 行の時刻だけが壊れている（相対の幅と絶対の上限のどちらでも外れる）
+        let text = format!("{{\"type\":\"meta\",\"session_start\":{T0}}}\n{{\"type\":\"key\",\"t\":{},\"category\":\"a\",\"press\":true}}\n", T0 + 50 * 86_400_000);
+        let f = parse_file("x", &text).unwrap();
         assert!(order_inputs(vec![f]).is_err());
         let start = |t: u64| {
             parse_file(
@@ -2722,9 +2760,14 @@ mod tests {
 
     #[test]
     fn overlapping_inputs_are_refused() {
-        let a = parse_file("a", "{\"type\":\"meta\",\"session_start\":1000}\n{\"type\":\"key\",\"t\":5000,\"category\":\"a\",\"press\":true}\n").unwrap();
-        let b = parse_file("b", "{\"type\":\"meta\",\"session_start\":3000}\n").unwrap();
-        assert!(order_inputs(vec![b, a]).is_err());
+        let a = parse_file("a", &format!("{{\"type\":\"meta\",\"session_start\":{T0}}}\n{{\"type\":\"key\",\"t\":{},\"category\":\"a\",\"press\":true}}\n", T0 + 5_000)).unwrap();
+        let b = parse_file(
+            "b",
+            &format!("{{\"type\":\"meta\",\"session_start\":{}}}\n", T0 + 3_000),
+        )
+        .unwrap();
+        let err = order_inputs(vec![b, a]).unwrap_err();
+        assert!(err.contains("重なる"), "{err}");
     }
 
     #[test]
@@ -2789,6 +2832,33 @@ mod tests {
             T0 + 5 * 86_400_000
         );
         assert!(order_inputs(vec![parse_file("x", &long).unwrap()]).is_ok());
+    }
+
+    /// /cross-review 2 巡目の Codex: ローテートの前に出した日の問いに後で答えた行（参照の時刻がファイルの始まりより前）を
+    /// 拒まない。絶対の範囲の外の `session_start` は拒む。
+    #[test]
+    fn reference_times_may_point_before_the_file_but_absolute_bounds_hold() {
+        let start_b = T0 + 30 * MIN;
+        let day_row = format!(
+            r#"{{"type":"day_question","t":{},"shown_ts":{},"in_eod_window":true,"target_day":20764,"trigger":"evening_idle","delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","motivation":4,"latency_ms":1,"duration_ms":1}}"#,
+            start_b + 10 * MIN,
+            T0
+        );
+        let a = format!("{{\"type\":\"meta\",\"session_start\":{}}}\n{{\"type\":\"meta\",\"session_end\":{}}}\n", T0 - MIN, start_b - 100);
+        let b = format!("{{\"type\":\"meta\",\"session_start\":{start_b}}}\n{day_row}\n");
+        assert!(order_inputs(vec![
+            parse_file("a", &a).unwrap(),
+            parse_file("b", &b).unwrap()
+        ])
+        .is_ok());
+        // 起きた時刻（t）がファイルの始まりより前なのは拒む
+        let early = format!("{{\"type\":\"meta\",\"session_start\":{start_b}}}\n{{\"type\":\"key\",\"t\":{},\"category\":\"a\",\"press\":true}}\n", start_b - 5 * MIN);
+        assert!(order_inputs(vec![parse_file("e", &early).unwrap()]).is_err());
+        let huge = format!(
+            "{{\"type\":\"meta\",\"session_start\":{}}}\n",
+            u64::MAX - 10
+        );
+        assert!(order_inputs(vec![parse_file("h", &huge).unwrap()]).is_err());
     }
 
     /// /cross-review の security-checker・code-reviewer MEDIUM: 枠の前（同意の前）の一時停止と再開を、枠の最初の

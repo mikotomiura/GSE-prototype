@@ -4830,7 +4830,7 @@ mod tests {
         let ok = dir.join("ok.ndjson");
         std::fs::write(
             &ok,
-            "{\"type\":\"meta\",\"session_start\":1000}\n{\"type\":\"key\",\"t\":2000,\"category\":\"a\",\"press\":true}\n",
+            "{\"type\":\"meta\",\"session_start\":1794042000000}\n{\"type\":\"key\",\"t\":1794042001000,\"category\":\"a\",\"press\":true}\n",
         )
         .unwrap();
         let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
@@ -4841,7 +4841,7 @@ mod tests {
         let broken = dir.join("broken.ndjson");
         std::fs::write(
             &broken,
-            "{\"type\":\"meta\",\"session_start\":1000}\n{\"type\":\"probe_suppressed\",\"t\":\"x\"}\n",
+            "{\"type\":\"meta\",\"session_start\":1794042000000}\n{\"type\":\"probe_suppressed\",\"t\":\"x\"}\n",
         )
         .unwrap();
         let args = parse_args_from(v(&[broken.to_str().unwrap(), "--probes"])).unwrap();
