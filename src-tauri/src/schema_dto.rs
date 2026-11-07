@@ -423,6 +423,9 @@ pub enum LogEntryDto {
         /// ADR-031 D4 の「3 値を常に書く / キーの不在 = 古いビルド」は writer 側で保たれる。
         #[serde(skip_serializing_if = "Option::is_none")]
         stratum: Option<ProbeStratumDto>,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
     },
     /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
     ///
@@ -444,6 +447,9 @@ pub enum LogEntryDto {
         analysis_window_start_ms: u64,
         analysis_window_end_ms: u64,
         ts: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
     },
     /// v0.3 較正スモーク: 尺度理解テスト回答 (ビネット)。常に回答あり (q1/q2 は 1..=5)。
     /// `expected_quadrant` は教示の正解ラベル (`UserLabelKindDto` とは別物で `idle` を含む)。
@@ -488,6 +494,9 @@ pub enum LogEntryDto {
         /// この回答が指している区間の終了 (ms)。[`Self::ActivityLabel::recall_window_start_ms`] 参照。
         recall_window_end_ms: u64,
         t: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
     },
     /// EH3 のその日の条件（`meta.eh3_mode` があるときだけ出る）。
     ///
@@ -609,6 +618,9 @@ pub enum LogEntryDto {
         motivation: Option<u8>,
         latency_ms: Option<u64>,
         duration_ms: Option<u64>,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
     },
 }
 

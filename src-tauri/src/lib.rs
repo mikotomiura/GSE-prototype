@@ -53,6 +53,8 @@ pub mod s1;
 pub mod s1_driver;
 // 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
 pub mod s1_day_state;
+// 段 1 の再生（`gse-replay --probes`・`--day-questions`・記録から調停器を回し直して照合する・純粋）。
+pub mod s1_replay;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -2057,7 +2059,55 @@ fn s1_day_question_entry(r: crate::s1_driver::DayRowData) -> LogEntry {
         motivation: r.motivation,
         latency_ms: r.latency_ms,
         duration_ms: r.duration_ms,
+        debug: r.debug,
     })
+}
+
+/// 段 1: 駆動役の出来事のうち、1 行で書けるもの（枠・抑制・割り当て・日の問い）を行に写す（純関数）。
+///
+/// ★ 同意と一時停止の門は呼び出し側（`run_s1_effects`）が持つ。再生の往復の検査（`s1_replay`）が同じ写しを使う。
+/// ラベルの 2 行（差し替え）は 6 択の門の中で組むので、ここに置かない（`emit_s1_superseded`）。
+pub(crate) fn s1_effect_row(effect: crate::s1_driver::Effect) -> Option<LogEntry> {
+    use crate::s1_driver::Effect;
+    match effect {
+        // ★ 枠の行の時刻は起点（本タスクの判断 1: 本人が同意を押した時刻を消えない行に残さない）
+        Effect::Frame {
+            anchor_ms,
+            frame_seed,
+            config,
+        } => Some(LogEntry::ProbeFrame {
+            timestamp: anchor_ms,
+            frame_seed,
+            anchor_ms,
+            config,
+        }),
+        Effect::Suppressed {
+            t,
+            candidate_ts,
+            stratum,
+            reason,
+        } => Some(LogEntry::ProbeSuppressed {
+            timestamp: t,
+            candidate_ts,
+            stratum: stratum.into(),
+            reason,
+        }),
+        Effect::Assigned {
+            probe_id,
+            scheduled_ts,
+            session_elapsed_ms,
+            stratum,
+            debug,
+        } => Some(LogEntry::ProbeAssignment {
+            probe_id,
+            scheduled_ts,
+            session_elapsed_ms,
+            stratum: stratum.into(),
+            debug,
+        }),
+        Effect::DayRow(r) => Some(s1_day_question_entry(r)),
+        _ => None,
+    }
 }
 
 /// 段 1: 差し替えた層化のカードの 2 行（`realtime_label` と `activity_label`・`superseded`）。
@@ -2092,7 +2142,7 @@ fn emit_s1_superseded(log_tx: &Sender<LogEntry>, t: u64, card: &crate::s1_driver
         card.window_end_ms,
     );
     for entry in [realtime, activity] {
-        if let Err(e) = log_tx.try_send(entry) {
+        if let Err(e) = log_tx.try_send(entry.with_s1_debug(card.debug)) {
             tracing::warn!("stage 1: superseded row not sent: {}", log_send_error(e));
         }
     }
@@ -2133,44 +2183,14 @@ fn run_s1_effects(
                 tracing::info!("stage 1: end-of-day question closed while paused; no row written");
                 None
             }
-            // ★ 枠の行の時刻は起点（本タスクの判断 1: 本人が同意を押した時刻を消えない行に残さない）
-            Effect::Frame {
-                anchor_ms,
-                frame_seed,
-                config,
-            } => Some(LogEntry::ProbeFrame {
-                timestamp: anchor_ms,
-                frame_seed,
-                anchor_ms,
-                config,
-            }),
-            Effect::Suppressed {
-                t,
-                candidate_ts,
-                stratum,
-                reason,
-            } => Some(LogEntry::ProbeSuppressed {
-                timestamp: t,
-                candidate_ts,
-                stratum: stratum.into(),
-                reason,
-            }),
-            Effect::Assigned {
-                probe_id,
-                scheduled_ts,
-                session_elapsed_ms,
-                stratum,
-            } => Some(LogEntry::ProbeAssignment {
-                probe_id,
-                scheduled_ts,
-                session_elapsed_ms,
-                stratum: stratum.into(),
-            }),
+            e @ (Effect::Frame { .. } | Effect::Suppressed { .. } | Effect::Assigned { .. }) => {
+                s1_effect_row(e)
+            }
             Effect::Superseded { t, card } => {
                 emit_s1_superseded(log_tx, t, &card);
                 None
             }
-            Effect::DayRow(r) => Some(s1_day_question_entry(r)),
+            e @ Effect::DayRow(_) => s1_effect_row(e),
             Effect::CardChanged => {
                 changed = true;
                 None
@@ -2606,7 +2626,7 @@ fn record_probe_response(
             card.window_end_ms,
         );
         // ★ 1 行目が送れなければカードを残す（再押下でやり直せる）
-        if let Err(e) = log_tx.try_send(realtime) {
+        if let Err(e) = log_tx.try_send(realtime.with_s1_debug(card.debug)) {
             return (Err(log_send_error(e)), Vec::new());
         }
         let activity = LogEntry::activity_label_answered(
@@ -2619,7 +2639,9 @@ fn record_probe_response(
             card.window_end_ms,
         );
         // ⚠️ 2 行目が送れなくてもカードは閉じる（やり直すと 1 行目が二重になる）
-        let res = log_tx.try_send(activity).map_err(log_send_error);
+        let res = log_tx
+            .try_send(activity.with_s1_debug(card.debug))
+            .map_err(log_send_error);
         (res, d.close_probe(&card.probe_id))
     })
     .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
@@ -2664,7 +2686,7 @@ fn record_probe_skip(
             card.window_start_ms,
             card.window_end_ms,
         );
-        if let Err(e) = log_tx.try_send(realtime) {
+        if let Err(e) = log_tx.try_send(realtime.with_s1_debug(card.debug)) {
             return (Err(log_send_error(e)), Vec::new());
         }
         let activity = LogEntry::activity_label_skipped(
@@ -2675,7 +2697,9 @@ fn record_probe_skip(
             card.window_start_ms,
             card.window_end_ms,
         );
-        let res = log_tx.try_send(activity).map_err(log_send_error);
+        let res = log_tx
+            .try_send(activity.with_s1_debug(card.debug))
+            .map_err(log_send_error);
         (res, d.close_probe(&card.probe_id))
     })
     .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
@@ -6705,6 +6729,7 @@ pub fn run() {
                                     //   (ADR-031 D2 の `low_operation_end` / `resumption` は
                                     //   §Migration M5 で配線する)。★ ここで嘘の層を書かない。
                                     stratum: crate::logger::ProbeStratum::Random,
+                                    debug: false,
                                 });
                                 // (3) frontend へ emit (回答カード表示は Task C)。
                                 if let Err(e) = app_handle.emit(

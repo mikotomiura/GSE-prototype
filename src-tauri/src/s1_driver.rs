@@ -57,6 +57,8 @@ pub struct ProbeCard {
     pub scheduled_ts: u64,
     pub window_start_ms: u64,
     pub window_end_ms: u64,
+    /// 研究者の画面の確かめ用に出したカード（`debug_show_probe`）。★ 行に `"debug":true` を付ける（3 本目の判断 3）。
+    pub debug: bool,
 }
 
 /// 開いている日の問いのカード（1 枚まで）。
@@ -111,6 +113,8 @@ pub struct DayRowData {
     pub motivation: Option<u8>,
     pub latency_ms: Option<u64>,
     pub duration_ms: Option<u64>,
+    /// 研究者の画面の確かめ用のカードの行（★ 行に `"debug":true` を付ける・3 本目の判断 3）。
+    pub debug: bool,
 }
 
 /// 駆動役が起こす出来事。`lib.rs` が実行する。
@@ -135,6 +139,8 @@ pub enum Effect {
         scheduled_ts: u64,
         session_elapsed_ms: u64,
         stratum: Stratum,
+        /// 研究者の画面の確かめ用のカード（3 本目の判断 3）。
+        debug: bool,
     },
     /// 層化のカードを無作為に差し替えた（`realtime_label`・`activity_label` を `superseded` で 2 行）。
     Superseded { t: u64, card: ProbeCard },
@@ -415,6 +421,7 @@ impl S1Driver {
                         scheduled_ts,
                         session_elapsed_ms: scheduled_ts.saturating_sub(anchor),
                         stratum,
+                        debug: false,
                     });
                     self.probe = Some(ProbeCard {
                         probe_id,
@@ -422,6 +429,7 @@ impl S1Driver {
                         scheduled_ts,
                         window_start_ms,
                         window_end_ms,
+                        debug: false,
                     });
                     out.push(Effect::CardChanged);
                 }
@@ -470,6 +478,7 @@ impl S1Driver {
                             motivation: None,
                             latency_ms: None,
                             duration_ms: None,
+                            debug: d.debug,
                         }));
                         out.push(Effect::CardChanged);
                     }
@@ -524,6 +533,7 @@ impl S1Driver {
             motivation: if answered { motivation } else { None },
             latency_ms,
             duration_ms,
+            debug: d.debug,
         })
     }
 
@@ -649,14 +659,24 @@ impl S1Driver {
         if self.probe.is_some() || !self.is_active() {
             return Vec::new();
         }
-        self.apply(
+        let mut out = self.apply(
             &[Action::FireProbe {
                 stratum,
                 scheduled_ts: wall,
             }],
             wall,
             &mut || probe_id.clone(),
-        )
+        );
+        // ★ 調停器の `Action` は `analysis/` の型なので印を持たせず、写した後で立てる（3 本目の判断 3）
+        if let Some(card) = self.probe.as_mut() {
+            card.debug = true;
+        }
+        for e in out.iter_mut() {
+            if let Effect::Assigned { debug, .. } = e {
+                *debug = true;
+            }
+        }
+        out
     }
 
     /// 研究者の画面の確かめ用: 日の問いのカードを出す（調停器の覚えの外の通し番号）。
@@ -999,6 +1019,7 @@ mod tests {
                 scheduled_ts: 1_500_000,
                 session_elapsed_ms: 500_000,
                 stratum: Stratum::Resumption,
+                debug: false,
             } if probe_id == "ID00000000000001"
         )));
         let p = d.probe.clone().unwrap();
@@ -1196,6 +1217,43 @@ mod tests {
         assert!(idle
             .debug_show_probe(T_1859Z, Stratum::Random, "ID00000000000009".into())
             .is_empty());
+    }
+
+    /// M5 の 3 本目の判断 3: 確かめ用のカードの行だけに印が立ち、本物のカードには立たない。
+    #[test]
+    fn debug_cards_mark_their_rows_and_real_cards_do_not() {
+        let mut d = driver_with_frame(1_000_000);
+        let fx = d.debug_show_probe(T_1859Z, Stratum::Random, "ID00000000000009".into());
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, Effect::Assigned { debug: true, .. })));
+        assert!(!fx
+            .iter()
+            .any(|e| matches!(e, Effect::Assigned { debug: false, .. })));
+        assert!(d.probe_card("ID00000000000009").unwrap().debug);
+        d.close_probe("ID00000000000009");
+
+        d.debug_show_day(T_1859Z, JST, false);
+        let id = d.day_card().unwrap().card_id;
+        let row = d
+            .day_row_for_close(id, T_1859Z + 5_000, None, DayClosedBy::Dismiss, None, None)
+            .unwrap();
+        assert!(row.debug);
+
+        // 本物のカード（調停器の発火）は印を持たない
+        let mut real = driver_with_frame(1_000_000);
+        let fx = real.apply(
+            &[Action::FireProbe {
+                stratum: Stratum::Random,
+                scheduled_ts: 1_500_000,
+            }],
+            1_500_000,
+            &mut ids(),
+        );
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, Effect::Assigned { debug: false, .. })));
+        assert!(!real.probe.as_ref().unwrap().debug);
     }
 
     #[test]
