@@ -213,6 +213,8 @@ def run(ds, col, work, side, seed, out, raw_dir, run_id):
     writers = L.load_column(ds, work, side, seed, col)
     base = os.path.join(raw_dir, "unsmoothed_residual_%s.%s.%s")
     WV = json.load(open(base % ("writer_values", ds, col) + ".json"))
+    if WV.get("run_id") != run_id:
+        sys.exit("書き手ごとの値の run_id が今回の実行と違う（別の実行の当てはめを読んでいる）")
     z = np.load(base % ("params", ds, col) + ".npz")
     ns = [len(ss) for ss in writers]
     elig = [i for i, n in enumerate(ns) if n >= H_ + 1]
@@ -243,7 +245,7 @@ def run(ds, col, work, side, seed, out, raw_dir, run_id):
     os.makedirs(os.path.join(out, "parts"), exist_ok=True)
     json.dump(dict(run_id=run_id, dataset=ds, column=col, residual={pn: S},
                    npz_check=dict(checked=checked, mismatched=mism), seconds=time.time() - t0),
-              open(os.path.join(out, "parts", "res.%s.%s.json" % (ds, col)), "w"), indent=1, ensure_ascii=False)
+              open(os.path.join(out, "parts", "res.%s.%s.json" % (ds, col)), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     print(json.dumps(dict(dataset=ds, column=col, npz_checked=checked, npz_mismatched=mism)))
     return 0 if checked > 0 and mism == 0 else 3
 

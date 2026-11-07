@@ -36,6 +36,9 @@ def apply_column(writers, side, col):
             if len(ua["seqs"]) != len(ub["o"]) or not all(
                     np.array_equal(np.asarray(x, dtype=np.int64), np.asarray(y, dtype=np.int64)) for x, y in zip(ua["seqs"], ub["o"])):
                 raise SystemExit("新しい中間の o が data.py の系列と違う")
+            if not (len(ub["u"]) == len(ub["n"]) == len(ua["pflag"]) == len(ub["o"])) or not all(
+                    len(a_) == len(b_) == len(c_) == len(d_) for a_, b_, c_, d_ in zip(ub["o"], ub["u"], ub["n"], ua["pflag"])):
+                raise SystemExit("新しい中間の u・n・pflag の系列の数か長さが o と違う")
             seqs, pflag = [], []
             for s_u, m_n, pf in zip(ub["u"], ub["n"], ua["pflag"]):
                 s_u = np.asarray(s_u, dtype=np.int64)

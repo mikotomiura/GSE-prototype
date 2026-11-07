@@ -62,6 +62,9 @@ class Acc:
                 if key in SKIP:
                     continue
                 self.walk(va, b.get(key, MISSING), sec)
+            for key in b:  # 新側にだけある鍵（例: 選ばれた構造の人数に別の構造が足される）も外れ
+                if key not in SKIP and key not in a:
+                    self.leaf(MISSING, "extra", sec)
         elif isinstance(a, list):
             if not isinstance(b, list) or len(a) != len(b):
                 self.leaf("list", MISSING, sec)
@@ -156,6 +159,9 @@ def selftest():
     x = copy.deepcopy(a)
     x["columns"]["o"]["cs1"]["fit"]["em"]["C5"]["5"]["two_stage"]["other"]["chosen_struct"] = {"ar2": 10}
     ok = ok and compare(x, b)["mismatched"] >= 1
+    x = copy.deepcopy(a)
+    x["columns"]["o"]["cs1"]["fit"]["em"]["C5"]["5"]["two_stage"]["other"]["chosen_struct"]["ar2"] = 3
+    ok = ok and compare(x, b)["mismatched"] == 1
     print(json.dumps(dict(repro_check_selftest=ok)))
     return 0 if ok else 3
 

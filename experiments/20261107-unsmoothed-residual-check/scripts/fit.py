@@ -234,8 +234,9 @@ def summarize(results, ds, ns, rng):
 
 # ---------------------------------------------------------------- 本計算
 def check_outside_repo(path):
-    repo = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
-    if os.path.realpath(path).startswith(repo + os.sep):
+    repo = os.path.normcase(os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
+    p = os.path.normcase(os.path.realpath(path))
+    if p == repo or p.startswith(repo + os.sep):
         sys.exit("書き手ごとの値の置き場が repo の中を指している（repo の外だけ）")
 
 
@@ -252,28 +253,32 @@ def run(ds, col, work, side, seed, out, raw_dir, jobs, run_id):
     for w in panel:
         assert all(DT.check_split(ns[w], k, H_) for k in cfg["grid"] if k <= ns[w] - H_)
     ex = ProcessPoolExecutor(jobs, initializer=_init, initargs=(ds, work, side, col, seed, sorted(MUT)))
-    full = list(ex.map(ml.fit_pool_full, [dict(ds=ds, si=ml.SEQ_NO[s], seed=seed) for s in ml.STRUCTS]))
-    pj = [dict(ds=ds, w=w, start=full[si][0]) for w in panel for si in range(len(ml.STRUCTS))]
-    pres = list(ex.map(ml.fit_pool_excl, pj, chunksize=1))
-    pools, pdiag = {}, []
-    it = iter(pres)
-    for w in panel:
-        pools[w] = {}
-        for s in ml.STRUCTS:
-            m, sb, d = next(it)
-            pools[w][ml.sname(s)] = (m, sb)
-            pdiag.append((ml.sname(s), d))
-    t1 = time.time()
-    wseq = {w: j for j, w in enumerate(elig)}  # tau-extend と同じ書き手の通し番号（elig の中の位置）
-    jl = [dict(ds=ds, w=w, wseq=wseq[w], seed=seed, ks_all=[k for k in cfg["grid"] if k <= ns[w] - H_], ks_make=ks,
-               pools=pools[w], mut=sorted(MUT)) for w in panel]
-    outs = list(ex.map(eval_writer, jl, chunksize=1))
-    ex.shutdown()
+    try:
+        full = list(ex.map(ml.fit_pool_full, [dict(ds=ds, si=ml.SEQ_NO[s], seed=seed) for s in ml.STRUCTS]))
+        pj = [dict(ds=ds, w=w, start=full[si][0]) for w in panel for si in range(len(ml.STRUCTS))]
+        pres = list(ex.map(ml.fit_pool_excl, pj, chunksize=1))
+        pools, pdiag = {}, []
+        it = iter(pres)
+        for w in panel:
+            pools[w] = {}
+            for s in ml.STRUCTS:
+                m, sb, d = next(it)
+                pools[w][ml.sname(s)] = (m, sb)
+                pdiag.append((ml.sname(s), d))
+        t1 = time.time()
+        wseq = {w: j for j, w in enumerate(elig)}  # tau-extend と同じ書き手の通し番号（elig の中の位置）
+        jl = [dict(ds=ds, w=w, wseq=wseq[w], seed=seed, ks_all=[k for k in cfg["grid"] if k <= ns[w] - H_], ks_make=ks,
+                   pools=pools[w], mut=sorted(MUT)) for w in panel]
+        outs = list(ex.map(eval_writer, jl, chunksize=1))
+    finally:
+        ex.shutdown()
     results = {w: r for w, (r, _) in zip(panel, outs)}
     flat = {}
     for w, (_, par) in zip(panel, outs):
         flat.update(flat_params(wseq[w], par))
     base = os.path.join(raw_dir, "unsmoothed_residual_%s.%s.%s")
+    for suffix in (("params", ".npz"), ("writer_values", ".json")):
+        check_outside_repo(base % (suffix[0], ds, col) + suffix[1])  # 出力ファイルの実体（リンクの先）も repo の外
     np.savez_compressed(base % ("params", ds, col) + ".npz", **flat)
     rng = np.random.default_rng(seed + 4)
     em, picks = summarize(results, ds, ns, rng)
@@ -281,7 +286,7 @@ def run(ds, col, work, side, seed, out, raw_dir, jobs, run_id):
                    picks={k: dict(tau_other={nm: {str(wseq[w]): t for w, t in m.items()} for nm, m in pk["tau_other"].items()},
                                   two_stage={str(wseq[w]): p for w, p in pk["two_stage"].items()})
                           for k, pk in picks.items()},
-                   panel=[wseq[w] for w in panel]),
+                   panel=[wseq[w] for w in panel], run_id=run_id),
               open(base % ("writer_values", ds, col) + ".json", "w"))
     D = dict(em=em)
     D["pool_full_diag"] = {ml.sname(s): dict(winner=d["winner"], gap12=d["gap12"], nonconv=d["nonconv"], decreases=d["decreases"])
@@ -297,7 +302,7 @@ def run(ds, col, work, side, seed, out, raw_dir, jobs, run_id):
     D["seconds"] = dict(pools=t1 - t0, writers=time.time() - t1, per_writer=ml.q([r["sec"] for r in results.values()]))
     os.makedirs(os.path.join(out, "parts"), exist_ok=True)
     json.dump(dict(run_id=run_id, dataset=ds, column=col, pin_sha256=pinned.SHA, fit=D),
-              open(os.path.join(out, "parts", "fit.%s.%s.json" % (ds, col)), "w"), indent=1, ensure_ascii=False)
+              open(os.path.join(out, "parts", "fit.%s.%s.json" % (ds, col)), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
 
 
 if __name__ == "__main__":

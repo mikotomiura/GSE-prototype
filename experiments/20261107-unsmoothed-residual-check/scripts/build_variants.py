@@ -54,12 +54,13 @@ def n_marks(series_times):
 
 def cmp_rows(got, feat):
     """kit の行 (t, o, u, xr, yr, x, y, alpha, path) と中間の feat 行 [t, p1, p2, p3, ewma_x, ewma_y, obs, alpha]。
-    返り値: 外れた行の数（行の数が違えば多い方の行の数）。"""
+    時刻・o・x・y（bit）・alpha を照らす。返り値: 外れた行の数（行の数が違えば多い方の行の数）。"""
     if len(got) != len(feat):
         return max(len(got), len(feat))
     bad = 0
     for g, f in zip(got, feat):
-        if g[0] != f[0] or g[1] != f[6] or g[5].hex() != float(f[4]).hex() or g[6].hex() != float(f[5]).hex():
+        if (g[0] != f[0] or g[1] != f[6] or g[5].hex() != float(f[4]).hex() or g[6].hex() != float(f[5]).hex()
+                or g[7] != f[7]):
             bad += 1
     return bad
 

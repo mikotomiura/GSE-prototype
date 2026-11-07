@@ -17,10 +17,12 @@ QTY = {"G": ("hmm3", "tau_other", "all/self_minus_pool_same"),
 FREE_ORDER = ["hmm3", "ar1", "ar2", "ar3"]  # 自由な母数の少ない順（同数の最頻の構造はこの順で先）
 
 
-def load_parts(out):
+def load_parts(out, run_id=None):
     S = {}
     for p in sorted(glob.glob(os.path.join(out, "parts", "*.json"))):
         d = json.load(open(p, encoding="utf-8"))
+        if run_id is not None and d.get("run_id") != run_id:
+            raise SystemExit("parts の run_id が今回の実行と違う: " + os.path.basename(p))
         kind = os.path.basename(p).split(".")[0]
         S.setdefault(d["column"], {}).setdefault(d["dataset"], {})
         if kind == "fit":
@@ -74,6 +76,9 @@ def modal_struct(E):
     c = E["two_stage"]["other"]["chosen_struct"] if E else None
     if not c or c.get("suppressed"):
         return None
+    c = {s: v for s, v in c.items() if s in FREE_ORDER}  # 2 段の選びが無い書き手（"None"）は数えない
+    if not c:
+        return None
     best = max(c.values())
     return [s for s in FREE_ORDER if c.get(s) == best][0]
 
@@ -96,24 +101,35 @@ def readings(S):
                 ov, xv = (o or {}).get("median"), (x or {}).get("median")
                 vals.append(dict(cell="%s/%s/k%s" % (ds, DSETS[ds], k), o=ov, **{col: xv}, word=fw(ov, xv)))
                 words.append(fw(ov, xv))
-            same = len(set(words)) == 1 and words[0] is not None and not words[0].startswith("比べない")
-            out["columns"]["%s/%s" % (name, col)] = dict(cells=vals, reading=words[0] if same else "割れる")
+            if any(w is None for w in words):
+                reading = "欠けがある"
+            elif all(w.startswith("比べない") for w in words):
+                reading = "比べない（o = 0）"
+            elif len(set(words)) == 1:
+                reading = words[0]
+            else:
+                reading = "割れる" + ("（比べないセルを含む）" if any(w.startswith("比べない") for w in words) else "")
+            out["columns"]["%s/%s" % (name, col)] = dict(cells=vals, reading=reading)
     for col in COLS:
         for ds, k in MAIN:
             E = cell(S, col, ds, k)
+            key = "%s/%s/%s/k%s" % (col, ds, DSETS[ds], k)
             try:
                 R = S[col][ds]["residual"][DSETS[ds]][k]
             except KeyError:
+                out["residual"][key] = dict(modal_struct=None, lag1_median={}, reading="欠けがある（未計算）")
                 continue
             ms = modal_struct(E)
             v = {m: {ax: r1med(R, m, ax) for ax in ("x", "y")} for m in ("pool_hmm3", "pool_" + ms if ms else None, "r1") if m}
             word = "どちらでもない"
-            if ms and ms.startswith("ar") and all(v[m][ax] is not None for m in v for ax in ("x", "y")):
+            if ms and ms.startswith("ar") and not all(v[m][ax] is not None for m in v for ax in ("x", "y")):
+                word = "欠けがある"
+            elif ms and ms.startswith("ar"):
                 ar = "pool_" + ms
                 carries = all(abs(v[ar][ax]) < abs(v["pool_hmm3"][ax]) for ax in ("x", "y"))
                 if carries:
                     word = "ar でも残る" if all(abs(v[ar][ax]) >= abs(v["r1"][ax]) for ax in ("x", "y")) else "ar で運べる"
-            out["residual"]["%s/%s/%s/k%s" % (col, ds, DSETS[ds], k)] = dict(modal_struct=ms, lag1_median=v, reading=word)
+            out["residual"][key] = dict(modal_struct=ms, lag1_median=v, reading=word)
     return out
 
 
@@ -172,9 +188,9 @@ def tables(S, Rd):
 def main(argv):
     out = argv[0]
     run_id = argv[argv.index("--run-id") + 1] if "--run-id" in argv else None
-    S = load_parts(out)
+    S = load_parts(out, run_id)
     Rd = readings(S)
-    json.dump(dict(run_id=run_id, columns=S, readings=Rd), open(os.path.join(out, "summary.json"), "w"), indent=1, ensure_ascii=False)
+    json.dump(dict(run_id=run_id, columns=S, readings=Rd), open(os.path.join(out, "summary.json"), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     open(os.path.join(out, "tables.md"), "w", encoding="utf-8").write(tables(S, Rd))
     return 0
 
