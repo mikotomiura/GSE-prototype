@@ -200,6 +200,10 @@ def fit_counts(rows, levels, endog=None):
             "finite": bool(np.all(np.isfinite(sd)))}
 
 
+LEN_METHODS = (("default", {}), ("powell", {"method": ["powell"], "maxiter": 5000}),
+               ("nm", {"method": ["nm"], "maxiter": 5000}))
+
+
 def fit_lengths(lens, nested, endog=None):
     """対数の長さ。書き手を群・nested を分散成分。CS1 の課題の共通の効果は固定効果。"""
     import pandas as pd
@@ -210,15 +214,28 @@ def fit_lengths(lens, nested, endog=None):
     df["y"] = np.log([x[5] for x in lens]) if endog is None else endog
     form = "y ~ C(task)" if df["task"].nunique() > 1 else "y ~ 1"
     vc = {n: "0 + C(%s)" % n for n in nested}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        f = MixedLM.from_formula(form, df, groups="writer", vc_formula=vc if vc else None,
-                                 re_formula="1").fit(reml=True)
+    mod = MixedLM.from_formula(form, df, groups="writer", vc_formula=vc if vc else None, re_formula="1")
+    # ずれ 13: 既定の最適化は実データで REML の最大に届かず未収束のことがある。既定・Powell・Nelder–Mead で当て、
+    # 収束した中で REML の対数尤度が最大のものを採る（推定量は REML のまま）
+    fits = {}
+    for name, kw in LEN_METHODS:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                fits[name] = mod.fit(reml=True, **kw)
+            except (np.linalg.LinAlgError, ValueError):
+                continue
+    ok = {k: f for k, f in fits.items() if f.converged and np.isfinite(f.llf)}
+    pool = ok or {k: f for k, f in fits.items() if np.isfinite(f.llf)}
+    best = max(pool, key=lambda k: pool[k].llf)
+    f = pool[best]
     out = {"writer": float(math.sqrt(max(0.0, float(f.cov_re.iloc[0, 0]))))}
     for n, v in zip(f.model.exog_vc.names, f.vcomp):
         out[n] = float(math.sqrt(max(0.0, v)))
     out["stall"] = float(math.sqrt(f.scale))
-    return {"sd": out, "converged": bool(f.converged)}
+    return {"sd": out, "converged": bool(f.converged), "method": best,
+            "llf": {k: float(x.llf) for k, x in fits.items()},
+            "converged_by_method": {k: bool(x.converged) for k, x in fits.items()}}
 
 
 def shares(sd, keys):
