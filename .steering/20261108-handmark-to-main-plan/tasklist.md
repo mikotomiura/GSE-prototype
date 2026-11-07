@@ -7,7 +7,7 @@
 - [x] 判断 P・1・1b・2・3・4・5・6 を研究者に 1 問ずつ確かめる（decisions.md）
 
 ## 比べ
-- [ ] /reimagine（判断 6 を中心に、requirement.md だけから v2 を作って比べる）
+- [x] /reimagine 1 回目（ハイブリッド・v2 が土台を採用・判断 6b）
 
 ## 文書
 - [ ] ADR-050「手跡の入力を記録しない」（枝の ADR-040 と補訂 1 を振り直す。macOS の射程・Proposed）
