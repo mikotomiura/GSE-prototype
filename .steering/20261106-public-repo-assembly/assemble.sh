@@ -22,6 +22,7 @@ WHOLE=(
   experiments/20261106-findings-paper1-exploration
   experiments/20261107-findings-paper1-round3-checks
   experiments/20261107-findings-paper1-round4-checks
+  experiments/20261107-findings-paper1-round5-checks
 )
 # 2) 依存先の実験: 変換と解析のスクリプト・実行の手順・条件・データの記録（results と notes は入れない）
 DEP_DIRS=(
