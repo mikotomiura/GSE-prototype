@@ -1,0 +1,29 @@
+{
+ "seed": 20261107,
+ "git_head": "8bb4887b",
+ "scripts_dirty": false,
+ "python": "3.14.4",
+ "numpy": "2.5.4",
+ "scipy": "1.18.1",
+ "pandas": "3.1.1",
+ "statsmodels": "0.15.0",
+ "cache_sha256": {
+  "units.pkl": "c6d4373b0d4c8d484ed4344919a86a9fbfe0e0d1b920d9b5658da38b5dec0d36",
+  "configs.pkl": "0fac2ffd31a98ad376f349eb230da1413afaeef8274dcb769c322a76f0722c15",
+  "c3b.json": "18ca5a75d017c5748eb9b9aac295eed87f4d8040e67c7581304de2e13386806b",
+  "prep_summary.json": "62c4f8002069afe9b3ed7cbe363783b0348a8b72cb6ff22ec466733cc1cbbddb"
+ },
+ "scripts_sha256": {
+  "analyze.py": "d36c5edfa1e4f6f43a185f4b789fe45f30022c66d37c83e78f1df238bd68ec50",
+  "c3b.py": "23cf42d109912ac8a72441357ff62be8ec50677db8f1952aedd95ace991ddff3",
+  "core.py": "abfaa71a8f52ee449b6bcd978baf51f85f9cec48ef82ebb17e868f27be106fce",
+  "k1_match.py": "98c3c35f7fde820c06b09a2be9f4379b750f0b08dc428b0c86914cc885ad6028",
+  "mutate.py": "976ba5f817b374c96b7c2f77b3dcf1c4f5657eee8fcef483cda32696eb81baaa",
+  "prep.py": "7a3b5096ac4a41e72758c0ad51d0cb46e599492c89567e76cde165daa22ff158",
+  "provenance.py": "b0f764f6533d20746a22176ebfeaa30a52abed29380b9ae0695e4d80fb5bafdb",
+  "run_configs.py": "839dc1ad78035636eb5631399b87b5adb7ae983c51da5edfbd83e5b0d7dc13b9"
+ },
+ "jobs": 8,
+ "run_configs_seconds": 4894,
+ "note": "結果は並列の数によらない。中間は repo の外にあり、ここには SHA-256 だけを置く"
+}
