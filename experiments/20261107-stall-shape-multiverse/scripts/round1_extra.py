@@ -113,7 +113,7 @@ def load_scores(data):
     with zipfile.ZipFile(zp) as z:
         members = sorted(m for m in z.namelist() if "keystrokelogs/csv/" in m and m.endswith(".csv"))
         idx = {os.path.basename(m)[:-4]: i for i, m in enumerate(members)}
-        raw = z.read("WritingTask/holistic_scores.csv").decode("utf-8-sig")
+        raw = z.read("WritingTask/holistic_scores.csv").decode("utf-8-sig", errors="replace")  # 本文（Text）に cp1252 の字が混じる。ID・Score は ASCII
     prompts = {}
     out = {}
     for row in csv.DictReader(io.StringIO(raw)):
@@ -191,8 +191,9 @@ def main(data, cache, out, seed, jobs=8):
         if max(abs(v["ci"][0] - ref[0]), abs(v["ci"][1] - ref[1])) > 0.05:
             sys.exit("基準の φ の区間が c2 と 0.05 を超えて違う: %s %r %r" % (cell, v["ci"], ref))
     summ = summarize(res)
-    json.dump({"summary": summ, "by_cfg": res}, open(out, "w"), indent=1, ensure_ascii=False)
-    print(json.dumps(summ, ensure_ascii=False, indent=1))
+    conv = lambda o: o.item() if hasattr(o, "item") else str(o)
+    json.dump({"summary": summ, "by_cfg": res}, open(out, "w"), indent=1, ensure_ascii=False, default=conv)
+    print(json.dumps(summ, ensure_ascii=False, indent=1, default=conv))
 
 
 if __name__ == "__main__":
