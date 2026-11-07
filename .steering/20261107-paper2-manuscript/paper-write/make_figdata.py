@@ -23,23 +23,10 @@ r1 = json.load(open(res / "round1_extra.json"))
 r3 = json.load(open(res / "round3_speed.json"))
 r4 = json.load(open(res / "round4_speedvar.json"))
 l90 = json.load(open(res / "c1_lengths90.json"))
-t5 = json.load(open(res / "round5_theta.json"))        # 本人の分位の族: θ を推定し直した区間（追加の条件 6 (b)）
+r8 = json.load(open(res / "round8_causal.json"))       # 因果の二段の区間（追加の条件 8）: 読み方で一段を主に戻した
 ln5 = json.load(open(res / "round5_length.json"))       # 作文と観測の長さを固定した偏相関（追加の条件 6 (c)）
 pz5 = json.load(open(res / "round5_pause.json"))        # 休止の系統（追加の条件 6 (a)）
-# 本人の分位の族の区間を、θ を推定し直した区間に置き換える（条件の読み方: どちらが狭いかによらず置き換える）
-for k, v in t5["by_cfg"].items():
-    r1["by_cfg"][k]["score"]["ci"] = v["score_ci"]
-    for pr, x in v["ratio"].items():
-        r1["by_cfg"][k]["ratio"][pr]["ci"] = x["ci"]
-    for cell, x in v["phi_b"].items():
-        r1["by_cfg"][k]["phi_b"][cell]["ci"] = x["ci"]
-B0_ = "W30_q0.99_net_replay"
-r1["summary"]["B"]["b0"]["ci"] = t5["by_cfg"][B0_]["score_ci"]
-for pr in r1["summary"]["A1"]:
-    r1["summary"]["A1"][pr]["b0_ci"] = t5["by_cfg"][B0_]["ratio"][pr]["ci"]
-for cell in r1["summary"]["phi_range"]:
-    r1["summary"]["phi_range"][cell]["b0_ci"] = t5["by_cfg"][B0_]["phi_b"][cell]["ci"]
-
+# 区間は一段（書き手の再標本だけ）を主にする。追加の条件 8 の読み方: φ で点が二段の区間の外に出た通りが 5% を超えた。
 B0 = "W30_q0.99_net_replay"
 DS = ["CS1 2019", "CS1 2021", "CoAuthor", "KLiCKe"]
 
@@ -225,12 +212,15 @@ print("zero share all", min(z), max(z), "| pos", min(zp), max(zp))
 pm = [r1["by_cfg"][k]["score"]["rho_prompt_median"] for k in alt]
 print("prompt median neg/pos:", sum(x < 0 for x in pm), sum(x > 0 for x in pm))
 print("S1 median q/fix:", r3["summary"]["groups"]["q"]["S1_median"], r3["summary"]["groups"]["fix"]["S1_median"])
-print("A1 (θ re-estimated):", {p: v for p, v in t5["summary"]["recount_with_reestimated_theta"]["A1"].items()})
+print("A1 (one-stage):", r8["summary"]["recount_onestage"]["A1"])
+print("A1 (causal two-stage):", r8["summary"]["recount_causal"]["A1"])
+print("score (one-stage / causal):", {k: r8["summary"]["recount_onestage"]["score"][k] for k in ("neg","pos","other","b0_ci")}, {k: r8["summary"]["recount_causal"]["score"][k] for k in ("neg","pos","other","b0_ci")})
+print("outside causal:", r8["summary"]["outside"])
 lr = [math.log(r1["by_cfg"][k]["ratio"]["CS1 2019 / KLiCKe"]["point"]) for k in alt]
 print("log ratio cs19/kl range:", min(lr), max(lr))
 A2 = {c: sum(r1["by_cfg"][k]["phi_b"][c]["ci"] is not None and r1["by_cfg"][k]["phi_b"][c]["ci"][0] > 1 for k in alt)
       for c in CELLS}
-print("A2 (θ re-estimated):", A2, "| A3:", t5["summary"]["recount_with_reestimated_theta"]["A3"])
+print("A2 (one-stage):", A2, "| A3 one-stage:", r8["summary"]["recount_onestage"]["A3"], "| causal:", r8["summary"]["recount_causal"]["A3"])
 print("phi range:", {c: (round(v["b0"], 2), round(v["median"], 2)) for c, v in r1["summary"]["phi_range"].items()})
 cs = {ds: (min(l90["by_cfg"][k][ds]["shares"]["stall"] for k in keys),
            max(l90["by_cfg"][k][ds]["shares"]["writer"] for k in keys)) for ds in ["CS1 2019", "CS1 2021", "CoAuthor"]}

@@ -21,28 +21,24 @@ rates between datasets, and the count and length structure within writers---move
 stay.
 
 We answer this with a diagnostic. We take one window-based stall detector, which labels a stop in net character
-production that lasts at least the window plus a threshold (more than 15~s in our grid), and vary its four choices (the
-window, the threshold, the condition for a stop and the segmentation of observation) over 89 definitions around its
-default. Because the grid centres on one detector, we add a second detector of the kind used in writing research, which
-counts inter-key intervals above a threshold of 2 to 10~s or above a writer quantile, over 36 definitions. Both are
-applied to four datasets released for research, from three sources, two editions of a CS1 course and two writing corpora. Each
-conclusion is reported with an interval from resampling writers, in which the writer-relative threshold is estimated
-again, so that the spread across definitions can be set beside sampling variation.
+production once a condition has held for a window and then a threshold (more than 15~s in our grid), and vary its four
+choices (the window, the threshold, the condition for a stop and the segmentation of observation) over 89 definitions
+around its default. Because the grid centres on one detector, we add a second detector of the kind used in writing
+research, which counts inter-key intervals above a fixed threshold of 2 to 10~s (18 definitions). Both are applied to
+four datasets released for research, from three sources: two editions of a CS1 course and two writing corpora. Each
+conclusion is reported with an interval from resampling writers, so that the spread across definitions can be set
+beside sampling variation. We do not evaluate the labels as predictors or as triggers for an intervention; we ask the
+prior question of whether the conclusions that such uses rest on are stable.
 
-By the criteria we set before each computation, the conclusions fall into three groups:
+The main result concerns the association with essay quality. By criteria set before the computations, an association
+is present for most definitions, but its direction changes within each detector, and it changes again with
+adjustment: given essay length, which correlates with the score at 0.75, no definition is negative
+(Sections~\ref{sec:res-score} and~\ref{sec:res-adjust}). The same diagnostic applied to comparisons between datasets
+and to the structure within writers shows that a rate ratio between the two CS1 editions reverses for a fifth of the
+definitions and that overdispersion within writers depends on the definition, whereas the largest component of stall
+length stays (Section~\ref{sec:res-other}).
 
-\begin{itemize}
-\item The direction of the association between the label rate and the essay score changes within each detector: for
-stalls only in the corner with a 15-s window; for pauses between fixed thresholds of 2 and 10~s, both in use.
-Whether an association is present does not move, and its strength does (Section~\ref{sec:res-score}).
-\item Adjustment moves the association as much as the definition: given typing speed it is negative for every stall
-definition, and given essay length, which correlates with the score at 0.75, it is negative for none
-(Section~\ref{sec:res-adjust}).
-\item Ratios of rates between a CS1 edition and the essay corpus reverse for most definitions, and whether counts are
-overdispersed within writers depends on the definition (Sections~\ref{sec:res-ratio} and~\ref{sec:res-phi}), whereas in
-CS1 the largest component of stall length, from stall to stall within a writer, stays (Section~\ref{sec:res-length}).
-\end{itemize}
-
-What generalises is the procedure; the score association is one worked example on one corpus. For researchers who
-report pause, stall or inactivity labels, the result changes what a report should contain: not the point value of one
-definition, but the range across definitions and adjustments, with intervals.
+We contribute a reporting convention for pause and stall rates in educational data mining: give the value of each
+axis, the range of a conclusion across definitions and adjustments with intervals, and a three-valued reading of its
+direction (consistent, negligible, or dependent on the definition). The score association in one corpus is the worked
+example.

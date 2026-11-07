@@ -8,16 +8,19 @@ A stall is a stop in net character production, not a judgement that the writer w
 detector's default, the 15-s window has no precedent, and fixed thresholds make up four in ten stall definitions. The
 stall detector does not reach pauses shorter than about 15~s, and the pause family covers 2 to 10~s and writer
 quantiles; we did not vary thresholds below 2~s, thresholds proportional to within-word speed \cite{guo2020scenario}
-or pauses split by linguistic location, because we fixed grids that apply alike to code and essays. We did not compare
-groups within a dataset.
+or pauses split by linguistic location, because we fixed grids that apply alike to code and essays. We varied the rate per observed hour only; rates per key press or per
+word and measures of pause duration, such as mixture components, were not varied, so the recommendation is limited to
+rates. We did not compare groups within a dataset.
 
 \paragraph{Differences between datasets.} The datasets differ at once in the task, the recording (CS1 key presses are
 reconstructed from edit events) and the length of units, so differences between them are not attributed to a cause.
 
-\paragraph{Intervals and samples.} The two-stage resample assumes that a writer's intervals have one distribution within
-a unit; its intervals did not widen but were shifted against the point values, and for one ratio the baseline point lay
-outside its interval (S2). A definition changes the time in which a stall can be detected (the writer-quantile family
-cannot detect before the 100th interval), which units reach 5 minutes of exposure and, for $\varphi$, which writers
+\paragraph{Intervals and samples.} The primary intervals hold each writer's quantile threshold as detected and leave
+out its variation. Two resamples that redraw it did not widen the intervals: the first, which drew early intervals from
+the whole unit, placed 18 of 54 score values below their intervals; the second, which draws only from the intervals so
+far, kept every score and ratio value inside its interval but placed 74 of 270 values of $\varphi$ below theirs (S2).
+A definition changes the time in which a stall can be detected (the writer-quantile family
+cannot detect before the 100th interval, 3.2--10.3\% of the exposure), which units reach 5 minutes of exposure and, for $\varphi$, which writers
 have stalls at all, so definitions differ in their samples as well as their labels. Restricting all definitions to the time after the 100th interval
 left the conclusions unchanged except one, noted in Section~\ref{sec:res-phi} (S2).
 
@@ -28,6 +31,7 @@ decomposition excludes stalls that did not resume, and CS1 days are inferred fro
 
 \paragraph{One outcome and its length.} The score association rests on one holistic score in KLiCKe and was not checked
 against a second outcome. The score reflects essay length strongly (0.75), so part of any label's association with it
-can run through length. Speed and length were adjusted linearly on ranks, and non-linear remainders were not examined.
+can run through length; and because the observation time is nearly fixed in KLiCKe, time spent in stalls reduces the
+time left for writing, so adjusting for length removes part of what the label counts. Speed and length were adjusted linearly on ranks, and non-linear remainders were not examined.
 We did not evaluate the labels as predictors. We say nothing about Japanese input, input method editors, natural work
 or other populations.

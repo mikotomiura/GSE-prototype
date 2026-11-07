@@ -1,18 +1,20 @@
 \begin{abstract}
 Pause and stall labels in keystroke logs rest on choices that differ between studies: a window, a threshold, a
 condition for a stop and a segmentation of the log. We asked which conclusions drawn from such a label move across
-definitions and which stay. We applied a window-based stall detector to four datasets released for research (two editions of an
-introductory programming course, an essay corpus and a corpus of writing with model suggestions), varied its four
-choices over 89 definitions around its default, added 36 definitions of a second detector that counts inter-key
-intervals above a threshold, and gave each conclusion an interval from resampling writers. By the criteria set before
-each computation, the direction of the association between the label rate and the holistic essay score changed within
-both detectors: for stalls only with a 15-s window, a level without precedent, and for pauses between the 2-s and 10-s
-thresholds, both in use. Adjustment moved it as much: given typing speed it was negative for all 89 stall definitions,
-and given essay length, which correlated with the score at 0.75, it was negative for none. The ratio of stall rates
-between a programming course and the essay corpus reversed beyond sampling variation for most definitions, and
-within-writer overdispersion of counts depended on the definition, whereas the largest component of stall length in
-the programming data stayed. Reports of pause and stall labels should give the range across definitions with
-intervals; the code and the aggregate tables are released.\\
+definitions and which stay. We applied a window-based stall detector to four datasets released for research (two
+editions of an introductory programming course, an essay corpus and a corpus of writing with model suggestions),
+varied its four choices over 89 definitions around its default, added a second detector that counts
+inter-key intervals above a fixed threshold of 2 to 10~s (18 definitions; 18 with a writer quantile served as a
+control, since their rate follows the rate of key presses), and gave each conclusion an interval from resampling writers.
+By criteria set before the computations, the association between the label rate and the holistic essay score was
+present for most definitions, but its direction changed: for stalls only with a 15-s window, a level without
+precedent, and for pauses from a negligible positive correlation at 2~s ($\leq 0.05$) to a small negative one at
+10~s (down to $-0.13$). Adjusting for essay length, which correlated with the score at 0.75, left no definition with a
+negative association; an exploratory adjustment for typing speed left all stall definitions negative. Between the two
+programming editions, the ratio of stall rates reversed for a fifth of the definitions, mostly when the threshold
+became fixed, and within-writer overdispersion of counts depended on the definition. Reports of pause and stall rates
+should give the range across definitions and adjustments, with intervals; the code and the aggregate tables are
+released.\\
 
 {\parindent0pt
 \textbf{Keywords:} keystroke logging, pauses, stalls, multiverse analysis, introductory programming, writing

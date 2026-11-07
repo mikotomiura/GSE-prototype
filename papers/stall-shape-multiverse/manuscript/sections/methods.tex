@@ -60,9 +60,10 @@ A stall is detected from three ingredients (Figure~\ref{fig:detector}). Let \emp
 in the window $(t - W, t]$, the number of character presses minus the number of deletion presses is less than one. When
 condition A rises from false to true at time $s$ and stays true until $t_0 = s + \theta$, an onset is raised at $t_0$.
 The stall lasts from $s$ to the next character press in the same observation interval (the resumption); its length is
-measured from $t_0$. The shortest stall is therefore $W + \theta$ long, more than 15~s in our grid; the label is a stop in
-net character production, and under the net rule typing that is deleted again (retyping) also counts as a stop. The
-detector does not reach pauses of a few seconds, which the pause family below covers. The \emph{baseline definition} is
+measured from $t_0$, so it can be short if typing resumes soon after the onset. Under the characters-only rule an onset
+requires no character press for at least $W + \theta$, more than 15~s in our grid; under the net rule, deletions can make
+condition A hold while characters are still being typed, so the label is a stop in net character production and
+retyping counts as a stop. The detector does not reach pauses of a few seconds, which the pause family below covers. The \emph{baseline definition} is
 the default of the detector's reference implementation: $W = 30$~s, $\theta$ the 0.99 nearest-rank quantile of the
 writer's inter-keystroke intervals so far in the unit (defined once 100 intervals exist), the net rule for condition A,
 and the default observation intervals. It is the definition of the companion study's appendix and was fixed before any
@@ -131,10 +132,12 @@ time-on-task \cite{hart2023time}; 30~min as a session timeout \cite{halfaker2015
 
 \paragraph{The pause family.} The second detector counts a pause whenever two consecutive key presses in the same
 observation interval are more than a threshold apart. We crossed two kinds of interval (between any two key presses,
-or between two character presses), six thresholds (fixed 2, 5 and 10~s, the range of fixed thresholds in writing
-\cite{torrance2024methods}, and the writer's 0.95, 0.99 and 0.995 quantile over the unit) and the three segmentations,
-for 36 definitions. Units with fewer than 100 intervals have no writer quantile and are left out of those definitions.
-The pause family is not a check of the stall results but the same diagnostic applied to a second detector.
+or between two character presses), three fixed thresholds (2, 5 and 10~s, within the range used in writing
+\cite{torrance2024methods}) and the three segmentations, for 18 definitions. We also computed 18 definitions with the
+writer's 0.95, 0.99 and 0.995 quantile over the unit as the threshold; such a threshold labels a fixed share of each
+writer's intervals, so its rate is close to that share times the writer's rate of key presses, and we report these as
+a control for the key-press rate rather than as pause labels (S3). The pause family is not a check of the stall
+results but the same diagnostic applied to a second detector.
 
 \subsection{What we measured}
 \label{sec:measures}
@@ -165,10 +168,10 @@ session (CoAuthor), fitted by REML; we report the share of each level and of the
 variation. Stalls that did not resume within their interval are excluded (S5). We do not report the analogous
 decomposition of counts, whose estimates did not recover simulated components (S6).
 
-\paragraph{Intervals.} All intervals are 95\% percentile intervals from 2,000 resamples of writers. For the
-writer-quantile $\theta$ of the stall detector the resample is two-stage: within each resampled writer, the key-press
-intervals are drawn again and $\theta$ and the stalls are recomputed (S2). The pause family's quantile and the
-adjusted correlations keep the threshold fixed. The interval of a
+\paragraph{Intervals.} All intervals are 95\% percentile intervals from 2,000 resamples of writers, with each
+writer's labels as detected. For the writer-quantile $\theta$ of the stall detector we also computed two-stage
+intervals that redraw $\theta$ within each resampled writer; by a reading set before the second of these, they are
+reported as a sensitivity analysis, under which every conclusion reads the same (S2). The interval of a
 definition shows sampling variation; the spread across definitions shows definitional variation, and we set the two
 side by side \cite{robitzsch2022multiverse}. Definitions share axes and are not independent, so we read counts as
 proportions of the grid and do not test the grid as a whole \cite{simonsohn2020specification}.
@@ -177,12 +180,15 @@ proportions of the grid and do not test the grid as a whole \cite{simonsohn2020s
 \label{sec:status}
 
 Every computation ran under conditions committed in the author's repository before it ran; these are not third-party
-registrations. S1 gives the order of the computations and the status of each conclusion. The speed covariate was
-chosen twice after seeing results, so the speed-adjusted values are exploratory. Three points bear on the claims. The criterion for a reversal of a rate ratio (25\% of the
+registrations. S1 gives the order of the computations and the status of each conclusion; after the first round of
+review of this manuscript we added four computations, and after the second we recomputed the two-stage intervals
+with a causal draw, which by the reading set in advance left the one-stage intervals primary. The
+speed covariate was chosen twice after seeing results, so the speed-adjusted values are exploratory. Three points bear
+on the claims. The criterion for a reversal of a rate ratio (25\% of the
 definitions for a pair) was set after the number of reversed point values per pair had been seen, and the pair committed
 to be reported first, the two CS1 editions, did not reach it. The criterion for a reversal of the score association
 required only one definition with an interval on the other side of zero, which is lenient, so we report the full
 distribution. Descriptions of strength are counted after seeing the results.
 
-The author used Claude (Anthropic) to write the analysis scripts under these conditions and to check the numbers in the
-text against the result files; every number in the text was compared with the result files.
+The author used Claude (Anthropic) to search the literature, to write the analysis scripts under these conditions and
+to check the numbers in the text against the result files; every number in the text was compared with the result files.

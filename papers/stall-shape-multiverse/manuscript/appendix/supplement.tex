@@ -29,8 +29,12 @@ of zero) \\
 Section~\ref{sec:res-adjust} \\
 7 & [A] & After the first review of the manuscript: the pause family (36 definitions), intervals with the writer
 quantile estimated again, and the adjustment for essay and observation length; the readings of each, including that
-the two-stage intervals replace the earlier ones whichever is narrower \\
+the two-stage intervals replace the earlier ones regardless of which is narrower \\
 8 & [A] & The restriction of all 90 definitions to the time after each unit's 100th interval (S2); its readings \\
+9 & [A] & After the second review: two-stage intervals with the writer quantile estimated causally (S2), the
+counting rule that a reversal needs both the point value and the interval on the other side, and the reading that the
+new intervals replace the one-stage ones only if at most 5\% of point values fall outside their intervals; 27\% of
+the $\varphi$ values did, so the one-stage intervals stayed primary \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -45,13 +49,15 @@ after seeing results; [D] descriptive, counted after seeing results.
 Conclusion & Status \\
 \midrule
 Direction of the stall--score and pause--score association changes (criterion: one definition on the other side of
-zero) & [A] \\
+zero). For pauses the reading was stated over all 36 definitions and was met there; the main text reports the 18
+fixed-threshold definitions, in which it is also met, and treats the 18 writer-quantile ones as a control & [A] \\
+Three-way reading of direction (90\% of definitions in one class) & [D] \\
 Presence of the association does not move (criterion: 25--75\% of intervals excluding zero) & [A] \\
 Strength of the association (negligible to small) & [D] \\
 Given typing speed, negative for all stall definitions & [E] \\
 Given essay length, negative for none & [A] \\
 Rank order of datasets changes (criterion: 25\% of definitions) & [P] \\
-Rate ratios reverse beyond sampling variation (criterion set after seeing reversed point values) & [A] \\
+Rate ratios reverse beyond sampling variation (criterion set after seeing reversed point values) & [D] \\
 Within-writer $\varphi$ reverses at 1.5 & [P, A] \\
 CS1 stall-to-stall share stays the largest & [A] \\
 \bottomrule
@@ -135,17 +141,29 @@ setting, and 20 mutants of the condition, the quantile, the segmentation and the
 
 \paragraph{Intervals.} Writers were resampled with replacement 2,000 times within each dataset with a fixed seed; the
 rate of a resample is the sum of counts over the sum of exposures of its units (units with at least 5~min of
-exposure). For the 54 writer-quantile stall definitions, each unit's intervals were also drawn again with replacement
-from all of the unit's intervals, keeping their number and their order in time, $\theta$ was recomputed by the causal
-rule, and the stalls were counted again; 200 such draws were made per unit, and each writer drawn in an outer resample
+exposure). These one-stage intervals are the primary ones. For the 54 writer-quantile stall definitions we also
+computed two two-stage intervals. In the first, the key-press times of each unit were kept and the values of its
+intervals were drawn again with replacement from all of the unit's intervals; $\theta$ was recomputed by the causal
+rule and the stalls were counted again. 200 such draws were made per unit, and each writer drawn in an outer resample
 took one at random. Without the inner draw, the counts agreed exactly with the detector in every block of every unit.
-The two-stage intervals were about as wide as the one-stage ones (median ratio of widths for the score association
-1.00, range 0.95--1.06) but shifted: under the baseline the score interval moved from [$-0.091$, $-0.034$] to
-[$-0.073$, $-0.019$] around the point value $-0.063$, and the CS1 2019 to KLiCKe ratio interval [0.807, 0.861] no longer
-contained the point value 0.865. We read the shift as the effect of drawing early intervals from the whole unit, where
-the causal rule uses only the intervals so far; we did not test it. With the one-stage intervals, 10 definitions had a
-positive score interval instead of 14, and the ratio reversals were 66 (CS1 2019 against KLiCKe), 53 (CS1 2021 against
-KLiCKe), 6 (CS1 2019 against CoAuthor) and 20 (the two CS1 editions).
+These intervals were about as wide as the one-stage ones (median ratio of widths for the score association 1.00, range
+0.95--1.06) but shifted against the point values: 18 of 54 score values, 11 of 324 ratios and 47 of 270 values of
+$\varphi$ fell outside their intervals, and under the baseline the CS1 2019 to KLiCKe ratio interval [0.807, 0.861] no
+longer contained the point value 0.865. We read the shift as the effect of drawing early intervals from the whole unit,
+where the causal rule uses only the intervals so far.
+
+In the second, set after the second review, each interval of a unit received a Poisson(1) weight, and $\theta$ at each
+time was the weighted quantile of the intervals before it, so that the draw is causal as well; again 200 draws per unit.
+With unit weights it reproduced the detector's counts in every block of every unit. Its intervals had the same width
+as the one-stage ones (median ratio 1.00), and all 54 score values and 324 ratios lay inside them, but 74 of 270 values
+of $\varphi$ lay below their intervals (CS1 2019 blocks 33, CS1 2019 assignments 32, CS1 2021 blocks 5, CoAuthor 3,
+CS1 2021 assignments 1): the redrawn $\theta$ adds its own variation to the counts within a writer and so raises
+$\varphi$. By the reading set before the computation (more than 5\% outside in any quantity), the one-stage intervals
+stayed primary. Under the second two-stage intervals, counting a reversal only when the point value and the interval
+are on the other side, the score association was positive for the same 10 definitions and negative for 74; the ratio
+reversals were 20 (the two CS1 editions), 66 (CS1 2019 against KLiCKe), 53 (CS1 2021 against KLiCKe) and 7 (CS1 2019
+against CoAuthor); and the reversals of $\varphi$ at 1.5 were 42 (CS1 2019 assignments), 39 (CS1 2021 blocks) and 18
+(CS1 2021 assignments). Under the first two-stage intervals, 14 definitions had a positive score interval.
 
 \section{All definitions}
 \label{app:all}
@@ -181,7 +199,7 @@ example, in KLiCKe a definition with $W = 15$~s, the characters-only rule and a 
 \caption{All definitions. $\theta$: writer quantile or fixed seconds; A: net or characters only; Obs.: default
 intervals or key-press gaps of 5 or 30~min. Rates per hour for CS1 2019, CS1 2021, CoAuthor and KLiCKe. Rank: highest
 rate first (a CS1 2019, b CS1 2021, c CoAuthor, k KLiCKe). Ratios with 95\% intervals. $\rho$: score association with
-95\% interval (two-stage for writer quantiles); adj.: partial correlation given speed [E]; len.: given essay and
+95\% interval; adj.: partial correlation given speed [E]; len.: given essay and
 observation length. Zero: \% of KLiCKe writers with no stall. Baseline marked
 with an asterisk.}\label{tab:s3}\\
 \toprule
@@ -248,8 +266,7 @@ CoAuthor & session & 1.76 [1.29, 2.20] & 1.08 [0.98, 1.19] \\
 KLiCKe & writer & 2.57 [2.34, 2.81] & \\
 \bottomrule
 \end{tabular}
-\captionof{table}{Baseline $\varphi$ with two expectations, with 95\% intervals from the primary computation (the
-two-stage intervals in Table~\ref{tab:phi} differ because the writer quantile is estimated again, S2).}\label{tab:s4b}
+\captionof{table}{Baseline $\varphi$ with two expectations, with 95\% intervals.}\label{tab:s4b}
 \end{center}
 
 {\scriptsize
