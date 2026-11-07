@@ -17,7 +17,7 @@ HP Z2 の repo の .steering/_handoff/next-session-gse-paper3-unsmoothed-residua
 
 ## 2 準備（研究者が Mac で行い、HP Z2 で確かめる）
 
-1. 枝 `docs/gse-paper3-per-person-learning` を研究者が push する（このメモを書いた時点では未 push）。HP Z2 で取り出し、`git log --oneline -3` の先頭が §5 のコミットであることを確かめる。
+1. 枝 `docs/gse-paper3-per-person-learning` を研究者が push する（このメモを書いた時点では未 push）。HP Z2 で取り出し、`git log --oneline -3` に §5 のコミットが含まれることを確かめる。
 2. Mac の `~/gse-public-data/landscape/` から次の 3 ファイルを HP Z2 の `C:/Users/SDS02/gse-public-data/landscape/` へ写す（前の試験と同じく Drive 経由・研究者が手で）。
    - `unsmoothed_residual_coauthor.json.gz`（約 170 KB）
    - `unsmoothed_residual_cs1.json.gz`（約 480 KB）
@@ -53,7 +53,7 @@ JOBS=16 bash run.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/unsmoothed_residu
 
 ## 5 Mac での状態（このメモを書いた時点）
 
-- 枝 `docs/gse-paper3-per-person-learning`。条件と SEED は `efa38fbf`（コードより前）、コードと合成の門は `d0c41fe9`、レビューへの対応は §5 の次のコミット（このメモと同じコミット）。
+- 枝 `docs/gse-paper3-per-person-learning`。条件と SEED は `efa38fbf`（コードより前）、コードと合成の門は `d0c41fe9`、レビューへの対応とこのメモは `762e6b01`（この §5 の書き直しはその次のコミット）。HP Z2 では、取り出した枝の先端が `762e6b01` かその後であることを確かめる。
 - Mac（Python 3.14・numpy 2.x）で、足す対照 10 個はすべて緑、変異 11 個はすべて当たり（終了コード 3・名指しの対照が赤・値で落ちた）、配管の合成の通しは緑。P-U は全行一致（CoAuthor 588,227 行・CS1 2,794,277 行・alpha を含む・外れ 0・data.py の並べとの照合 0）。Mac の selftest の結果のファイルは repo に入れていない（HP Z2 の run.sh が同じものを `results/` に書く）。
 - 引き継ぐ対照（tau-extend の `ml.py --selftest`）は Mac では回していない（tau-extend で通ったコードをそのまま読み込み、SHA-256 で固定している）。HP Z2 の run.sh が回す。
 
