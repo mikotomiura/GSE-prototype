@@ -53,3 +53,22 @@
 - 影響範囲: gse-dataset の PR を PR 1 と対にする（push は研究者に確かめてから）。PR 2 の (c) は文書だけになる。
 - 訂正（2026-11-07・実装の後）: 背景の「6 行種が欠けている」は、origin より 3 コミット遅れたローカルの `~/gse-dataset` の main と比べた結果だった。origin/main（bd1d471）と比べると、EH3 の `eh3_day`・`invitation_present` は同期済みで、欠けていたのは `day_question`・`invitation_condition`・`probe_frame`・`probe_suppressed` の 4 行種（と今回の `debug`・`superseded`）。同期が要ることは変わらない。
 - 実施: `~/gse-dataset` に origin/main から `chore/schema-s1-replay` を切り、`schema/current.json` を写した（3b6539e・push はまだ）。`check_schema_parity.py` は OK。gse-dataset の `validate_schema.py` で、確かめ用の印つきの記録（判断 0 と同じ手順の隔離した HOME・新しい版）が新しい schema で OK、origin/main の schema では段 1 の行種で FAIL（陽性対照）。
+
+## 判断 6: 点検（V1・code-reviewer ∥ security-checker）への対応
+
+- 判断日時: 2026-11-07
+- 範囲: `origin/main..b7c2b53e -- src-tauri`。HIGH は規約どおり直し、MEDIUM 6 件は研究者に聞いて全部直した（推奨どおり）。安い LOW も直した。直したものは、元に戻すと対応する検査が赤になることを確かめた（5 つの変異）。
+
+| 出所 | 重さ | 指摘 | 対応 |
+|---|---|---|---|
+| code-reviewer | HIGH | 再生にだけ出た日の問いの鍵が tick の壁時計で、位相ごとに違うので必ず `boundary_tick` になり、`day_question` の行の欠けが赤にならない | 位相をまたいで結ぶ名（`stab`・判定は鍵の時刻、日の問いは対象の日と契機）を別に持つ。検査 `deleting_a_day_question_is_missing`。直すと、取り消しの後に再生だけが出す日の問いが `tail` でなく `missing` に出たので、日の問いも `tail` の対象にした |
+| security-checker | MEDIUM | 時刻の幅に上限が無く、壊れた時刻 1 行で再生が止まらない・桁あふれ | 行の時刻が `meta.session_start` から −60 秒〜+3 日の外なら拒む・入力の全体の幅は 40 日まで・足し算は `saturating_add`・調停器の無い間は次の枠まで飛ばす・開いているカードの区間は索引で引く（毎 tick に全部をなめない）。検査 `broken_times_and_too_long_inputs_are_refused` |
+| code-reviewer | MEDIUM | 枠を作った tick で起点より前の押下が調停器に渡る・調停器の無い間も待ち行列が残る | 駆動役と同じく、入力を受けた後に枠を作って起点より前を捨て、調停器の無い tick では待ち行列を捨てる。検査 `presses_before_the_anchor_are_not_fed` |
+| code-reviewer | MEDIUM | 記録が `warmup` の不一致がすべて `unverified.power_resume` | 行が 30 秒以上途切れた直後か推定した復帰の直後（ウォームアップの幅）に限る。検査 `a_warmup_mismatch_is_unverified_only_after_a_gap` |
+| code-reviewer | MEDIUM | 判定の行が 1 行も無い枠は全部 `tail` | 判定の行がある枠だけ `tail`。検査 `a_frame_without_any_decision_row_is_missing` |
+| code-reviewer | MEDIUM | 同じ鍵の行が 2 行あると 1 件に潰れる | 2 行目以降を別の項目にして `extra`。検査 `a_duplicated_row_is_extra` |
+| code-reviewer | MEDIUM | 時差なしで no_ask が有効なら全部が `offset_unknown` | no_ask の判定が絡む項目（記録か再生が `no_ask`）だけにする。検査なし（no_ask は既定で無効・`probe_arbiter.rs:59`） |
+| code-reviewer | LOW | 確かめ用のカードの区間が候補 + 3 秒より後から・確かめ用の層化のカードに再生だけが差し替えを出す | 確かめ用のカードは割り当ての行の位置から開く・差し替えを出さない |
+| security-checker | LOW | UTF-8 でない行を置き換えて受理する・`skip_reason` を検証せず出力のキーにする | UTF-8 でない行は読めない行として数える・`skip_reason` は既知の 4 値だけ |
+| code-reviewer | LOW | `cards` の使わない引数 | 外した |
+| 見送り | LOW | 1 秒の中で止めて再開してまた止めたときの `on_pause` の呼び方の差・ファイル全体の大きさの上限・`--day-state` の大きさ・出力にファイル名が載る（研究者の手元の CLI・gse-dataset へは metrics だけを共有する運用） | design の既知の限界に書く |

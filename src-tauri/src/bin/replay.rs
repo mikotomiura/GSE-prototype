@@ -2022,8 +2022,12 @@ fn read_session_text(path: &Path) -> Result<String, String> {
         if content_len as u64 > INVITATION_MAX_LINE_BYTES {
             return Err(format!("{name}: a session line is over 1 MiB"));
         }
-        // ★ UTF-8 でない行は JSON として読めない行と同じく飛ばす（再生は数えて出す）
-        text.push_str(&String::from_utf8_lossy(&buf[..content_len]));
+        // ★ UTF-8 でない行は置き換えて読まず、JSON として読めない行として数えさせる（security-checker LOW:
+        //   置き換えると欄の値が化けたまま受理され、数えられずに照合が食い違う）
+        match std::str::from_utf8(&buf[..content_len]) {
+            Ok(line) => text.push_str(line),
+            Err(_) => text.push_str("<not utf-8>"),
+        }
         text.push('\n');
     }
     Ok(text)

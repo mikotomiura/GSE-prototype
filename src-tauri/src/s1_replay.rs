@@ -48,6 +48,13 @@ pub const DAY_SHOWN_TOLERANCE_MS: u64 = 1_000;
 pub const ROTATION_GAP_MS: u64 = 1_000;
 /// 走行の始まりからこの幅の拾い直しの不一致は `unverified.app_start`（起動とローテートの別が推定のため）。
 pub const APP_START_WINDOW_MS: u64 = 10_000;
+/// 1 本のファイルの行の時刻が `meta.session_start` から外れてよい幅（O1 は 1 日ごとにローテートする）。
+/// ★ 壊れた時刻（ビット化けなど）で再生の tick が止まらなくなるのを防ぐ（security-checker MEDIUM）。
+pub const MAX_FILE_SPAN_MS: u64 = 3 * 86_400_000;
+/// ファイルの始まりより前に出てよい時刻の幅（書き込みの順の揺れ）。
+pub const MAX_BEFORE_START_MS: u64 = 60_000;
+/// 入力の全体の時間の幅の上限。
+pub const MAX_TOTAL_SPAN_MS: u64 = 40 * 86_400_000;
 
 // ---------------------------------------------------------------------------
 // 行
@@ -321,7 +328,14 @@ pub fn parse_line(line: &str) -> Result<Option<Row>> {
                 t: u64_of(&v, "ts")?,
                 probe_id: probe_id.to_string(),
                 answered: bool_of(&v, "answered")?,
-                skip_reason: str_of(&v, "skip_reason")?.to_string(),
+                skip_reason: {
+                    // ★ 既知の値だけ（出力の集計のキーになるので、検証していない文字列を通さない）
+                    let r = str_of(&v, "skip_reason")?;
+                    if !SKIP_REASONS.contains(&r) {
+                        return Err(format!("知らない skip_reason: {r}"));
+                    }
+                    r.to_string()
+                },
                 debug: debug_of(&v),
             })
         }
@@ -343,6 +357,9 @@ pub fn parse_line(line: &str) -> Result<Option<Row>> {
         _ => return Ok(None),
     }))
 }
+
+/// `realtime_label.skip_reason` の既知の値（`logger::SkipReason`）。
+const SKIP_REASONS: [&str; 4] = ["none", "dont_remember", "dismissed", "superseded"];
 
 /// JSON として読めない行の誤りの文（`parse_file` が数えて飛ばす）。
 const UNREADABLE: &str = "JSON として読めない";
@@ -374,7 +391,29 @@ pub fn order_inputs(mut files: Vec<InputFile>) -> Result<Vec<InputFile>> {
             return Err(format!("{}: meta.session_start が無い", f.name));
         }
     }
+    for f in &files {
+        let start = f.session_start().unwrap_or(0);
+        for t in f.rows.iter().filter_map(row_time) {
+            if t.saturating_add(MAX_BEFORE_START_MS) < start
+                || t > start.saturating_add(MAX_FILE_SPAN_MS)
+            {
+                return Err(format!(
+                    "{}: 行の時刻 {t} が meta.session_start {start} から外れている",
+                    f.name
+                ));
+            }
+        }
+    }
     files.sort_by_key(|f| f.session_start().unwrap_or(0));
+    if let (Some(a), Some(b)) = (files.first(), files.last()) {
+        let span = b
+            .last_ms()
+            .unwrap_or(0)
+            .saturating_sub(a.session_start().unwrap_or(0));
+        if span > MAX_TOTAL_SPAN_MS {
+            return Err(format!("入力の時間の幅が長すぎる（{span} ms）"));
+        }
+    }
     for w in files.windows(2) {
         let (a, b) = (&w[0], &w[1]);
         let a_end = a.last_ms().unwrap_or(0);
@@ -397,6 +436,8 @@ struct CardSpan {
     card: OpenCard,
     /// プローブなら `probe_id`（再生の発火と結んで `from` を直す）。
     probe: Option<(Stratum, u64)>,
+    /// 確かめ用のカード（調停器の外で出す。再生は差し替えを出さない）。
+    debug: bool,
 }
 
 /// 枠の動き出し。
@@ -429,6 +470,8 @@ struct Timeline {
     days: Vec<DayRow>,
     /// 記録の段 1 の判定の行（割り当て・抑制）の位置の時刻（枠ごとの `tail` の判定に使う）。
     decision_times: Vec<u64>,
+    /// 時刻つきの行が 30 秒以上途切れた後の最初の行の時刻（見えないスリープの候補・`warmup` の未照合に使う）。
+    gap_ends: Vec<u64>,
     first_ms: u64,
     last_ms: u64,
 }
@@ -449,7 +492,7 @@ fn positions(rows: &[Row], start: u64) -> Vec<u64> {
 fn build_timeline(files: &[InputFile]) -> Timeline {
     let mut tl = Timeline::default();
     let mut prev_end: Option<u64> = None;
-    let mut open_probes: Vec<(String, u64, Stratum, u64, usize)> = Vec::new();
+    let mut open_probes: Vec<(String, u64, Stratum, u64, bool)> = Vec::new();
     for (fi, f) in files.iter().enumerate() {
         let start = f.session_start().unwrap_or(0);
         let end = f.last_ms().unwrap_or(start);
@@ -473,8 +516,8 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                     tl.pauses.push((*t, *paused));
                     if *paused {
                         // ★ 一時停止で下ろしたカード（ラベルの行なし）はここで閉じる
-                        for (_, from, st, sched, _) in open_probes.drain(..) {
-                            tl.spans.push(probe_span(from, *t, st, sched));
+                        for (_, from, st, sched, dbg) in open_probes.drain(..) {
+                            tl.spans.push(probe_span(from, *t, st, sched, dbg));
                         }
                     }
                 }
@@ -488,7 +531,9 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                         .max(lo);
                     // ★ 直後に溜まった候補の抑制の行があれば、その `t` が最初の tick の壁時計そのもの
                     let exact = f.rows[i + 1..].iter().find_map(|r| match r {
-                        Row::Suppressed(s) if s.t > s.candidate_ts + 1_000 => Some(s.t),
+                        Row::Suppressed(s) if s.t > s.candidate_ts.saturating_add(1_000) => {
+                            Some(s.t)
+                        }
                         _ => None,
                     });
                     let lo = exact.filter(|&t| t <= hi).unwrap_or(lo);
@@ -508,7 +553,7 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                     first_frame_in_file = false;
                 }
                 Row::Assigned(a) => {
-                    open_probes.push((a.probe_id.clone(), at, a.stratum, a.scheduled_ts, fi));
+                    open_probes.push((a.probe_id.clone(), at, a.stratum, a.scheduled_ts, a.debug));
                     tl.assigned.push(a.clone());
                     tl.decision_times.push(at);
                 }
@@ -518,8 +563,8 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                 }
                 Row::Label(l) => {
                     if let Some(k) = open_probes.iter().position(|p| p.0 == l.probe_id) {
-                        let (_, from, st, sched, _) = open_probes.remove(k);
-                        tl.spans.push(probe_span(from, l.t, st, sched));
+                        let (_, from, st, sched, dbg) = open_probes.remove(k);
+                        tl.spans.push(probe_span(from, l.t, st, sched, dbg));
                     }
                     tl.labels.push(l.clone());
                 }
@@ -531,6 +576,7 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                             target_day: d.target_day,
                         },
                         probe: None,
+                        debug: d.debug,
                     });
                     if d.trigger == DayTrigger::Quit {
                         tl.quits.push(d.shown_ts);
@@ -550,13 +596,13 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
             .and_then(InputFile::session_start)
             .is_some_and(|ns| ns.saturating_sub(end) < ROTATION_GAP_MS);
         if !next_is_rotation {
-            for (_, from, st, sched, _) in open_probes.drain(..) {
-                tl.spans.push(probe_span(from, end, st, sched));
+            for (_, from, st, sched, dbg) in open_probes.drain(..) {
+                tl.spans.push(probe_span(from, end, st, sched, dbg));
             }
         }
     }
-    for (_, from, st, sched, _) in open_probes.drain(..) {
-        tl.spans.push(probe_span(from, tl.last_ms, st, sched));
+    for (_, from, st, sched, dbg) in open_probes.drain(..) {
+        tl.spans.push(probe_span(from, tl.last_ms, st, sched, dbg));
     }
     // スリープからの復帰の推定: 溜まった候補の抑制の行（t − candidate_ts ≥ 30 秒）の t が復帰の tick
     for s in &tl.suppressed {
@@ -568,18 +614,42 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
     }
     tl.power_resumes.sort_unstable();
     tl.power_resumes.dedup();
+    let mut times: Vec<u64> = files
+        .iter()
+        .flat_map(|f| f.rows.iter().filter_map(row_time))
+        .collect();
+    times.sort_unstable();
+    tl.gap_ends = times
+        .windows(2)
+        .filter(|w| w[1].saturating_sub(w[0]) >= GAP_AS_POWER_RESUME_MS)
+        .map(|w| w[1])
+        .collect();
     tl.presses.sort_unstable();
     tl.focus.sort_unstable();
     tl.decision_times.sort_unstable();
     tl
 }
 
-fn probe_span(from: u64, to: u64, stratum: Stratum, scheduled_ts: u64) -> CardSpan {
+fn probe_span(from: u64, to: u64, stratum: Stratum, scheduled_ts: u64, debug: bool) -> CardSpan {
+    // ★ 確かめ用のカードは押した tick の直後から開いている（割り当ての行の位置の時刻）
+    if debug {
+        return CardSpan {
+            from,
+            to,
+            card: if stratum == Stratum::Random {
+                OpenCard::Random
+            } else {
+                OpenCard::Strat
+            },
+            probe: Some((stratum, scheduled_ts)),
+            debug,
+        };
+    }
     CardSpan {
         // ★ カードは候補（層化なら引き金の押下）の時刻 + 2 秒より前の tick には出ない（調停器の時計が 2 秒遅れ・
         //   tick は最大 1 秒遅れる）。割り当ての行の位置の時刻は発火の tick より前になりうるので、再生が自分で
         //   発火させていない間は「候補 + 3 秒」より後から開いているとみなす（再生が発火させれば `fired_at` で直す）。
-        from: from.max(scheduled_ts + S1_TICK_LAG_MS + 1_000),
+        from: from.max(scheduled_ts.saturating_add(S1_TICK_LAG_MS + 1_000)),
         to,
         card: if stratum == Stratum::Random {
             OpenCard::Random
@@ -587,6 +657,7 @@ fn probe_span(from: u64, to: u64, stratum: Stratum, scheduled_ts: u64) -> CardSp
             OpenCard::Strat
         },
         probe: Some((stratum, scheduled_ts)),
+        debug,
     }
 }
 
@@ -673,6 +744,11 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
         wall += 1_000;
     }
     let last = tl.last_ms;
+    // 開いているカードの区間の索引（毎 tick に全部をなめない）
+    let mut order: Vec<usize> = (0..tl.spans.len()).collect();
+    order.sort_by_key(|&k| span_lower(&tl.spans[k]));
+    let mut span_i = 0;
+    let mut active: Vec<usize> = Vec::new();
     while wall <= last {
         // 一時停止の行（本物は止める側のコマンドが tick の前に `on_pause_requested` を呼ぶ）
         while pause_i < tl.pauses.len() && tl.pauses[pause_i].0 <= wall {
@@ -688,7 +764,16 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
             epoch += 1;
             pause_i += 1;
         }
-        // 枠の始まりと終わり
+        // 入力（行の時刻に届いたとみなす。調停器には 2 秒遅らせた時刻までしか渡らない）
+        while pi < tl.presses.len() && tl.presses[pi] <= wall {
+            presses_q.push(tl.presses[pi]);
+            pi += 1;
+        }
+        while fi < tl.focus.len() && tl.focus[fi] <= wall {
+            focus_q.push(tl.focus[fi]);
+            fi += 1;
+        }
+        // 枠の始まりと終わり（★ 駆動役と同じく、入力を受けた後に枠を作り、起点より前の入力を捨てる）
         if arbiter.is_some() && wall > active_end {
             day = arbiter.take().map(Arbiter::into_day_question);
         }
@@ -713,16 +798,13 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
             focus_q.retain(|&t| t >= f.frame.anchor_ms);
             frame_idx += 1;
         }
-        // 入力（行の時刻に届いたとみなす。調停器には 2 秒遅らせた時刻までしか渡らない）
-        while pi < tl.presses.len() && tl.presses[pi] <= wall {
-            presses_q.push(tl.presses[pi]);
-            pi += 1;
+        // 開いているカードの候補（始まりの下限の順に足し、閉じた後 1 秒で外す）
+        while span_i < order.len() && span_lower(&tl.spans[order[span_i]]) <= wall {
+            active.push(order[span_i]);
+            span_i += 1;
         }
-        while fi < tl.focus.len() && tl.focus[fi] <= wall {
-            focus_q.push(tl.focus[fi]);
-            fi += 1;
-        }
-        let open = open_card_at(tl, &fired_at, wall);
+        active.retain(|&k| tl.spans[k].to.saturating_add(1_000) >= wall);
+        let open = open_card_at(tl, &active, &fired_at, wall);
         // 終了の補助（本物はトレイのコマンドが tick の外で `on_quit` を呼ぶ）
         while quit_i < tl.quits.len() && tl.quits[quit_i] <= wall {
             let t = tl.quits[quit_i];
@@ -733,7 +815,7 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
             let (d, m) = local_clock(t.saturating_sub(S1_TICK_LAG_MS), offset);
             if let Some(a) = arbiter.as_mut() {
                 let cfg = *a.config();
-                let before = open_card_at(tl, &fired_at, t);
+                let before = open_card_at(tl, &active, &fired_at, t);
                 if let Some(Action::ShowDayQuestion {
                     card_id,
                     target_day,
@@ -822,7 +904,8 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
                         suppressed: Some(reason),
                     }),
                     Action::SupersedeOpenStrat => {
-                        if let Some(key) = open_probe_at(tl, &fired_at, wall)
+                        // ★ 確かめ用のカードの差し替えは記録の側でも照合の外（`debug` の行）
+                        if let Some(key) = open_probe_at(tl, &active, &fired_at, wall)
                             .filter(|(s, _)| *s != Stratum::Random)
                         {
                             out.push(Replayed::Supersede {
@@ -854,26 +937,51 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
                     Action::CloseDayQuestion { .. } => {}
                 }
             }
-        } else if paused {
+        } else {
+            // ★ 駆動役は調停器が無い tick で待ち行列を捨てる（`s1_driver.rs` の tick）
             presses_q.clear();
             focus_q.clear();
+            // 次の枠まで何も判定しないので、次の枠の最初の tick の手前まで飛ばす（ファイルの間の空白を毎秒回さない）
+            match tl.frames.get(frame_idx) {
+                Some(next) if next.activation_lo > wall => {
+                    let k = (next.activation_lo - wall - 1) / 1_000;
+                    wall = wall.saturating_add(k * 1_000);
+                }
+                Some(_) => {}
+                None => break,
+            }
         }
-        wall += 1_000;
+        wall = wall.saturating_add(1_000);
     }
     out
 }
 
 fn span_from(s: &CardSpan, fired_at: &HashMap<(u8, u64), u64>) -> u64 {
     match s.probe {
-        Some((st, t)) => fired_at.get(&(code(st), t)).copied().unwrap_or(s.from),
-        None => s.from,
+        Some((st, t)) if !s.debug => fired_at.get(&(code(st), t)).copied().unwrap_or(s.from),
+        _ => s.from,
+    }
+}
+
+/// 区間が開きうる最も早い時刻（索引の順）。★ 本物のプローブは候補 + 2 秒より前の tick には出ない。
+fn span_lower(s: &CardSpan) -> u64 {
+    match s.probe {
+        Some((_, t)) if !s.debug => s.from.min(t.saturating_add(S1_TICK_LAG_MS)),
+        _ => s.from,
     }
 }
 
 /// 壁時計 `wall` の tick の前に開いていたカード（★ プローブがあれば日の問いより優先・`s1_driver.rs`）。
-fn open_card_at(tl: &Timeline, fired_at: &HashMap<(u8, u64), u64>, wall: u64) -> Option<OpenCard> {
+/// `active` は開きうる区間の番号（`run_phase` の索引）。
+fn open_card_at(
+    tl: &Timeline,
+    active: &[usize],
+    fired_at: &HashMap<(u8, u64), u64>,
+    wall: u64,
+) -> Option<OpenCard> {
     let mut day = None;
-    for s in &tl.spans {
+    for &k in active {
+        let s = &tl.spans[k];
         let from = span_from(s, fired_at);
         if wall > from && wall <= s.to {
             match s.card {
@@ -885,14 +993,19 @@ fn open_card_at(tl: &Timeline, fired_at: &HashMap<(u8, u64), u64>, wall: u64) ->
     day
 }
 
+/// いま開いている本物のプローブのカード（確かめ用は除く）。
 fn open_probe_at(
     tl: &Timeline,
+    active: &[usize],
     fired_at: &HashMap<(u8, u64), u64>,
     wall: u64,
 ) -> Option<(Stratum, u64)> {
-    tl.spans.iter().find_map(|s| {
+    active.iter().find_map(|&k| {
+        let s = &tl.spans[k];
         let from = span_from(s, fired_at);
-        (wall > from && wall <= s.to).then_some(s.probe).flatten()
+        (!s.debug && wall > from && wall <= s.to)
+            .then_some(s.probe)
+            .flatten()
     })
 }
 
@@ -969,6 +1082,10 @@ fn outcome_str(s: Option<SuppressReason>) -> String {
 struct Raw {
     kind: Kind,
     key_ms: u64,
+    /// 位相をまたいで同じ項目を指す名（判定は鍵の時刻、日の問いは対象の日と契機）。
+    /// ★ 再生にだけ出た日の問いの鍵は tick の壁時計で位相ごとに違うので、鍵では位相をまたいで結べない
+    ///   （code-reviewer HIGH: 結べないと必ず `boundary_tick` になり、記録の欠けが赤にならない）。
+    stab: String,
     recorded: Option<String>,
     replayed: Option<String>,
 }
@@ -977,22 +1094,39 @@ impl Raw {
     fn matched(&self) -> bool {
         self.recorded.is_some() && self.recorded == self.replayed
     }
-    fn id(&self) -> (Kind, u64) {
-        (self.kind, self.key_ms)
+    fn id(&self) -> (Kind, String) {
+        (self.kind, self.stab.clone())
     }
 }
 
 /// 1 つの位相の再生と記録を突き合わせる（記録の確かめ用の行は除いてある）。
 fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
     let mut raws: BTreeMap<(Kind, u64), Raw> = BTreeMap::new();
-    let mut put = |kind: Kind, key: u64, rec: Option<String>, rep: Option<String>| {
+    // ★ 記録に同じ鍵の行が 2 行以上あれば、2 行目以降を別の項目にする（二重に書く不具合を一致として潰さない）
+    let mut dups: Vec<Raw> = Vec::new();
+    let mut put = |kind: Kind, key: u64, stab: String, rec: Option<String>, rep: Option<String>| {
         let e = raws.entry((kind, key)).or_insert(Raw {
             kind,
             key_ms: key,
+            stab: stab.clone(),
             recorded: None,
             replayed: None,
         });
         if rec.is_some() {
+            if e.recorded.is_some() {
+                let n = dups
+                    .iter()
+                    .filter(|d| d.kind == kind && d.key_ms == key)
+                    .count();
+                dups.push(Raw {
+                    kind,
+                    key_ms: key,
+                    stab: format!("{stab}#dup{}", n + 1),
+                    recorded: rec,
+                    replayed: None,
+                });
+                return;
+            }
             e.recorded = rec;
         }
         if rep.is_some() {
@@ -1004,6 +1138,7 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
         put(
             kind_of(a.stratum),
             a.scheduled_ts,
+            a.scheduled_ts.to_string(),
             Some(outcome_str(None)),
             None,
         );
@@ -1012,6 +1147,7 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
         put(
             kind_of(s.stratum),
             s.candidate_ts,
+            s.candidate_ts.to_string(),
             Some(outcome_str(Some(s.reason))),
             None,
         );
@@ -1031,6 +1167,7 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
             put(
                 Kind::Superseded,
                 a.scheduled_ts,
+                a.scheduled_ts.to_string(),
                 Some("superseded".into()),
                 None,
             );
@@ -1043,6 +1180,7 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
         put(
             Kind::DayQuestion,
             d.shown_ts,
+            day_label(d.target_day, d.trigger, d.delayed),
             Some(day_label(d.target_day, d.trigger, d.delayed)),
             None,
         );
@@ -1050,6 +1188,7 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
             put(
                 Kind::DayEnd,
                 d.t,
+                format!("day_end:{}", d.target_day),
                 Some(format!("day_end:{}", d.target_day)),
                 None,
             );
@@ -1070,12 +1209,14 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
             } => put(
                 kind_of(*stratum),
                 *key_ms,
+                key_ms.to_string(),
                 None,
                 Some(outcome_str(*suppressed)),
             ),
             Replayed::Supersede { probe_id_key, .. } => put(
                 Kind::Superseded,
                 probe_id_key.1,
+                probe_id_key.1.to_string(),
                 None,
                 Some("superseded".into()),
             ),
@@ -1097,7 +1238,7 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
                     Some(i) => day_keys.remove(i).3,
                     None => *wall,
                 };
-                put(Kind::DayQuestion, key, None, Some(label));
+                put(Kind::DayQuestion, key, label.clone(), None, Some(label));
             }
             Replayed::DayEnd { target_day, wall } => {
                 let near = day_end_keys.iter().position(|k| {
@@ -1110,13 +1251,16 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
                 put(
                     Kind::DayEnd,
                     key,
+                    format!("day_end:{target_day}"),
                     None,
                     Some(format!("day_end:{target_day}")),
                 );
             }
         }
     }
-    raws.into_values().collect()
+    let mut out: Vec<Raw> = raws.into_values().collect();
+    out.extend(dups);
+    out
 }
 
 fn day_label(target_day: i64, trigger: DayTrigger, delayed: bool) -> String {
@@ -1146,7 +1290,9 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
     }) {
         return Class::BoundaryActivation;
     }
-    let no_ask = tl.frames.iter().any(|f| f.frame.config.no_ask_enabled);
+    // ★ no_ask は現地の時刻で決まる。時差が無いとき、no_ask の判定が絡む項目だけを未照合にする
+    let no_ask =
+        raw.recorded.as_deref() == Some("no_ask") || raw.replayed.as_deref() == Some("no_ask");
     if opts.utc_offset_secs.is_none() && (is_day || no_ask) {
         return Class::UnverifiedOffsetUnknown;
     }
@@ -1162,8 +1308,25 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
             return Class::UnverifiedPriorDayState;
         }
     }
+    // ★ 記録だけがウォームアップで抑制したのは、記録に行の無いスリープからの復帰（調停器はウォームアップを
+    //   やり直す）が見えないときだけ。行が 30 秒以上途切れた直後か、推定した復帰の直後に限る
+    //   （限らないとウォームアップの判定の退行を見逃す・code-reviewer MEDIUM）。
     if raw.recorded.as_deref() == Some("warmup") {
-        return Class::UnverifiedPowerResume;
+        let warmup = tl
+            .frames
+            .iter()
+            .map(|f| f.frame.config.random.min_session_elapsed_ms)
+            .max()
+            .unwrap_or(0)
+            .saturating_add(S1_TICK_LAG_MS + 1_000);
+        let after_gap = tl
+            .gap_ends
+            .iter()
+            .chain(tl.power_resumes.iter())
+            .any(|&g| k >= g.saturating_sub(S1_TICK_LAG_MS) && k <= g.saturating_add(warmup));
+        if after_gap {
+            return Class::UnverifiedPowerResume;
+        }
     }
     if is_day
         && tl.frames.iter().any(|f| {
@@ -1172,8 +1335,9 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
     {
         return Class::UnverifiedAppStart;
     }
-    if raw.recorded.is_none() && !is_day {
-        // 枠の中の記録の最後の判定の行より後で、再生だけが判定した（同意の取り消しの後とみなす）
+    if raw.recorded.is_none() {
+        // 枠の中の記録の最後の判定の行より後で、再生だけが判定した（同意の取り消しの後とみなす）。
+        // ★ 取り消しの後は日の問いも出ないので、日の問いも同じ扱いにする
         let frame = tl
             .frames
             .iter()
@@ -1185,7 +1349,8 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
                 .copied()
                 .filter(|&t| t >= f.activation_lo && t <= f.end_ms)
                 .max();
-            if last_rec.is_none_or(|t| k > t) {
+            // ★ 枠に判定の行が 1 行も無いなら取り消しではなく全面的な欠けとして残す（code-reviewer MEDIUM）
+            if last_rec.is_some_and(|t| k > t) {
                 return Class::UnverifiedTail;
             }
         }
@@ -1327,7 +1492,7 @@ pub fn replay_probes(files: &[InputFile], opts: &ReplayOptions) -> ProbesReport 
         .map(|&ph| compare(&tl, &run_phase(&tl, opts, ph)))
         .collect();
     // 位相ごとの一致の有無
-    let mut matched_by_phase: HashMap<(Kind, u64), Vec<bool>> = HashMap::new();
+    let mut matched_by_phase: HashMap<(Kind, String), Vec<bool>> = HashMap::new();
     for run in &runs {
         for r in run {
             matched_by_phase
@@ -1401,7 +1566,7 @@ pub fn replay_probes(files: &[InputFile], opts: &ReplayOptions) -> ProbesReport 
         counts,
         by_kind,
         items,
-        cards: cards(files, &tl),
+        cards: cards(files),
         lag_check,
         power_resumes_inferred: tl.power_resumes.clone(),
         notes: NOTES.to_vec(),
@@ -1432,7 +1597,7 @@ fn lag_check(tl: &Timeline, raws: &[Raw]) -> LagCheck {
     out
 }
 
-fn cards(files: &[InputFile], tl: &Timeline) -> Cards {
+fn cards(files: &[InputFile]) -> Cards {
     let mut c = Cards::default();
     // probe_id → (ファイルの番号, 確かめ用か)
     let mut assigned: HashMap<&str, (usize, bool)> = HashMap::new();
@@ -1506,7 +1671,6 @@ fn cards(files: &[InputFile], tl: &Timeline) -> Cards {
         c.superseded + c.dropped_by_pause + c.dropped_at_quit + c.open_at_input_end,
     );
     c.response_rate_excl_superseded = (denom > 0).then(|| c.answered as f64 / denom as f64);
-    let _ = tl;
     c
 }
 
@@ -2108,6 +2272,164 @@ mod tests {
         }
     }
 
+    /// code-reviewer HIGH: 記録から日の問いの行が消えたら欠けになる（位相の境目に隠れない）。
+    #[test]
+    fn deleting_a_day_question_is_missing() {
+        let (r0, mut files) = run(&base(), &jst());
+        assert!(r0
+            .by_kind
+            .get(&Kind::DayQuestion)
+            .is_some_and(|c| c.matched >= 1));
+        assert!(drop_row(&mut files, |r| matches!(r, Row::Day(_))));
+        let r = replay_probes(&files, &jst());
+        assert!(
+            r.items.iter().any(|i| i.kind == Kind::DayQuestion
+                && i.class == Class::Missing
+                && i.phase_stable),
+            "{:#?}",
+            r.items
+        );
+    }
+
+    /// code-reviewer MEDIUM: 記録に同じ判定の行が 2 行あれば、2 行目は余り。
+    #[test]
+    fn a_duplicated_row_is_extra() {
+        let (_, mut files) = run(&base(), &jst());
+        let dup = files[0]
+            .rows
+            .iter()
+            .find(|r| matches!(r, Row::Suppressed(_)))
+            .cloned()
+            .expect("抑制の行がある");
+        let Row::Suppressed(sr) = dup else {
+            unreachable!()
+        };
+        files[0].rows.push(Row::Suppressed(sr));
+        let r = replay_probes(&files, &jst());
+        assert!(
+            r.items
+                .iter()
+                .any(|i| i.key_ms == sr.candidate_ts && i.class == Class::Extra),
+            "{:#?}",
+            r.items
+        );
+        assert!(r.counts.matched >= 1, "1 行目は一致のまま");
+    }
+
+    /// code-reviewer MEDIUM: 枠に判定の行が 1 行も無いなら、取り消し（tail）ではなく欠け。
+    #[test]
+    fn a_frame_without_any_decision_row_is_missing() {
+        let (_, mut files) = run(&base(), &jst());
+        for f in files.iter_mut() {
+            f.rows
+                .retain(|r| !matches!(r, Row::Suppressed(_) | Row::Assigned(_) | Row::Label(_)));
+        }
+        let r = replay_probes(&files, &jst());
+        assert_eq!(r.counts.unverified.tail, 0, "{:?}", r.counts);
+        assert!(r.counts.missing >= 3, "{:?}", r.counts);
+    }
+
+    /// code-reviewer MEDIUM: 記録だけのウォームアップの抑制は、行の途切れの直後だけ未照合にする。
+    #[test]
+    fn a_warmup_mismatch_is_unverified_only_after_a_gap() {
+        let (_, files0) = run(&base(), &jst());
+        // 押下が続いている時刻（途切れの直後でない）に記録だけのウォームアップの抑制
+        let busy = T0 + 40 * MIN + 77;
+        // 長い途切れ（100〜125 分）の直後
+        let after_gap = T0 + 125 * MIN + 5_000;
+        for (k, want) in [
+            (busy, Class::Extra),
+            (after_gap, Class::UnverifiedPowerResume),
+        ] {
+            let mut files = files0.clone();
+            files[0].rows.push(Row::Suppressed(SuppressedRow {
+                t: k + 2_000,
+                candidate_ts: k,
+                stratum: Stratum::Random,
+                reason: SuppressReason::Warmup,
+            }));
+            let r = replay_probes(&files, &jst());
+            let item = r
+                .items
+                .iter()
+                .find(|i| i.key_ms == k)
+                .expect("注入した行が照合に出る");
+            assert_eq!(item.class, want, "{k}");
+        }
+    }
+
+    /// code-reviewer MEDIUM: 枠の起点より前の押下（ファイルの始まりから同意までの間）を調停器に渡さない。
+    #[test]
+    fn presses_before_the_anchor_are_not_fed() {
+        let cfg = ArbiterConfig {
+            strata_enabled: false,
+            ..ArbiterConfig::default()
+        };
+        let mut sc = base();
+        sc.config = cfg;
+        // 最初の候補がウォームアップの後・離席の判定の幅（180 秒）の中に落ちる seed
+        let (seed, c) = (1..2_000)
+            .map(|seed| {
+                (
+                    seed,
+                    RandomFrame::new(seed, cfg.random, sc.anchor).next_candidate_ms(),
+                )
+            })
+            .find(|&(_, c)| c > sc.anchor + 40_000 && c < sc.anchor + 150_000)
+            .expect("候補が見つかる");
+        sc.seed = seed;
+        // 起点の後は候補より後から打つ（駆動役から見ると候補の時点で押下が無い）
+        sc.presses = burst(c + 10_000, sc.anchor + 40 * MIN, 1_500);
+        sc.end = sc.anchor + 40 * MIN;
+        let (r0, mut files) = run(&sc, &jst());
+        assert_eq!(bad(&r0), 0, "{:#?}", r0.items);
+        // ファイルの始まりを 2 分前にずらし、起点の直前に押下の行を足す（同意の前の打鍵）
+        let pre: Vec<Row> = (1..=20)
+            .map(|k| Row::Key {
+                t: sc.anchor - k * 1_000,
+            })
+            .collect();
+        for r in files[0].rows.iter_mut() {
+            if let Row::MetaStart { t } = r {
+                *t = sc.anchor - 120_000;
+            }
+        }
+        let at = files[0]
+            .rows
+            .iter()
+            .position(|r| matches!(r, Row::Frame(_)))
+            .unwrap();
+        for (k, r) in pre.into_iter().rev().enumerate() {
+            files[0].rows.insert(at + k, r);
+        }
+        let r = replay_probes(&files, &jst());
+        assert!(
+            !r.items.iter().any(|i| i.key_ms == c),
+            "起点の前の押下が候補 {c} の判定に入った: {:#?}",
+            r.items
+        );
+    }
+
+    /// security-checker MEDIUM: 壊れた時刻の行・長すぎる入力は拒む（再生を止まらなくしない）。
+    #[test]
+    fn broken_times_and_too_long_inputs_are_refused() {
+        let text = "{\"type\":\"meta\",\"session_start\":1000}\n{\"type\":\"key\",\"t\":1000000000000000,\"category\":\"a\",\"press\":true}\n";
+        let f = parse_file("x", text).unwrap();
+        assert!(order_inputs(vec![f]).is_err());
+        let start = |t: u64| {
+            parse_file(
+                &format!("f{t}"),
+                &format!("{{\"type\":\"meta\",\"session_start\":{t}}}\n"),
+            )
+            .unwrap()
+        };
+        assert!(order_inputs(vec![start(T0), start(T0 + 39 * 86_400_000)]).is_ok());
+        assert!(order_inputs(vec![start(T0), start(T0 + 41 * 86_400_000)]).is_err());
+        // 知らない skip_reason も拒む
+        let bad_skip = "{\"type\":\"realtime_label\",\"probe_id\":\"A\",\"answered\":false,\"skip_reason\":\"<x>\",\"ts\":5}\n";
+        assert!(parse_file("x", bad_skip).is_err());
+    }
+
     // ---- 個別 ----
 
     /// 再生が自分で発火させたカードは、その tick の後から開いている（見積もりの「候補 + 3 秒」を待たない）。
@@ -2115,23 +2437,29 @@ mod tests {
     fn a_card_fired_by_the_replay_is_open_from_its_fire_tick() {
         let c = T0 + 10 * MIN;
         let tl = Timeline {
-            spans: vec![probe_span(c, c + 20_000, Stratum::Random, c)],
+            spans: vec![probe_span(c, c + 20_000, Stratum::Random, c, false)],
             ..Timeline::default()
         };
         let none = HashMap::new();
         // 見積もりだけなら c + 3 秒までは閉じている
-        assert_eq!(open_card_at(&tl, &none, c + 2_500), None);
-        assert_eq!(open_card_at(&tl, &none, c + 3_500), Some(OpenCard::Random));
+        assert_eq!(open_card_at(&tl, &[0], &none, c + 2_500), None);
+        assert_eq!(
+            open_card_at(&tl, &[0], &none, c + 3_500),
+            Some(OpenCard::Random)
+        );
         // c + 2.2 秒の tick で発火させたなら、次の tick から開いている
         let fired: HashMap<(u8, u64), u64> = [((code(Stratum::Random), c), c + 2_200)].into();
         assert_eq!(
-            open_card_at(&tl, &fired, c + 2_200),
+            open_card_at(&tl, &[0], &fired, c + 2_200),
             None,
             "発火の tick の前は閉じている"
         );
-        assert_eq!(open_card_at(&tl, &fired, c + 2_500), Some(OpenCard::Random));
+        assert_eq!(
+            open_card_at(&tl, &[0], &fired, c + 2_500),
+            Some(OpenCard::Random)
+        );
         // 閉じた時刻の後は閉じている
-        assert_eq!(open_card_at(&tl, &fired, c + 20_001), None);
+        assert_eq!(open_card_at(&tl, &[0], &fired, c + 20_001), None);
     }
 
     #[test]
@@ -2289,8 +2617,7 @@ mod tests {
         ]
         .join("\n");
         let files = vec![parse_file("x", &text).unwrap()];
-        let tl = build_timeline(&files);
-        let c = cards(&files, &tl);
+        let c = cards(&files);
         assert_eq!((c.total, c.answered, c.superseded), (3, 1, 1));
         assert_eq!(c.skipped_by_person.get("dismissed"), Some(&1));
         // 分母は差し替えを外した 2
