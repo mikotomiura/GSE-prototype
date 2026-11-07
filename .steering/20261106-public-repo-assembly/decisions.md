@@ -61,4 +61,4 @@
 - 研究者の採否（論文の判断 42 (4)）: 投稿する版は v8。公開 repo の `paper/` を v8 に写して版を上げる（push と release の前に確かめる）。
 - 中身: `assemble.sh` で scratchpad に組み、今の公開 repo と比べた差は `paper/` の 8 ファイルと `gse-source.tsv` だけ（実験・推定器・`gse-commits.tsv` は同じ）。それを写し、README（英・日）と `tools/readme_media.py` の「Table 6 / 表 6」を「5」に（組んだ aux で `tab:sens` が表 5 であることを確かめた）。CITATION.cff と `.zenodo.json` を 0.2.2 に。
 - 検査: ローカルのコミット 3ea2591 の後に `tools/verify.sh ~/gse-public-data` が 0（cargo test 228・図の照合 18 行・漏れの検査 222 ファイル 0 件・陽性対照すべて ok）。コミットの前は漏れの検査が「未コミットの変更」で止まる（作りのとおり）。
-- 未: push・release v0.2.2・Zenodo の DOI・原稿の DOI の差し替え（研究者に確かめる）。
+- 公開（研究者の採否・AskUserQuestion）: push・release v0.2.2（3ea2591）。Zenodo 0.2.2 は 10.5281/zenodo.24026278（zip 826,148 バイト・タグとファイル単位で同じ・222 ファイル。タグは verify の漏れの検査 0 件を通ったコミット）。README（英・日）と CITATION.cff に DOI を足した 7e4d81d も verify が 0 の後に push。原稿の要旨・Data and code availability・カバーレターの DOI を 0.2.2 に（組むと誤り 0・overfull 1・32 頁・要旨 295 語）。公開 repo の `paper/` の DOI は 0.2.1 のまま（その版の DOI は版の中に書けない）。

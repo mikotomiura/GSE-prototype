@@ -25,7 +25,7 @@ is the comparison itself, which others can apply to their own run-up signals, to
 the learners and the calibration of the decision rule. For replicability, the preregistration, the deviation, the
 start records and the results are registered on the Open Science Framework (https://osf.io/mrkxt and
 https://osf.io/uj6cy), and the estimator, the replay tool, the conversion, the evaluation and the explorations are
-archived at https://doi.org/10.5281/zenodo.24025995.
+archived at https://doi.org/10.5281/zenodo.24026278.
 
 Data. No new data were collected. The CS1 files were obtained from their authors on request, and I agreed to publish
 only aggregate values, so neither the data nor the per-pause estimate rows are redistributed. The essay-writing
