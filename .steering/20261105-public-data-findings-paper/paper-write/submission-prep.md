@@ -56,3 +56,13 @@
 - カバーレター: PREPRINT の行を予約の DOI で埋め、「既発表でない」に「プレプリントを除き」を足した（1 頁・約 470 語）。
 - 公開（研究者の採否・AskUserQuestion）: 1 回目の publish は 400（`pids.doi` が空）。Chrome の画面で作った下書きは RDM の側の DOI が未設定で、deposit API の `prereserve_doi` は表示だけだった。RDM の API で `POST /api/records/24026330/draft/pids/doi` を呼んで同じ番号を予約し、2 回目で公開（`done`）。外から（token なし）`/api/records/24026330` で open・2026-11-07・preprint・CC BY 4.0・ファイル 1 つ（md5 一致）、取った PDF は手元と SHA-256 が同じ、`https://doi.org/10.5281/zenodo.24026330` は Zenodo に解決（302）。
 - 次から: Zenodo の下書きは API だけで作る（画面で作ると DOI の欄が空のまま残る）。
+
+## 投稿（2026-11-07・Claude in Chrome）
+
+- 受付: JEDM の投稿番号 1484。受付の画面は「Submission complete」（確認のメールを送ったとの文）。API で status Queued・stage 1（submission）・節 Articles・dateSubmitted 2026-11-07 03:21:40（サイトの時刻。日本時間の 12:21 に押した）。
+- ログインは研究者が先にしていた（私はパスワードを入れていない）。研究者の判断（AskUserQuestion）: 節は Articles、チェックリストとプライバシーの同意の印は私が付けてよい、全頁を見たうえで著作権の同意をして投稿する。
+- 組んだもの（scratchpad・repo の外）: テンプレートは著者の頁のリンク（Google Drive）から 2024_08_02_jedm-latex.zip を取り直した。`build.sh` で誤り 0・未定義 0・overfull 1・32 頁。カバーレターは `pandoc cover-letter.md`（YAML の余白 22mm をそのまま使う。`-V geometry` で上書きすると URL がはみ出す）で 1 頁。
+- 上げたファイル: 本文の PDF（Article Text・323,529 バイト・SHA-256 5eab8d6f…）とカバーレターの PDF（Letter to Editor・40,571 バイト・SHA-256 6e0f4dce…）。システムから取り直した 2 つが手元と SHA-256 で一致。OJS は校正刷りを作らない（編集者が見るのは上げた PDF そのもの）。
+- 詳細: 題は原稿のまま。キーワード 5 つ。要旨は `abstract-plain.txt`（1,759 文字・一致）。参考文献の欄は main.bbl から 1 行 1 件の素の文 66 件。1 回目は変換が足りず（`{\O}`・`\v{s}` など）「Nielsen, M. .」になっていたので、9 か所を直して貼り直し、保存後に読み直した。編集者への欄はカバーレターの本文（pandoc の HTML）。
+- 寄与者: 国 Japan・メールは登録のまま。所属にプロフィール由来の壊れた表記（PHP の serialize の文字列）が入っていたので「Independent Researcher」に直した（API で ror なしの 1 件を確認）。所属の候補を選ぶ途中で一覧が入れ替わり別の機関が選ばれたが、Add の前に外した。ORCID の欄は ORCID 側の確認が要るため空（原稿とカバーレターに番号がある）。
+- 研究者のクリップボードは退避して戻した。
