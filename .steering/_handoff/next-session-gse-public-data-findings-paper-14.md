@@ -1,5 +1,6 @@
 # 次のセッション —— 公開データの知見の論文 1: round 3 の直しと公開 repo 0.2.0 の後（round 4 の要否・著者の返事）
 
+> 使用済み（2026-11-07・続きは next-session-gse-public-data-findings-paper-15.md）。
 > 作成: 2026-11-07。worktree `/Users/johnd/GSE-prototype-public-findings`・枝 `docs/public-data-findings-paper`（push は研究者の手元・docs だけなので [skip ci]）。前の引き継ぎ `next-session-gse-public-data-findings-paper-13.md` の §2 の 2 と 3 は済んだ。
 
 ## §1 状態
