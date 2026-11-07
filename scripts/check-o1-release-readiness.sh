@@ -290,12 +290,33 @@ fi
 
 # ★ 2026-11-07（decisions 判断 4）: O1 の配布物に段 1 の印 `s1.mode` を書き出さない。
 #   ⚠️ 入ると、O1 の参加者の画面に段 1 の問い（6 択）が出る（O1 の同意文書は問いを出さないと約束している）。
-if grep -rqE '>[[:space:]]*"?\$[A-Za-z_]+/s1\.mode"?' \
-     experiments/20260801-controlled-friction-task/make-distribution.sh \
-     experiments/20260801-controlled-friction-task/make-common-app-zip.sh 2>/dev/null; then
-  ng "O1 の配布スクリプトが段 1 の印 s1.mode を書き出す（★ O1 の参加者に段 1 の問いが出る）"
+#   ★ 2026-11-07（M5 の 3 本目の PR 2・判断 10）: 組み立てに段 1 の本人用（`--mode s1`）を足したので、
+#     `make-common-app-zip.sh` の書き出しは `[ "$MODE" = s1 ] &&` で始まる 1 行に限って許す
+#     （その形でない書き出しは O1 の配布物に入りうる）。`make-distribution.sh`（G1 の 1 人ぶん）は 1 行も許さない。
+#   ⚠️ コメントの行は数えない。CR は先に落とす。
+#   ★ 2026-11-07（PR 2 の点検）: `${M}` の形と `tee`/`cp`/`touch`/`mv` も拾い、許す行は段 1 の門と同じ 2 行の
+#     完全一致に限る（行頭だけ見ると、後ろに `; : > …` を続けた行を通していた）。組み立てが無ければ赤。
+s1_write_re='(>|tee|cp|touch|mv)[^#]*\$\{?[A-Za-z_]+\}?"?/s1\.mode'
+s1_writes_ () { tr -d '\r' < "$1" | grep -vE '^[[:space:]]*#' | grep -E "$s1_write_re" \
+                  | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' || true; }
+s1_allowed_ () { printf '[ "$MODE" = s1 ] && printf %s%s%s %s > "$%s/s1%s"' "'" '%s\n' "'" "'audience=self'" "$1" '.mode'; }
+s1_dist_writes=""; s1_common_bad=""; s1_missing=""
+for f in experiments/20260801-controlled-friction-task/make-distribution.sh \
+         experiments/20260801-controlled-friction-task/make-common-app-zip.sh; do
+  [ -f "$f" ] || s1_missing="${s1_missing} ${f}"
+done
+if [ -z "$s1_missing" ]; then
+  s1_dist_writes=$(s1_writes_ experiments/20260801-controlled-friction-task/make-distribution.sh)
+  s1_common_bad=$(s1_writes_ experiments/20260801-controlled-friction-task/make-common-app-zip.sh \
+                    | grep . | grep -vxF -e "$(s1_allowed_ M)" -e "$(s1_allowed_ W)" || true)
+fi
+if [ -n "$s1_missing" ]; then
+  ng "O1 の配布スクリプトが無いので段 1 の印 s1.mode の書き出しを判定できない:${s1_missing}"
+elif [ -n "$s1_dist_writes" ] || [ -n "$s1_common_bad" ]; then
+  ng "O1 の配布スクリプトが段 1 の印 s1.mode を書き出す（★ O1 の参加者に段 1 の問いが出る）:
+$(printf '%s\n%s\n' "$s1_dist_writes" "$s1_common_bad" | grep . | sed 's/^/        /')"
 else
-  ok "O1 の配布スクリプトは段 1 の印 s1.mode を書き出さない"
+  ok "O1 の配布スクリプトは段 1 の印 s1.mode を書き出さない（段 1 の分岐の中の書き出しだけ）"
 fi
 
 # ⚠️★ 限界: **書き込み文**を要求する（コメントに `o1.mode` と書くだけでは緑にしない）。
@@ -995,6 +1016,20 @@ selftest () {
   s1_marker_line=': > "$M/s1''.mode"'
   build; printf '\n%s\n' "$s1_marker_line" >> "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"
   expect_red "段 1 の印 s1.mode を書き出す" "O1 の配布物に s1.mode"
+  # ★ 2026-11-07（PR 2）: 段 1 の分岐の中の書き出し（本物の組み立て）は緑。同じ形でも G1 の 1 人ぶんの組み立てでは赤。
+  build; expect_green "段 1 の分岐の中の書き出しだけ" "段 1 の分岐の中の s1.mode の書き出しは O1 に入らない"
+  s1_branch_line='[ "$MODE" = s1 ] && printf x > "$M/s1''.mode"'
+  build; printf '\n%s\n' "$s1_branch_line" >> "$fix/w/experiments/20260801-controlled-friction-task/make-distribution.sh"
+  expect_red "段 1 の印 s1.mode を書き出す" "G1 の 1 人ぶんの組み立てでは段 1 の分岐の形でも赤"
+  build; printf '\n# %s\n' "$s1_marker_line" >> "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"
+  expect_green "段 1 の分岐の中の書き出しだけ" "コメントの中の書き出しは数えない"
+  # ★ 点検の指摘の対照: 分岐の形の後ろに別の書き出しを続けた行・`${M}` の形・組み立てが無い。
+  build; printf '\n%s; : > "$M/s1''.mode"\n' '[ "$MODE" = s1 ] && true' >> "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"
+  expect_red "段 1 の印 s1.mode を書き出す" "分岐の形の後ろに書き出しを続けた行は赤"
+  build; printf '\n: > "${M}/s1''.mode"\n' >> "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"
+  expect_red "段 1 の印 s1.mode を書き出す" "\${M} の形の書き出しも拾う"
+  build; rm -f "$fix/w/experiments/20260801-controlled-friction-task/make-distribution.sh"
+  expect_red "書き出しを判定できない" "組み立てが無ければ赤"
   # ⚠️★★★ 運用管理シート（起票 T-25）—— ★ **3 つの壊し方を別々に撃つ**。
   #   ⚠️ 1 つだけだと「どれか 1 つでも欠けたら赤」なのか「たまたま拾えた」のか分からない。
   build; sed_i 's/function buildO1MgmtSheet/function DISABLED_buildO1MgmtSheet/' "$fix/w/$FORM_BUILDER"

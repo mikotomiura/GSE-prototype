@@ -475,6 +475,22 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 - 肖像の「終わり」は終了・スリープの直前・4:00 の区切り、「始まり」は起動・復帰・その日を数えた時点。終了の待ち合わせは固定の長さ（2 秒）でバックグラウンドのスレッドで行う（待ち時間から本人の操作が読めないように）。
 - EH3 では probe と自己申告のカードを止め、GSE の窓への遷移を `focus_transition` に書かない。
 
+### 段 1 の層（問いの調停と配布の門・ADR-043・2026-11-07）
+
+段 1 のモード（O1 の上でだけ立つ・`s1.rs`・印 `s1.mode` か env `GSE_S1_MODE=1`）のときだけ動く。印の無い O1 の記録と挙動は変わらない（`logger::tests::o1_meta_unchanged_without_s1_marker`）。EH3 の印と同時にあれば両方を落として素の O1 として動く（`s1::resolve_with_eh3`）。Nudge と招待は出さない。
+
+| 層 | 置き場 | スレッド | 記録 |
+|---|---|---|---|
+| 調停器（無作為の枠 → 層化 → 日の問い） | `analysis/probe_arbiter.rs`（純粋・推定器の出力を入力に持たない） | 段 1 の駆動スレッド（1 秒ごと・時刻は 2 秒遅らせ押下が届き切ってから判定） | `probe_frame`・`probe_suppressed`・`probe_assignment` |
+| 駆動役 | `s1_driver.rs`（純粋・`Action` を `Effect` に変える）→ `lib.rs`（行の組み立て・6 択の門・emit） | 同上 | 回答は `realtime_label` と `activity_label`（同じ `probe_id`）、差し替えは `skip_reason = superseded`、日の終わりの問いは `day_question` |
+| カード | overlay（段 1 では `show()`・画面共有と録画から外す） | WebView | — |
+| 再生 | `s1_replay.rs`・`gse-replay --probes` / `--day-questions` | オフライン | 照合の JSON（研究者の手元だけ・gse-dataset へは共有しない） |
+
+- 6 択の門は `o1::activity_label_allowed(段 1, 本人の同意の印)`。素の O1 では通さない（ADR-043 D8）。
+- `GSE_DISABLE_PROBES` は段 1 では見ない（立っていたら warn を 1 行・Windows の自動起動は launcher を通らないため）。止めるときは `s1.mode` を外す。
+- 配布: `make-common-app-zip.sh --mode s1` が本人の試し（R5）の配布物だけを組む（`o1.mode` と、中身 `audience=self` の `s1.mode`・launcher `launch-s1-windows.bat`）。配る前に `scripts/check-s1-release-readiness.sh --audience self --dist <Windows の zip> --dist <macOS の zip>` を通す（片方の OS だけなら `--os-only windows|macos`）。この門は組み立てと launcher・段 1 を含むタグの新しさ・同意（他の参加者向けは段 1 の同意文書の承認の印 `<!-- s1-esm-consent: approved -->`）・配布物の印と中身（`eh3.mode`・`g1.mode` の不在、本人用の配布物を他の参加者向けの門で弾く）・自動送信に要るファイル・launcher が repo の段 1 の launcher とバイト一致することを見る。O1 の門は、`s1.mode` の書き出しが段 1 の分岐（`[ "$MODE" = s1 ] &&`）の中にだけあることを確かめる。
+- 詳細: `.steering/20261106-gse-m5-s1-core/`・`.steering/20261107-gse-m5-s1-driver-ui/`・`.steering/20261107-gse-m5-s1-replay-gate/`・`docs/functional-design.md` の段 1 の節。
+
 ## 5. データフロー
 
 ### フロー 1: キーストローク → 状態推定（1Hz サイクル）

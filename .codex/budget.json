@@ -38,8 +38,8 @@
   "_comment_merge_2026_10_14_rhythm_stage": "2026-10-14: docs/rhythm-stage-graded-world に origin/main を merge した際、台帳が衝突した。共通の起点（60eb1021）の today は 10-13 の 214879 / 7 回。10-13 は和を採った: 起点 214879 / 7 ＋ 本ブランチ +91960 / +3（背景のステージの第 2 回の /cross-review の Codex） ＋ origin/main +229964 / +4 = 536803 / 14 回を history に入れた。today は本ブランチの 10-14 の 251688 / 8 回（origin/main に 10-14 の記帳は無い）。",
   "today": {
     "date": "2026-11-07",
-    "tokens_used": 178640,
-    "invocations": 4
+    "tokens_used": 277167,
+    "invocations": 6
   },
   "history": [
     {

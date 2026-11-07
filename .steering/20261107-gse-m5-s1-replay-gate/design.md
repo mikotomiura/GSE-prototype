@@ -92,3 +92,61 @@
 - 実行回数: 1 回目
 - 採用: ハイブリッド（v2 を土台に、v1 の 2 秒の遅れの陽性対照を足す）
 - 根拠: 研究者が推奨どおり選んだ（2026-11-07）。v2 は開いているカードを記録から渡して不一致の連鎖を防ぎ、v1 が見落としたスリープの復帰（記録に行が無い）を拾う。v1 は `design-v1.md`、比べは `design-comparison.md`。
+
+---
+
+# PR 2: 段 1 の配布の門・launcher・組み立て・文書（2026-11-07）
+
+/reimagine はかけない（requirement の運用メモ・O1 の門の型にならう）。研究者の決め（decisions 判断 9・10）: 本人用の印は `s1.mode` の中身に `audience=self` の 1 行で置く／組み立て `make-common-app-zip.sh` に `--mode s1`（本人用だけ）を足す。
+
+## アプローチ
+
+1. **組み立て `--mode s1`**（`experiments/20260801-controlled-friction-task/make-common-app-zip.sh`）
+   - 持ち物は O1 と同じ（README・初回セットアップ・鍵・`g1-submit.json`）で、launcher だけ段 1 用の `launch-s1-windows.bat` を `GSE_起動.bat` の名で入れる。README は O1 のものを使う（本人用。参加者向けの README は R9 で同意文書と一緒に作る）。
+   - 印: `o1.mode`（0 バイト）と `s1.mode`（中身 `audience=self` の 1 行）。`g1.mode`・`eh3.mode` は入れない。`s1.mode` の書き出しは `[ "$MODE" = s1 ] &&` で始まる 1 行に限る（O1 の門がこの形で O1 の配布物への混入と見分ける）。
+   - `--config` の明示を O1 と同じく求める。タグに `o1.rs` と `s1.rs` があること、実体（`gse-next` の macOS と Windows）に `s1.mode`・`GSE_S1_MODE` の文字列があることを確かめる。
+   - 展開後の検査（macOS）と Windows の zip の検査に、段 1 の印 2 つ・中身・`g1.mode`/`eh3.mode` の不在を足す。selftest にモード `s1` の持ち物・launcher のバイト形式・`GSE_DISABLE_PROBES` を付けないことを足す。
+2. **launcher `launch-s1-windows.bat`**: O1 の launcher を元に、`set GSE_DISABLE_PROBES=1` を外し（計画の判断 6）、`s1.mode` の不足を知らせ、`eh3.mode` が同居していたら中断する（アプリは両方を落として素の O1 で動くので、黙らせない・計画の判断 7）。BOM・chcp を日本語より前・CRLF（memory participant-launcher-encoding）。
+3. **門 `scripts/check-s1-release-readiness.sh`**
+   - 引数: `--audience self|participants`（必須）・`--dist <フォルダか zip>`（1 つ以上・必須）・`--consent <段 1 の同意文書>`（participants のとき）・`--selftest`。知らない引数・欠けは exit 2。終了コードは O1 と同じ（0/1/2）。
+   - [1] 組み立てと launcher（repo）: `s1.mode` を書き出す行が macOS と Windows の両方にあり、すべて `[ "$MODE" = s1 ] &&` の形／`eh3.mode` を書き出す行が無い／launcher が在り、BOM・CRLF・chcp が最初の非 ASCII の行より前・コメントでない行に `GSE_DISABLE_PROBES` が無い。
+   - [2] リリースタグ: `s1.rs` と `s1_driver.rs` を含む最新のタグがあり、そのタグ以降に `src-tauri/src`・`src-tauri/Cargo.toml`・`src` が動いていない（O1 の門と同じ判定・比較先は origin/main か main）。
+   - [3] 同意: self は「本人用（計画の判断 5）: 同意文書の承認は求めない」で緑。participants は `--consent` があり、行頭完全一致の `<!-- s1-esm-consent: approved -->` と、未記入の欄（`（実施前に記入）`）が無いこと。今は段 1 の同意文書（R4）が無いので participants は赤が正しい。
+   - [4] 配布物（`--dist` ごと・zip は展開せず python の zipfile で読む）: `o1.mode` と `s1.mode` があり、`g1.mode` と `eh3.mode` が無い／`s1.mode` の中身が audience に一致（self は `audience=self`、participants は `audience=participants`。participants の門に `audience=self` を渡すと「本人用の配布物」で赤）／`.bat` のコメントでない行に `GSE_DISABLE_PROBES` が無い・Windows の配布物（`gse-next.exe` がある）に `.bat` がある／`gse-next` の実体に `s1.mode` と `GSE_S1_MODE` のバイト列がある。
+   - selftest: 一時ディレクトリに門・組み立て・launcher を写し、`git init -b main` で合成の `s1.rs`・`s1_driver.rs` をコミットしてタグを打ち、合成の配布物（フォルダと zip）を作る。基準が緑、✅ を 1 つずつ壊すと赤、未達を満たすと緑。対照の文字列（`GSE_DISABLE_PROBES`・承認の印・`audience=self` など門の本文に出る語）は実行時に連結して作る。
+4. **O1 の門の手直し**（`check-o1-release-readiness.sh`）: 「O1 の配布スクリプトが `s1.mode` を書き出さない」を、「`make-distribution.sh` には 1 行も無く、`make-common-app-zip.sh` の書き出しはすべて `[ "$MODE" = s1 ] &&` の形」に変える。selftest に陽性（段 1 の分岐の中の書き出しは緑）と陰性（`make-distribution.sh` に書き出し → 赤・分岐の外の書き出し → 赤のまま）を足す。
+5. **文書**: `docs/architecture.md`（段 1 の行種と配布の門）・`docs/architecture/gse-design-map.md`（§1 のラベルの行・§4）・`docs/o1-distribution-tag.md` は触らない（段 1 の配布タグの文書は R9）。
+
+## 変更対象ファイル
+
+| ファイル | 変更 |
+|---|---|
+| `scripts/check-s1-release-readiness.sh` | 新規 |
+| `experiments/20260801-controlled-friction-task/launch-s1-windows.bat` | 新規（BOM・CRLF） |
+| `experiments/20260801-controlled-friction-task/make-common-app-zip.sh` | `--mode s1`・検査・selftest |
+| `scripts/check-o1-release-readiness.sh` | `s1.mode` の書き出しの判定と selftest |
+| `docs/architecture.md`・`docs/architecture/gse-design-map.md` | 段 1 の行種と門 |
+
+`src/`・`src-tauri/` は変えない。
+
+## テスト戦略
+
+- `bash scripts/check-s1-release-readiness.sh --selftest`（陽性と陰性の対照）。
+- `bash scripts/check-o1-release-readiness.sh --selftest` が今までの件数＋足した件数で緑。本体の実行は、変更の前後で s1.mode の行の判定だけが変わり、他の行は同じ（前後の出力の差分で確かめる）。
+- `bash experiments/20260801-controlled-friction-task/make-common-app-zip.sh --selftest`。
+- `scripts/check-shell-portability.sh`（bash 3.2）。
+- 本体の `check-s1-release-readiness.sh --audience self --dist <無い>` が赤・exit 1 で、理由が出る。実の組み立て（dmg と gh が要る）は今は回さない（段 1 を含むタグがまだ無い）。
+
+## 既知の限界
+
+- 門は組み立ての本文を静的に読む。実体の検査は組み立ての展開後の検査と、門の [4] が担う。
+- アプリは `s1.mode` の中身を読まないので、本人用の配布物を門を通さずに他の人へ渡すことは防げない（防ぐのは門を通す運用）。
+- 参加者向けの組み立て（`audience=participants`）は作らない（R9）。
+
+## PR 2 の実装中に変わった点（2026-11-07）
+
+- 門が本物の launcher を赤にした（O1 の launcher から写した日本語のコメントが `chcp 65001` より前）。段 1 の launcher は chcp を 2 行目へ上げた。O1 の launcher も同じ並びだが配布中なので触らない。
+- 点検（判断 11）で、配布物を読む python の例外で緑に倒れる穴を塞いだ（`DONE=1` を求める）。印の名前は大文字小文字・末尾の点と空白をならして比べ、全階層の印・`.bat`/`.cmd`・名前の異常・1 GiB を超えるメンバーを見る。
+- 書き出しの検出は `${M}` と `tee`/`cp`/`touch`/`mv` も拾い、許す行は「`[ "$MODE" = s1 ] && printf '%s\n' 'audience=self' > "$M/s1.mode"`」と `$W` の 2 行の完全一致に限る（段 1 と O1 の両方の門）。組み立ての selftest 7c は探す行を実行時に組み立てる（門が 7c の行を書き出しと数えたため）。
+- タグの新しさは `src-tauri` の全体・`src`・`package.json`・`package-lock.json` を見る。`git log` の失敗は赤。
+- 同意の印はコードのフェンスの外にちょうど 1 回。版との結び付けは R4 で決める。
