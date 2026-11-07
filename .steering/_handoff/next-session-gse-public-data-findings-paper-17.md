@@ -12,9 +12,9 @@
 
 ## §2 やること
 
-1. 編集者からの連絡（メール・JEDM のダッシュボード）が来たら読み、対応を研究者に聞く。査読の結果が来たら改訂の段へ（attack-me は改訂の後）。
+1. 編集者からの連絡（メール・JEDM のダッシュボード）が来たら `next-session-gse-public-data-findings-paper-jedm-response.md` から始める。
 2. プレプリントの記録に投稿先は書かない（研究者の判断・2026-11-07）。受理・公開の後に誌の DOI を足すだけにする。
-3. 著者の返事が来たら引き継ぎ 11 の §2 の 1。
+3. CS1 の著者の返事が来たら `next-session-gse-public-data-findings-paper-cs1-reply.md` から始める（引き継ぎ 11 の §2 の 1 を投稿の後に合わせて書き直したもの）。
 4. 受理・公開の後は、プレプリントと公開 repo に誌の DOI を足す（JEDM の Copyright Notice が求める）。
 
 ## §3 気をつけること
