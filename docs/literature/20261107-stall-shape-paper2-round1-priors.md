@@ -8,7 +8,7 @@
 ## 検証状態
 
 - 3 角度（A1 CS1 の打鍵・編集のログの休止と作業時間の閾値／A2 学習分析・EDM・教育測定で定義を振った研究／A3 作文の休止の閾値の恣意性への既存の答え）を Sonnet のサブエージェント 3 本で並列に探した。反証の角度（「既に同じことをした研究」）を各々に含めた。Semantic Scholar は 429、OpenAlex は後半に枠が戻った。
-- メインが一次で照合したもの: 登録した 14 本の書誌（Crossref・Zenodo）と、各 1 つの逐語（抄録は Crossref か OpenAlex、[V476] と [V483] は本文の PDF を grep）。[V439]（Koutcheme ら 2026・論文 1 の作業で登録済み）は抄録を OpenAlex で照合した。
+- メインが一次で照合したもの: 登録した 14 本の書誌（Crossref・Zenodo）と、各 1 つの逐語（抄録は Crossref か OpenAlex、[V476] と [V483] は本文の PDF を grep）。[V439]（Koutcheme ら 2026・論文 1 の作業で登録済み）は抄録を OpenAlex で、本文の 4 か所を ACM の頁で照合した。
 - 登録しなかったもの（逐語を照合できない・格が低い）: Fancsali ら 2020 AIED（二次の複製でしか読めない）・Evans ら 2016・Khalil & Ebner 2014（定義を並べた研究か確かめられない）・Van Waes & Leijten 2015・Wengelin 2006・Guo ら 2018・Guo ら 2019・Barkaoui 2019・Alves ら 2008・Révész ら 2019（抄録まで・閾値を振る分析かは未確認）・Rosenqvist 2015（学士論文）。
 
 ## 要点を先に
@@ -26,7 +26,7 @@
 ### カード 1: CS1 の打鍵では、閾値の置き方で結論が変わることが既に指摘されている **[検証済・抄録]** [V439] [V475] [V476] [V477] [V478]
 
 1. **どんなもの？** Koutcheme ら（[V439]）は公開の CS1 の打鍵データ 5 学期で、打鍵の速さ（流暢さ）と止まる頻度（ためらい）を試験得点に結びつけた複製の研究。Hart ら（[V475]・[V476]）と Edwards ら（[V477]）は無活動の時間から作業中の確率を出すモデル。Shrestha ら（[V478]）は休止の長さの帯ごとの頻度と成績。
-2. **先行研究と比べてどこがすごい？** [V439] 抄録の逐語 *"Hesitation behaved differently: students who paused more often at chunk boundaries scored lower even after accounting for their typing speed and general pausing."*（本文の 750 ms の境界についての逐語はサブエージェントが ACM の頁で読んだもので、メインは未照合）。[V476] 序論の逐語 *"For years, ad hoc thresholds were used, which ranged from five minutes to one hour"*。[V475] 抄録の逐語 *"a simple 5-minute threshold of inactivity is a reasonable estimate for whether a student is on-task or not"*。
+2. **先行研究と比べてどこがすごい？** [V439] 抄録の逐語 *"Hesitation behaved differently: students who paused more often at chunk boundaries scored lower even after accounting for their typing speed and general pausing."*本文（2026-11-07 にメインが ACM の全文の頁を Chrome で開いて照合）の逐語: *"We keep 750 ms as the dividing line, although it was not chosen on cognitive grounds"*・*"A median restricted to 10–750 ms therefore ignores more than half of the E and H transitions of a typical student."*・*"Their 750 ms window removed the longer pauses."*・*"For H, the association is clearest for pauses of 2 to 15 s, which Shrestha et al. [26] relate to thinking about the code locally (r = −0.21, p =.001). The estimate for brief stops is weaker and not significant (r = −0.09, p =.396)."*。境界の置き方で関連の強さが変わることを示すが、向きの入れ替わりは示していない（どちらも負）。[V476] 序論の逐語 *"For years, ad hoc thresholds were used, which ranged from five minutes to one hour"*。[V475] 抄録の逐語 *"a simple 5-minute threshold of inactivity is a reasonable estimate for whether a student is on-task or not"*。
 3. **技術や手法の肝はどこ？** 閾値を自己申告で接地する（[V475]・[V477]）か、境界を変えた感度を並べる（[V439]）。
 4. **どうやって有効だと検証した？** 交差検証の誤差・複数学期での相関。
 5. **議論はあるか？** 論文 2 との違い: 見ているのは試験得点との関連や作業時間の推定で、停滞のラベルの定義の空間を振ってデータの間の比べや同じ人の中の構造を見てはいない。[V475] の 5 分は論文 2 の区間の切り方（押下の空白 5 分）の根拠に使える。
@@ -56,5 +56,5 @@
 
 ## 本ラウンドのやり残し
 
-- [V439] の本文の照合（750 ms の境界の逐語）。Fancsali ら 2020 の一次。Van Waes & Leijten 2015・Wengelin 2006・Barkaoui 2019 の本文。
+Fancsali ら 2020 の一次。Van Waes & Leijten 2015・Wengelin 2006・Barkaoui 2019 の本文。
 - Semantic Scholar が使えず、セッション・gaming・engagement の定義を振る研究の網羅は弱い。
