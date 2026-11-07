@@ -1,26 +1,25 @@
 \section{Discussion}
 \label{sec:discussion}
 
-The strength of the association between the keystroke stall rate and essay score moved, depending on the definition,
-from negligible to small-to-moderate (largest $|\rho| = 0.25$), and in the corner with the shortest window it turned
-weakly positive. For researchers in educational data mining and learning analytics who relate stall, pause or
-inactivity labels to outcomes or compare them across datasets, this changes what a report should contain: the range of
-the conclusion across definitions, with intervals, rather than the point value of one definition. What generalises is
-the procedure; the score association is one worked example on one corpus. Compared with earlier multiverse analyses,
-the stall label moved further than an eye-movement effect, which kept its existence and changed its size
-\cite{godwin2025multiverse}, and further than boundary pausing in CS1, which changed strength with the split at 2~s but
-not direction \cite{koutcheme2026keystroke}.
+The direction of the association between a keystroke label rate and essay score changed with the definition within
+both detectors, and changed again with adjustment; the ratio of rates between a programming course and an essay corpus
+reversed for most definitions; the structure of stall length in CS1 stayed. For researchers in educational data mining
+and learning analytics who relate pause, stall or inactivity labels to outcomes or compare them across datasets, a
+report should therefore contain the range of the conclusion across definitions and adjustments, with intervals, rather
+than the point value of one definition. What generalises is the procedure; the score association is one worked example
+on one corpus. Compared with earlier multiverse analyses, what moved here was of a different kind: an eye-movement
+effect kept its existence and changed its size \cite{godwin2025multiverse}, and boundary pausing in CS1 changed
+strength with the split at 2~s but not direction \cite{koutcheme2026keystroke}; here the existence of a stall--score
+association stayed, and its direction changed.
 
-\paragraph{The speed-adjusted association.} The adjusted results are exploratory, because the covariate was chosen
-twice after seeing results (Section~\ref{sec:status}); as stated in advance, their direction also depended on the
-measure of speed, although no measure gave a positive adjusted correlation (Section~\ref{sec:res-score}). The raw correlation leaned positive in the definitions in which faster writers had more stalls, which reads
-as suppression by typing speed but was not tested. The covariation across definitions between the raw correlation and
-the correlation of stall rate with speed follows almost algebraically from the formula of the partial correlation, so it
-is not independent evidence. The same direction appears in the CS1 replication that controlled for typing fluency
-\cite{koutcheme2026keystroke}. Speed was entangled with the writer-quantile family only; the fixed-second rates were
-nearly uncorrelated with speed (median $+0.02$). The argument against fixed thresholds that slow writers have more long
-intervals \cite{guo2020scenario} concerns thresholds of a few seconds; our fixed thresholds of 10 and 30~s are an order
-of magnitude longer, and that argument was not tested in this range.
+\paragraph{Why the direction can change.} A rate of labels per hour is a count, and counts carry how much and how fast
+a writer types as well as how often the writer stops. A writer-quantile threshold makes this explicit, which is why
+the pause family with such thresholds correlated with the score at about $+0.6$. Prior work reports the same split between counts and durations:
+pause counts can correlate positively with scores through text length, whereas pause durations correlate negatively
+\cite{schaller2026keyscore}. Adjusting for speed removed the positive part and left a negative association for every
+stall definition; adjusting for essay length left no negative one. These are patterns, not a tested mechanism; the
+association that remains after either adjustment is the part of the rate that does not overlap with the covariate, and
+speed and length may confound or mediate it \cite{mackinnon2000equivalence}.
 
 \paragraph{Existing answers to arbitrary thresholds.} Mixture models, personalised thresholds, state models, location
 classes and controls for typing skill (Section~\ref{sec:related}) each choose a threshold, a model or a control. The
@@ -28,20 +27,19 @@ diagnostic applies to them in the same way: vary the choice they make and report
 that keep the uncertainty of the choice, such as probabilistic assignment of pauses to components or averaging over
 models, are the natural complement.
 
-\paragraph{What was established and what remains possible.} The four conclusions were counted against criteria set
-before the quantity was seen [P, A]: the score association moves in strength and in one corner in direction, the
-CS1--essay rate ratios reverse, within-writer overdispersion depends on the definition, and the CS1 length structure
-stays. The direction of the speed-adjusted association is exploratory [E]. That such definitional spread would corrupt
-the decision of when to intervene, or the evaluation of a predictor, and the mechanism of suppression are possibilities
-we did not test. Agreement of rates does not ensure agreement in time: among the 63 pairs of a definition and a dataset
-with a rate within 20\% of the baseline, 11 labelled mostly different moments (S3).
+\paragraph{What the criteria established.} By criteria set before each quantity was seen: the direction of the
+score association changed within both detectors (a lenient criterion, one definition on the other side of zero), and
+the presence of an association did not move (S1); within-writer departure from a constant rate depended on the
+definition; the CS1 length structure stayed. The reversal of rate ratios was counted against a criterion set after seeing point values, which
+the two CS1 editions did not reach (Section~\ref{sec:status}). The strength of the association is described after seeing the results,
+and the speed-adjusted values are exploratory. We did not test whether the definitional spread changes the performance
+of a predictor or a decision about when to intervene.
 
-\paragraph{Recommendation.} When reporting an association or a comparison based on a stall label, report the value of
-each of the four axes, and vary each axis over its range in prior practice (Table~\ref{tab:grid}) and around the
-default, reporting the spread with intervals. Do the same for comparisons of rates between datasets and for the choice
-of a count model, checking the direction of the ratio and $\varphi$ across the definitions in use
-(Sections~\ref{sec:res-score}--\ref{sec:res-phi}). If most definitions agree in direction with intervals, report the
-direction; otherwise report that it depends on the definition. The code is released for this purpose. Beyond this
-recommendation, reporting the association both with and without adjustment for a quantity that does not contain the
-stall label, such as typing speed measured in more than one way, may change how it is read; neither value is a causal
-effect (Section~\ref{sec:limitations}).
+\paragraph{Recommendation.} When reporting an association or a comparison based on a pause or stall label, report the
+value of each axis, vary each axis over its range in prior practice and around the default, and report the spread with
+intervals. As a working rule, report a direction only if the intervals of at least 90\% of the definitions examined lie
+on the same side of zero, and otherwise report that it depends on the definition; in our grid this held for the fixed
+stall thresholds and not for the writer-quantile stall thresholds or the pause family. Report the association with and
+without adjustment for quantities that do not contain the label, such as typing speed and the length of the product.
+The same applies to comparisons of rates between datasets and to the choice of a count model. The code is released
+for this purpose.

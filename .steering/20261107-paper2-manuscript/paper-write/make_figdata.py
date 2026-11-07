@@ -23,6 +23,22 @@ r1 = json.load(open(res / "round1_extra.json"))
 r3 = json.load(open(res / "round3_speed.json"))
 r4 = json.load(open(res / "round4_speedvar.json"))
 l90 = json.load(open(res / "c1_lengths90.json"))
+t5 = json.load(open(res / "round5_theta.json"))        # 本人の分位の族: θ を推定し直した区間（追加の条件 6 (b)）
+ln5 = json.load(open(res / "round5_length.json"))       # 作文と観測の長さを固定した偏相関（追加の条件 6 (c)）
+pz5 = json.load(open(res / "round5_pause.json"))        # 休止の系統（追加の条件 6 (a)）
+# 本人の分位の族の区間を、θ を推定し直した区間に置き換える（条件の読み方: どちらが狭いかによらず置き換える）
+for k, v in t5["by_cfg"].items():
+    r1["by_cfg"][k]["score"]["ci"] = v["score_ci"]
+    for pr, x in v["ratio"].items():
+        r1["by_cfg"][k]["ratio"][pr]["ci"] = x["ci"]
+    for cell, x in v["phi_b"].items():
+        r1["by_cfg"][k]["phi_b"][cell]["ci"] = x["ci"]
+B0_ = "W30_q0.99_net_replay"
+r1["summary"]["B"]["b0"]["ci"] = t5["by_cfg"][B0_]["score_ci"]
+for pr in r1["summary"]["A1"]:
+    r1["summary"]["A1"][pr]["b0_ci"] = t5["by_cfg"][B0_]["ratio"][pr]["ci"]
+for cell in r1["summary"]["phi_range"]:
+    r1["summary"]["phi_range"][cell]["b0_ci"] = t5["by_cfg"][B0_]["phi_b"][cell]["ci"]
 
 B0 = "W30_q0.99_net_replay"
 DS = ["CS1 2019", "CS1 2021", "CoAuthor", "KLiCKe"]
@@ -76,13 +92,16 @@ for k in keys:
         a, alo, ahi = r3["summary"]["b0"]["S2"], *r3["summary"]["b0"]["S2_ci"]
     else:
         a, (alo, ahi) = adj["S2"], adj["S2_ci"]
+    L = ln5["by_cfg"][k]
     rows.append(dict(k=k, W=W, fam=fam, th=th, rule=rule, seg=seg, rho=sc["rho"], lo=sc["ci"][0], hi=sc["ci"][1],
-                     adj=a, alo=alo, ahi=ahi, b0=int(k == B0)))
+                     adj=a, alo=alo, ahi=ahi, b0=int(k == B0), ln=L["p_both"], llo=L["p_both_ci"][0],
+                     lhi=L["p_both_ci"][1]))
 rows.sort(key=lambda r: r["rho"])
 with open(out / "figdata/score.csv", "w") as f:
-    f.write("i rho lo hi adj alo ahi fam b0 W15\n")
+    f.write("i rho lo hi adj alo ahi ln llo lhi fam b0 W15\n")
     for i, r in enumerate(rows, 1):
         f.write(f"{i} {r['rho']:.4f} {r['lo']:.4f} {r['hi']:.4f} {r['adj']:.4f} {r['alo']:.4f} {r['ahi']:.4f} "
+                f"{r['ln']:.4f} {r['llo']:.4f} {r['lhi']:.4f} "
                 f"{1 if r['fam']=='q' else 0} {r['b0']} {1 if r['W']==15 else 0}\n")
 
 # ---------- Figure 3: ratios ----------
@@ -155,9 +174,25 @@ for k in order:
     p2, c2 = ratio(k, "CS1 2019 / CS1 2021")
     s3.append(" & ".join(head + [f"{x:.1f}" for x in rates] + [rk, f"{p1:.2f} [{c1[0]:.2f}, {c1[1]:.2f}]",
               f"{p2:.2f} [{c2[0]:.2f}, {c2[1]:.2f}]", f"{fmt(sc['rho'], 3)} [{fmt(sc['ci'][0], 2)}, {fmt(sc['ci'][1], 2)}]",
-              fmt(a, 3), f"{zero:.1f}"]) + " \\\\")
+              fmt(a, 3), fmt(ln5["by_cfg"][k]["p_both"], 3), f"{zero:.1f}"]) + " \\\\")
     s4.append(" & ".join(head + [f"{phi(k, c)[0]:.2f}" for c in CELLS]) + " \\\\")
-for name, rows_ in [("tab_s3.tex", s3), ("tab_s4.tex", s4)]:
+# ---------- pause family table ----------
+sp = []
+pb = pz5["by_cfg"]
+def pkey(k):
+    _, kind, th, seg = k.split("_")
+    return (kind != "all", not th.startswith("fix"), float(th[3:-1]) if th.startswith("fix") else float(th[1:]), SEGO[seg])
+for k in sorted(pb, key=pkey):
+    _, kind, th, seg = k.split("_")
+    v = pb[k]
+    rk = "".join({"CS1 2019": "a", "CS1 2021": "b", "CoAuthor": "c", "KLiCKe": "k"}[d] for d in v["rank"])
+    thl = (th[3:-1] + "\\,s") if th.startswith("fix") else th[1:]
+    sc_ = v["score"]
+    sp.append(" & ".join([{"all": "any", "char": "char"}[kind], thl, {"replay": "def.", "g5": "5", "g30": "30"}[seg]]
+              + [f"{v['rate'][d]:.1f}" for d in DS] + [rk,
+              f"{fmt(sc_['rho'], 3)} [{fmt(sc_['ci'][0], 2)}, {fmt(sc_['ci'][1], 2)}]", fmt(sc_["partial_speed"], 3),
+              fmt(ln5["by_cfg"][k]["p_both"], 3)]) + " \\\\")
+for name, rows_ in [("tab_s3.tex", s3), ("tab_s4.tex", s4), ("tab_pause.tex", sp)]:
     with open(out / "appendix" / name, "w") as f:
         f.write("% Generated from the aggregate result files by the authors' script; do not edit by hand.\n")
         f.write("\n".join(rows_) + "\n")
@@ -190,10 +225,12 @@ print("zero share all", min(z), max(z), "| pos", min(zp), max(zp))
 pm = [r1["by_cfg"][k]["score"]["rho_prompt_median"] for k in alt]
 print("prompt median neg/pos:", sum(x < 0 for x in pm), sum(x > 0 for x in pm))
 print("S1 median q/fix:", r3["summary"]["groups"]["q"]["S1_median"], r3["summary"]["groups"]["fix"]["S1_median"])
-print("A1:", {p: v.get("count") for p, v in r1["summary"]["A1"].items()})
+print("A1 (θ re-estimated):", {p: v for p, v in t5["summary"]["recount_with_reestimated_theta"]["A1"].items()})
 lr = [math.log(r1["by_cfg"][k]["ratio"]["CS1 2019 / KLiCKe"]["point"]) for k in alt]
 print("log ratio cs19/kl range:", min(lr), max(lr))
-print("A2:", r1["summary"]["A2"], "| A3:", r1["summary"]["A3"])
+A2 = {c: sum(r1["by_cfg"][k]["phi_b"][c]["ci"] is not None and r1["by_cfg"][k]["phi_b"][c]["ci"][0] > 1 for k in alt)
+      for c in CELLS}
+print("A2 (θ re-estimated):", A2, "| A3:", t5["summary"]["recount_with_reestimated_theta"]["A3"])
 print("phi range:", {c: (round(v["b0"], 2), round(v["median"], 2)) for c, v in r1["summary"]["phi_range"].items()})
 cs = {ds: (min(l90["by_cfg"][k][ds]["shares"]["stall"] for k in keys),
            max(l90["by_cfg"][k][ds]["shares"]["writer"] for k in keys)) for ds in ["CS1 2019", "CS1 2021", "CoAuthor"]}

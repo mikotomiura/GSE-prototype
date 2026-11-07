@@ -16,36 +16,33 @@ changed the results of the same regression \cite{kovanovic2015time}; operational
 most cases \cite{zhang2019wheel}; models of student success differ across a multiverse of reasonable choices
 \cite{tang2025multiverse}; and in eye-movement research a multiverse of cleaning procedures left the existence of an
 effect intact while changing its size \cite{godwin2025multiverse}. What has not been examined is how far the conclusions
-that readers draw from a keystroke stall label---its association with the quality of a product, comparisons of rates
-between datasets, and the count and length structure within writers---move across defensible definitions, and which of
-them stay.
+that readers draw from a keystroke pause or stall label---its association with the quality of a product, comparisons of
+rates between datasets, and the count and length structure within writers---move across definitions, and which of them
+stay.
 
-We answer this with a diagnostic. We apply one detector to four public datasets from three sources, two editions of a
-CS1 course and two writing corpora, and vary its four choices (the window, the threshold, the condition for a stop and
-the segmentation of observation) over 89 definitions around a baseline. For each definition we report the conclusion
-with an interval from resampling writers, so that the spread across definitions can be set beside sampling variation.
-Relative to existing multiverse analyses, the diagnostic adds three things: it varies the way keystroke events are cut
-into stalls, which earlier analyses of behavioural data held fixed \cite{godwin2025multiverse}; it attaches a
-writer-level interval to every definition; and it separates two families of thresholds, relative to the writer and in
-absolute seconds, as a choice of construct.
+We answer this with a diagnostic. We take one window-based stall detector, which labels a stop in net character
+production that lasts at least the window plus a threshold (more than 15~s in our grid), and vary its four choices (the
+window, the threshold, the condition for a stop and the segmentation of observation) over 89 definitions around its
+default. Because the grid centres on one detector, we add a second detector of the kind used in writing research, which
+counts inter-key intervals above a threshold of 2 to 10~s or above a writer quantile, over 36 definitions. Both are
+applied to four datasets released for research, from three sources, two editions of a CS1 course and two writing corpora. Each
+conclusion is reported with an interval from resampling writers, in which the writer-relative threshold is estimated
+again, so that the spread across definitions can be set beside sampling variation.
 
-The strongest finding concerns the association with essay quality (for one holistic score in KLiCKe; the proportions
-are of the 89 definitions examined, not a sample from all possible definitions). The strength of the association between
-the stall rate and the score moves, depending on the definition, from negligible ($-0.06$) to small-to-moderate (as
-large as $-0.25$), and in the corner with the shortest window it turns weakly positive. We contribute the diagnostic and
-its application to four conclusions:
+By the criteria we set before each computation, the conclusions fall into three groups:
 
 \begin{itemize}
-\item The stall--score association ranges from negligible to small-to-moderate and changes direction within one
-construct (Section~\ref{sec:res-score}).
-\item The rank order of the four datasets' rates changes for most definitions, and the ratio between a CS1 edition and
-the essay corpus reverses beyond sampling variation for most of them; between the two CS1 editions it reverses for a
-minority, mostly when the threshold becomes fixed (Section~\ref{sec:res-ratio}).
-\item Whether stall counts are overdispersed within writers depends on the definition (Section~\ref{sec:res-phi}).
-\item In CS1, the largest component of the variation in stall length, from stall to stall within a writer, does not
-depend on the definition (Section~\ref{sec:res-length}).
+\item The direction of the association between the label rate and the essay score changes within each detector: for
+stalls only in the corner with a 15-s window; for pauses between fixed thresholds of 2 and 10~s, both in use.
+Whether an association is present does not move, and its strength does (Section~\ref{sec:res-score}).
+\item Adjustment moves the association as much as the definition: given typing speed it is negative for every stall
+definition, and given essay length, which correlates with the score at 0.75, it is negative for none
+(Section~\ref{sec:res-adjust}).
+\item Ratios of rates between a CS1 edition and the essay corpus reverse for most definitions, and whether counts are
+overdispersed within writers depends on the definition (Sections~\ref{sec:res-ratio} and~\ref{sec:res-phi}), whereas in
+CS1 the largest component of stall length, from stall to stall within a writer, stays (Section~\ref{sec:res-length}).
 \end{itemize}
 
-The detector, the grid and the aggregate tables are released. For researchers who report stall, pause or inactivity
-labels, the result changes what a report should contain: not the point value of one definition, but the range across
-definitions with intervals.
+What generalises is the procedure; the score association is one worked example on one corpus. For researchers who
+report pause, stall or inactivity labels, the result changes what a report should contain: not the point value of one
+definition, but the range across definitions and adjustments, with intervals.

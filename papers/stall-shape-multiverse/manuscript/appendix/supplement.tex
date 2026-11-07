@@ -1,4 +1,4 @@
-% Supplementary material, placed after the references as the journal's instructions ask. Sections S1 to S9 are referred
+% Supplementary material, placed after the references as the journal's instructions ask. Sections S1 to S8 are referred
 % to from the main text by their numbers.
 \renewcommand{\thesection}{S\arabic{section}}
 \setcounter{section}{0}
@@ -17,7 +17,7 @@ time stamp.
 Order & Status & Computation and what was fixed before it \\
 \midrule
 1 & [P] & Primary: the 90 definitions, rates, ranks, $\varphi$, agreement in time, the decomposition of counts and lengths
-for 9 definitions, the estimator-level comparison (S7); the criteria for ``moves'' (25\% of definitions) and for
+for 9 definitions, an estimator-level comparison (in the archive); the criteria for ``moves'' (25\% of definitions) and for
 overdispersion \\
 2 & [A] & Length decomposition for all 90 definitions; the criterion that the stall-to-stall share stays the largest \\
 3 & [A] & Intervals for rates, ratios and $\varphi$; the KLiCKe score association; the criteria for a reversal of a
@@ -26,7 +26,34 @@ of zero) \\
 4 & [E] & Partial association given the key-press rate (withdrawn as a covariate, below) \\
 5 & [E] & Partial association given typing speed (median interval $< 2$~s) \\
 6 & [E] & Six ways of measuring speed and the within-prompt adjustment; the reading sentence stated in
-Section~\ref{sec:res-score} \\
+Section~\ref{sec:res-adjust} \\
+7 & [A] & After the first review of the manuscript: the pause family (36 definitions), intervals with the writer
+quantile estimated again, and the adjustment for essay and observation length; the readings of each, including that
+the two-stage intervals replace the earlier ones whichever is narrower \\
+8 & [A] & The restriction of all 90 definitions to the time after each unit's 100th interval (S2); its readings \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\paragraph{Status of each conclusion.} [P] primary, quantity and criterion committed before any result; [A] added
+after the primary results, quantity and criterion committed before that quantity was seen; [E] exploratory, chosen
+after seeing results; [D] descriptive, counted after seeing results.
+
+\begin{center}\footnotesize
+\begin{tabularx}{\textwidth}{@{}X l@{}}
+\toprule
+Conclusion & Status \\
+\midrule
+Direction of the stall--score and pause--score association changes (criterion: one definition on the other side of
+zero) & [A] \\
+Presence of the association does not move (criterion: 25--75\% of intervals excluding zero) & [A] \\
+Strength of the association (negligible to small) & [D] \\
+Given typing speed, negative for all stall definitions & [E] \\
+Given essay length, negative for none & [A] \\
+Rank order of datasets changes (criterion: 25\% of definitions) & [P] \\
+Rate ratios reverse beyond sampling variation (criterion set after seeing reversed point values) & [A] \\
+Within-writer $\varphi$ reverses at 1.5 & [P, A] \\
+CS1 stall-to-stall share stays the largest & [A] \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -54,8 +81,15 @@ when one of the two definitions has no stall. (12) After a two-system code revie
 completed (all mutants fail the checks, the unmodified code passes). (13) The length model took the maximum REML
 likelihood over three optimisers (S5). (14) The variational count model gave different values on repeated runs (S6).
 (15) The text column of the KLiCKe score file was read with replacement of undecodable characters; the identifier,
-prompt and score columns are ASCII. (16) The result files were rewritten after a conversion of integer types, with the
-same seed.
+prompt and score columns are ASCII, and essay length counts characters of that column. (16) The result files were
+rewritten after a conversion of integer types, with the same seed. (17) The check that the one-stage intervals of the
+two-stage code reproduce the earlier intervals within 0.05 failed at 0.070; the largest differences were upper ends of
+quantities involving CoAuthor (41 writers), and two runs of the same code with different seeds differed by 0.056, so we
+widened the tolerance to 0.08 (3 of 864 comparisons exceeded 0.05). (18) A summary count of the earlier intervals by
+threshold family was corrected before the results were read. (19) A synthetic control of the two-stage code was
+rebuilt before the run because its constant intervals included the long gap. (20) The first mutation check ran in a
+directory where imports failed; it was repeated in a copy of the layout, and controls were added for the mutants that
+survived.
 
 \paragraph{Holdouts.} The CS1 2019 holdout of 146 writers was drawn at random before any analysis of these data and
 opened after the companion study's confirmatory test (145 had key presses). The KLiCKe holdout of 1,498 writers had
@@ -69,9 +103,29 @@ were not opened; checks of the work files confirmed that none of their units ent
 with a recorded key a deletion press. Insertions of several characters (mostly pastes) and edits without a recorded key
 did not become key presses. The mapping is that of the companion study \cite{miura2026runup}.
 
-\paragraph{Threshold.} The writer quantile is the nearest-rank quantile of the inter-keystroke intervals within the
-observation intervals of the unit so far, updated causally, defined once 100 intervals exist. Fixed thresholds do not
-depend on the writer.
+\paragraph{Threshold and evaluation times.} The writer quantile is the nearest-rank quantile of the inter-keystroke
+intervals within the observation intervals of the unit so far, updated causally, defined once 100 intervals exist.
+Fixed thresholds do not depend on the writer. Condition A is evaluated at the union of the key-press times and the
+key-press times plus $W$, each time once; the resumption is the first character press after $t_0$, so a length is
+always positive.
+
+\paragraph{Observation intervals.} The default intervals are where the companion study's estimator, re-run on the key
+stream with a release added 100~ms after each press, wrote per-second rows, split where rows are more than 2~s apart.
+They cover a median of 99.9\% of the time from the first to the last key press of a KLiCKe essay (1st percentile
+80\%) and of a CoAuthor session from its start; holes are mostly 3~s long and contain a key press after a gap of
+several seconds (median 7~s in KLiCKe). A CS1 unit is replayed work block by work block (blocks split at 30-minute
+gaps), so time between blocks lies outside. The two other segmentations use key times alone.
+
+\paragraph{Time before the 100th interval.} The share of exposure before each unit's 100th interval in the default
+segmentation was 3.4\% (CS1 2019), 5.0\% (CS1 2021), 3.2\% (KLiCKe) and 10.3\% (CoAuthor), and 91, 14, 0 and 1 units
+never reached 100 intervals (2.8--8.4\% with key-press gaps of 5~min). Restricting all 90 definitions to the time after the
+100th interval of each unit (both numerator and exposure; one-stage intervals, compared with the one-stage values of
+the full time) changed the baseline stall--score correlation from $-0.063$ to $-0.081$ [$-0.108$, $-0.053$]; 9
+definitions instead of 10 had a positive interval, 74 a negative one, and no interval changed from one side of zero to
+the other. The rank order differed for 80 definitions, as before. The rate ratios reversed for 22 definitions between
+the two CS1 editions (20 before; 19 with a fixed $\theta$, 18 before), 66, 53, 8 and 2 for the other pairs (66, 53, 6
+and 0 before). The reversals of $\varphi$ at 1.5 were 17, 57, 53, 26 and 0 (18, 54, 49, 19 and 0 before); only the CS1
+2021 assignments crossed 25\% of the definitions.
 
 \paragraph{Checks.} The onsets $(s, t_0)$ of the baseline agreed with those of the reference implementation in all
 7,709 units. For the window variants of 15 and 60~s and the 0.995 quantile variant (with the minimum of 200 intervals of
@@ -81,14 +135,24 @@ setting, and 20 mutants of the condition, the quantile, the segmentation and the
 
 \paragraph{Intervals.} Writers were resampled with replacement 2,000 times within each dataset with a fixed seed; the
 rate of a resample is the sum of counts over the sum of exposures of its units (units with at least 5~min of
-exposure). The writer-quantile threshold is not re-estimated in a resample.
+exposure). For the 54 writer-quantile stall definitions, each unit's intervals were also drawn again with replacement
+from all of the unit's intervals, keeping their number and their order in time, $\theta$ was recomputed by the causal
+rule, and the stalls were counted again; 200 such draws were made per unit, and each writer drawn in an outer resample
+took one at random. Without the inner draw, the counts agreed exactly with the detector in every block of every unit.
+The two-stage intervals were about as wide as the one-stage ones (median ratio of widths for the score association
+1.00, range 0.95--1.06) but shifted: under the baseline the score interval moved from [$-0.091$, $-0.034$] to
+[$-0.073$, $-0.019$] around the point value $-0.063$, and the CS1 2019 to KLiCKe ratio interval [0.807, 0.861] no longer
+contained the point value 0.865. We read the shift as the effect of drawing early intervals from the whole unit, where
+the causal rule uses only the intervals so far; we did not test it. With the one-stage intervals, 10 definitions had a
+positive score interval instead of 14, and the ratio reversals were 66 (CS1 2019 against KLiCKe), 53 (CS1 2021 against
+KLiCKe), 6 (CS1 2019 against CoAuthor) and 20 (the two CS1 editions).
 
 \section{All definitions}
 \label{app:all}
 
 Table~\ref{tab:s3} lists, for each definition, the pooled stall rates, the rank of the datasets, two rate ratios, the
-score association with and without adjustment for speed (median interval $< 2$~s) and the share of KLiCKe writers with
-no stall.
+score association with and without adjustment for speed (median interval $< 2$~s) and for essay and observation
+length, and the share of KLiCKe writers with no stall. Table~\ref{tab:spause} gives the pause family.
 
 \paragraph{Ways of measuring speed [E].} The partial correlations of score and stall rate given speed, as (negative /
 including zero / positive) out of 89, with their range: maximum interval 1~s, median, 89/0/0, $-0.28$ to $-0.03$;
@@ -103,8 +167,9 @@ the key-press rate, the partial correlation of score and stall rate ranged from 
 interval excluding zero for 48 definitions and negative for 27; the sign split by condition A. Because the key-press
 rate shares its denominator with the stalls, we do not use these values.
 
-\paragraph{Agreement in time.} For each definition and dataset, the share of baseline onsets that fall within a stall
-of the definition, and the reverse. The smaller of the two was below 0.5 for 51\% of the definitions in CS1 2019, 36\%
+\paragraph{Agreement in time.} Two labels agree on a stall when the onset of one falls between the start and the
+resumption of a stall of the other. For each definition and dataset we computed the share of baseline onsets that fall
+within a stall of the definition, and the reverse. The smaller of the two was below 0.5 for 51\% of the definitions in CS1 2019, 36\%
 in CS1 2021, 77\% in KLiCKe and 80\% in CoAuthor. Among the 63 pairs of a definition and a dataset whose rate was within
 20\% of the baseline rate, 11 had the smaller agreement below 0.5 (4 in CS1 2019, 6 in KLiCKe, 1 in CS1 2021); for
 example, in KLiCKe a definition with $W = 15$~s, the characters-only rule and a fixed 10-s threshold had a rate within
@@ -112,23 +177,44 @@ example, in KLiCKe a definition with $W = 15$~s, the characters-only rule and a 
 
 {\scriptsize
 \setlength{\tabcolsep}{2.5pt}
-\begin{longtable}{@{}l r l l r r r r l l l l r r@{}}
+\begin{longtable}{@{}l r l l r r r r l l l l r r r@{}}
 \caption{All definitions. $\theta$: writer quantile or fixed seconds; A: net or characters only; Obs.: default
 intervals or key-press gaps of 5 or 30~min. Rates per hour for CS1 2019, CS1 2021, CoAuthor and KLiCKe. Rank: highest
 rate first (a CS1 2019, b CS1 2021, c CoAuthor, k KLiCKe). Ratios with 95\% intervals. $\rho$: score association with
-95\% interval; adj.: partial correlation given speed [E]. Zero: \% of KLiCKe writers with no stall. Baseline marked
+95\% interval (two-stage for writer quantiles); adj.: partial correlation given speed [E]; len.: given essay and
+observation length. Zero: \% of KLiCKe writers with no stall. Baseline marked
 with an asterisk.}\label{tab:s3}\\
 \toprule
-$\theta$ & $W$ & A & Obs. & CS19 & CS21 & CoA & KL & Rank & CS19/KL & CS19/CS21 & $\rho$ & adj. & Zero \\
+$\theta$ & $W$ & A & Obs. & CS19 & CS21 & CoA & KL & Rank & CS19/KL & CS19/CS21 & $\rho$ & adj. & len. & Zero \\
 \midrule
 \endfirsthead
 \toprule
-$\theta$ & $W$ & A & Obs. & CS19 & CS21 & CoA & KL & Rank & CS19/KL & CS19/CS21 & $\rho$ & adj. & Zero \\
+$\theta$ & $W$ & A & Obs. & CS19 & CS21 & CoA & KL & Rank & CS19/KL & CS19/CS21 & $\rho$ & adj. & len. & Zero \\
 \midrule
 \endhead
 \bottomrule
 \endfoot
 \input{appendix/tab_s3}
+\end{longtable}
+}
+
+{\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}l l l r r r r l l r r@{}}
+\caption{The pause family. Interval: between any two key presses or between two character presses; threshold in
+seconds or as a writer quantile; Obs. as in Table~\ref{tab:s3}. Rates per hour; rank as in Table~\ref{tab:s3}. $\rho$:
+score association with 95\% interval; adj.: given speed; len.: given essay and observation length.}\label{tab:spause}\\
+\toprule
+Interval & Threshold & Obs. & CS19 & CS21 & CoA & KL & Rank & $\rho$ & adj. & len. \\
+\midrule
+\endfirsthead
+\toprule
+Interval & Threshold & Obs. & CS19 & CS21 & CoA & KL & Rank & $\rho$ & adj. & len. \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\input{appendix/tab_pause}
 \end{longtable}
 }
 
@@ -140,7 +226,9 @@ a negative binomial one; it is a working threshold, not a published rule, which 
 distribution of $\varphi$ and the count of definitions whose interval exceeds 1. With a single pooled rate as the
 expectation, the baseline $\varphi$ was larger at every level and also defined at the level of writers
 (Table~\ref{tab:s4b}); with the writer's own rate, CoAuthor sessions could not be told apart from counting.
-Table~\ref{tab:s4} gives $\varphi$ with the writer's rate for every definition.
+Table~\ref{tab:s4} gives $\varphi$ with the writer's rate for every definition. Writers with no stall carry no
+information about their own rate and are left out of the writer-expectation $\varphi$; their share differs between
+definitions (in KLiCKe 0.1--35\%), so the definitions differ in the writers they use.
 
 \begin{center}\footnotesize
 \begin{tabular}{@{}l l r r@{}}
@@ -161,8 +249,7 @@ KLiCKe & writer & 2.57 [2.34, 2.81] & \\
 \bottomrule
 \end{tabular}
 \captionof{table}{Baseline $\varphi$ with two expectations, with 95\% intervals from the primary computation (the
-intervals of the added computation in Table~\ref{tab:phi} differ in the second decimal because the resamples
-differ).}\label{tab:s4b}
+two-stage intervals in Table~\ref{tab:phi} differ because the writer quantile is estimated again, S2).}\label{tab:s4b}
 \end{center}
 
 {\scriptsize
@@ -209,23 +296,15 @@ data the shares were unstable across definitions, and repeated runs on the same 
 by up to 0.93. With on average 2.02 blocks per assignment in CS1 2019 and 3.55 in CS1 2021, this estimator cannot
 separate the levels of count variation. We report no shares.
 
-\section{Estimator level}
-\label{app:level}
-
-The primary conditions included a comparison of the share of time in which the companion study's estimator placed its
-Stuck-state probability at or above 0.60, between CS1 2019 and KLiCKe. Restricting the per-second rows to those within
-60~s of the last key press reduced the ratio of the two shares from 6.39 to 4.89 (a factor of 0.77); the criterion for
-``the level difference is explained by long periods without key presses'' was a factor of 0.5 or less, and it was not
-met. The level difference between the datasets is not explained by the long periods without key presses. This result is
-reported for completeness and is not used in the main text.
-
 \section{Scope of the search for prior work}
 \label{app:search}
 
-Three rounds of searches (OpenAlex, publisher pages and full texts where available, between 2026-11-05 and 2026-11-07)
-covered analytic choices and multiverse analyses in learning analytics, educational measurement and behavioural data;
-time-on-task and pause thresholds in CS1 and writing, with the answers to them (mixture models, personalised thresholds,
-state models); and decompositions and dispersion of keystroke measures. Statements that we found no study of a given
+Four rounds of searches (OpenAlex, Crossref, publisher pages and full texts where available, between 2026-11-05 and
+2026-11-08) covered analytic choices and multiverse analyses in learning analytics, educational measurement and
+behavioural data; time-on-task and pause thresholds in CS1 and writing, with the answers to them (mixture models,
+personalised thresholds, state models); decompositions and dispersion of keystroke measures; and associations of pause
+measures with essay scores, with adjustment for speed and length and with null, positive or threshold-dependent
+results. Statements that we found no study of a given
 kind are limited to these searches.
 
 \section{Relation to the companion study}
@@ -244,8 +323,8 @@ CS1 length structure stays \\
 Data & CS1 2019 (holdout), KLiCKe and CoAuthor as descriptions & CS1 2019 and 2021, KLiCKe, CoAuthor \\
 Shared & \multicolumn{2}{X}{The baseline stall definition, the conversion of CS1, the estimator, the opened holdouts
 and the data.} \\
-New here & \multicolumn{2}{X}{The 89 definitions, the intervals, the score association and the adjustment for speed, the
-overdispersion within writers and the length decomposition.} \\
+New here & \multicolumn{2}{X}{The 89 definitions, the pause family, the intervals, the score association and its
+adjustments, the overdispersion within writers and the length decomposition.} \\
 \bottomrule
 \end{tabularx}
 \end{center}
