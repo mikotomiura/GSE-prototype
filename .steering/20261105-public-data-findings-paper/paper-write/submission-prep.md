@@ -54,4 +54,5 @@
 - 下書き 24026330（`unsubmitted`・予約の DOI 10.5281/zenodo.24026330）。PDF は Chrome の投稿の画面から上げ（Miura-2026-stall-runup-equivalence-preprint.pdf・323,529 バイト・md5 cc6cff37…が手元と一致・SHA-256 452f77ae…）、メタデータは deposit API で入れた（token はプロセスの中で読むだけ）。未公開の下書きはこの 1 件だけ。
 - メタデータ: publication / preprint・CC BY 4.0・著者 Miura, Mikoto（Independent Researcher・ORCID）・題は原稿のまま・要旨は原稿の要旨から LaTeX の記号を外した文・版「v1 (manuscript before peer review)」・注記「Preprint; not peer reviewed.」・キーワード 5 つ・関連の識別子 9 件（公開 repo 0.2.2 の DOI と GitHub を isSupplementedBy、OSF の登録 5 件と CS1 の Dataverse 2 件を references。すべて解決を確かめた）。形は KeepCount のプレプリント（23858734）に揃えた。投稿先の誌名は書いていない（公開の時点では未投稿のため）。
 - カバーレター: PREPRINT の行を予約の DOI で埋め、「既発表でない」に「プレプリントを除き」を足した（1 頁・約 470 語）。
-- 公開（publish）は研究者に確かめてから。公開の後、外から `/api/records/24026330` で open と DOI の解決を確かめる。
+- 公開（研究者の採否・AskUserQuestion）: 1 回目の publish は 400（`pids.doi` が空）。Chrome の画面で作った下書きは RDM の側の DOI が未設定で、deposit API の `prereserve_doi` は表示だけだった。RDM の API で `POST /api/records/24026330/draft/pids/doi` を呼んで同じ番号を予約し、2 回目で公開（`done`）。外から（token なし）`/api/records/24026330` で open・2026-11-07・preprint・CC BY 4.0・ファイル 1 つ（md5 一致）、取った PDF は手元と SHA-256 が同じ、`https://doi.org/10.5281/zenodo.24026330` は Zenodo に解決（302）。
+- 次から: Zenodo の下書きは API だけで作る（画面で作ると DOI の欄が空のまま残る）。
