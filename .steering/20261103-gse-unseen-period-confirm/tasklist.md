@@ -16,4 +16,4 @@
 - [x] 11-04 の 6 本の扱いを研究者に聞く（判断 9・条件どおり＋U7 の感度の記述）→ U7 のコード・対照・変異 4 種（44 種すべて赤）
 - [x] U7 の code-reviewer（HIGH・MEDIUM 無し・LOW 2 つ直す）→ コミット（記録を開く前）
 - [x] `bash run.sh`（1 回だけ・試行 1）→ notes.md（H4a 支持・H5 決まらない・U4 は e だけ繰り返さず・逸脱なし）
-- [ ] code-reviewer と /cross-review（Codex に送るのは notes・コードだけ）
+- [x] code-reviewer と /cross-review（Codex 27,895・判断 10・notes の言い換えだけ）
