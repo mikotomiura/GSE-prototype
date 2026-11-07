@@ -48,9 +48,6 @@ pub const DAY_SHOWN_TOLERANCE_MS: u64 = 1_000;
 pub const ROTATION_GAP_MS: u64 = 1_000;
 /// 走行の始まりからこの幅の拾い直しの不一致は `unverified.app_start`（起動とローテートの別が推定のため）。
 pub const APP_START_WINDOW_MS: u64 = 10_000;
-/// 1 本のファイルの行の時刻が `meta.session_start` から外れてよい幅（O1 は 1 日ごとにローテートする）。
-/// ★ 壊れた時刻（ビット化けなど）で再生の tick が止まらなくなるのを防ぐ（security-checker MEDIUM）。
-pub const MAX_FILE_SPAN_MS: u64 = 3 * 86_400_000;
 /// ファイルの始まりより前に出てよい時刻の幅（書き込みの順の揺れ）。
 pub const MAX_BEFORE_START_MS: u64 = 60_000;
 /// 入力の全体の時間の幅の上限。
@@ -161,6 +158,17 @@ fn row_time(r: &Row) -> Option<u64> {
         Row::Suppressed(s) => Some(s.t),
         Row::Label(l) => Some(l.t),
         Row::Day(d) => Some(d.t),
+    }
+}
+
+/// 行の時刻の欄すべて（入力の検査用・`row_time` に入らない欄も含む）。
+fn all_times(r: &Row) -> Vec<u64> {
+    match r {
+        Row::Frame(f) => vec![f.t, f.anchor_ms],
+        Row::Assigned(a) => vec![a.scheduled_ts],
+        Row::Suppressed(x) => vec![x.t, x.candidate_ts],
+        Row::Day(d) => vec![d.t, d.shown_ts],
+        r => row_time(r).into_iter().collect(),
     }
 }
 
@@ -391,11 +399,14 @@ pub fn order_inputs(mut files: Vec<InputFile>) -> Result<Vec<InputFile>> {
             return Err(format!("{}: meta.session_start が無い", f.name));
         }
     }
+    // ★ 壊れた時刻（ビット化けなど）で再生の tick が止まらなくならないように、時刻の欄を全部縛る。
+    //   ファイルの幅では縛らない（一時停止の間はローテートが回らないので、正しい記録でも 1 本が何日にもなる・
+    //   /cross-review の security-checker MEDIUM）。上の端は入力の全体の幅（下の 40 日）で縛る。
     for f in &files {
         let start = f.session_start().unwrap_or(0);
-        for t in f.rows.iter().filter_map(row_time) {
+        for t in f.rows.iter().flat_map(all_times) {
             if t.saturating_add(MAX_BEFORE_START_MS) < start
-                || t > start.saturating_add(MAX_FILE_SPAN_MS)
+                || t > start.saturating_add(MAX_TOTAL_SPAN_MS)
             {
                 return Err(format!(
                     "{}: 行の時刻 {t} が meta.session_start {start} から外れている",
@@ -406,10 +417,13 @@ pub fn order_inputs(mut files: Vec<InputFile>) -> Result<Vec<InputFile>> {
     }
     files.sort_by_key(|f| f.session_start().unwrap_or(0));
     if let (Some(a), Some(b)) = (files.first(), files.last()) {
-        let span = b
-            .last_ms()
+        let end = files
+            .iter()
+            .flat_map(|f| f.rows.iter().flat_map(all_times))
+            .max()
             .unwrap_or(0)
-            .saturating_sub(a.session_start().unwrap_or(0));
+            .max(b.last_ms().unwrap_or(0));
+        let span = end.saturating_sub(a.session_start().unwrap_or(0));
         if span > MAX_TOTAL_SPAN_MS {
             return Err(format!("入力の時間の幅が長すぎる（{span} ms）"));
         }
@@ -531,14 +545,20 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                         .max(lo);
                     // ★ 直後に溜まった候補の抑制の行があれば、その `t` が最初の tick の壁時計そのもの
                     let exact = f.rows[i + 1..].iter().find_map(|r| match r {
-                        Row::Suppressed(s) if s.t > s.candidate_ts.saturating_add(1_000) => {
+                        // ★ ふつうの抑制の行でも t − 候補 は 2〜3 秒（調停器の時計が 2 秒遅れ・tick は最大 1 秒遅れる）。
+                        //   それを超えるものだけを溜まった候補と読む（/cross-review の code-reviewer MEDIUM）
+                        Row::Suppressed(s)
+                            if s.t > s.candidate_ts.saturating_add(S1_TICK_LAG_MS + 1_000) =>
+                        {
                             Some(s.t)
                         }
                         _ => None,
                     });
                     let lo = exact.filter(|&t| t <= hi).unwrap_or(lo);
                     if let Some(prev) = tl.frames.last_mut() {
-                        if prev.end_ms > lo {
+                        // ★ ローテートでは駆動役は調停器を持ち続ける（次の枠を作るまで前の枠で回す）。
+                        //   走行が変わったときだけ、前の枠はファイルの終わりで止まる
+                        if prev.end_ms > lo || (!app_start && first_frame_in_file) {
                             prev.end_ms = lo;
                         }
                     }
@@ -728,9 +748,7 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
     let mut focus_q: Vec<u64> = Vec::new();
     let (mut pi, mut fi, mut pause_i, mut quit_i, mut close_i, mut power_i) = (0, 0, 0, 0, 0, 0);
     let mut paused = false;
-    let mut last_paused = false;
     let mut epoch: u64 = 0;
-    let mut last_epoch: u64 = 0;
     let mut started = false;
     // 記録の割り当て（層・時刻）→ 再生が発火させた壁時計（開いた区間の始まりを直す）
     let mut fired_at: HashMap<(u8, u64), u64> = HashMap::new();
@@ -743,6 +761,15 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
     if wall < first.activation_lo {
         wall += 1_000;
     }
+    // ★ 最初の枠より前の一時停止の行は、駆動役では調停器の無い tick で縁が進んでいる（枠の最初の tick を
+    //   再開として扱わない）。ループの前に状態だけ進める
+    while pause_i < tl.pauses.len() && tl.pauses[pause_i].0 < wall.saturating_sub(1_000) {
+        paused = tl.pauses[pause_i].1;
+        epoch += 1;
+        pause_i += 1;
+    }
+    let mut last_paused = paused;
+    let mut last_epoch = epoch;
     let last = tl.last_ms;
     // 開いているカードの区間の索引（毎 tick に全部をなめない）
     let mut order: Vec<usize> = (0..tl.spans.len()).collect();
@@ -943,9 +970,12 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
             focus_q.clear();
             // 次の枠まで何も判定しないので、次の枠の最初の tick の手前まで飛ばす（ファイルの間の空白を毎秒回さない）
             match tl.frames.get(frame_idx) {
-                Some(next) if next.activation_lo > wall => {
+                // ★ 次の枠の 1 つ前の tick（まだ調停器が無い）に着地させる。その tick で、飛ばした間の入力を
+                //   捨て、一時停止の縁（`last_epoch`・`last_paused`）を進めてから枠を作る（駆動役は毎 tick そうする・
+                //   /cross-review の security-checker と code-reviewer の MEDIUM）
+                Some(next) if next.activation_lo > wall.saturating_add(2_000) => {
                     let k = (next.activation_lo - wall - 1) / 1_000;
-                    wall = wall.saturating_add(k * 1_000);
+                    wall = wall.saturating_add(k.saturating_sub(1) * 1_000);
                 }
                 Some(_) => {}
                 None => break,
@@ -1174,24 +1204,23 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
         }
     }
     // 日の問い（出した時刻は ±1 秒で寄せる）
-    let mut day_keys: Vec<(i64, DayTrigger, bool, u64)> = Vec::new();
+    // ★ 位相をまたいで結ぶ名は「ラベル＋同じラベルの中の通し番号」（同じラベルが 2 件あっても潰さない・
+    //   /cross-review の code-reviewer MEDIUM）。記録と寄せた再生は記録の名を使う
+    let mut day_keys: Vec<(i64, DayTrigger, bool, u64, String)> = Vec::new();
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    let mut ordinal = |label: &str| {
+        let n = seen.entry(label.to_string()).or_default();
+        *n += 1;
+        format!("{label}#{n}")
+    };
     for d in tl.days.iter().filter(|d| !d.debug) {
-        day_keys.push((d.target_day, d.trigger, d.delayed, d.shown_ts));
-        put(
-            Kind::DayQuestion,
-            d.shown_ts,
-            day_label(d.target_day, d.trigger, d.delayed),
-            Some(day_label(d.target_day, d.trigger, d.delayed)),
-            None,
-        );
+        let label = day_label(d.target_day, d.trigger, d.delayed);
+        let stab = ordinal(&label);
+        day_keys.push((d.target_day, d.trigger, d.delayed, d.shown_ts, stab.clone()));
+        put(Kind::DayQuestion, d.shown_ts, stab, Some(label), None);
         if d.closed_by == DayClosedBy::DayEnd {
-            put(
-                Kind::DayEnd,
-                d.t,
-                format!("day_end:{}", d.target_day),
-                Some(format!("day_end:{}", d.target_day)),
-                None,
-            );
+            let label = format!("day_end:{}", d.target_day);
+            put(Kind::DayEnd, d.t, ordinal(&label), Some(label), None);
         }
     }
     let mut day_end_keys: Vec<(i64, u64)> = tl
@@ -1200,6 +1229,21 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
         .filter(|d| !d.debug && d.closed_by == DayClosedBy::DayEnd)
         .map(|d| (d.target_day, d.t))
         .collect();
+    let mut day_end_stabs: Vec<String> = Vec::new();
+    {
+        let mut n: HashMap<i64, usize> = HashMap::new();
+        for &(day, _) in &day_end_keys {
+            let k = n.entry(day).or_default();
+            *k += 1;
+            day_end_stabs.push(format!("day_end:{day}#{k}"));
+        }
+    }
+    let mut replay_only: HashMap<String, usize> = HashMap::new();
+    let mut replay_only_stab = |label: &str| {
+        let n = replay_only.entry(label.to_string()).or_default();
+        *n += 1;
+        format!("{label}#r{n}")
+    };
     for r in replayed {
         match r {
             Replayed::Decision {
@@ -1234,24 +1278,27 @@ fn compare(tl: &Timeline, replayed: &[Replayed]) -> Vec<Raw> {
                         && k.2 == *delayed
                         && k.3.abs_diff(*wall) <= DAY_SHOWN_TOLERANCE_MS
                 });
-                let key = match near {
-                    Some(i) => day_keys.remove(i).3,
-                    None => *wall,
+                let (key, stab) = match near {
+                    Some(i) => {
+                        let k = day_keys.remove(i);
+                        (k.3, k.4)
+                    }
+                    None => (*wall, replay_only_stab(&label)),
                 };
-                put(Kind::DayQuestion, key, label.clone(), None, Some(label));
+                put(Kind::DayQuestion, key, stab, None, Some(label));
             }
             Replayed::DayEnd { target_day, wall } => {
                 let near = day_end_keys.iter().position(|k| {
                     k.0 == *target_day && k.1.abs_diff(*wall) <= DAY_SHOWN_TOLERANCE_MS
                 });
-                let key = match near {
-                    Some(i) => day_end_keys.remove(i).1,
-                    None => *wall,
+                let (key, stab) = match near {
+                    Some(i) => (day_end_keys.remove(i).1, day_end_stabs.remove(i)),
+                    None => (*wall, replay_only_stab(&format!("day_end:{target_day}"))),
                 };
                 put(
                     Kind::DayEnd,
                     key,
-                    format!("day_end:{target_day}"),
+                    stab,
                     None,
                     Some(format!("day_end:{target_day}")),
                 );
@@ -1341,7 +1388,7 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
         let frame = tl
             .frames
             .iter()
-            .find(|f| k + S1_TICK_LAG_MS >= f.activation_lo && k <= f.end_ms);
+            .find(|f| k.saturating_add(S1_TICK_LAG_MS) >= f.activation_lo && k <= f.end_ms);
         if let Some(f) = frame {
             let last_rec = tl
                 .decision_times
@@ -1349,8 +1396,13 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
                 .copied()
                 .filter(|&t| t >= f.activation_lo && t <= f.end_ms)
                 .max();
-            // ★ 枠に判定の行が 1 行も無いなら取り消しではなく全面的な欠けとして残す（code-reviewer MEDIUM）
-            if last_rec.is_some_and(|t| k > t) {
+            // ★ 枠に判定の行が 1 行も無いなら取り消しではなく全面的な欠けとして残す（code-reviewer MEDIUM）。
+            //   取り消しの後も O1 の記録（押下）は続くので、鍵の後に押下が無ければ（記録の後ろが落ちた）欠けのまま
+            let presses_after = tl
+                .presses
+                .get(tl.presses.partition_point(|&p| p <= k))
+                .is_some_and(|&p| p <= f.end_ms);
+            if last_rec.is_some_and(|t| k > t) && presses_after {
                 return Class::UnverifiedTail;
             }
         }
@@ -1370,6 +1422,8 @@ fn classify(tl: &Timeline, opts: &ReplayOptions, raw: &Raw, phase_stable: bool) 
 pub struct Counts {
     #[serde(rename = "match")]
     pub matched: usize,
+    /// `match` のうち、位相によって一致しない位相もあったもの（内訳・`match` に含まれる）。
+    pub match_phase_sensitive: usize,
     pub differ: usize,
     pub missing: usize,
     pub extra: usize,
@@ -1425,6 +1479,8 @@ pub struct Cards {
     pub open_at_input_end: usize,
     /// 割り当ての無いラベル。
     pub orphan: usize,
+    /// 同じカードの 2 行目以降のラベル（数えない）。
+    pub duplicate_labels: usize,
     pub debug: usize,
     /// 答えた数 ÷（本物のカード − 差し替え − 一時停止・終了・入力の終わりで下ろしたもの）。分母が 0 なら `None`。
     pub response_rate_excl_superseded: Option<f64>,
@@ -1507,7 +1563,13 @@ pub fn replay_probes(files: &[InputFile], opts: &ReplayOptions) -> ProbesReport 
     for raw in &runs[0] {
         let flags = &matched_by_phase[&raw.id()];
         let stable = flags.len() == runs.len() && flags.iter().all(|&m| m == flags[0]);
-        let class = if raw.matched() {
+        // ★ どれかの位相で一致すれば一致（記録の tick の位相は分からないので、説明できる位相があれば足りる）。
+        //   位相に敏感な一致は別に数える（/cross-review の Codex P1: 位相 0 だけを見ると非対称になる）
+        let any_match = flags.iter().any(|&m| m);
+        if any_match && !stable {
+            counts.match_phase_sensitive += 1;
+        }
+        let class = if any_match {
             Class::Match
         } else {
             classify(&tl, opts, raw, stable)
@@ -1547,7 +1609,10 @@ pub fn replay_probes(files: &[InputFile], opts: &ReplayOptions) -> ProbesReport 
             first_divergence_ms: items
                 .iter()
                 .filter(|i| matches!(i.class, Class::Differ | Class::Missing | Class::Extra))
-                .filter(|i| i.key_ms + S1_TICK_LAG_MS >= f.activation_lo && i.key_ms <= f.end_ms)
+                .filter(|i| {
+                    i.key_ms.saturating_add(S1_TICK_LAG_MS) >= f.activation_lo
+                        && i.key_ms <= f.end_ms
+                })
                 .map(|i| i.key_ms)
                 .min(),
         })
@@ -1602,8 +1667,17 @@ fn cards(files: &[InputFile]) -> Cards {
     // probe_id → (ファイルの番号, 確かめ用か)
     let mut assigned: HashMap<&str, (usize, bool)> = HashMap::new();
     let mut labelled: HashSet<&str> = HashSet::new();
+    // ★ 開いているカードはローテートをまたいで持つ（/cross-review の Codex・code-reviewer）
+    let mut open: Vec<&str> = Vec::new();
     for (fi, f) in files.iter().enumerate() {
-        let mut open: Vec<&str> = Vec::new();
+        let rotated_from_prev = fi > 0
+            && f.session_start()
+                .unwrap_or(0)
+                .saturating_sub(files[fi - 1].last_ms().unwrap_or(0))
+                < ROTATION_GAP_MS;
+        if !rotated_from_prev {
+            open.clear();
+        }
         for r in &f.rows {
             match r {
                 Row::Assigned(a) => {
@@ -1624,7 +1698,11 @@ fn cards(files: &[InputFile]) -> Cards {
                         c.orphan += 1;
                         continue;
                     };
-                    labelled.insert(l.probe_id.as_str());
+                    // ★ 同じカードに 2 行目のラベルが来たら数えず、二重として出す（回答率を 1 より大きくしない）
+                    if !labelled.insert(l.probe_id.as_str()) {
+                        c.duplicate_labels += 1;
+                        continue;
+                    }
                     if debug {
                         continue;
                     }
@@ -1726,11 +1804,34 @@ pub fn day_question_presses(files: &[InputFile], utc_offset_secs: i32) -> Vec<Da
             target_day: d.target_day,
             presses_until_cutoff: hi.saturating_sub(lo),
             cutoff_ms: cutoff,
-            input_covers_cutoff: tl.last_ms >= cutoff,
+            input_covers_cutoff: covers(files, d.t, cutoff),
             paused_ms_in_span: paused_ms,
         });
     }
     out
+}
+
+/// 回答の時刻 `t` から `cutoff` まで、記録がローテートの鎖で途切れずに続いているか
+/// （/cross-review の Codex P2: 最後の時刻だけを見ると、途中の空白を見逃す）。
+fn covers(files: &[InputFile], t: u64, cutoff: u64) -> bool {
+    let Some(mut i) = files
+        .iter()
+        .position(|f| f.session_start().unwrap_or(0) <= t && f.last_ms().unwrap_or(0) >= t)
+    else {
+        return false;
+    };
+    loop {
+        let end = files[i].last_ms().unwrap_or(0);
+        if end >= cutoff {
+            return true;
+        }
+        match files.get(i + 1) {
+            Some(n) if n.session_start().unwrap_or(0).saturating_sub(end) < ROTATION_GAP_MS => {
+                i += 1
+            }
+            _ => return false,
+        }
+    }
 }
 
 fn overlap(a0: u64, a1: u64, b0: u64, b1: u64) -> u64 {
@@ -2316,6 +2417,25 @@ mod tests {
         assert!(r.counts.matched >= 1, "1 行目は一致のまま");
     }
 
+    /// /cross-review の code-reviewer MEDIUM: 記録の後ろが落ちた（押下も続かない）なら、取り消しでなく欠け。
+    #[test]
+    fn a_truncated_tail_without_presses_is_missing() {
+        let (_, mut files) = run(&base(), &jst());
+        let cut = T0 + 120 * MIN;
+        for f in files.iter_mut() {
+            f.rows.retain(|r| match r {
+                Row::Suppressed(s) => s.candidate_ts < cut,
+                Row::Assigned(a) => a.scheduled_ts < cut,
+                Row::Label(l) => l.t < cut,
+                Row::Day(d) => d.t < cut,
+                Row::Key { t } | Row::Focus { t } => *t < cut,
+                _ => true,
+            });
+        }
+        let r = replay_probes(&files, &jst());
+        assert!(r.counts.missing >= 1, "{:?}", r.counts);
+    }
+
     /// code-reviewer MEDIUM: 枠に判定の行が 1 行も無いなら、取り消し（tail）ではなく欠け。
     #[test]
     fn a_frame_without_any_decision_row_is_missing() {
@@ -2516,7 +2636,11 @@ mod tests {
 
     #[test]
     fn rows_after_revocation_are_tail_not_missing() {
-        let (_, mut files) = run(&base(), &jst());
+        // 取り消しの後も O1 の記録（押下）は続く
+        let mut sc = base();
+        sc.presses
+            .extend(burst(T0 + 170 * MIN, T0 + 180 * MIN, 1_700));
+        let (_, mut files) = run(&sc, &jst());
         // 120 分より後の判定の行を消す（同意の取り消しで枠が止まったのと同じ見え方）
         let cut = T0 + 120 * MIN;
         for f in files.iter_mut() {
@@ -2624,6 +2748,84 @@ mod tests {
         assert_eq!(c.response_rate_excl_superseded, Some(0.5));
     }
 
+    /// /cross-review の Codex P2・code-reviewer: 同じカードの 2 行目のラベルは数えない・ローテートの後の一時停止で下ろしたカード。
+    #[test]
+    fn cards_count_each_card_once_and_follow_rotation() {
+        let f1 = [
+            r#"{"type":"meta","session_start":1000}"#,
+            r#"{"type":"probe_assignment","probe_id":"A","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random"}"#,
+            r#"{"type":"realtime_label","probe_id":"A","source":"random_probe","q1_friction":3,"q2_progress":3,"answered":true,"skip_reason":"none","latency_ms":9,"analysis_window_start_ms":0,"analysis_window_end_ms":1,"ts":3000}"#,
+            r#"{"type":"realtime_label","probe_id":"A","source":"random_probe","q1_friction":3,"q2_progress":3,"answered":true,"skip_reason":"none","latency_ms":9,"analysis_window_start_ms":0,"analysis_window_end_ms":1,"ts":3500}"#,
+            r#"{"type":"probe_assignment","probe_id":"B","scheduled_ts":5000,"session_elapsed_ms":4000,"stratum":"random"}"#,
+            r#"{"type":"meta","session_end":6000}"#,
+        ]
+        .join("\n");
+        // ローテート（すぐ次のファイル）で、回答の前に一時停止
+        let f2 = [
+            r#"{"type":"meta","session_start":6100}"#,
+            r#"{"type":"recording_pause","t":7000,"paused":true}"#,
+            r#"{"type":"meta","session_end":9000}"#,
+        ]
+        .join("\n");
+        let files = vec![parse_file("a", &f1).unwrap(), parse_file("b", &f2).unwrap()];
+        let c = cards(&files);
+        assert_eq!((c.total, c.answered, c.duplicate_labels), (2, 1, 1));
+        assert_eq!(c.dropped_by_pause, 1, "{c:?}");
+        assert_eq!(c.response_rate_excl_superseded, Some(1.0));
+    }
+
+    /// /cross-review の Codex P1・security-checker: 時刻の欄を全部縛る（桁あふれ）・何日も止めた記録は拒まない。
+    #[test]
+    fn every_time_field_is_bounded_but_long_pauses_are_accepted() {
+        let overflow = format!(
+            "{{\"type\":\"meta\",\"session_start\":{T0}}}\n{{\"type\":\"probe_assignment\",\"probe_id\":\"A\",\"scheduled_ts\":{},\"session_elapsed_ms\":0,\"stratum\":\"random\"}}\n",
+            u64::MAX
+        );
+        assert!(order_inputs(vec![parse_file("x", &overflow).unwrap()]).is_err());
+        // 5 日止めてから再開した 1 本のファイル（一時停止の間はローテートが回らない）
+        let long = format!(
+            "{{\"type\":\"meta\",\"session_start\":{T0}}}\n{{\"type\":\"recording_pause\",\"t\":{},\"paused\":true}}\n{{\"type\":\"recording_pause\",\"t\":{},\"paused\":false}}\n",
+            T0 + MIN,
+            T0 + 5 * 86_400_000
+        );
+        assert!(order_inputs(vec![parse_file("x", &long).unwrap()]).is_ok());
+    }
+
+    /// /cross-review の security-checker・code-reviewer MEDIUM: 枠の前（同意の前）の一時停止と再開を、枠の最初の
+    /// tick の再開として扱わない（飛ばした区間の縁を、調停器の無い tick で進める）。
+    #[test]
+    fn a_pause_before_the_frame_is_not_a_resume_of_the_frame() {
+        let (r0, mut files) = run(&base(), &jst());
+        assert_eq!(bad(&r0), 0);
+        // ファイルの始まりを 10 分前にし、同意の前に止めて再開した行を足す
+        for r in files[0].rows.iter_mut() {
+            if let Row::MetaStart { t } = r {
+                *t = T0 - 10 * MIN;
+            }
+        }
+        let at = files[0]
+            .rows
+            .iter()
+            .position(|r| matches!(r, Row::Frame(_)))
+            .unwrap();
+        files[0].rows.insert(
+            at,
+            Row::Pause {
+                t: T0 - 4 * MIN,
+                paused: false,
+            },
+        );
+        files[0].rows.insert(
+            at,
+            Row::Pause {
+                t: T0 - 6 * MIN,
+                paused: true,
+            },
+        );
+        let r = replay_probes(&files, &jst());
+        assert_eq!(bad(&r), 0, "{:#?}", r.items);
+    }
+
     // ---- --day-questions ----
 
     #[test]
@@ -2647,5 +2849,36 @@ mod tests {
         let utc = day_question_presses(&files, 0);
         assert_eq!(utc[0].presses_until_cutoff, 3);
         assert!(!utc[0].input_covers_cutoff);
+    }
+
+    /// /cross-review の Codex P2: 回答の日のファイルが途中で切れ、翌日の別の走行があっても「切れ目まで続いた」としない。
+    #[test]
+    fn coverage_requires_an_unbroken_chain_to_the_cutoff() {
+        let t = T0 + 2 * 60 * MIN;
+        let day_row = format!(
+            r#"{{"type":"day_question","t":{t},"shown_ts":{},"in_eod_window":true,"target_day":20764,"trigger":"evening_idle","delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","motivation":4,"latency_ms":1,"duration_ms":1}}"#,
+            t - 5_000
+        );
+        let a = format!("{{\"type\":\"meta\",\"session_start\":{T0}}}\n{day_row}\n{{\"type\":\"meta\",\"session_end\":{}}}\n", t + MIN);
+        // 翌日の昼の別の走行（切れ目の後まで続くが、間が空いている）
+        let b = format!("{{\"type\":\"meta\",\"session_start\":{}}}\n{{\"type\":\"meta\",\"session_end\":{}}}\n", t + 12 * 60 * MIN, t + 14 * 60 * MIN);
+        let files = order_inputs(vec![
+            parse_file("a", &a).unwrap(),
+            parse_file("b", &b).unwrap(),
+        ])
+        .unwrap();
+        let rows = day_question_presses(&files, JST);
+        assert!(
+            !rows[0].input_covers_cutoff,
+            "間の空いた走行を連続とみなした"
+        );
+        // ローテートで続いていれば連続
+        let c = format!("{{\"type\":\"meta\",\"session_start\":{}}}\n{{\"type\":\"meta\",\"session_end\":{}}}\n", t + MIN + 100, t + 14 * 60 * MIN);
+        let files = order_inputs(vec![
+            parse_file("a", &a).unwrap(),
+            parse_file("c", &c).unwrap(),
+        ])
+        .unwrap();
+        assert!(day_question_presses(&files, JST)[0].input_covers_cutoff);
     }
 }

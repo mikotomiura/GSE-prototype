@@ -72,3 +72,26 @@
 | security-checker | LOW | UTF-8 でない行を置き換えて受理する・`skip_reason` を検証せず出力のキーにする | UTF-8 でない行は読めない行として数える・`skip_reason` は既知の 4 値だけ |
 | code-reviewer | LOW | `cards` の使わない引数 | 外した |
 | 見送り | LOW | 1 秒の中で止めて再開してまた止めたときの `on_pause` の呼び方の差・ファイル全体の大きさの上限・`--day-state` の大きさ・出力にファイル名が載る（研究者の手元の CLI・gse-dataset へは metrics だけを共有する運用） | design の既知の限界に書く |
+
+## 判断 7: /cross-review（Claude ∥ Codex）と完了時の点検への対応
+
+- 判断日時: 2026-11-07
+- 範囲: `origin/main..3663803a -- src-tauri`（3200 行・研究者が閾値 2000 行を超えて送ることを承認）。Claude 側は code-reviewer をメインから直接起こし（decisions は読ませない）、Codex は wrapper（固定の prompt）で回した（独立した 2 系統）。あわせて security-checker（直しの差分 `b7c2b53e..3663803a`）と test-runner（全体の検査 lib 1085・gse-replay 81・ゴールデン 6 本 rc=0）。Codex の使用量 61,381 / 1 回（本日の合計 151,605 / 3 回）は、この枝の台帳に記帳し、メインの checkout の台帳の today を同じ値にした。
+- HIGH は無かった（Codex の P1 2 件は内容で HIGH 相当として扱った）。指摘は全部一次で確かめ、実在したので直した（判断 6 の方針の範囲）。
+
+| 出所 | 指摘 | 対応 |
+|---|---|---|
+| Codex P1 | 位相 0 で一致すれば他の位相で割れても一致・逆は境目（非対称） | どれかの位相で一致すれば一致とし、位相に敏感な一致を `match_phase_sensitive` に別に数える |
+| Codex P1・security LOW | `scheduled_ts`・`candidate_ts`・`anchor_ms`・`shown_ts` が時刻の検査から漏れ、桁あふれ | 時刻の欄を全部（`all_times`）縛る・残りの足し算を saturating に |
+| security MEDIUM | ファイルごとの +3 日の上限が、3 日を超えて止めた正しい記録を拒む（一時停止の間はローテートが回らない） | ファイルの単位は「始まりより 60 秒以上前」だけ。上の端は全体の 40 日で縛る。検査 `every_time_field_is_bounded_but_long_pauses_are_accepted` |
+| security・code-reviewer MEDIUM（両者一致） | 調停器の無い区間を飛ばすと、その間の入力と一時停止の縁が枠の最初の tick に流れ込む | 次の枠の 1 つ前の tick（調停器なし）に着地させ、そこで入力を捨てて縁を進める。最初の枠の前の一時停止も、ループの前に縁を進める。⚠️ 検査 `a_pause_before_the_frame_is_not_a_resume_of_the_frame` は直す前でも緑だった（枠の最初の tick を再開と扱っても、ウォームアップの起点は起点とほぼ同じになり結果が変わらない）。赤を作れる入力は見つけていない |
+| code-reviewer MEDIUM | 動き出しの「溜まった候補」の見分けの閾値（t − 候補 > 1 秒）がどの抑制の行でも真 | 2 秒の遅れ ＋ 1 秒を超えるものだけ |
+| code-reviewer MEDIUM | 日の問いの位相をまたぐ名が同じラベルで潰れる | ラベル ＋ 同じラベルの中の通し番号。再生だけの項目は `#rN` |
+| code-reviewer MEDIUM | `tail` が広く、記録の後ろが落ちただけでも未照合 | 鍵の後に枠の中の押下が続くときだけ（取り消しの後も O1 の押下は続く）。検査 `a_truncated_tail_without_presses_is_missing` |
+| Codex P2・code-reviewer LOW（両者一致） | カードの集計の「開いているカード」がファイルごとに初期化され、ローテートの後の一時停止で下ろしたカードを数えない | ローテートをまたいで持つ。検査 `cards_count_each_card_once_and_follow_rotation` |
+| Codex P2 | 同じカードの二重のラベルで回答率が 1 を超える | 2 行目以降は数えず `duplicate_labels` に |
+| Codex P2 | `input_covers_cutoff` が最後の時刻だけを見る | 回答のファイルからローテートの鎖で切れ目まで続くか。検査 `coverage_requires_an_unbroken_chain_to_the_cutoff` |
+| code-reviewer LOW | ローテートで再生だけが調停器を捨てる | ローテートでは前の枠を次の枠の動き出しまで回す |
+| 見送り | 再生の側の同じ鍵の二重（今の作りでは起きない） | 記録だけ |
+
+- 変異: 二重のラベル・ローテートの持ち越し・切れ目の鎖は、戻すと赤。時刻の欄の検査は、戻しても全体の幅の検査が同じ入力を拒むので緑（二重の守り）。
