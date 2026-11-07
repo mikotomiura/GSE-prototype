@@ -2061,6 +2061,9 @@ pub struct SessionLogger {
     /// いま書いている先 + その状態 (ローテートで更新される共有ハンドル)。
     pub target: SharedLogTarget,
     _handle: thread::JoinHandle<()>,
+    /// 記録のスレッドのループの周回数（テスト専用。空回りの回帰を数えて捕まえる）。
+    #[cfg(test)]
+    loop_iters: Arc<AtomicU64>,
 }
 
 /// `LogChannel` がまだ `start()` されていないことを表す `LogStatus::Disabled` の理由文字列。
@@ -2219,6 +2222,10 @@ impl SessionLogger {
             };
         }
         let target_for_thread = target.clone();
+        #[cfg(test)]
+        let loop_iters = Arc::new(AtomicU64::new(0));
+        #[cfg(test)]
+        let loop_iters_for_thread = loop_iters.clone();
 
         let handle = thread::spawn(move || {
             let mut writer = BufWriter::new(boxed);
@@ -2237,13 +2244,19 @@ impl SessionLogger {
 
             tracing::info!("SessionLogger: writing to {:?}", actual_path);
 
-            let flush_interval = Duration::from_secs(5);
-            let mut last_flush = Instant::now();
+            let mut flush_clock = FlushClock::new(FLUSH_INTERVAL, Instant::now());
             let mut dirty = false;
 
             loop {
-                let timeout = flush_interval.saturating_sub(last_flush.elapsed());
-                match rx.recv_timeout(timeout) {
+                #[cfg(test)]
+                loop_iters_for_thread.fetch_add(1, Ordering::Relaxed);
+                // 5秒間隔でバッファフラッシュ (I/O負荷軽減)。
+                // 判断はループの先頭に置く: 一時停止中に行を落とす `continue` の道も通るように。
+                if flush_clock.on_tick(Instant::now(), dirty) {
+                    let _ = writer.flush();
+                    dirty = false;
+                }
+                match rx.recv_timeout(flush_clock.wait(Instant::now())) {
                     Ok(entry) => {
                         // ⚠️★★★ **一時停止中はここで落とす** (O1 / ADR-014 D7-ii)。
                         //
@@ -2631,7 +2644,7 @@ impl SessionLogger {
                                 //   「止めた」直後にアプリが落ちたときに**止めた事実が消え**、
                                 //   その先の空白が「信号が無かった」と読まれる。
                                 let _ = writer.flush();
-                                last_flush = Instant::now();
+                                flush_clock.reset(Instant::now());
                                 dirty = false;
                             }
                             LogEntry::FocusTransition { timestamp } => {
@@ -2750,7 +2763,7 @@ impl SessionLogger {
                                     block_closed = true;
                                 }
                                 let _ = writer.flush();
-                                last_flush = Instant::now();
+                                flush_clock.reset(Instant::now());
                                 dirty = false;
                                 // ★ **flush の後**に知らせる。⚠️ 先に知らせると、収束器が
                                 //   `session_end` の無いファイルを見て「まだ閉じていない」と
@@ -2817,7 +2830,7 @@ impl SessionLogger {
                                 }
 
                                 block_closed = false;
-                                last_flush = Instant::now();
+                                flush_clock.reset(Instant::now());
                                 dirty = false;
                             }
                             LogEntry::End => {
@@ -2830,16 +2843,9 @@ impl SessionLogger {
                         }
                     }
                     Err(RecvTimeoutError::Timeout) => {
-                        // 5秒間アイドル → バッファフラッシュ
+                        // 何もしない。期限の判断は次の周回の先頭 (`flush_clock.on_tick`) で行う
                     }
                     Err(RecvTimeoutError::Disconnected) => break,
-                }
-
-                // 5秒間隔でバッファフラッシュ (I/O負荷軽減)
-                if dirty && last_flush.elapsed() >= flush_interval {
-                    let _ = writer.flush();
-                    last_flush = Instant::now();
-                    dirty = false;
                 }
             }
 
@@ -2854,9 +2860,54 @@ impl SessionLogger {
             log_path: resolved_path,
             target,
             _handle: handle,
+            #[cfg(test)]
+            loop_iters,
         };
 
         (logger, status)
+    }
+}
+
+/// 記録のスレッドが書いた行を書き出す間隔。
+const FLUSH_INTERVAL: Duration = Duration::from_secs(5);
+
+/// 記録のスレッドの書き出しの時計。書いた行は最大 `interval` で書き出す。
+///
+/// 時刻は引数で受ける（テストで眠らずに時刻を進めるため）。
+struct FlushClock {
+    interval: Duration,
+    last: Instant,
+}
+
+impl FlushClock {
+    fn new(interval: Duration, now: Instant) -> Self {
+        Self {
+            interval,
+            last: now,
+        }
+    }
+
+    /// 次の期限までの待ち時間。
+    fn wait(&self, now: Instant) -> Duration {
+        self.interval
+            .saturating_sub(now.saturating_duration_since(self.last))
+    }
+
+    /// 期限が来ていれば時計を進め、書いた行があれば `true`（＝ いま flush する）を返す。
+    ///
+    /// 書いた行が無くても期限が来たら時計を進める。進めないと `wait` が 0 のまま戻らず、
+    /// 記録のスレッドが `recv_timeout(0)` で回り続ける（2026-10-30 に 1 コアの 93〜98% を実測）。
+    fn on_tick(&mut self, now: Instant, dirty: bool) -> bool {
+        if now.saturating_duration_since(self.last) < self.interval {
+            return false;
+        }
+        self.last = now;
+        dirty
+    }
+
+    /// 期限を待たずに flush したときに時計を合わせる。
+    fn reset(&mut self, now: Instant) {
+        self.last = now;
     }
 }
 
@@ -6291,5 +6342,140 @@ mod tests {
         assert_eq!(load_id_from(&path), None);
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// 書いた行が無いまま期限を過ぎても、次の待ちが 0 にならない（2026-10-30）。
+    ///
+    /// 0 になると記録のスレッドが `recv_timeout(0)` で回り続け、1 コアを使い切る
+    /// （何も届かない間と、一時停止中に届いた行を全部落とす間に起きた）。
+    #[test]
+    fn flush_clock_idle_past_deadline_does_not_spin() {
+        let t0 = Instant::now();
+        let interval = Duration::from_secs(5);
+        let mut c = FlushClock::new(interval, t0);
+        let t1 = t0 + Duration::from_secs(6);
+        assert!(!c.on_tick(t1, false), "書いた行が無いのに flush しない");
+        assert!(
+            c.wait(t1) > Duration::ZERO,
+            "期限を過ぎた後の待ちが 0 のまま: {:?}",
+            c.wait(t1)
+        );
+        assert_eq!(c.wait(t1), interval);
+    }
+
+    /// 書いた行は期限で flush し、期限の前は flush しない（従来の約束）。
+    #[test]
+    fn flush_clock_flushes_dirty_at_deadline_only() {
+        let t0 = Instant::now();
+        let interval = Duration::from_secs(5);
+        let mut c = FlushClock::new(interval, t0);
+        assert!(!c.on_tick(t0 + Duration::from_secs(4), true));
+        assert_eq!(c.wait(t0 + Duration::from_secs(4)), Duration::from_secs(1));
+        let t5 = t0 + interval;
+        assert!(c.on_tick(t5, true));
+        assert_eq!(c.wait(t5), interval);
+    }
+
+    /// 期限を待たずに flush した箇所（`recording_pause` など）は時計を合わせる。
+    #[test]
+    fn flush_clock_reset_restarts_interval() {
+        let t0 = Instant::now();
+        let interval = Duration::from_secs(5);
+        let mut c = FlushClock::new(interval, t0);
+        let t3 = t0 + Duration::from_secs(3);
+        c.reset(t3);
+        assert_eq!(c.wait(t3), interval);
+        assert!(
+            !c.on_tick(t0 + interval, true),
+            "reset の後 5 秒たつまで flush しない"
+        );
+    }
+
+    /// 一時停止中に届いた行を落とし続けても、記録のスレッドが空回りしない（2026-10-30）。
+    ///
+    /// `FlushClock` 単体のテストはループからの呼び方の回帰を捕まえないので、実際のループの
+    /// 周回数を数える。期限（5 秒）を越えるまで動かすので 6 秒あまりかかる。
+    /// 直す前は 5 秒を過ぎたところで 1 コアを使い切っていた（周回数は桁違いに増える）。
+    #[test]
+    fn paused_logger_does_not_spin_past_flush_deadline() {
+        let p = rot_test_path("paused_spin", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::RecordingPause {
+            timestamp: 1_700_000_000_000,
+            paused: true,
+        })
+        .unwrap();
+        // 一時停止の行を処理し終えた時刻を取る（2 周目に入っている）。時計はそれより前に作られて
+        // いるので、ここから 5.5 秒たてば期限は必ず過ぎている（スレッドの起動が遅れても）。
+        let paused_at = wait_for_iters(&logger, 2);
+        // 500ms ごとに 13 行。どれも一時停止のゲートで落とされる。
+        for i in 0..13u64 {
+            std::thread::sleep(Duration::from_millis(500));
+            tx.send(LogEntry::FocusTransition {
+                timestamp: 1_700_000_000_001 + i,
+            })
+            .unwrap();
+        }
+        let rest = Duration::from_millis(5_500).saturating_sub(paused_at.elapsed());
+        std::thread::sleep(rest);
+        // 届いた 14 行を処理し終えている（1 周目 + 14 行）。
+        wait_for_iters(&logger, 15);
+        let iters = logger.loop_iters.load(Ordering::Relaxed);
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        // 届いた行 14 本と、期限ごとの数回だけ回ればよい。
+        assert!(iters < 200, "記録のスレッドが空回りしている: {iters} 周");
+    }
+
+    /// 書いた行は、終了・一時停止・ローテートを待たずに期限（5 秒）で書き出される（2026-10-30）。
+    ///
+    /// `FlushClock` 単体のテストは「flush せよ」の戻り値しか見ないので、実際のループで
+    /// ファイルに出ることを確かめる。6 秒あまりかかる。
+    #[test]
+    fn logger_flushes_written_line_at_deadline() {
+        let p = rot_test_path("deadline_flush", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::Key {
+            vk_code: 0x41,
+            timestamp: 1_700_000_000_000,
+            is_press: true,
+        })
+        .unwrap();
+        let sent_at = Instant::now();
+        let mut flushed = false;
+        while sent_at.elapsed() < Duration::from_secs(8) {
+            let c = fs::read_to_string(&p).unwrap_or_default();
+            if c.contains(r#""type":"key""#) {
+                flushed = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        assert!(flushed, "書いた行が 8 秒たってもファイルに出ていない");
+    }
+
+    /// 記録のスレッドの周回数が `n` に届くまで待ち、届いた時刻を返す（5 秒で諦める）。
+    fn wait_for_iters(logger: &SessionLogger, n: u64) -> Instant {
+        let start = Instant::now();
+        while logger.loop_iters.load(Ordering::Relaxed) < n {
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "記録のスレッドが {n} 周に届かない"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Instant::now()
     }
 }
