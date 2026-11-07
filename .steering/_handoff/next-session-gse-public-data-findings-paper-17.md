@@ -16,6 +16,7 @@
 2. プレプリントの記録に投稿先は書かない（研究者の判断・2026-11-07）。受理・公開の後に誌の DOI を足すだけにする。
 3. CS1 の著者の返事が来たら `next-session-gse-public-data-findings-paper-cs1-reply.md` から始める（引き継ぎ 11 の §2 の 1 を投稿の後に合わせて書き直したもの）。
 4. 受理・公開の後は、プレプリントと公開 repo に誌の DOI を足す（JEDM の Copyright Notice が求める）。
+5. 論文 2（停滞の形）は論文 3 の後に `next-session-gse-public-data-findings-paper2.md` から（判断 43）。
 
 ## §3 気をつけること
 
