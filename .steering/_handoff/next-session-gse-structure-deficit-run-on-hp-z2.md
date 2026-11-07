@@ -60,7 +60,7 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/structure_deficit_run.log"; echo "exit
 
 ## 6 Mac 側の状態（2026-11-07）
 
-- 枝 `exp/gse-structure-deficit-test`（`exp/gse-tau-mode-candidate` の `05a65021` から）。条件と SEED は `3d7f9f07`、コードと合成の門は `507f81b5`、計算の前のレビューへの対応は `00518580`・`79eb19a9`、変異の門の直しと時間の見積もりは `eb8bdfd9`（判断 11・12）。push は研究者の手元で行う（HP Z2 で取り出す前に、この枝が origin に上がっていることを研究者が確かめる）。
+- 枝 `exp/gse-structure-deficit-test`（`exp/gse-tau-mode-candidate` の `05a65021` から）。条件と SEED は `3d7f9f07`、コードと合成の門は `507f81b5`、計算の前のレビューへの対応は `00518580`・`79eb19a9`、変異の門の直しと時間の見積もりは `eb8bdfd9`（判断 11・12）。origin に push 済み（2026-11-07・研究者の確認の後）。HP Z2 では `git fetch origin` の後に、この枝の先頭がこのメモを足したコミット以降であることを確かめる。
 - Mac（Python 3.14.4・numpy 2.5.2）の合成の門（`eb8bdfd9`）: selftest 19 対照すべて緑（約 23 分・P-EM2 の目的の減少 0）、変異 16 個すべてが名指しの対照を赤にした（約 23 分）。HP Z2 は前の試験の実測から、どちらも Mac と同じかやや速い見込み。
 
 ## 7 HP Z2 での実行の記録（職場の PC のセッションが追記）
