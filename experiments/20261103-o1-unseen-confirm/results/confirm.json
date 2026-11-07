@@ -1,0 +1,676 @@
+{
+ "files": {
+  "given": 10,
+  "excluded": {
+   "no_focus": 0,
+   "obs_lt_4h": 5
+  },
+  "used": 5
+ },
+ "selfcheck": {
+  "files": 10,
+  "onsets_replay": 363,
+  "onsets_port": 363,
+  "mismatch_files": 0
+ },
+ "H4a": {
+  "C0": {
+   "days": 5,
+   "defined": true,
+   "pooled_per_h": 8.201123506164352,
+   "X2": 52.88669064544964,
+   "df": 4,
+   "phi": 13.22167266136241,
+   "p_one_sided": 8.999911926821369e-11,
+   "phi_upper95": 109.17560830736268,
+   "sd_between": 3.9676226131507515,
+   "sd_poisson": 1.0500296034966683,
+   "sd_ratio": 3.7785816704008197,
+   "verdict": "support",
+   "perm": {
+    "defined": true,
+    "F": 10.557971978784478,
+    "p_perm": 0.0004997501249375312,
+    "days": 5,
+    "blocks": 41
+   },
+   "including_warmup": {
+    "days": 5,
+    "defined": true,
+    "pooled_per_h": 8.006595751422319,
+    "X2": 51.94145091670636,
+    "df": 4,
+    "phi": 12.98536272917659,
+    "p_one_sided": 1.4188938912695903e-10,
+    "phi_upper95": 107.22432110972605,
+    "sd_between": 3.859159015934603,
+    "sd_poisson": 1.0265881514466517,
+    "sd_ratio": 3.7592086081417726
+   },
+   "excluded_post_warm_lt_4h": 0
+  },
+  "C1": {
+   "days": 5,
+   "defined": true,
+   "pooled_per_h": 8.566955898355817,
+   "X2": 16.813529792033805,
+   "df": 4,
+   "phi": 4.203382448008451,
+   "p_one_sided": 0.002101012734891272,
+   "phi_upper95": 34.70868228729287,
+   "sd_between": 2.1705685864100244,
+   "sd_poisson": 1.055038326368817,
+   "sd_ratio": 2.0573362428269206,
+   "verdict": "not_judged",
+   "perm": {
+    "defined": true,
+    "F": 5.309582395261001,
+    "p_perm": 0.001999000499750125,
+    "days": 5,
+    "blocks": 41
+   },
+   "including_warmup": {
+    "days": 5,
+    "defined": true,
+    "pooled_per_h": 8.482908813121663,
+    "X2": 16.299717786012362,
+    "df": 4,
+    "phi": 4.0749294465030905,
+    "p_one_sided": 0.002642260613167413,
+    "phi_upper95": 33.648004494290454,
+    "sd_between": 2.1039810461738457,
+    "sd_poisson": 1.04233124548977,
+    "sd_ratio": 2.0185339883821944
+   },
+   "excluded_post_warm_lt_4h": 0
+  },
+  "C2": {
+   "days": 5,
+   "defined": true,
+   "pooled_per_h": 2.9505458506596964,
+   "X2": 80.54991772363786,
+   "df": 4,
+   "phi": 20.137479430909465,
+   "p_one_sided": 1.1102230246251565e-16,
+   "phi_upper95": 166.2816515697947,
+   "sd_between": 3.126410672012407,
+   "sd_poisson": 0.6536938085350475,
+   "sd_ratio": 4.782683622197388,
+   "verdict": "not_judged",
+   "perm": {
+    "defined": true,
+    "F": 8.677944210857191,
+    "p_perm": 0.0004997501249375312,
+    "days": 5,
+    "blocks": 41
+   },
+   "including_warmup": {
+    "days": 5,
+    "defined": true,
+    "pooled_per_h": 2.880559944562704,
+    "X2": 79.79156216859722,
+    "df": 4,
+    "phi": 19.947890542149306,
+    "p_one_sided": 2.220446049250313e-16,
+    "phi_upper95": 164.71615507106543,
+    "sd_between": 3.051888677329593,
+    "sd_poisson": 0.6387118828492797,
+    "sd_ratio": 4.778193046472197
+   },
+   "excluded_post_warm_lt_4h": 0
+  }
+ },
+ "H5": {
+  "C0": {
+   "days": 5,
+   "bouts": 11,
+   "early_n": 131,
+   "late_n": 136,
+   "half_obs_h": 14.834219444444445,
+   "warm_excluded_h": 1.8320094444444444,
+   "thirds_per_h": [
+    8.291639506928332,
+    9.808402831366442,
+    8.898344836703577
+   ],
+   "RR": 1.0381679389312977,
+   "se_log": 0.11994175195297661,
+   "ci95": [
+    0.8206748648499465,
+    1.3133004501385868
+   ],
+   "verdict": "undetermined",
+   "support_but_small": false
+  },
+  "C1": {
+   "days": 5,
+   "bouts": 11,
+   "early_n": 121,
+   "late_n": 144,
+   "half_obs_h": 14.834219444444445,
+   "warm_excluded_h": 1.8320094444444444,
+   "thirds_per_h": [
+    8.190521951965792,
+    9.50505016647882,
+    9.100579946628658
+   ],
+   "RR": 1.1900826446280992,
+   "se_log": 0.07866877468343633,
+   "ci95": [
+    1.0200299153082961,
+    1.3884854549750594
+   ],
+   "verdict": "not_judged",
+   "support_but_small": false
+  },
+  "C2": {
+   "days": 5,
+   "bouts": 11,
+   "early_n": 54,
+   "late_n": 51,
+   "half_obs_h": 14.834219444444445,
+   "warm_excluded_h": 1.8320094444444444,
+   "thirds_per_h": [
+    3.640231978651463,
+    3.437996868726382,
+    3.5391144236889227
+   ],
+   "RR": 0.9444444444444444,
+   "se_log": 0.17048328445343688,
+   "ci95": [
+    0.6761734511102759,
+    1.3191516277034434
+   ],
+   "verdict": "not_judged",
+   "support_but_small": false
+  }
+ },
+ "U7_by_date_C0": {
+  "days": 5,
+  "defined": true,
+  "pooled_per_h": 8.248472782766584,
+  "X2": 52.314802122815,
+  "df": 4,
+  "phi": 13.07870053070375,
+  "p_one_sided": 1.185422870975117e-10,
+  "phi_upper95": 107.99504139004115,
+  "sd_between": 3.948818657793153,
+  "sd_poisson": 1.043114301266254,
+  "sd_ratio": 3.785604945689667,
+  "verdict_if_judged": "support",
+  "dates": 5,
+  "dates_with_several_files": 1,
+  "dates_excluded_post_warm_lt_4h": 0
+ },
+ "U4_summary": {
+  "days": 5,
+  "obs_h": 44.089,
+  "O1_counts_rates": {
+   "C0": {
+    "n": 353,
+    "pooled_per_h": 8.0066,
+    "day_per_h": {
+     "n": 5,
+     "q1": 6.1762,
+     "median": 7.5768,
+     "q3": 10.5218
+    },
+    "day_unit_sd": {
+     "units": 5,
+     "pooled_rate_per_h": 8.0066,
+     "sd_between_units": 3.8592,
+     "sd_expected_poisson_mean": 1.0266,
+     "unit_obs_h": {
+      "n": 5,
+      "q1": 8.2575,
+      "median": 8.8427,
+      "q3": 10.9295
+     },
+     "unit_rate_per_h": {
+      "n": 5,
+      "q1": 6.1762,
+      "median": 7.5768,
+      "q3": 10.5218
+     }
+    }
+   },
+   "C1": {
+    "n": 374,
+    "pooled_per_h": 8.4829,
+    "day_per_h": {
+     "n": 5,
+     "q1": 8.4815,
+     "median": 9.0827,
+     "q3": 9.3913
+    },
+    "day_unit_sd": {
+     "units": 5,
+     "pooled_rate_per_h": 8.4829,
+     "sd_between_units": 2.104,
+     "sd_expected_poisson_mean": 1.0423,
+     "unit_obs_h": {
+      "n": 5,
+      "q1": 8.2575,
+      "median": 8.8427,
+      "q3": 10.9295
+     },
+     "unit_rate_per_h": {
+      "n": 5,
+      "q1": 8.4815,
+      "median": 9.0827,
+      "q3": 9.3913
+     }
+    }
+   },
+   "C2": {
+    "n": 127,
+    "pooled_per_h": 2.8806,
+    "day_per_h": {
+     "n": 5,
+     "q1": 1.3724,
+     "median": 2.0356,
+     "q3": 4.5217
+    },
+    "day_unit_sd": {
+     "units": 5,
+     "pooled_rate_per_h": 2.8806,
+     "sd_between_units": 3.0519,
+     "sd_expected_poisson_mean": 0.6387,
+     "unit_obs_h": {
+      "n": 5,
+      "q1": 8.2575,
+      "median": 8.8427,
+      "q3": 10.9295
+     },
+     "unit_rate_per_h": {
+      "n": 5,
+      "q1": 1.3724,
+      "median": 2.0356,
+      "q3": 4.5217
+     }
+    }
+   },
+   "C6": {
+    "n": 0,
+    "pooled_per_h": 0.0,
+    "day_per_h": {
+     "n": 5,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    },
+    "day_unit_sd": {
+     "units": 5,
+     "pooled_rate_per_h": 0.0,
+     "sd_between_units": 0.0,
+     "sd_expected_poisson_mean": 0.0,
+     "unit_obs_h": {
+      "n": 5,
+      "q1": 8.2575,
+      "median": 8.8427,
+      "q3": 10.9295
+     },
+     "unit_rate_per_h": {
+      "n": 5,
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 0.0
+     }
+    }
+   }
+  },
+  "O2_thresholds": {
+   "C0": {
+    "unit": "ms",
+    "threshold_at_fire": {
+     "n": 353,
+     "q1": 31028.0,
+     "median": 36206,
+     "q3": 91708.0
+    },
+    "day_median_threshold": {
+     "n": 5,
+     "q1": 33749.0,
+     "median": 78780,
+     "q3": 88612.0
+    },
+    "rises_without_threshold_warmup": 16
+   },
+   "C1": {
+    "unit": "ms",
+    "threshold_at_fire": {
+     "n": 374,
+     "q1": 13117.75,
+     "median": 34517.0,
+     "q3": 62020.0
+    },
+    "day_median_threshold": {
+     "n": 5,
+     "q1": 12341.5,
+     "median": 48227,
+     "q3": 60573.0
+    },
+    "rises_without_threshold_warmup": 11
+   },
+   "C6": {
+    "unit": "presses_per_30s",
+    "threshold_at_fire": null,
+    "day_median_threshold": null
+   }
+  },
+  "O3_lengths": {
+   "C0": {
+    "short": {
+     "num": 29,
+     "den": 353,
+     "ratio": 0.0822
+    },
+    "mid": {
+     "num": 181,
+     "den": 353,
+     "ratio": 0.5127
+    },
+    "long": {
+     "num": 104,
+     "den": 353,
+     "ratio": 0.2946
+    },
+    "censored": {
+     "num": 39,
+     "den": 353,
+     "ratio": 0.1105
+    },
+    "len_s_resumed": {
+     "n": 314,
+     "q1": 36.108,
+     "median": 92.599,
+     "q3": 269.323
+    },
+    "day_median_len_s": {
+     "n": 5,
+     "q1": 85.186,
+     "median": 122.965,
+     "q3": 145.651
+    },
+    "day_share_long_or_censored": {
+     "n": 5,
+     "q1": 0.3077,
+     "median": 0.5098,
+     "q3": 0.5224
+    }
+   },
+   "C1": {
+    "short": {
+     "num": 63,
+     "den": 374,
+     "ratio": 0.1684
+    },
+    "mid": {
+     "num": 204,
+     "den": 374,
+     "ratio": 0.5455
+    },
+    "long": {
+     "num": 106,
+     "den": 374,
+     "ratio": 0.2834
+    },
+    "censored": {
+     "num": 1,
+     "den": 374,
+     "ratio": 0.0027
+    },
+    "len_s_resumed": {
+     "n": 373,
+     "q1": 23.97,
+     "median": 70.017,
+     "q3": 220.094
+    },
+    "day_median_len_s": {
+     "n": 5,
+     "q1": 57.369,
+     "median": 67.966,
+     "q3": 68.723
+    },
+    "day_share_long_or_censored": {
+     "n": 5,
+     "q1": 0.1509,
+     "median": 0.2667,
+     "q3": 0.28
+    }
+   },
+   "C2": {
+    "short": {
+     "num": 15,
+     "den": 127,
+     "ratio": 0.1181
+    },
+    "mid": {
+     "num": 73,
+     "den": 127,
+     "ratio": 0.5748
+    },
+    "long": {
+     "num": 27,
+     "den": 127,
+     "ratio": 0.2126
+    },
+    "censored": {
+     "num": 12,
+     "den": 127,
+     "ratio": 0.0945
+    },
+    "len_s_resumed": {
+     "n": 115,
+     "q1": 28.532,
+     "median": 67.642,
+     "q3": 146.85
+    },
+    "day_median_len_s": {
+     "n": 5,
+     "q1": 58.5695,
+     "median": 71.424,
+     "q3": 75.222
+    },
+    "day_share_long_or_censored": {
+     "n": 5,
+     "q1": 0.3243,
+     "median": 0.3333,
+     "q3": 0.4
+    }
+   },
+   "C6": {
+    "span_s": null
+   }
+  },
+  "O4_overlap": {
+   "C0_hit_C1": {
+    "num": 186,
+    "den": 353,
+    "ratio": 0.5269
+   },
+   "C1_hit_C0": {
+    "num": 188,
+    "den": 374,
+    "ratio": 0.5027
+   },
+   "C0_is_C2": {
+    "num": 127,
+    "den": 353,
+    "ratio": 0.3598
+   },
+   "C0_neither_C2_nor_hit_C1": 40,
+   "C6_in_pre_or_span": {
+    "C0": {
+     "num": 0,
+     "den": 0,
+     "ratio": null
+    },
+    "C1": {
+     "num": 0,
+     "den": 0,
+     "ratio": null
+    },
+    "C2": {
+     "num": 0,
+     "den": 0,
+     "ratio": null
+    }
+   },
+   "has_C6_in_pre_or_span": {
+    "C0": {
+     "num": 0,
+     "den": 353,
+     "ratio": 0.0
+    },
+    "C1": {
+     "num": 0,
+     "den": 374,
+     "ratio": 0.0
+    },
+    "C2": {
+     "num": 0,
+     "den": 127,
+     "ratio": 0.0
+    }
+   },
+   "posthoc_C1_inside_C0_stall_to_resume": {
+    "num": 354,
+    "den": 374,
+    "ratio": 0.9465
+   },
+   "posthoc_C1_not_hit_C0_but_inside_C0_stall": 166,
+   "posthoc_C0_stalls_with_C1": {
+    "num": 237,
+    "den": 353,
+    "ratio": 0.6714
+   },
+   "posthoc_C1_per_C0_stall_with_C1": {
+    "n": 237,
+    "q1": 1.0,
+    "median": 1,
+    "q3": 2.0
+   },
+   "posthoc_C1_per_C0_stall_with_C1_max": 7,
+   "posthoc_C1_inside_C0_stalls_with_ge3_C1": 104,
+   "day": {
+    "C0_is_C2": {
+     "n": 5,
+     "q1": 0.2687,
+     "median": 0.3061,
+     "q3": 0.4298
+    },
+    "C0_hit_C1": {
+     "n": 5,
+     "q1": 0.4925,
+     "median": 0.5207,
+     "q3": 0.551
+    },
+    "C1_hit_C0": {
+     "n": 5,
+     "q1": 0.44,
+     "median": 0.4444,
+     "q3": 0.5733
+    }
+   }
+  },
+  "O5_position": {
+   "C0": {
+    "early": {
+     "n": 40,
+     "obs_h": 4.62,
+     "pooled_per_h": 8.6576
+    },
+    "later": {
+     "n": 313,
+     "obs_h": 39.16,
+     "pooled_per_h": 7.9929
+    },
+    "no_position": 0,
+    "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
+   },
+   "C1": {
+    "early": {
+     "n": 34,
+     "obs_h": 4.62,
+     "pooled_per_h": 7.359
+    },
+    "later": {
+     "n": 338,
+     "obs_h": 39.16,
+     "pooled_per_h": 8.6313
+    },
+    "no_position": 2,
+    "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
+   },
+   "C2": {
+    "early": {
+     "n": 12,
+     "obs_h": 4.62,
+     "pooled_per_h": 2.5973
+    },
+    "later": {
+     "n": 115,
+     "obs_h": 39.16,
+     "pooled_per_h": 2.9367
+    },
+    "no_position": 0,
+    "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
+   },
+   "C6": {
+    "early": {
+     "n": 0,
+     "obs_h": 4.62,
+     "pooled_per_h": 0.0
+    },
+    "later": {
+     "n": 0,
+     "obs_h": 39.16,
+     "pooled_per_h": 0.0
+    },
+    "no_position": 0,
+    "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
+   }
+  }
+ },
+ "U4_readings": {
+  "a_C0_is_C2": {
+   "value": 0.3598,
+   "value_14_days": 0.5093,
+   "repeated": true
+  },
+  "b_C0_hit_C1": {
+   "value": 0.5269,
+   "value_14_days": 0.4359,
+   "repeated": true
+  },
+  "c_C1_inside_C0_stall": {
+   "value": 0.9465,
+   "value_14_days": 0.9186,
+   "repeated": true
+  },
+  "d_C6_per_h": {
+   "value": 0.0,
+   "value_14_days": 0.0197,
+   "repeated": true
+  },
+  "e_theta1_over_theta": {
+   "value": 0.9533502734353422,
+   "value_14_days": 0.2620211033212945,
+   "repeated": false
+  },
+  "f_sd_ratio": {
+   "value": {
+    "C0": 3.7592051431911164,
+    "C1": 2.0186126834884393,
+    "C2": 4.778299671207139
+   },
+   "value_14_days": {
+    "C0": 3.36845348120764,
+    "C1": 2.180910792264504,
+    "C2": 3.9349487956151736
+   },
+   "repeated": true
+  }
+ }
+}
