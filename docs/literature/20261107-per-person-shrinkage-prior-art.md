@@ -13,7 +13,7 @@
 
 - 下位の問い 4 つ（(a) 多水準・混合 HMM と話者適応の MAP、(b) 階層モデル・経験ベイズの部分的なプールと分散 0 への張り付き、(c) 入力の言語モデルの個人化、(d) 反証と前ラウンドのやり残し）を、Sonnet のサブエージェント 4 本で並列に探した。
 - 新規に登録: 24 件（[V401]〜[V424]）。既登録で番号だけ挙げたもの: [V386]〜[V400]（特に [V387]・[V392]・[V394]・[V395]・[V396]・[V398]・[V399]・[V400]）、[V98]、[P226]。
-- 一次の照合: 本文を取れた 20 件は、サブエージェントが持ち帰った逐語の引用を、メインが原本の全文（ACL Anthology・ISCA archive・PsyArXiv/OSF・arXiv・bioRxiv・著者のページ・Europe PMC・EDM の proceedings）から抜いた文字列で照合した（照合した引用は全件一致。不一致に見えたものは段組・ハイフン・OCR の空白の崩れで、本文の文は同じ）。[V392] Ferrari はメインが Chrome で大学のリポジトリの PDF を取り、本文で照合した（下のカード 6）。抄録だけのもの: [V407] Altman 2007・[V422] Pardos & Heffernan 2010。本文未読で書誌だけ確かめたもの: [V401] Gauvain & Lee 1994（会議版 [V402]・[V403] で照合）・[V404] Reynolds ほか 2000（式は [V405] の再掲で確かめた）。[V398] Stoye の雑誌版は今回も取れず、arXiv 版で照合した。
+- 一次の照合: 本文を取れた 20 件は、サブエージェントが持ち帰った逐語の引用を、メインが原本の全文（ACL Anthology・ISCA archive・PsyArXiv/OSF・arXiv・bioRxiv・著者のページ・Europe PMC・EDM の proceedings）から抜いた文字列で照合した（照合した引用は全件一致。不一致に見えたものは段組・ハイフン・OCR の空白の崩れで、本文の文は同じ）。[V392] Ferrari はメインが Chrome で大学のリポジトリの PDF を取り、本文で照合した（下のカード 6）。抄録だけのもの: [V407] Altman 2007・[V422] Pardos & Heffernan 2010。本文未読で書誌だけ確かめたもの: [V401] Gauvain & Lee 1994（会議版 [V402]・[V403] で照合）・[V404] Reynolds ほか 2000（式は [V405] の再掲で確かめた）。[V398] Stoye の雑誌版は今回も取れず、arXiv 版で照合した。→ この 5 件と [V411] の雑誌版相当は、同じ日の後で著者のページ・研究室のサイト・保存版・オープンアクセスの雑誌版から本文を取り、メインが照合した（末尾の「追加の照合」）。
 - claim 14 件を抽出し、3 票（内的妥当性・外への広げ・頑健さ）で判定した。確定 6・留保つき確定 5・判定不能 1。否決 2 件と、登録しなかった候補を末尾の否決リストへ。
 
 ## 要点（下位の問いごとの温度）
@@ -38,7 +38,7 @@
 2. **先行研究と比べてどこがすごい？** [V402] の逐語: "a Dirichlet density can also be used for the initial probability vector π and for each row of the transition probability matrix A"。[V403] の逐語: "speaker adaptation may be viewed as adjusting speaker-independent models to form speaker-specific ones, using the available prior information and a small amount of speaker-specific adaptation data"、"When this weight is large, the prior density is sharply peaked around the values of the SI HMM parameters and these values will be modified only slightly by the adaptation process"。[V405] の逐語（Reynolds の方式の再掲）: "αm … is calculated via a relevance factor τ"、"for our experiments an τ = 16 received good results"。[V424] の逐語: "such mismatch can be compensated partly by empirically adjusting the relevance factor (RF), which controls the degree of adaptation"。
 3. **技術や手法の肝はどこ？** 事前分布の中心を全体（話者に依らない）のモデルに置き、集中度（重み・relevance factor）で本人のデータとの釣り合いを決める。論文 3 の擬似度数 = 基 + τ × 共通の期待度数の割合は、この形の離散の場合と同じ。[V402] の逐語 "as Q → ∞, the MAP reestimation formulas approach the ML ones" の Q は観測の列の数で、データが増えると本人だけの推定に近づく、という意味（τ → 0 の話ではない）。
 4. **どうやって有効だと検証した？** 単語誤り率・話者照合の誤り率。集中度は、[V402] の逐語 "the prior density parameters were estimated along with the estimation of the SI model parameters"（集団の学習データから推定）、[V405] は固定の値。他の話者の後の時点の予測で選ぶ手続きは、読んだ本文には無い。[V403] は "a common value for all the HMMs was estimated. This is clearly too strong a constraint" と自ら書く。[V403] の話者ごとの表では、適応で話者に依らないモデルより悪くなる話者がいる（サブエージェントの読み・数値はメイン未照合）。
-5. **議論はあるか？** 留保（1 票・頑健さ）: 雑誌版 [V401] と Reynolds の原典 [V404] の本文は未読で、形の同一は会議版と再掲で確かめた。[V402] の多くの実験は "the transition probabilities are assumed fixed and known" で、遷移に事前分布を置いた実証は少ない。論文 3 の外枠で「新しい推定法」とは書けない。「話者適応の MAP（[V401]）を記号列の HMM に当てた」と書く。
+5. **議論はあるか？** 留保（1 票・頑健さ）: 雑誌版 [V401] と Reynolds の原典 [V404] の本文は、この時点では未読で、形の同一は会議版と再掲で確かめた（後で両方の本文で照合した・末尾の「追加の照合」）。[V402] の多くの実験は "the transition probabilities are assumed fixed and known" で、遷移に事前分布を置いた実証は少ない。論文 3 の外枠で「新しい推定法」とは書けない。「話者適応の MAP（[V401]）を記号列の HMM に当てた」と書く。
 6. **次に読むべき論文は？** [V401] と [V404] の本文。relevance factor の選び方を比べた研究（Interspeech 2012 の "Effect of relevance factor of maximum a posteriori adaptation for GMM-SVM"・doi:10.21437/interspeech.2012-551・未読）。
 
 ### カード 2: 多水準 HMM は集団の分散を階層ベイズで推定し、評価は母数の回復。混合 HMM の効きは小さく、大きな標本が要る **[検証済 3-0 / 2-1]** [V406] [V407] [V409]
@@ -46,7 +46,7 @@
 1. **どんなもの？** 心理の時系列の多水準 HMM の数値実験とチュートリアル（[V406]・PsyArXiv v2）。経時のデータへの混合 HMM（[V407]・GLMM の枠組み）。動物の遠隔測定で、HMM に個体のランダム効果を入れる価値を確かめた研究（[V409]）。
 2. **先行研究と比べてどこがすごい？** [V406] の逐語: "we only need to specify prior distributions on the group-level parameters, since the estimated group-level distributions take on the role of priors for the subject-level parameters"、"the hierarchical priors imply a regularization on the subject-level parameters, which to some extent shrinks the parameters towards the group-level means"、事前の強さは "K0 denotes the number of hypothetical subjects on which the prior mean vector … is based"。[V409] の逐語: "I generally found mixed HMMs did not improve state assignment relative to standard HMMs. Reliable estimation of random effects required larger sample sizes than are often feasible in telemetry studies"。
 3. **技術や手法の肝はどこ？** 個人の母数を集団の分布から引く。縮小の強さは集団の分散で、データから推定する（固定でも他の人の予測で選ぶのでもない）。
-4. **どうやって有効だと検証した？** [V406] はシミュレーションでの母数の回復（被験者 15〜120 人）と事後予測の検査。本文に "out-of-sample" は 0 回（メインが全文で数えた）。[V409] はシミュレーションの状態の割り当てと AICc。[V407] は抄録だけで、[V406] は "the dimensions of the integral … make fitting these methods largely intractable for more complex models" と評する（サブエージェントの読み・メイン未照合）。
+4. **どうやって有効だと検証した？** [V406] はシミュレーションでの母数の回復（被験者 15〜120 人）と事後予測の検査。本文に "out-of-sample" は 0 回（メインが全文で数えた）。[V409] はシミュレーションの状態の割り当てと AICc。[V407] はシミュレーションと実データの例で、予測の評価は無い（後で本文で照合・末尾の「追加の照合」）。[V406] は "the dimensions of the integral … make fitting these methods largely intractable for more complex models" と評する（サブエージェントの読み・メイン未照合）。
 5. **議論はあるか？** 留保（[V409] に 1 票・外への広げ）: 動物の移動で、評価は状態の割り当て。人の後の時点の予測の尤度で、個人の分布つきと共通のモデルを比べた研究は、この系統の中にも見つからなかった。論文 3 の「1 人ごとの上積みは小さい」と同じ向きの傍証として [V409] を引ける。
 6. **次に読むべき論文は？** [V407] の本文。Aarts の R パッケージ mHMMbayes の文書（書誌未確認）。
 
@@ -56,7 +56,7 @@
 2. **先行研究と比べてどこがすごい？** [V411] の逐語: "Group-level variance estimates of zero often arise when fitting multilevel or hierarchical linear models, especially when the number of groups is small. For situations where zero variances are implausible a priori, we propose a maximum penalized likelihood approach to avoid such boundary estimates"。[V412] の逐語: "A flaw of the MLE is that ÂMLE = 0 occurs commonly. This not only dictates full shrinkage"。[V410] の逐語: "in a hierarchical model the data can never rule out a group-level variance of zero"。[V415] の逐語: "The problem is to predict each player's batting average over the remainder of the season"、"Stein's estimators achieve uniformly lower aggregate risk than the MLE but permit considerably increased risk to individual components"。
 3. **技術や手法の肝はどこ？** 縮小の強さを周辺尤度で推定すると、境界（完全なプール）に張り付くことがある。それを避ける事前分布・罰則を置く。
 4. **どうやって有効だと検証した？** [V411] はシミュレーションと例。[V415] は同じ選手の後の時点の打率で、本人だけの推定（MLE）と縮めた推定を比べた。縮小の係数は同じ全員のデータから 1 つ推定し、他の単位で選んでいない。
-5. **議論はあるか？** 留保（1 票・外への広げ）: どれも分散成分の点推定が 0 になる話で、論文 3 の CS1 で「他の人の予測で選ぶと全員で τ = ∞（共通のモデル）が選ばれた」結果は、周辺尤度の境界推定ではない。予測で選んで ∞ が最良なら、データの示す答えである可能性が残る。向きの注意: [V410] の σα は集団の分散で、σα = ∞ はプールしない側、σα = 0 が完全なプール。論文 3 の τ は集中度で向きが逆（τ = ∞ が完全なプール）。外枠で「boundary」「pooled limit」を使うときに、どちらの向きかを明記する。[V411] は 8 頁の著者版（Gelman のページ）で照合し、雑誌版 685–709 頁は未読。
+5. **議論はあるか？** 留保（1 票・外への広げ）: どれも分散成分の点推定が 0 になる話で、論文 3 の CS1 で「他の人の予測で選ぶと全員で τ = ∞（共通のモデル）が選ばれた」結果は、周辺尤度の境界推定ではない。予測で選んで ∞ が最良なら、データの示す答えである可能性が残る。向きの注意: [V410] の σα は集団の分散で、σα = ∞ はプールしない側、σα = 0 が完全なプール。論文 3 の τ は集中度で向きが逆（τ = ∞ が完全なプール）。外枠で「boundary」「pooled limit」を使うときに、どちらの向きかを明記する。[V411] は 8 頁の著者版（Gelman のページ）で照合し、後で 25 頁の版（雑誌の 685–709 頁の組版）でも抄録の逐語を照合した。
 6. **次に読むべき論文は？** Morris 1983 JASA（parametric empirical Bayes・doi:10.1080/01621459.1983.10477920・未読）、Gelman & Hill 2007（未読）。
 
 ### カード 4: 予測の対象が「既存の単位の将来」か「新しい単位」かで、予測分布と評価が分かれる **[検証済 3-0]** [V413] [V414]
@@ -83,7 +83,7 @@
 2. **先行研究と比べてどこがすごい？** [V421] の逐語: "in both the weight of the per-skill parameters (Wk) are two to three times smaller than that of per-student parameters (Wu)"、"One explanation for that could be possible over-fitting"、正則化については "While we did not specifically check or prove this"。[V392]（メインが Chrome で大学のリポジトリの PDF を取り、本文で照合）の逐語: "it is quite clear that the hybrid strategy works better than the subject-independent one, the improvement is of about 3%"、"apart from UniMiB-SHAR, the subject-dependent strategy achieves an average accuracy of about 35% lower than both subject-independent and hybrid strategies"。[V398]（arXiv 版）の逐語: "the forecasting performance, which we did not investigate here"、"should not be reduced to a naive comparison of AIC or BIC"。[V422] は抄録だけ: "we achieved lower prediction error in 33 of the 42 problem sets evaluated"。
 3. **技術や手法の肝はどこ？** [V421] は学習者の初期値と学習の速さを正規の集団分布から引く階層ベイズ。[V422] は初期の習得の確率だけを学習者ごとにする。
 4. **どうやって有効だと検証した？** [V421] は "3-fold item-stratified cross-validation"（項目で層化）で、同じ人の後の時点ではない。[V392] の数値は AdaBoost の第 1 群の実験の文。[V398] は予測を評価していない。
-5. **議論はあるか？** 留保（[V422] に 1 票・頑健さ）: 本文未読で、比べの相手と分割は不明。[V421] は前ラウンドのカード 3（[V387]・学習の速さの個人化が効く）と同じ系統の後継で、学習者の母数の重みが大きいことを過学習の可能性と並べて書く。[V392] は provisional から active に上げる。[V398] は雑誌版を今回も取れなかった（Springer が curl を拒む）。
+5. **議論はあるか？** 留保（[V422] に 1 票・頑健さ）: この時点では本文未読で、比べの相手と分割は不明だった（後で本文で照合: 相手は標準の知識追跡、分割は同じ問題セットの最後の問いの予測・末尾の「追加の照合」）。[V421] は前ラウンドのカード 3（[V387]・学習の速さの個人化が効く）と同じ系統の後継で、学習者の母数の重みが大きいことを過学習の可能性と並べて書く。[V392] は provisional から active に上げる。[V398] は雑誌版を今回も取れなかった（Springer が curl を拒む）。
 6. **次に読むべき論文は？** [V422] の本文、[V398] の雑誌版。
 
 ### カード 7: HMM を 1 次のマルコフと比べた先例は、同じデータの中の比べならある **[検証済 2-1]** [V408] [V423]
@@ -94,6 +94,23 @@
 4. **どうやって有効だと検証した？** [V408] は DIC と事後予測の検査で、保持した後の時点の尤度ではない。1 人ごとのモデルでもない（集団の母数にランダム効果）。
 5. **議論はあるか？** 留保（[V408] に 1 票・外への広げ）: 飲酒の日の列で、打鍵の 1 Hz の記号列ではない。前ラウンドの要点表の「人の行動の記号列で、HMM を 1 次のマルコフと予測の尤度で比べた研究: 判定不能（0 件）」は、「同じデータの中の比べ（DIC）は [V408] がある。保持した後の時点の予測の尤度で比べた研究は 0 件」と読み替える。論文 3 の C2 は [V408] を先例に挙げ、違いを「後の時点の予測で、本人の 1 次のマルコフと比べた」に限る。[V423] は前ラウンドのカード 1（評価の分割で効きが変わる）の補強。
 6. **次に読むべき論文は？** 臨床の EMA で HMM と 1 次のマルコフを保持したデータで比べた研究（今回は EMA の検索が 1 回だけで、網羅が足りない）。
+
+
+## 追加の照合（2026-11-07・本文を取れなかった 6 件と Garcés-Manzanera 2026）
+
+前の照合で本文を取れなかった文献を、著者の個人のページ・研究室のサイト・保存版・オープンアクセスの雑誌版の順に探し直した（サブエージェント 2 本が探し、curl が拒まれたものはメインが Chrome で開いた。海賊版の置き場は使っていない）。どれもメインが本文の文字列で照合した。原本は repo に入れていない。
+
+| 文献 | 取れた版 | 照合した内容 |
+|---|---|---|
+| [V401] Gauvain & Lee 1994 | 雑誌版の走査 PDF（国立台湾大学の音声の研究室のサイト・9 頁・OCR） | 逐語 "a Dirichlet density can be used for the initial probability vector π and for each row of the transition probability matrix A"。事前の母数は既知とするか、経験ベイズで "the prior parameters are estimated directly from data"。カード 1 の芯（話者に依らないモデルを中心にした Dirichlet を π と A の各行に置く）は雑誌版でも同じ |
+| [V404] Reynolds ほか 2000 | CiteSeerX の全文（23 頁・誌名と頁つき） | 式 (14) の適応の係数 α = n / (n + r)、r は "a fixed relevance factor"。"The relevance factor is a way of controlling how much new data should be observed in a mixture before the new parameters begin replacing the old parameters"。[V405] の再掲と同じ形 |
+| [V407] Altman 2007 | 著者の SFU の個人ページの改訂稿（10 頁・Internet Archive の 2017-08-09 の保存版・Chrome） | 逐語 "I define the models using the framework of generalized linear mixed models"。推定は尤度の直接の最大化（準ニュートン）で、変量効果の積分は数値積分か Monte Carlo EM。検証はシミュレーションと実データの例で、"predict" は本文に 0 回（予測の評価は無い） |
+| [V411] Chung ほか 2013 | Gelman の個人ページの 25 頁の版（Psychometrika の 685–709 頁の組版） | カード 3 の抄録の逐語は 25 頁の版でも同じ |
+| [V422] Pardos & Heffernan 2010 | Pardos の MIT の個人ページの全文（12 頁・Google Scholar の別の版から辿った） | 相手は標準の知識追跡で、"predicting student responses better than standard knowledge tracing in 33 out of the 42 problem sets"。分割は、各問題セットの最後の問いを除いた応答で当てはめ、最後の問いを予測する（同じ系列の中の予測で、同じ人の後のセッションではない） |
+| [V398] Stoye ほか 2025 | 雑誌版（オープンアクセス・Version of record 2025-07-07・Chrome） | カード 6 の逐語 2 つ（"the forecasting performance, which we did not investigate here"・"should not be reduced to a naive comparison of AIC or BIC"）は雑誌版にもある。巻頁はまだ無い |
+| [V425] Garcés-Manzanera 2026（新規） | 雑誌版（オープンアクセス・CC BY-NC 4.0・Chrome） | 第二言語の打鍵を 1 秒の窓にまとめ、対角共分散のガウスの HMM（K = 3）を "fitted separately to each writing session"（100 セッション）。"Markov chain"・"first-order"・"log-likelihood"・"cross-validat" は本文に 0 回で、1 次のマルコフとの比べと予測の尤度の評価は無い。"held-out" は推定に使わなかった特徴（文の境界など）の意味。K は BIC だけで決めず、K = 4 が全 100 セッションで BIC が低かったと書く |
+
+還元: カード 1・3 の結論は変わらない。カード 6 の [V422] は、比べの相手が弱い（標準の知識追跡）同じ系列の中の予測で、論文 3 の「同じ構造の共通を相手に置き、同じ人の後のセッションで測る」とは評価の形が違う。カード 7 の「人の行動の記号列で HMM を 1 次のマルコフと保持した後の時点の予測で比べた研究: 0 件」は、打鍵の HMM の [V425] を加えても変わらない（[V425] は比べを持たない）。[V398]・[V401]・[V404]・[V407]・[V422] は provisional から active に上げた。
 
 ---
 
