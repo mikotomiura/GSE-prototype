@@ -51,3 +51,5 @@
 - 選択肢: A PR 1 に合わせて同期／B 実装の前に今の main で同期し PR 1 でもう一度／C PR 2 のまま
 - 採用: A
 - 影響範囲: gse-dataset の PR を PR 1 と対にする（push は研究者に確かめてから）。PR 2 の (c) は文書だけになる。
+- 訂正（2026-11-07・実装の後）: 背景の「6 行種が欠けている」は、origin より 3 コミット遅れたローカルの `~/gse-dataset` の main と比べた結果だった。origin/main（bd1d471）と比べると、EH3 の `eh3_day`・`invitation_present` は同期済みで、欠けていたのは `day_question`・`invitation_condition`・`probe_frame`・`probe_suppressed` の 4 行種（と今回の `debug`・`superseded`）。同期が要ることは変わらない。
+- 実施: `~/gse-dataset` に origin/main から `chore/schema-s1-replay` を切り、`schema/current.json` を写した（3b6539e・push はまだ）。`check_schema_parity.py` は OK。gse-dataset の `validate_schema.py` で、確かめ用の印つきの記録（判断 0 と同じ手順の隔離した HOME・新しい版）が新しい schema で OK、origin/main の schema では段 1 の行種で FAIL（陽性対照）。

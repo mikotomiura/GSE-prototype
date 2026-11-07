@@ -40,16 +40,22 @@
 - [x] T1 往復（駆動役 → 本物の書式 → 再生で全件一致）・2 秒の遅れの陽性対照（0〜1900 ms 一致・2100 ms 以上で割れる）
 - [x] T2 壊すと赤（1 行消す・1 行足す・seed・境目の 1 秒前と 4 秒前・`debug`）
 - [x] T3 個別（ローテートまたぎ・一時停止で下ろした・`superseded`・取り消しの `tail`・スリープ・`--day-questions` の JST と UTC）・引数
-- [ ] T4 `cargo test --workspace`・6 本のゴールデンの `--snapshot`・`emit_schema` の byte-equal・clippy
-- [ ] T5 手で: 判断 0 の隔離した HOME の記録（手元だけ）を `--probes` に通し、確かめ用のカードが `debug_check` に入る
+- [x] T4 `cargo test --workspace`・6 本のゴールデンの `--snapshot`・`emit_schema` の byte-equal・clippy
+- [x] T5 手で: 判断 0 の隔離した HOME の記録（手元だけ）を `--probes` に通し、確かめ用のカードが `debug_check` に入る
 
 ### S gse-dataset（判断 5）
-- [ ] S1 `~/gse-dataset` に枝を切り `schema/current.json` を写す・parity check が緑（push・PR は研究者に確かめてから）
+- [x] S1 `~/gse-dataset` に枝を切り `schema/current.json` を写す・parity check が緑（push・PR は研究者に確かめてから）
 
 ### V 点検と完了
 - [ ] V1 code-reviewer ＋ security-checker（並列）・指摘への対応
 - [ ] V2 docs（`functional-design.md`・`glossary.md`・`development-guidelines.md` §3 の再生のモード）
 - [ ] V3 `/finish-task`（/cross-review・push と PR は研究者に確かめてから）
+
+## T5 の記録（2026-11-07）
+
+- 判断 0 の記録（main の版・印なし）を `--probes` に通すと、確かめ用のボタンのカード 3 枚が `extra`（調停器が出していない発火）に見えた。判断 3 の印が要ることの実例。
+- 新しい版で隔離した HOME を作り直し、同意 → 確かめ用のプローブに「思い出せない」→ 確かめ用の日の問いを「今日は答えない」。4 行（割り当て・2 つのラベル・日の問い）に `"debug":true`。`--probes` で `debug_check` 2・`extra` 0。走らせた 3 分の間に無作為の候補は落ちず、`match` は 0。
+- 取り消しで下ろしたカード（行なし）は `cards.open_at_input_end` に入る（取り消しは行が無いので見分けられない・既知の限界に足す）。
 
 ## PR 2: 門・launcher・文書（PR 1 の後・design.md の末尾に設計を足す）
 
