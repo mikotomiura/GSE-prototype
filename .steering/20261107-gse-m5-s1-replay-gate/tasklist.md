@@ -18,28 +18,28 @@
 ## PR 1: 再生
 
 ### P 確かめ用の印（判断 3）
-- [ ] P1 `s1_driver.rs`: `ProbeCard.debug`・`Effect::Assigned` の印・`DayRowData.debug`・`debug_show_probe` が `apply` の後で立てる・`day_row_for_close` が写す
-- [ ] P2 `logger.rs`: 4 行の構造体と書式関数（真のときだけ `,"debug":true`）・byte 固定の検査が変わらないこと・真の行の検査
-- [ ] P3 `lib.rs`: 割り当て・ラベル・差し替え・日の問いの行に写す（`activity_label_*` の引数は増やさない）
-- [ ] P4 `schema_dto.rs`・`emit_schema` で `schema/current.json`
+- [x] P1 `s1_driver.rs`: `ProbeCard.debug`・`Effect::Assigned` の印・`DayRowData.debug`・`debug_show_probe` が `apply` の後で立てる・`day_row_for_close` が写す
+- [x] P2 `logger.rs`: 4 行の構造体と書式関数（真のときだけ `,"debug":true`）・byte 固定の検査が変わらないこと・真の行の検査
+- [x] P3 `lib.rs`: 割り当て・ラベル・差し替え・日の問いの行に写す（`activity_label_*` の引数は増やさない）
+- [x] P4 `schema_dto.rs`・`emit_schema` で `schema/current.json`
 
 ### R 再生の本体 `s1_replay.rs`
-- [ ] R1 行の読み取り（段 1 の行種・`key`・`focus_transition`・`recording_pause`・`meta`）・`probe_frame` から `ArbiterConfig`（`lambda_per_ms` の往復の検査）・複数のファイルの並べ
-- [ ] R2 開いているカードの区間を記録から作る（プローブ・日の問い・ローテートまたぎ・一時停止で下ろした・終了）
-- [ ] R3 tick を回す（位相・一時停止・スリープの復帰の推定・枠の動き出し・`on_quit`・`on_closed`）
-- [ ] R4 照合と分類（鍵・`boundary_*`・`unverified.*`・`match/differ/missing/extra`・`near_pause_outside_window`・`first_divergence_ms`）
-- [ ] R5 位相 4 通りの割れを `boundary_tick` に
-- [ ] R6 カードの集計（回答率・`superseded`・`dropped_by_pause` ほか）・`lag_check`
-- [ ] R7 `--day-questions` の押下の数
-- [ ] R8 `lib.rs` の Effect → LogEntry の写しを純関数に切り出す（挙動は変えない）
+- [x] R1 行の読み取り（段 1 の行種・`key`・`focus_transition`・`recording_pause`・`meta`）・`probe_frame` から `ArbiterConfig`（`lambda_per_ms` の往復の検査）・複数のファイルの並べ
+- [x] R2 開いているカードの区間を記録から作る（プローブ・日の問い・ローテートまたぎ・一時停止で下ろした・終了）
+- [x] R3 tick を回す（位相・一時停止・スリープの復帰の推定・枠の動き出し・`on_quit`・`on_closed`）
+- [x] R4 照合と分類（鍵・`boundary_*`・`unverified.*`・`match/differ/missing/extra`・`near_pause_outside_window`・`first_divergence_ms`）
+- [x] R5 位相 4 通りの割れを `boundary_tick` に
+- [x] R6 カードの集計（回答率・`superseded`・`dropped_by_pause` ほか）・`lag_check`
+- [x] R7 `--day-questions` の押下の数
+- [x] R8 `lib.rs` の Effect → LogEntry の写しを純関数に切り出す（挙動は変えない）
 
 ### B bin
-- [ ] B1 `replay.rs`: `--probes`・`--day-questions`・排他・`--utc-offset-secs`・`--day-state`・複数の位置引数・使い方の文・exit 1
+- [x] B1 `replay.rs`: `--probes`・`--day-questions`・排他・`--utc-offset-secs`・`--day-state`・複数の位置引数・使い方の文・exit 1
 
 ### T 検査
-- [ ] T1 往復（駆動役 → 本物の書式 → 再生で全件一致）・2 秒の遅れの陽性対照（0〜1900 ms 一致・2100 ms 以上で割れる）
-- [ ] T2 壊すと赤（1 行消す・1 行足す・seed・境目の 1 秒前と 4 秒前・`debug`）
-- [ ] T3 個別（ローテートまたぎ・一時停止で下ろした・`superseded`・取り消しの `tail`・スリープ・`--day-questions` の JST と UTC）・引数
+- [x] T1 往復（駆動役 → 本物の書式 → 再生で全件一致）・2 秒の遅れの陽性対照（0〜1900 ms 一致・2100 ms 以上で割れる）
+- [x] T2 壊すと赤（1 行消す・1 行足す・seed・境目の 1 秒前と 4 秒前・`debug`）
+- [x] T3 個別（ローテートまたぎ・一時停止で下ろした・`superseded`・取り消しの `tail`・スリープ・`--day-questions` の JST と UTC）・引数
 - [ ] T4 `cargo test --workspace`・6 本のゴールデンの `--snapshot`・`emit_schema` の byte-equal・clippy
 - [ ] T5 手で: 判断 0 の隔離した HOME の記録（手元だけ）を `--probes` に通し、確かめ用のカードが `debug_check` に入る
 

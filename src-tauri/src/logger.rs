@@ -1824,7 +1824,7 @@ fn format_eh3_day_line(timestamp: u64, day: u32, condition: crate::eh3::Conditio
 }
 
 /// `probe_frame` 行の本文（改行なし）。系の設定（seed・起点・調停器の版と定数）だけを持つ。
-fn format_probe_frame_line(
+pub(crate) fn format_probe_frame_line(
     timestamp: u64,
     frame_seed: u64,
     anchor_ms: u64,

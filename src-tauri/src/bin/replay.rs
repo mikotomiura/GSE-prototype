@@ -1549,7 +1549,14 @@ struct Args {
     /// 出した時刻を JSON で出す（ADR-040 D4・`feat` 行の `p_stuck` と `key` 行の押下の時刻だけを読む）。
     invitation_path: Option<PathBuf>,
     /// --utc-offset-secs <N>: `--invitation` の現地の日（4:00 区切り）の計算に使う UTC との差（秒・既定 0）。
+    /// `--probes` では任意（無ければ日の問いと no_ask を照合しない）、`--day-questions` では必須。
     utc_offset_secs: Option<i32>,
+    /// --probes: 段 1 の問いの行を、記録から調停器を回し直して照合する（M5 の 3 本目）。複数の記録を受ける。
+    probes: bool,
+    /// --day-questions: 段 1 の日の問いに答えた後の押下の数を出す。複数の記録を受ける。
+    day_questions: bool,
+    /// --day-state <s1_day_state.json>: `--probes` の前日までの日の問いの状態（任意）。
+    day_state_path: Option<PathBuf>,
     /// --calibration: v0.3 較正解析 (時間隔離窓 C-index / 2段ゲート / MNAR / ビネット)。
     /// 1 被験者の複数セッションを受けるため、追加の positional を `extra_sessions` に積む。
     calibration: bool,
@@ -1672,8 +1679,40 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     } else {
         None
     };
-    if utc_offset_secs.is_some() && invitation_path.is_none() {
-        return Err("--utc-offset-secs requires --invitation".to_string());
+    // --probes / --day-questions（段 1 の再生・M5 の 3 本目）
+    let probes = if let Some(pos) = args.iter().position(|a| a == "--probes") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+    let day_questions = if let Some(pos) = args.iter().position(|a| a == "--day-questions") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+    let day_state_path = if let Some(pos) = args.iter().position(|a| a == "--day-state") {
+        if pos + 1 >= args.len() {
+            return Err("--day-state requires a path argument".to_string());
+        }
+        let path = args.remove(pos + 1);
+        args.remove(pos);
+        Some(PathBuf::from(path))
+    } else {
+        None
+    };
+    if utc_offset_secs.is_some() && invitation_path.is_none() && !probes && !day_questions {
+        return Err(
+            "--utc-offset-secs requires --invitation, --probes or --day-questions".to_string(),
+        );
+    }
+    if day_questions && utc_offset_secs.is_none() {
+        // ★ 既定 0 で黙って数え違えない（4:00 の切れ目が時差で動く）
+        return Err("--day-questions requires --utc-offset-secs".to_string());
+    }
+    if day_state_path.is_some() && !probes {
+        return Err("--day-state requires --probes".to_string());
     }
 
     // --calibration フラグ (v0.3 較正解析)
@@ -1780,6 +1819,8 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         snapshot_path.is_some(),
         intervention,
         invitation_path.is_some(),
+        probes,
+        day_questions,
         calibration,
         sweep,
         nudge_diag,
@@ -1791,7 +1832,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention, --invitation, --calibration, --sweep, --nudge-diag, --corr-floor, --features are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --invitation, --probes, --day-questions, --calibration, --sweep, --nudge-diag, --corr-floor, --features are mutually exclusive"
                 .to_string(),
         );
     }
@@ -1801,7 +1842,14 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     if args.is_empty() {
         return Err("expected at least 1 positional argument (session.ndjson)".to_string());
     }
-    if !calibration && !sweep && !nudge_diag && !corr_floor && args.len() != 1 {
+    if !calibration
+        && !sweep
+        && !nudge_diag
+        && !corr_floor
+        && !probes
+        && !day_questions
+        && args.len() != 1
+    {
         return Err(format!(
             "expected 1 positional argument (session.ndjson), got {}",
             args.len()
@@ -1821,6 +1869,9 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         intervention,
         invitation_path,
         utc_offset_secs,
+        probes,
+        day_questions,
+        day_state_path,
         calibration,
         sweep,
         nudge_diag,
@@ -1950,6 +2001,81 @@ fn run_invitation(
     }))
 }
 
+/// 記録を 1 行 1 MiB の上限つきで読む（`--invitation` と同じ上限）。
+fn read_session_text(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+    let name = path.display();
+    let file = File::open(path).map_err(|_| format!("{name}: could not be read"))?;
+    let mut reader = BufReader::new(file);
+    let mut text = String::new();
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        buf.clear();
+        let n = (&mut reader)
+            .take(INVITATION_MAX_LINE_BYTES + 1)
+            .read_until(b'\n', &mut buf)
+            .map_err(|_| format!("{name}: could not be read"))?;
+        if n == 0 {
+            break;
+        }
+        let content_len = buf.len() - usize::from(buf.last() == Some(&b'\n'));
+        if content_len as u64 > INVITATION_MAX_LINE_BYTES {
+            return Err(format!("{name}: a session line is over 1 MiB"));
+        }
+        // ★ UTF-8 でない行は JSON として読めない行と同じく飛ばす（再生は数えて出す）
+        text.push_str(&String::from_utf8_lossy(&buf[..content_len]));
+        text.push('\n');
+    }
+    Ok(text)
+}
+
+/// `--probes` / `--day-questions`: 記録を読み、段 1 の再生を JSON で返す。
+fn run_s1_replay(args: &Args, paths: &[PathBuf]) -> Result<serde_json::Value, String> {
+    use gse_next_lib::s1_replay;
+    let mut files = Vec::new();
+    for p in paths {
+        let name = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| p.display().to_string());
+        files.push(s1_replay::parse_file(&name, &read_session_text(p)?)?);
+    }
+    let files = s1_replay::order_inputs(files)?;
+    if args.day_questions {
+        let offset = args
+            .utc_offset_secs
+            .ok_or_else(|| "--day-questions requires --utc-offset-secs".to_string())?;
+        let rows = s1_replay::day_question_presses(&files, offset);
+        return Ok(serde_json::json!({
+            "mode": "day_questions",
+            "replay_version": s1_replay::REPLAY_VERSION,
+            "utc_offset_secs": offset,
+            "inputs": files.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+            "rows": rows,
+        }));
+    }
+    let day_state = match &args.day_state_path {
+        None => None,
+        Some(p) => match gse_next_lib::s1_day_state::load(p) {
+            gse_next_lib::s1_day_state::DayStateLoad::Loaded(s) => Some(s),
+            gse_next_lib::s1_day_state::DayStateLoad::Fresh => {
+                return Err(format!("--day-state {}: not found", p.display()))
+            }
+            gse_next_lib::s1_day_state::DayStateLoad::Broken => {
+                return Err(format!("--day-state {}: unreadable or broken", p.display()))
+            }
+        },
+    };
+    let report = s1_replay::replay_probes(
+        &files,
+        &s1_replay::ReplayOptions {
+            utc_offset_secs: args.utc_offset_secs,
+            day_state,
+        },
+    );
+    serde_json::to_value(&report).map_err(|e| format!("report could not be serialized: {e}"))
+}
+
 fn usage() -> String {
     String::from(
         "gse-replay — NDJSON セッションを再実行し FeatSnapshot 列を生成\n\n\
@@ -1960,6 +2086,8 @@ fn usage() -> String {
          gse-replay <session.ndjson> --segments <segments.txt> [--json]\n    \
          gse-replay <session.ndjson> --intervention [--json]\n    \
          gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs <N>]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --probes [--utc-offset-secs <N>] [--day-state <s1_day_state.json>]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --day-questions --utc-offset-secs <N>\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
@@ -1971,6 +2099,9 @@ fn usage() -> String {
          --segment           活動境界で分割した .segments.txt を生成\n    \
          --segments <path>   .segments.txt を読み込み範囲マッチングでメトリクス算出\n    \
          --intervention      v2 介入ポリシーを反実仮想リプレイし HIR/Precision/Recall/DC/Burden + reason 別分解を算出\n    \
+         --probes            段 1 の問いの行を記録から調停器を回し直して照合 (一致・欠け・余り・境目・未照合を JSON で)\n    \
+         \x20                   時差が無ければ日の問いと no_ask は未照合。区間の削除をまたぐ記録は一致しない\n    \
+         --day-questions     段 1 の日の問いに答えた後、次の現地 4:00 までの押下の数 (--utc-offset-secs 必須)\n    \
          --calibration       v0.3 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット)。1 被験者の複数セッションを時刻順に渡す\n    \
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
          --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
@@ -2230,6 +2361,23 @@ fn main() -> ExitCode {
             let _ = write!(lock, "{}", format_intervention_pretty(&metrics));
         }
         return ExitCode::SUCCESS;
+    }
+
+    // --probes / --day-questions 経路: 段 1 の問いを記録から再生する（M5 の 3 本目）。HMM・特徴量は通らない。
+    //   ⚠️ 記録・状態ファイルが不正なら exit 1 で、stdout には 1 バイトも出さない。
+    if args.probes || args.day_questions {
+        let mut paths = vec![args.session_path.clone()];
+        paths.extend(args.extra_sessions.iter().cloned());
+        return match run_s1_replay(&args, &paths) {
+            Ok(v) => {
+                let _ = writeln!(std::io::stdout().lock(), "{}", v);
+                ExitCode::SUCCESS
+            }
+            Err(msg) => {
+                tracing::error!("invalid stage 1 replay input: {}", msg);
+                ExitCode::from(1)
+            }
+        };
     }
 
     // --invitation 経路: 招待の契機を記録から再現する（ADR-040 D4）。HMM・特徴量は通らない。
@@ -4615,6 +4763,96 @@ mod tests {
     }
 
     /// `--invitation` は他のモードと相互排他で、パスを要る。`--utc-offset-secs` は `--invitation` 専用。
+    #[test]
+    fn probes_and_day_questions_mode_args() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // 複数の記録を受け、時差と状態ファイルは任意
+        let p = parse_args_from(v(&["a.ndjson", "b.ndjson", "--probes"])).expect("probes alone");
+        assert!(p.probes);
+        assert_eq!(p.extra_sessions.len(), 1);
+        assert_eq!(p.utc_offset_secs, None);
+        let p = parse_args_from(v(&[
+            "a.ndjson",
+            "--probes",
+            "--utc-offset-secs",
+            "32400",
+            "--day-state",
+            "s.json",
+        ]))
+        .expect("probes with offset and day state");
+        assert_eq!(p.utc_offset_secs, Some(32400));
+        assert_eq!(p.day_state_path.as_deref(), Some(Path::new("s.json")));
+        let p = parse_args_from(v(&[
+            "a.ndjson",
+            "--day-questions",
+            "--utc-offset-secs",
+            "0",
+        ]))
+        .expect("day questions");
+        assert!(p.day_questions);
+        for bad in [
+            v(&["a.ndjson", "--probes", "--invitation", "t.json"]),
+            v(&[
+                "a.ndjson",
+                "--probes",
+                "--day-questions",
+                "--utc-offset-secs",
+                "0",
+            ]),
+            v(&["a.ndjson", "--probes", "--metrics"]),
+            v(&["a.ndjson", "--probes", "--snapshot", "g.json"]),
+            // ★ 既定 0 で黙って数え違えない
+            v(&["a.ndjson", "--day-questions"]),
+            v(&["a.ndjson", "--day-state", "s.json"]),
+            v(&[
+                "a.ndjson",
+                "--day-questions",
+                "--utc-offset-secs",
+                "0",
+                "--day-state",
+                "s.json",
+            ]),
+            v(&["a.ndjson", "--probes", "--day-state"]),
+        ] {
+            assert!(parse_args_from(bad.clone()).is_err(), "{bad:?}");
+        }
+    }
+
+    /// `--probes` を通しで: 記録が壊れていれば Err（main は exit 1 で stdout を空にする）、読めれば JSON。
+    #[test]
+    fn probes_mode_runs_and_fails_closed() {
+        let dir = std::env::temp_dir().join(format!("gse_replay_probes_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let ok = dir.join("ok.ndjson");
+        std::fs::write(
+            &ok,
+            "{\"type\":\"meta\",\"session_start\":1000}\n{\"type\":\"key\",\"t\":2000,\"category\":\"a\",\"press\":true}\n",
+        )
+        .unwrap();
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let args = parse_args_from(v(&[ok.to_str().unwrap(), "--probes"])).unwrap();
+        let out = run_s1_replay(&args, std::slice::from_ref(&ok)).expect("読める");
+        assert_eq!(out["mode"], "probes");
+        assert_eq!(out["counts"]["match"], 0);
+        let broken = dir.join("broken.ndjson");
+        std::fs::write(
+            &broken,
+            "{\"type\":\"meta\",\"session_start\":1000}\n{\"type\":\"probe_suppressed\",\"t\":\"x\"}\n",
+        )
+        .unwrap();
+        let args = parse_args_from(v(&[broken.to_str().unwrap(), "--probes"])).unwrap();
+        assert!(run_s1_replay(&args, std::slice::from_ref(&broken)).is_err());
+        let missing_state = parse_args_from(v(&[
+            ok.to_str().unwrap(),
+            "--probes",
+            "--day-state",
+            dir.join("none.json").to_str().unwrap(),
+        ]))
+        .unwrap();
+        assert!(run_s1_replay(&missing_state, std::slice::from_ref(&ok)).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn invitation_mode_args() {
         let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
