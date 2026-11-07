@@ -13,7 +13,12 @@
 
 ## §2 やること
 
-1. 研究者が JEDM に登録（「Register as Author」に印）して投稿の画面を開く。私は画面の文を Chrome で読んで `submission-prep.md` の項目と照合し、要旨の素の文を渡す（Zenodo の記録 24026330 の description と同じ文）。入力と Submit は研究者。Submit の前に、システムが作った版の全頁を研究者が見る。
+1. 投稿（研究者の指示 2026-11-07: 次のセッションは Claude in Chrome で投稿するところまで進める）。研究者は JEDM に登録済み（2026-11-07）。
+   - 準備: 原稿の PDF を組む（`manuscript/BUILD.md`。テンプレートは https://jedm.educationaldatamining.org/index.php/JEDM/information/authors の `2024_08_02_jedm-latex.zip`。前のセッションの scratchpad は消えている前提で取り直す。出力は scratchpad に。誤り 0・overfull 1・32 頁を確かめる）。カバーレターの PDF を pandoc で組む（1 頁）。要旨の素の文は `papers/public-data-findings/submission/abstract-plain.txt`（Zenodo 24026330 の description と同じ・確認済み）。
+   - 最初に `browser-verification` Skill を読み、Chrome のツールを 1 回の ToolSearch でまとめて読み込む。
+   - ログイン（https://jedm.educationaldatamining.org/index.php/JEDM/login）は研究者がする（私はパスワードを入れない）。ログインの後、「Make a Submission」から進む。
+   - 入れる値は `.steering/20261105-public-data-findings-paper/paper-write/submission-prep.md` の項目の表。画面の項目が表と違えば、画面の文を読んで照合してから入れる。チェックリストの匿名版の項目・節（section）・国など、表で決まっていないものは AskUserQuestion で聞く。ファイルは `file_upload`（本文の PDF とカバーレターの PDF だけ。CSV などは上げない）。カバーレターの本文は編集者への欄にも貼る。
+   - 最後の Submit（Finish）を押す前に止め、システムが作った版の全頁を研究者に見てもらい、押してよいかを確かめる。押した後は受付の画面の文（番号・日付）を読んで記録する。
 2. カバーレターの「編集者との関係なし」は研究者が確かめた（2026-11-07・関係なし）。
 3. 投稿の後: 受付の番号を記録し、プレプリントに誌名を足すかを決める（Zenodo の記録の notes の更新は新しい版を作らずにできる）。
 4. 著者の返事が来たら引き継ぎ 11 の §2 の 1。
