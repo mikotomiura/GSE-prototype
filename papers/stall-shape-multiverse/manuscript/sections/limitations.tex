@@ -1,0 +1,30 @@
+\section{Limitations}
+\label{sec:limitations}
+
+\paragraph{No ground truth.} The data have no self-reports or think-aloud, so we cannot say which definition is right.
+A stall is a pause in character production, not a judgement that the writer was stuck.
+
+\paragraph{The range varied.} All proportions are of the 89 definitions examined. The grid is centred on the detector's
+default; the 15-s window was set at half the default, and we did not find a prior use of it. Fixed thresholds make up
+four in ten definitions. We did not vary thresholds proportional to within-word speed \cite{guo2020scenario} or
+definitions that split pauses by linguistic location, because we fixed a grid that applies alike to code and essays. We
+did not compare groups within a dataset, and the agreement in time between labels is not corrected for chance.
+
+\paragraph{Differences between datasets.} The datasets differ at once in the task, the recording (CS1 key presses are
+reconstructed from edit events) and the length of units, so differences between them are not attributed to a cause.
+
+\paragraph{Counts and lengths.} The levels of variation in counts could not be separated (S6). The dispersion of
+assignments includes differences between assignments. A $\varphi$ near 1 does not establish a Poisson process: the
+window of the detector can make counts underdispersed while heterogeneity makes them overdispersed. The length
+decomposition excludes stalls that did not resume (S5), and CS1 days are inferred from gaps of 6~h.
+
+\paragraph{Analyses added after results.} Five computations were added after the primary results
+(Section~\ref{sec:status}, S1).
+
+\paragraph{One outcome, one measure of speed, no causal claim.} The score association rests on one holistic score in
+KLiCKe and was not checked against a second outcome (the CS1 2021 release has grades, but only for 31 seen writers). The
+speed measure is a median of short intervals; for writers whose quantile $\theta$ is below 2~s it can include some of
+the intervals that start a stall, and short intervals of deletion inside stalls (we also measured speed on intervals
+between character presses only). Speed was adjusted linearly on ranks. We do not say whether speed confounds or
+mediates the association. We did not examine how the stall rate relates to the length of observation or of the essay,
+and we say nothing about Japanese input, input method editors, natural work or other populations.

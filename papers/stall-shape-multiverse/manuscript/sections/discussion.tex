@@ -1,0 +1,47 @@
+\section{Discussion}
+\label{sec:discussion}
+
+The strength of the association between the keystroke stall rate and essay score moved, depending on the definition,
+from negligible to small-to-moderate (largest $|\rho| = 0.25$), and in the corner with the shortest window it turned
+weakly positive. For researchers in educational data mining and learning analytics who relate stall, pause or
+inactivity labels to outcomes or compare them across datasets, this changes what a report should contain: the range of
+the conclusion across definitions, with intervals, rather than the point value of one definition. What generalises is
+the procedure; the score association is one worked example on one corpus. Compared with earlier multiverse analyses,
+the stall label moved further than an eye-movement effect, which kept its existence and changed its size
+\cite{godwin2025multiverse}, and further than boundary pausing in CS1, which changed strength with the split at 2~s but
+not direction \cite{koutcheme2026keystroke}.
+
+\paragraph{The speed-adjusted association.} The adjusted results are exploratory, because the covariate was chosen
+twice after seeing results (Section~\ref{sec:status}); as stated in advance, their direction also depended on the
+measure of speed, although no measure gave a positive adjusted correlation (Section~\ref{sec:res-score}). The raw correlation leaned positive in the definitions in which faster writers had more stalls, which reads
+as suppression by typing speed but was not tested. The covariation across definitions between the raw correlation and
+the correlation of stall rate with speed follows almost algebraically from the formula of the partial correlation, so it
+is not independent evidence. The same direction appears in the CS1 replication that controlled for typing fluency
+\cite{koutcheme2026keystroke}. Speed was entangled with the writer-quantile family only; the fixed-second rates were
+nearly uncorrelated with speed (median $+0.02$). The argument against fixed thresholds that slow writers have more long
+intervals \cite{guo2020scenario} concerns thresholds of a few seconds; our fixed thresholds of 10 and 30~s are an order
+of magnitude longer, and that argument was not tested in this range.
+
+\paragraph{Existing answers to arbitrary thresholds.} Mixture models, personalised thresholds, state models, location
+classes and controls for typing skill (Section~\ref{sec:related}) each choose a threshold, a model or a control. The
+diagnostic applies to them in the same way: vary the choice they make and report whether the conclusion moves. Methods
+that keep the uncertainty of the choice, such as probabilistic assignment of pauses to components or averaging over
+models, are the natural complement.
+
+\paragraph{What was established and what remains possible.} The four conclusions were counted against criteria set
+before the quantity was seen [P, A]: the score association moves in strength and in one corner in direction, the
+CS1--essay rate ratios reverse, within-writer overdispersion depends on the definition, and the CS1 length structure
+stays. The direction of the speed-adjusted association is exploratory [E]. That such definitional spread would corrupt
+the decision of when to intervene, or the evaluation of a predictor, and the mechanism of suppression are possibilities
+we did not test. Agreement of rates does not ensure agreement in time: among the 63 pairs of a definition and a dataset
+with a rate within 20\% of the baseline, 11 labelled mostly different moments (S3).
+
+\paragraph{Recommendation.} When reporting an association or a comparison based on a stall label, report the value of
+each of the four axes, and vary each axis over its range in prior practice (Table~\ref{tab:grid}) and around the
+default, reporting the spread with intervals. Do the same for comparisons of rates between datasets and for the choice
+of a count model, checking the direction of the ratio and $\varphi$ across the definitions in use
+(Sections~\ref{sec:res-score}--\ref{sec:res-phi}). If most definitions agree in direction with intervals, report the
+direction; otherwise report that it depends on the definition. The code is released for this purpose. Beyond this
+recommendation, reporting the association both with and without adjustment for a quantity that does not contain the
+stall label, such as typing speed measured in more than one way, may change how it is read; neither value is a causal
+effect (Section~\ref{sec:limitations}).

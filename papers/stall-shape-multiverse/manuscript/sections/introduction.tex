@@ -1,0 +1,51 @@
+\section{Introduction}
+\label{sec:intro}
+
+Pauses, stalls and periods of inactivity in keystroke logs are among the most widely used process measures in
+educational data mining. In introductory programming they serve to estimate time on task
+\cite{hart2023time,hart2025time,edwards2022engagement} and are related to course performance
+\cite{shrestha2022pausing,koutcheme2026keystroke}; in writing research they measure planning and fluency
+\cite{roeser2024disfluencies,torrance2024methods,chukharev2014pauses,guo2020scenario}. Every such measure starts from a
+definition: how long a gap must be, relative to what, over which stretch of the log, and what counts as producing text.
+These choices differ from study to study. Time-on-task thresholds have ranged from five minutes to one hour
+\cite{hart2025time}, and fixed pause thresholds in writing are acknowledged to have no theoretical ground between about
+250~ms and 10~s \cite{torrance2024methods}.
+
+That analytic choices can change conclusions is known. In learning analytics the strategy for estimating time on task
+changed the results of the same regression \cite{kovanovic2015time}; operationalisations of wheel spinning disagreed on
+most cases \cite{zhang2019wheel}; models of student success differ across a multiverse of reasonable choices
+\cite{tang2025multiverse}; and in eye-movement research a multiverse of cleaning procedures left the existence of an
+effect intact while changing its size \cite{godwin2025multiverse}. What has not been examined is how far the conclusions
+that readers draw from a keystroke stall label---its association with the quality of a product, comparisons of rates
+between datasets, and the count and length structure within writers---move across defensible definitions, and which of
+them stay.
+
+We answer this with a diagnostic. We apply one detector to four public datasets from three sources, two editions of a
+CS1 course and two writing corpora, and vary its four choices (the window, the threshold, the condition for a stop and
+the segmentation of observation) over 89 definitions around a baseline. For each definition we report the conclusion
+with an interval from resampling writers, so that the spread across definitions can be set beside sampling variation.
+Relative to existing multiverse analyses, the diagnostic adds three things: it varies the way keystroke events are cut
+into stalls, which earlier analyses of behavioural data held fixed \cite{godwin2025multiverse}; it attaches a
+writer-level interval to every definition; and it separates two families of thresholds, relative to the writer and in
+absolute seconds, as a choice of construct.
+
+The strongest finding concerns the association with essay quality (for one holistic score in KLiCKe; the proportions
+are of the 89 definitions examined, not a sample from all possible definitions). The strength of the association between
+the stall rate and the score moves, depending on the definition, from negligible ($-0.06$) to small-to-moderate (as
+large as $-0.25$), and in the corner with the shortest window it turns weakly positive. We contribute the diagnostic and
+its application to four conclusions:
+
+\begin{itemize}
+\item The stall--score association ranges from negligible to small-to-moderate and changes direction within one
+construct (Section~\ref{sec:res-score}).
+\item The rank order of the four datasets' rates changes for most definitions, and the ratio between a CS1 edition and
+the essay corpus reverses beyond sampling variation for most of them; between the two CS1 editions it reverses for a
+minority, mostly when the threshold becomes fixed (Section~\ref{sec:res-ratio}).
+\item Whether stall counts are overdispersed within writers depends on the definition (Section~\ref{sec:res-phi}).
+\item In CS1, the largest component of the variation in stall length, from stall to stall within a writer, does not
+depend on the definition (Section~\ref{sec:res-length}).
+\end{itemize}
+
+The detector, the grid and the aggregate tables are released. For researchers who report stall, pause or inactivity
+labels, the result changes what a report should contain: not the point value of one definition, but the range across
+definitions with intervals.
