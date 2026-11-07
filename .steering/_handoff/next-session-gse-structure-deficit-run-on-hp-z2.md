@@ -39,7 +39,7 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/structure_deficit_run.log"; echo "exit
 ```
 
 - 中身: manifest の照合 → 門の selftest（`check_same_cs1.py`・`repro_check.py`）→ P-D1 の門 2 つ → selftest（合成・19 対照）→ 変異 16 個（合成）→ P-Q（`results/q_gate.json`・q = 5 の作り直しが全行で obs と一致しなければ止まる）→ 組 q5_o（CoAuthor → CS1）→ P-REPRO（`results/repro_check.json`・外れれば終了コード 3 で止まり、残りの組に進まない）→ 残りの 5 組（q5_p・q3_o・q3_p・q7_o・q7_p）→ provenance。
-- 見込み（MAC の値は §6）: selftest と変異は Mac で（未記入）。本計算は `results/timing.json`（Mac で作った見積もり）で約（未記入）時間、上側で（未記入）時間。
+- 見込み（MAC の値は §6）: selftest と変異は Mac でそれぞれ約 23 分。本計算は `results/timing.json`（Mac で作った見積もり）で約 10.7 時間、上側で約 16 時間（1 組は CoAuthor 約 0.4 時間・CS1 約 1.3〜1.5 時間。S0 の段と、列で反復の回数が変わる分は入っていない）。金曜の夜に始めれば週末のうちに終わる見込み。
 - 見積もりを大きく超えても途中で止めない。止まったように見えるときは CPU の使用率を見るだけにして、研究者に報告する（条件 D6）。`summary.json` は組とデータごとに書き足されるので、途中で落ちても済んだ組は残る。
 - P-Q が外れたら `q_gate.json` の `mismatched` を報告する（境界の丸めの可能性。直さない）。
 
@@ -60,8 +60,8 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/structure_deficit_run.log"; echo "exit
 
 ## 6 Mac 側の状態（2026-11-07）
 
-- 枝 `exp/gse-structure-deficit-test`（`exp/gse-tau-mode-candidate` の `05a65021` から）。条件と SEED は `3d7f9f07`、コードと合成の門は `507f81b5`。push は研究者の手元で行う（HP Z2 で取り出す前に、この枝が origin に上がっていることを研究者が確かめる）。
-- Mac（Python 3.14.4・numpy 2.5.2）の合成の門: （未記入）。
+- 枝 `exp/gse-structure-deficit-test`（`exp/gse-tau-mode-candidate` の `05a65021` から）。条件と SEED は `3d7f9f07`、コードと合成の門は `507f81b5`、計算の前のレビューへの対応は `00518580`・`79eb19a9`、変異の門の直しと時間の見積もりは `eb8bdfd9`（判断 11・12）。push は研究者の手元で行う（HP Z2 で取り出す前に、この枝が origin に上がっていることを研究者が確かめる）。
+- Mac（Python 3.14.4・numpy 2.5.2）の合成の門（`eb8bdfd9`）: selftest 19 対照すべて緑（約 23 分・P-EM2 の目的の減少 0）、変異 16 個すべてが名指しの対照を赤にした（約 23 分）。HP Z2 は前の試験の実測から、どちらも Mac と同じかやや速い見込み。
 
 ## 7 HP Z2 での実行の記録（職場の PC のセッションが追記）
 
