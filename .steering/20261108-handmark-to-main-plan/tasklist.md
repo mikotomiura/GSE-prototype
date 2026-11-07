@@ -24,5 +24,7 @@
 ## 完了
 - [x] /cross-review 1 巡目（判断 7）
 - [x] /cross-review 2 巡目（判断 8）
-- [ ] code-reviewer と /cross-review（Codex を加える。O1・段 1 の記録の本文を送らない）
+- [x] /cross-review 3 巡目（HIGH 0 件・MEDIUM 4 件を直して閉じた・判断 9）
+- [x] ADR-051 を研究者が本文を読むまで Proposed に
+- [x] code-reviewer と /cross-review（Codex を加えた。差分は文書だけで、O1・段 1 の記録の本文は送っていない）
 - [ ] /finish-task（push・PR は研究者に確かめてから）
