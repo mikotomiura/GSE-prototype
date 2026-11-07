@@ -44,3 +44,7 @@
 ## 版 0.2.1（判断 6）
 - [x] X18・X19 と原稿 v6 を写し直す・README・要約・CITATION・.zenodo.json
 - [x] verify が 0・push・release v0.2.1・Zenodo の zip を照合・原稿の DOI を差し替え
+
+## 版 0.2.2（判断 7）
+- [x] 原稿 v8 を写し直す・表 5・CITATION・.zenodo.json・verify が 0（ローカル 3ea2591）
+- [ ] push・release v0.2.2・Zenodo の zip を照合・原稿の DOI を差し替え（研究者に確かめる）

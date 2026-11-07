@@ -55,3 +55,10 @@
 - 研究者の採否（論文の判断 40 (3)）: 直した後に push して release v0.2.1 を作り、原稿の DOI を差し替える。
 - 中身: `experiments/20261107-findings-paper1-round4-checks/`（X18）・`...-round5-checks/`（X19）・原稿 v6・推定器の README に門の初回の不一致の原因は確かめていないと書いた・`tools/rerun-holdout.sh` が不一致のとき違う項目を出す・README の表と探索に回し直しの照合が無いこと・条件の英語の要約に round 4・5 と時刻・図の行名（q = 0.995 に warm-up 200）。
 - 検査: `tools/verify.sh ~/gse-public-data` が 0（222 ファイル 0 件・陽性対照 27・図の照合 18 行）。v0.2.1 = 3e58363・main 49348db。Zenodo 10.5281/zenodo.24025995 の zip はタグとファイル単位で同じ・漏れの検査 0 件。
+
+## 判断 7: 版 0.2.2（投稿する原稿 v8）（2026-11-07）
+
+- 研究者の採否（論文の判断 42 (4)）: 投稿する版は v8。公開 repo の `paper/` を v8 に写して版を上げる（push と release の前に確かめる）。
+- 中身: `assemble.sh` で scratchpad に組み、今の公開 repo と比べた差は `paper/` の 8 ファイルと `gse-source.tsv` だけ（実験・推定器・`gse-commits.tsv` は同じ）。それを写し、README（英・日）と `tools/readme_media.py` の「Table 6 / 表 6」を「5」に（組んだ aux で `tab:sens` が表 5 であることを確かめた）。CITATION.cff と `.zenodo.json` を 0.2.2 に。
+- 検査: ローカルのコミット 3ea2591 の後に `tools/verify.sh ~/gse-public-data` が 0（cargo test 228・図の照合 18 行・漏れの検査 222 ファイル 0 件・陽性対照すべて ok）。コミットの前は漏れの検査が「未コミットの変更」で止まる（作りのとおり）。
+- 未: push・release v0.2.2・Zenodo の DOI・原稿の DOI の差し替え（研究者に確かめる）。
