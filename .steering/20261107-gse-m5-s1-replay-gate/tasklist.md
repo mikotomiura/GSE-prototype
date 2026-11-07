@@ -47,8 +47,8 @@
 - [x] S1 `~/gse-dataset` に枝を切り `schema/current.json` を写す・parity check が緑（push・PR は研究者に確かめてから）
 
 ### V 点検と完了
-- [ ] V1 code-reviewer ＋ security-checker（並列）・指摘への対応
-- [ ] V2 docs（`functional-design.md`・`glossary.md`・`development-guidelines.md` §3 の再生のモード）
+- [x] V1 code-reviewer ＋ security-checker（並列）・指摘への対応
+- [x] V2 docs（`functional-design.md`・`glossary.md`・`development-guidelines.md` §3 の再生のモード）
 - [ ] V3 `/finish-task`（/cross-review・push と PR は研究者に確かめてから）
 
 ## T5 の記録（2026-11-07）
