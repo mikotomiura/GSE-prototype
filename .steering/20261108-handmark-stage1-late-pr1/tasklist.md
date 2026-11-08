@@ -10,5 +10,5 @@
 - [x] 記録の検査（他の行が増えない・語の検査と陽性対照）
 - [x] cargo fmt・clippy・test・emit_schema（parity は /finish-task）
 - [x] code-reviewer・security-checker・/cross-review（Codex を 3 巡・判断 4〜6）
-- [ ] 1b: 記録の検査の「HandmarkDay だけ」を、送出の関数を通す形に差し替える／`scrub_state` を lib.rs の削除の経路に配線する
+- [x] 1b: 記録の検査を駆動役の出口に差し替え・scrub_state を削除の経路に配線（判断 8〜10）
 - [ ] /finish-task（push・PR は研究者に確かめてから）
