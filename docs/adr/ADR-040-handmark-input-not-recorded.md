@@ -1,5 +1,7 @@
 # ADR-040: 手跡の背景の層は、カーソル・クリック・ホイールを表現の入力に使うが、記録しない
 
+> **振り直しの注（2026-11-08）**: 本 ADR は main で **ADR-050**（`docs/adr/ADR-050-handmark-input-not-recorded.md`）に振り直した。main の ADR-040 は `ADR-040-nudge-not-in-core.md`（別の決定）である。以後の補訂と状態の変更は main の ADR-050 で行い、この枝の本書は更新しない（main の `.steering/20261108-handmark-to-main-plan/decisions.md` 判断 4・`.steering/20261108-handmark-pr0-rest/decisions.md` 判断 1）。
+
 - **ステータス**: **Proposed**（方針は 2026-10-20〜21 に研究者が決めた。実物へ持ち込むタスクで見直す）
 - **日付**: 2026-10-21
 - **決定者**: 研究者 ＋ Claude Code
