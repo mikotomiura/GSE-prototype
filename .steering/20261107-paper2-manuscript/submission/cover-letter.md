@@ -17,11 +17,10 @@ interventions.
 
 Related work by the author. A companion manuscript by the same author, "The 30-second Signal Changes of a Hand-set
 Keystroke State Estimator before Code-writing Stalls Stayed inside a Preregistered Equivalence Band against Short
-Pauses", is under review at [JOURNAL]. The two share the baseline stall definition, the conversion of one dataset, the
+Pauses", is under review at this journal (submission 1484; preprint
+https://doi.org/10.5281/zenodo.24026330). The two share the baseline stall definition, the conversion of one dataset, the
 observation intervals and two opened holdouts, so a few baseline values can coincide; the questions, designs and
-results differ, and Supplement S8 sets them side by side. We can provide the companion manuscript to the editor on
-request. [If the companion is under double-blind review, decide before submission whether to cite it as "Anonymous"
-in this manuscript.]
+results differ, and Supplement S8 sets them side by side. Neither manuscript is anonymised.
 
 Status of the analyses. Every computation ran under conditions committed to the author's version control before it
 ran; these are not third-party registrations. Supplement S1 lists their order and marks which conclusions rest on
