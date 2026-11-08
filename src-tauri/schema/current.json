@@ -1730,7 +1730,9 @@
         "off_today",
         "assigned_off",
         "before_late",
-        "after_table"
+        "after_table",
+        "window_unavailable",
+        "paths_unavailable"
       ]
     },
     "HandmarkToggleDto": {

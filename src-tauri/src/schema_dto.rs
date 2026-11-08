@@ -688,6 +688,8 @@ pub enum HandmarkReasonDto {
     AssignedOff,
     BeforeLate,
     AfterTable,
+    WindowUnavailable,
+    PathsUnavailable,
 }
 
 /// 段 1 の候補を出さなかった理由。

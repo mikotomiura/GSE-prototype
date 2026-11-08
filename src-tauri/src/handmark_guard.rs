@@ -7,13 +7,13 @@
 //! （対照の文字列は実行時に連結して作る。禁じる語をこのファイルに書かない）。
 //! 文字列の検査は別名の関数を経由した漏れを見つけられない。
 
-use crate::analysis::handmark::state::{replay, Stage};
+use crate::analysis::handmark::state::replay;
 use crate::handmark_store::testfs::with_table;
 use crate::handmark_store::Evaluation;
 use crate::logger::LogEntry;
 
 /// 新しく足したファイルの本文（このファイル自身は含めない）。
-const FILES: [(&str, &str); 6] = [
+const FILES: [(&str, &str); 8] = [
     (
         "analysis/handmark/mod.rs",
         include_str!("analysis/handmark/mod.rs"),
@@ -35,6 +35,8 @@ const FILES: [(&str, &str); 6] = [
         include_str!("analysis/handmark/gate.rs"),
     ),
     ("handmark_store.rs", include_str!("handmark_store.rs")),
+    ("handmark_driver.rs", include_str!("handmark_driver.rs")),
+    ("handmark_stage.rs", include_str!("handmark_stage.rs")),
 ];
 const BIN: &str = include_str!("bin/gse-handmark-table.rs");
 
@@ -81,40 +83,47 @@ fn the_word_check_is_red_on_a_planted_word() {
     assert!(log_entry_violations(&ok).is_empty());
 }
 
+/// 1 日分の打鍵を駆動役に流し(`new` → `tick` の列 → `turn_off` → `turn_on` → `on_quit`)、
+/// 出た出来事のうち記録に向かうものが `Row`(= `handmark_day`)だけであることを、駆動役の出口で見る。
 #[test]
-fn a_day_of_typing_produces_only_handmark_day_rows() {
+fn a_day_of_typing_through_the_driver_produces_only_handmark_day_rows() {
+    use crate::handmark_driver::{Destination, Effect, HandmarkDriver};
     let fs = with_table();
     let day = 20_411;
-    let mut ev = Evaluation::run(&fs, true, day, None);
-    assert!(ev.is_open());
-    // 1 日分の打鍵を状態に流す（手跡が動く）
-    let mut stage = Stage::new(ev.draw_seed().unwrap(), 1_000_000);
+    let t0 = 1_800_000_000_000u64;
+    let (mut d, mut all) = HandmarkDriver::new(&fs, true, t0, day);
     let mut moved = false;
-    for i in 0..2_000u64 {
-        let t = 1_000_000 + i * 120;
-        stage.advance_to(t);
-        stage.press(t);
-        moved |= stage.state().speed > 0.0;
-        if i % 500 == 0 {
-            ev.add_shown(60_000);
+    for i in 1..3_000u64 {
+        d.on_press(t0 + i * 120);
+        all.extend(d.tick(&fs, t0 + i * 250, day));
+    }
+    all.extend(d.turn_off(&fs, t0 + 800_000));
+    all.extend(d.turn_on(&fs, t0 + 801_000));
+    all.extend(d.on_quit(&fs, t0 + 802_000));
+    for e in &all {
+        if let Effect::State(s) = e {
+            moved |= s.speed > 0.0;
         }
     }
     assert!(moved, "手跡が動いていない（検査が空回り）");
-    // 生じる LogEntry は行の生成だけ
-    let entries: Vec<LogEntry> = [1u64, 2, 3]
-        .iter()
-        .filter_map(|t| ev.row(*t))
-        .map(LogEntry::HandmarkDay)
-        .collect();
-    assert_eq!(entries.len(), 3);
-    for e in &entries {
-        assert_eq!(e.line_type(), Some("handmark_day"));
+    let mut rows = 0;
+    for e in &all {
+        // 行き先の網羅は `destination()` の match が保つ。記録へ向かうのは Row だけ。
+        if e.destination() == Destination::Log {
+            let Effect::Row(r) = e else {
+                panic!("記録へ向かうのが Row 以外: {e:?}");
+            };
+            let entry = LogEntry::HandmarkDay(r.clone());
+            assert_eq!(entry.line_type(), Some("handmark_day"));
+            rows += 1;
+        }
     }
-    // 状態は打鍵の時刻だけの純関数（再生しても同じ）
-    let times: Vec<u64> = (0..2_000u64).map(|i| 1_000_000 + i * 120).collect();
+    assert!(rows >= 4, "{rows}");
+    // 状態は打鍵の時刻だけの純関数(再生しても同じ)
+    let times: Vec<u64> = (1..3_000u64).map(|i| t0 + i * 120).collect();
     assert_eq!(
-        replay(&times, 5, 1_000_000, 1_300_000).bits(),
-        replay(&times, 5, 1_000_000, 1_300_000).bits()
+        replay(&times, 5, t0, t0 + 300_000).bits(),
+        replay(&times, 5, t0, t0 + 300_000).bits()
     );
 }
 

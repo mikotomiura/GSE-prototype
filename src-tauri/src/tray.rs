@@ -108,6 +108,78 @@ fn current_state(session_active: &AtomicBool) -> MeasureState {
     )
 }
 
+/// 手跡の「やめる」／「描く」の項目の ID(段 1 の後期・ADR-051)。
+const MENU_HANDMARK: &str = "gse-tray-handmark";
+
+/// 手跡のトレイの項目の状態(駆動役が書き、更新スレッドが読む)。0 = 出さない・1 = やめる・2 = 描く。
+static HANDMARK_TRAY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// メニューに実際に出している手跡の項目の状態(更新スレッドが書き、押下の処理が読む)。
+static HANDMARK_TRAY_SHOWN: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn handmark_item_code(t: crate::handmark_driver::TrayItem) -> u8 {
+    use crate::handmark_driver::TrayItem;
+    match t {
+        TrayItem::Hidden => 0,
+        TrayItem::Stop => 1,
+        TrayItem::Restore => 2,
+    }
+}
+
+fn handmark_item_from_code(c: u8) -> crate::handmark_driver::TrayItem {
+    use crate::handmark_driver::TrayItem;
+    match c {
+        1 => TrayItem::Stop,
+        2 => TrayItem::Restore,
+        _ => TrayItem::Hidden,
+    }
+}
+
+/// 手跡の項目の出し入れの計画(純関数で決め、ループはその結果だけを反映する)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HandmarkTrayPlan {
+    Nothing,
+    Remove,
+    /// 項目を出す(文言を決めて差し込む)。
+    Insert(&'static str),
+    /// 出ている項目の文言だけを替える。
+    Relabel(&'static str),
+}
+
+fn handmark_tray_plan(
+    want: crate::handmark_driver::TrayItem,
+    shown: crate::handmark_driver::TrayItem,
+) -> HandmarkTrayPlan {
+    use crate::handmark_driver::TrayItem;
+    if want == shown {
+        return HandmarkTrayPlan::Nothing;
+    }
+    match (want.label(), shown) {
+        (None, _) => HandmarkTrayPlan::Remove,
+        (Some(label), TrayItem::Hidden) => HandmarkTrayPlan::Insert(label),
+        (Some(label), _) => HandmarkTrayPlan::Relabel(label),
+    }
+}
+
+/// 計画を実行した結果(`ok`)から、メニューに実際に出ている状態を返す。この値を押下の照合に使う。
+fn handmark_tray_after(
+    plan: HandmarkTrayPlan,
+    want: crate::handmark_driver::TrayItem,
+    shown: crate::handmark_driver::TrayItem,
+    ok: bool,
+) -> crate::handmark_driver::TrayItem {
+    if plan == HandmarkTrayPlan::Nothing || !ok {
+        shown
+    } else {
+        want
+    }
+}
+
+/// 駆動役が手跡の項目の状態を知らせる(項目の出し入れは更新スレッドが 1 秒ごとに行う)。
+pub fn set_handmark_item(t: crate::handmark_driver::TrayItem) {
+    HANDMARK_TRAY.store(handmark_item_code(t), Ordering::Release);
+}
+
 /// メニュー項目の ID。
 const MENU_QUIT: &str = "gse-tray-quit";
 const MENU_STATUS: &str = "gse-tray-status";
@@ -197,6 +269,13 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             } else if event.id.as_ref() == MENU_PORTRAIT_STOP {
                 // ⚠️ 選んだことは記録しない（applog にも出さない・R-P9）。
                 crate::stop_portrait_by_person();
+            } else if event.id.as_ref() == MENU_HANDMARK {
+                // ⚠️ 選んだことは applog にも出さない(日の行に切った／戻した時刻が残るだけ)。
+                // 押された項目の文言(メニューに出ていた状態)を渡し、駆動役の今の状態と照らす
+                crate::handmark_toggle_from_tray(
+                    app,
+                    handmark_item_from_code(HANDMARK_TRAY_SHOWN.load(Ordering::Acquire)),
+                );
             } else if event.id.as_ref() == MENU_INVITATION {
                 // ⚠️ 開いたことは記録しない（applog にも出さない・R-I1）。
                 let _ = crate::show_invitation_settings_window(app);
@@ -206,6 +285,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         builder = builder.icon(icon.clone());
     }
     let tray = builder.build(app)?;
+    // 手跡の項目(今日の割付が出す日のときだけ駆動役が `Hidden` 以外にする)
+    let handmark_menu_item = MenuItem::with_id(app, MENU_HANDMARK, "やめる", true, None::<&str>)?;
 
     std::thread::Builder::new()
         .name("gse-tray".to_string())
@@ -215,6 +296,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             let mut invitation_shown = false;
             // 差し込みの失敗は最初の 1 回だけ警告する(毎秒の連投を避ける・内容は書かない)
             let mut insert_failure_warned = false;
+            // 手跡の項目をいま差し込んでいる文言
+            let mut handmark_shown = crate::handmark_driver::TrayItem::Hidden;
             loop {
                 std::thread::sleep(Duration::from_millis(1000));
                 // ★ 終了処理が始まったら抜ける。⚠️ 落ちるまでの数百 ms のあいだ
@@ -237,6 +320,26 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                     } else if !want && invitation_shown && menu.remove(item).is_ok() {
                         invitation_shown = false;
                     }
+                }
+                // 手跡の項目: 状態が変わったときだけ触る(出し入れは記録しない)
+                let want = handmark_item_from_code(HANDMARK_TRAY.load(Ordering::Acquire));
+                let plan = handmark_tray_plan(want, handmark_shown);
+                let ok = match plan {
+                    HandmarkTrayPlan::Nothing => true,
+                    HandmarkTrayPlan::Remove => menu.remove(&handmark_menu_item).is_ok(),
+                    HandmarkTrayPlan::Relabel(label) => handmark_menu_item.set_text(label).is_ok(),
+                    HandmarkTrayPlan::Insert(label) => {
+                        // 終了の直前に差し込む(招待の項目は静的な並びの 2 番目なので食い違わない)
+                        let position = menu.items().map_or(2, |i| i.len().saturating_sub(1));
+                        handmark_menu_item.set_text(label).is_ok()
+                            && menu.insert(&handmark_menu_item, position).is_ok()
+                    }
+                };
+                if plan != HandmarkTrayPlan::Nothing {
+                    handmark_shown = handmark_tray_after(plan, want, handmark_shown, ok);
+                    // 押下の照合に使う値は、出し入れ・文言の変更のどれでも成功したときに更新する
+                    HANDMARK_TRAY_SHOWN
+                        .store(handmark_item_code(handmark_shown), Ordering::Release);
                 }
                 let next = current_state(&session_active);
                 if next == last {
@@ -322,7 +425,19 @@ mod tests {
             MeasureState::Measuring,
             MeasureState::HookDown,
         ] {
-            for text in [measure_label(state), measure_title(state)] {
+            // 手跡の「やめる」／「描く」も同じ禁止語の対象(状態に依らない文言)
+            let handmark = [
+                crate::handmark_driver::TrayItem::Stop.label().unwrap_or(""),
+                crate::handmark_driver::TrayItem::Restore
+                    .label()
+                    .unwrap_or(""),
+            ];
+            for text in [
+                measure_label(state),
+                measure_title(state),
+                handmark[0],
+                handmark[1],
+            ] {
                 for word in banned {
                     assert!(
                         !text.contains(word),
@@ -330,6 +445,72 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// 手跡のトレイの文言(「やめる」／「描く」)も非開示語を含まず、手跡の語を出さない。
+    #[test]
+    fn handmark_tray_labels_are_plain() {
+        use crate::handmark_driver::TrayItem;
+        let banned = [
+            "Flow",
+            "flow",
+            "Incubation",
+            "incubation",
+            "Stuck",
+            "stuck",
+            "フロー",
+            "スタック",
+            "停滞",
+            "確率",
+            "p_",
+            "手跡",
+            "Handmark",
+            "handmark",
+            "背景",
+            "状態",
+        ];
+        for t in [TrayItem::Stop, TrayItem::Restore] {
+            let label = t.label().expect("label");
+            for w in banned {
+                assert!(!label.contains(w), "{label:?} has {w:?}");
+            }
+        }
+        assert_eq!(TrayItem::Hidden.label(), None);
+        for t in [TrayItem::Hidden, TrayItem::Stop, TrayItem::Restore] {
+            assert_eq!(handmark_item_from_code(handmark_item_code(t)), t);
+        }
+    }
+
+    /// 手跡の項目: 出す・文言を替える・隠すのどれでも、成功したときに照合の値が実際の表示になる。
+    #[test]
+    fn handmark_tray_step_updates_the_match_value_on_every_success() {
+        use crate::handmark_driver::TrayItem::{Hidden, Restore, Stop};
+        // Hidden -> Stop(挿入成功): 照合の値が Stop になる(押下が通る)
+        let plan = handmark_tray_plan(Stop, Hidden);
+        assert_eq!(plan, HandmarkTrayPlan::Insert("やめる"));
+        assert_eq!(handmark_tray_after(plan, Stop, Hidden, true), Stop);
+        // 挿入の失敗では Hidden のまま
+        assert_eq!(handmark_tray_after(plan, Stop, Hidden, false), Hidden);
+        // Stop -> Restore(文言の変更成功)
+        let plan = handmark_tray_plan(Restore, Stop);
+        assert_eq!(plan, HandmarkTrayPlan::Relabel("描く"));
+        assert_eq!(handmark_tray_after(plan, Restore, Stop, true), Restore);
+        assert_eq!(handmark_tray_after(plan, Restore, Stop, false), Stop);
+        // 隠す
+        let plan = handmark_tray_plan(Hidden, Restore);
+        assert_eq!(plan, HandmarkTrayPlan::Remove);
+        assert_eq!(handmark_tray_after(plan, Hidden, Restore, true), Hidden);
+        assert_eq!(handmark_tray_after(plan, Hidden, Restore, false), Restore);
+        // 変わらなければ何もしない
+        assert_eq!(handmark_tray_plan(Stop, Stop), HandmarkTrayPlan::Nothing);
+        assert_eq!(
+            handmark_tray_plan(Hidden, Hidden),
+            HandmarkTrayPlan::Nothing
+        );
+        // 照合の値の符号化は往復する
+        for t in [Hidden, Stop, Restore] {
+            assert_eq!(handmark_item_from_code(handmark_item_code(t)), t);
         }
     }
 

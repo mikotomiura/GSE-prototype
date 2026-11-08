@@ -61,7 +61,7 @@ pub fn splitmix64(x: u64) -> u64 {
 }
 
 /// 窓へ渡す状態。
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct StageState {
     pub speed: f64,
     pub irreg: f64,
@@ -249,6 +249,16 @@ pub fn replay(presses: &[u64], seed: u64, t0: u64, t: u64) -> StageState {
     }
     s.advance_to(t);
     s.state()
+}
+
+/// ライブが状態を進める遅れ（ms）。ライブは「今 − この値」までしか進めない（遅れて届く打鍵を
+/// 時刻の順に入れるため・判断 7-3）。
+pub const LIVE_LAG_MS: u64 = 500;
+
+/// ライブの規則（時刻 `now` には「`now − LIVE_LAG_MS` まで」の状態を出す）を、記録の打鍵の時刻から再現する。
+/// 500 ms 以内の遅れで届いた打鍵なら、ライブの `tick` の列と `to_bits` で一致する。
+pub fn replay_live(presses: &[u64], seed: u64, t0: u64, now: u64) -> StageState {
+    replay(presses, seed, t0, now.saturating_sub(LIVE_LAG_MS))
 }
 
 #[cfg(test)]

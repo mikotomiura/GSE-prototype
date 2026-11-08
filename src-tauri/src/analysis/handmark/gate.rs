@@ -18,10 +18,14 @@ pub enum CloseReason {
     AssignedOff,
     BeforeLate,
     AfterTable,
+    /// 窓を作れなかった・出せなかった(窓の層の印を駆動役が読んで閉じる)。
+    WindowUnavailable,
+    /// 表と状態ファイルの置き場が決まらなかった(ホームが分からない等・駆動役が起きない)。
+    PathsUnavailable,
 }
 
 impl CloseReason {
-    pub const ALL: [CloseReason; 10] = [
+    pub const ALL: [CloseReason; 12] = [
         CloseReason::TableMissing,
         CloseReason::TableBroken,
         CloseReason::ShaMissing,
@@ -32,6 +36,8 @@ impl CloseReason {
         CloseReason::AssignedOff,
         CloseReason::BeforeLate,
         CloseReason::AfterTable,
+        CloseReason::WindowUnavailable,
+        CloseReason::PathsUnavailable,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -46,6 +52,8 @@ impl CloseReason {
             CloseReason::AssignedOff => "assigned_off",
             CloseReason::BeforeLate => "before_late",
             CloseReason::AfterTable => "after_table",
+            CloseReason::WindowUnavailable => "window_unavailable",
+            CloseReason::PathsUnavailable => "paths_unavailable",
         }
     }
 }
@@ -254,7 +262,9 @@ mod tests {
                 "off_today",
                 "assigned_off",
                 "before_late",
-                "after_table"
+                "after_table",
+                "window_unavailable",
+                "paths_unavailable"
             ]
         );
     }
