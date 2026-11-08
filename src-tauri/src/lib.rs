@@ -52,6 +52,10 @@ pub mod s1;
 // 段 1 の駆動役の純粋な部分（カードの状態と Action の写し・OS API と Tauri を持たない）。
 pub mod s1_driver;
 // 手跡（段 1 の後期・ADR-051）の IO 層（表・状態ファイル・印）。1a では lib.rs の本体に配線しない（1b で配線）。
+pub mod handmark_driver;
+// 手跡の背景の窓(macOS だけ・ADR-051)。駆動役の出来事だけが開け閉めする。
+#[cfg(target_os = "macos")]
+pub mod handmark_stage;
 pub mod handmark_store;
 // 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
 pub mod s1_day_state;
@@ -2302,6 +2306,157 @@ fn show_s1_overlay(app: &tauri::AppHandle) {
     }
 }
 
+// ===========================================================================
+// 手跡（段 1 の後期・ADR-051・1b）の配線。★ 段 1 のモードかつ macOS のときだけ駆動スレッドを起こす。
+//   純粋な部分は `handmark_driver`（出来事 `Effect` を返す）。ここは出来事を行・窓・トレイに変えるだけ。
+//   ロックの順は `HANDMARK_DRIVER` → `LogState`（出来事の実行では `LogState` のロックを取らない）。
+// ===========================================================================
+
+/// 手跡の駆動役。`None` = 段 1 でない・macOS でない・まだ起きていない。
+static HANDMARK_DRIVER: Mutex<Option<crate::handmark_driver::HandmarkDriver>> = Mutex::new(None);
+/// 手跡のファイルの口(駆動スレッドが起動で作る)。
+static HANDMARK_FS: std::sync::OnceLock<crate::handmark_store::DiskFs> = std::sync::OnceLock::new();
+/// 分析スレッドから駆動役へ打鍵の時刻を送る口(受信側のスレッドをロックで止めない)。
+static HANDMARK_PRESS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
+    std::sync::OnceLock::new();
+
+/// 手跡の駆動役へ打鍵の時刻を送る(口が無ければ何もしない・満杯なら捨てる)。
+fn handmark_send_press(t_ms: u64) {
+    if let Some(tx) = HANDMARK_PRESS_TX.get() {
+        let _ = tx.try_send(t_ms);
+    }
+}
+
+fn handmark_lock() -> std::sync::MutexGuard<'static, Option<crate::handmark_driver::HandmarkDriver>>
+{
+    HANDMARK_DRIVER.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// 手跡: 駆動役の出来事を実行する。★ `HANDMARK_DRIVER` のロックを持ったまま呼ぶ。
+fn run_handmark_effects(
+    app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    fx: Vec<crate::handmark_driver::Effect>,
+) {
+    use crate::handmark_driver::Effect;
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+    for e in fx {
+        match e {
+            Effect::Row(r) => {
+                if let Err(err) = log_tx.try_send(LogEntry::HandmarkDay(r)) {
+                    tracing::warn!("handmark: day row not sent: {}", log_send_error(err));
+                }
+            }
+            #[cfg(target_os = "macos")]
+            Effect::OpenWindow { .. } => crate::handmark_stage::open(app),
+            #[cfg(target_os = "macos")]
+            Effect::CloseWindow => crate::handmark_stage::close(app),
+            #[cfg(target_os = "macos")]
+            Effect::State(s) => crate::handmark_stage::emit_state(app, &s),
+            #[cfg(not(target_os = "macos"))]
+            Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
+            Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
+        }
+    }
+}
+
+fn handmark_log_tx(app: &tauri::AppHandle) -> Sender<LogEntry> {
+    app.state::<Arc<Mutex<LogState>>>()
+        .inner()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone_log_tx()
+}
+
+/// トレイの「やめる」／「描く」。選んだことは(切った時刻と日の行以外は)記録しない。
+pub(crate) fn handmark_toggle_from_tray(app: &tauri::AppHandle) {
+    use crate::handmark_driver::TrayItem;
+    let Some(fs) = HANDMARK_FS.get() else { return };
+    let log_tx = handmark_log_tx(app);
+    let mut g = handmark_lock();
+    let Some(d) = g.as_mut() else { return };
+    let now = epoch_ms();
+    let fx = match d.tray() {
+        TrayItem::Stop => d.turn_off(fs, now),
+        TrayItem::Restore => d.turn_on(fs, now),
+        TrayItem::Hidden => return,
+    };
+    run_handmark_effects(app, &log_tx, fx);
+}
+
+/// 区間の削除: 手跡の状態ファイルと走行中の累計から、区間に入る時刻を消す。
+fn handmark_on_redact(app: &tauri::AppHandle, from_ms: u64, to_ms: u64) {
+    let Some(fs) = HANDMARK_FS.get() else { return };
+    let log_tx = handmark_log_tx(app);
+    let mut g = handmark_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.on_redact(fs, from_ms, to_ms, epoch_ms());
+    run_handmark_effects(app, &log_tx, fx);
+}
+
+/// 終了: 手跡の累計を保存し、最後の行を `End` の前に書く。
+fn handmark_finish_before_end(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>) {
+    let Some(fs) = HANDMARK_FS.get() else { return };
+    let mut g = handmark_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.on_quit(fs, epoch_ms());
+    run_handmark_effects(app, log_tx, fx);
+}
+
+/// 手跡の駆動スレッド(250 ms ごと)。★ 段 1 かつ macOS のときだけ起こす。
+#[cfg(target_os = "macos")]
+fn spawn_handmark_driver(
+    app: tauri::AppHandle,
+    log_tx: Sender<LogEntry>,
+    press_rx: crossbeam_channel::Receiver<u64>,
+) {
+    thread::spawn(move || {
+        let Some(fs) = std::env::current_exe()
+            .ok()
+            .and_then(|exe| crate::handmark_store::DiskFs::from_env(&exe))
+        else {
+            tracing::warn!("handmark: file locations are unavailable; no background this run");
+            return;
+        };
+        let _ = HANDMARK_FS.set(fs);
+        let Some(fs) = HANDMARK_FS.get() else { return };
+        let mut offset = UtcOffsetCache::new();
+        let today_of =
+            |offset: &mut UtcOffsetCache, wall: u64| crate::eh3::local_day(wall, offset.get(wall));
+        {
+            let wall = epoch_ms();
+            let today = today_of(&mut offset, wall);
+            let mut g = handmark_lock();
+            let (d, fx) = crate::handmark_driver::HandmarkDriver::new(fs, true, wall, today);
+            run_handmark_effects(&app, &log_tx, fx);
+            *g = Some(d);
+        }
+        tracing::info!("handmark driver thread started");
+        loop {
+            thread::sleep(Duration::from_millis(
+                crate::analysis::handmark::state::TICK_MS,
+            ));
+            if is_shutting_down() {
+                return;
+            }
+            let wall = epoch_ms();
+            let today = today_of(&mut offset, wall);
+            let mut g = handmark_lock();
+            let Some(d) = g.as_mut() else { continue };
+            // ★ ロックを取った直後にもう一度見る(`shutdown` が最後の行を書いて `End` を送った後に行を送らない)
+            if is_shutting_down() {
+                return;
+            }
+            for t in press_rx.try_iter() {
+                d.on_press(t);
+            }
+            let fx = d.tick(fs, wall, today);
+            run_handmark_effects(&app, &log_tx, fx);
+        }
+    });
+}
+
 /// 段 1 の駆動スレッド（1 秒に 1 回）。★ 段 1 のときだけ起こす。
 fn spawn_s1_driver(
     app: tauri::AppHandle,
@@ -3046,6 +3201,7 @@ struct RedactionOutcomeDto {
 ///   `skip` した書きかけのファイルの行は消えない（★ `docs/o1-deletion-ledger.md`）。
 #[tauri::command]
 fn delete_time_range(
+    app: tauri::AppHandle,
     from_ms: u64,
     to_ms: u64,
     log: State<Arc<Mutex<LogState>>>,
@@ -3137,6 +3293,9 @@ fn delete_time_range(
         tracing::error!("delete_time_range failed: {e:?}");
         "記録の削除に失敗しました。".to_string()
     })?;
+
+    // 手跡: 状態ファイルと走行中の累計からも、区間に入る切った／戻した時刻と起点を消す。
+    handmark_on_redact(&app, from_ms, to_ms);
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -4769,6 +4928,8 @@ fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>) {
     {
         let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
         s1_finish_before_end(app, &log_tx);
+        // 手跡: 最後の行も `End` の前に書く。
+        handmark_finish_before_end(app, &log_tx);
     }
     // EH3: 肖像の「終わり」（A-seed なら seed）を書いてから `End` を送る。待ち合わせはこの関数を呼んだ
     //   スレッド（メインのことがある）ではなく、下のバックグラウンドのスレッドで行う。
@@ -5160,6 +5321,7 @@ pub fn run() {
     let log_tx_for_monitor = log_tx.clone();
     let log_tx_probe = log_tx.clone();
     let log_tx_s1 = log_tx.clone();
+    let log_tx_handmark = log_tx.clone();
     let log_tx_g1 = log_tx.clone();
     let log_tx_liveness = log_tx.clone();
     // ★ O1 (R3-a): 非打鍵チャネルのドレインスレッド用。
@@ -5345,6 +5507,8 @@ pub fn run() {
                 if k.is_press && !crate::recording::is_paused() {
                     // 段 1: 特徴量に流れる押下だけを駆動役へ（段 1 でなければ口が無く何もしない）。
                     s1_send_press(k.timestamp);
+                    // 手跡: 打鍵の時刻だけを駆動役へ(段 1 かつ macOS でなければ口が無く何もしない)。
+                    handmark_send_press(k.timestamp);
                     if let Some((a, tracker)) = eh3_days.as_mut() {
                         let off = utc_offset.get(k.timestamp);
                         if let Some(d) = tracker.on_press(k.timestamp, off, a) {
@@ -6773,6 +6937,15 @@ pub fn run() {
                 let _ = S1_PRESS_TX.set(press_tx);
                 let _ = S1_FOCUS_TX.set(focus_tx);
                 spawn_s1_driver(app.handle().clone(), log_tx_s1, press_rx, focus_rx);
+                // 手跡(ADR-051): 段 1 の後期の背景。macOS だけ(窓が無い OS では行も書かない)。
+                #[cfg(target_os = "macos")]
+                {
+                    let (hm_tx, hm_rx) = crossbeam_channel::bounded::<u64>(4096);
+                    let _ = HANDMARK_PRESS_TX.set(hm_tx);
+                    spawn_handmark_driver(app.handle().clone(), log_tx_handmark, hm_rx);
+                }
+                #[cfg(not(target_os = "macos"))]
+                let _ = log_tx_handmark;
             }
 
             // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
@@ -6900,6 +7073,12 @@ pub fn run() {
             // 段 1: 問いに同意していれば overlay を出す（NSPanel 化の後・画面外 1×1 に置いてから）。
             //   ★ O1 は `start_session` を押さないので、今は overlay が一度も `show()` されない。
             show_s1_overlay(app.handle());
+
+            // 手跡: 背景の窓を隠したまま先に作る(setup のメインスレッド・段 1 かつ macOS のときだけ)。
+            #[cfg(target_os = "macos")]
+            if crate::s1::is_s1() {
+                crate::handmark_stage::setup(app);
+            }
 
             // ★★ 常駐トレイ。⚠️ **窓を閉じると UI ごと消えるのに計測は生きている**という穴を塞ぐ
             //   (`tray.rs` のモジュールコメント参照)。★ 失敗しても起動は止めない

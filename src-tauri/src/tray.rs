@@ -108,6 +108,35 @@ fn current_state(session_active: &AtomicBool) -> MeasureState {
     )
 }
 
+/// 手跡の「やめる」／「描く」の項目の ID(段 1 の後期・ADR-051)。
+const MENU_HANDMARK: &str = "gse-tray-handmark";
+
+/// 手跡のトレイの項目の状態(駆動役が書き、更新スレッドが読む)。0 = 出さない・1 = やめる・2 = 描く。
+static HANDMARK_TRAY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn handmark_item_code(t: crate::handmark_driver::TrayItem) -> u8 {
+    use crate::handmark_driver::TrayItem;
+    match t {
+        TrayItem::Hidden => 0,
+        TrayItem::Stop => 1,
+        TrayItem::Restore => 2,
+    }
+}
+
+fn handmark_item_from_code(c: u8) -> crate::handmark_driver::TrayItem {
+    use crate::handmark_driver::TrayItem;
+    match c {
+        1 => TrayItem::Stop,
+        2 => TrayItem::Restore,
+        _ => TrayItem::Hidden,
+    }
+}
+
+/// 駆動役が手跡の項目の状態を知らせる(項目の出し入れは更新スレッドが 1 秒ごとに行う)。
+pub fn set_handmark_item(t: crate::handmark_driver::TrayItem) {
+    HANDMARK_TRAY.store(handmark_item_code(t), Ordering::Release);
+}
+
 /// メニュー項目の ID。
 const MENU_QUIT: &str = "gse-tray-quit";
 const MENU_STATUS: &str = "gse-tray-status";
@@ -197,6 +226,9 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             } else if event.id.as_ref() == MENU_PORTRAIT_STOP {
                 // ⚠️ 選んだことは記録しない（applog にも出さない・R-P9）。
                 crate::stop_portrait_by_person();
+            } else if event.id.as_ref() == MENU_HANDMARK {
+                // ⚠️ 選んだことは applog にも出さない(日の行に切った／戻した時刻が残るだけ)。
+                crate::handmark_toggle_from_tray(app);
             } else if event.id.as_ref() == MENU_INVITATION {
                 // ⚠️ 開いたことは記録しない（applog にも出さない・R-I1）。
                 let _ = crate::show_invitation_settings_window(app);
@@ -206,6 +238,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         builder = builder.icon(icon.clone());
     }
     let tray = builder.build(app)?;
+    // 手跡の項目(今日の割付が出す日のときだけ駆動役が `Hidden` 以外にする)
+    let handmark_menu_item = MenuItem::with_id(app, MENU_HANDMARK, "やめる", true, None::<&str>)?;
 
     std::thread::Builder::new()
         .name("gse-tray".to_string())
@@ -215,6 +249,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             let mut invitation_shown = false;
             // 差し込みの失敗は最初の 1 回だけ警告する(毎秒の連投を避ける・内容は書かない)
             let mut insert_failure_warned = false;
+            // 手跡の項目をいま差し込んでいる文言
+            let mut handmark_shown = crate::handmark_driver::TrayItem::Hidden;
             loop {
                 std::thread::sleep(Duration::from_millis(1000));
                 // ★ 終了処理が始まったら抜ける。⚠️ 落ちるまでの数百 ms のあいだ
@@ -236,6 +272,26 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                         }
                     } else if !want && invitation_shown && menu.remove(item).is_ok() {
                         invitation_shown = false;
+                    }
+                }
+                // 手跡の項目: 状態が変わったときだけ触る(出し入れは記録しない)
+                let want = handmark_item_from_code(HANDMARK_TRAY.load(Ordering::Acquire));
+                if want != handmark_shown {
+                    match want.label() {
+                        None => {
+                            if menu.remove(&handmark_menu_item).is_ok() {
+                                handmark_shown = want;
+                            }
+                        }
+                        Some(label) => {
+                            let _ = handmark_menu_item.set_text(label);
+                            let inserted = handmark_shown
+                                != crate::handmark_driver::TrayItem::Hidden
+                                || menu.insert(&handmark_menu_item, 2).is_ok();
+                            if inserted {
+                                handmark_shown = want;
+                            }
+                        }
                     }
                 }
                 let next = current_state(&session_active);
@@ -322,7 +378,19 @@ mod tests {
             MeasureState::Measuring,
             MeasureState::HookDown,
         ] {
-            for text in [measure_label(state), measure_title(state)] {
+            // 手跡の「やめる」／「描く」も同じ禁止語の対象(状態に依らない文言)
+            let handmark = [
+                crate::handmark_driver::TrayItem::Stop.label().unwrap_or(""),
+                crate::handmark_driver::TrayItem::Restore
+                    .label()
+                    .unwrap_or(""),
+            ];
+            for text in [
+                measure_label(state),
+                measure_title(state),
+                handmark[0],
+                handmark[1],
+            ] {
                 for word in banned {
                     assert!(
                         !text.contains(word),
@@ -330,6 +398,40 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// 手跡のトレイの文言(「やめる」／「描く」)も非開示語を含まず、手跡の語を出さない。
+    #[test]
+    fn handmark_tray_labels_are_plain() {
+        use crate::handmark_driver::TrayItem;
+        let banned = [
+            "Flow",
+            "flow",
+            "Incubation",
+            "incubation",
+            "Stuck",
+            "stuck",
+            "フロー",
+            "スタック",
+            "停滞",
+            "確率",
+            "p_",
+            "手跡",
+            "Handmark",
+            "handmark",
+            "背景",
+            "状態",
+        ];
+        for t in [TrayItem::Stop, TrayItem::Restore] {
+            let label = t.label().expect("label");
+            for w in banned {
+                assert!(!label.contains(w), "{label:?} has {w:?}");
+            }
+        }
+        assert_eq!(TrayItem::Hidden.label(), None);
+        for t in [TrayItem::Hidden, TrayItem::Stop, TrayItem::Restore] {
+            assert_eq!(handmark_item_from_code(handmark_item_code(t)), t);
         }
     }
 

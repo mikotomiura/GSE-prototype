@@ -570,6 +570,7 @@ mod tests {
             "LogEntry::ProbeFrame {",
             "LogEntry::ProbeSuppressed {",
             "LogEntry::DayQuestion(",
+            "LogEntry::HandmarkDay(",
             "LogEntry::activity_label_answered(",
             "LogEntry::activity_label_skipped(",
         ] {
