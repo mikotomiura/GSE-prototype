@@ -49,5 +49,5 @@
 - [x] 条件の英訳の要約・送付状の下書き（0214240a・442da558）・単盲で確定
 - [x] 公開物の組み立て（public/assemble.py・参照を伏せた写し・verify.py と対照・README 英日・図）→ GitHub mikotomiura/stall-shape-multiverse（公開）
 - [x] Zenodo の下書き 24047695・DOI 10.5281/zenodo.24047695 を予約・zip（md5 2622e3b1…）を上げた・原稿と README に DOI
-- [ ] Zenodo を publish（研究者に確かめてから）→ 公開後に record の zip を手元と SHA-256 で照合
+- [x] Zenodo を publish（2026-11-08・研究者の確認の後）。record の zip を取り直し、手元と SHA-256（37219bd7…）が一致
 - [ ] 投稿（研究者・Submit の前に校正刷り）
