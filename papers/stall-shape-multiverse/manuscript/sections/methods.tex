@@ -80,7 +80,10 @@ wrote its per-second rows; they cover nearly all of a KLiCKe essay, with holes o
 depend on the estimator, the grid also contains two segmentations defined by key times alone, and every result is
 reported for them. A writer-quantile $\theta$ is undefined before the unit's 100th interval, so no stall can start in
 that time (3.2--10.3\% of the exposure), whereas a fixed $\theta$ can; we repeated the comparisons with all
-definitions restricted to the time after the 100th interval (S2).
+definitions restricted to the time after the 100th interval (S2). Condition A is evaluated only from $W$ after the
+start of an observation interval, so no definition can detect a stall in the first $W$ seconds of an interval
+(0.5--10.9\% of the exposure across datasets, segmentations and windows); we also repeated the comparisons with each
+interval starting 60~s after its start and not before the 100th interval (S2).
 
 \begin{figure}[t]
 \centering

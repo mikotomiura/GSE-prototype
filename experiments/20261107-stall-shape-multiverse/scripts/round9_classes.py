@@ -2,8 +2,9 @@
 """区間の類による読み（結果を見た後の提案・原稿の考察）を、既にある集計の区間から数える。新しい計算はしない。
 
 類: 区間が −0.1 より下 / +0.1 より上 / ±0.1 の内（無視できる）/ どれでもない（精度不足）。
-読み: 分類できた定義（精度不足を除く）が 1 つの類だけなら、その類。2 つ以上の類にあり、1 つの類が分類できた定義の
-90% 以上ならその類（例外の数を添える）。それ以外は「定義に依る」。分類できた定義が無ければ「精度不足」。
+読み: 精度不足が群の半分以上なら「精度不足」。そうでなければ、分類できた定義（精度不足を除く）が 1 つの類だけなら、
+その類。2 つ以上の類にあり、1 つの類が分類できた定義の 90% 以上ならその類（例外の数を添える）。それ以外は「定義に依る」。
+主の類の割合（分類できた定義のうち）も出す。
 
   python3 round9_classes.py <results_dir> <out_json>
 """
@@ -31,12 +32,15 @@ def reading(cis):
     c = Counter(cls(ci) for ci in cis)
     classified = {k: v for k, v in c.items() if k != "imprecise"}
     n = sum(classified.values())
-    if n == 0:
+    top_share = None
+    if n:
+        top, m = max(classified.items(), key=lambda kv: kv[1])
+        top_share = m / n
+    if c.get("imprecise", 0) >= 0.5 * len(cis):
         r = "imprecise"
     else:
-        top, m = max(classified.items(), key=lambda kv: kv[1])
         r = top if (len(classified) == 1 or m >= SHARE * n) else "depends"
-    return {"n": len(cis), "counts": dict(c), "reading": r}
+    return {"n": len(cis), "counts": dict(c), "reading": r, "top_share": top_share}
 
 
 def selftest():
@@ -46,6 +50,8 @@ def selftest():
     assert reading([[-0.05, 0.05]] * 5 + [[-0.3, -0.2]] * 5)["reading"] == "depends"
     assert reading([[-0.05, 0.05]] * 9 + [[-0.3, -0.2]])["reading"] == "negligible"
     assert reading([[-0.15, 0.0]] * 3)["reading"] == "imprecise"
+    assert reading([[-0.05, 0.05]] * 5 + [[-0.15, 0.0]] * 5)["reading"] == "imprecise"
+    assert reading([[-0.05, 0.05]] * 6 + [[-0.15, 0.0]] * 4)["reading"] == "negligible"
     print("selftest: OK")
 
 

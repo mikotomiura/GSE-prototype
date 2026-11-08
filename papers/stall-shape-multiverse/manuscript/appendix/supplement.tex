@@ -39,6 +39,9 @@ positive for 10 definitions under the one-stage intervals, had been positive for
 10 & [D] & After a third internal check, no new computation: the reading by classes of interval, with imprecise intervals
 as a class of their own, and the grid of default and precedented levels, counted from the existing intervals (in the
 archive) \\
+11 & [A] & After a fourth internal check: the share of exposure in the first $W$ seconds of each observation interval,
+and all 90 definitions with each interval cut to start 60~s after its start and not before the 100th interval (S2);
+its readings \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -53,9 +56,9 @@ after seeing results; [D] descriptive, counted after seeing results.
 Conclusion & Status \\
 \midrule
 Direction of the stall--score and pause--score association changes (criterion: one definition on the other side of
-zero). For pauses the reading was stated over all 36 definitions and was met there, through the control alone; the main
-text reports the 18 fixed-threshold definitions, in which it is also met, and treats the 18 writer-quantile ones as a
-control. Presence of the pause association: by the stall criterion applied after seeing the results, it moves on the
+zero). For pauses the reading was stated over all 36 definitions and was met there, with the control supplying 18
+positive intervals; the main text reports the 18 fixed-threshold definitions, in which it is also met (3 positive and
+7 negative intervals), and treats the 18 writer-quantile ones as a control. Presence of the pause association: by the stall criterion applied after seeing the results, it moves on the
 18 (56\% of intervals exclude zero) and not on the 36 (78\%) & [A] \\
 Reading by classes of interval (90\% of classified definitions in one class; imprecise intervals counted apart) and
 the grid of default and precedented levels & [D] \\
@@ -141,7 +144,21 @@ and 0 before). The reversals of $\varphi$ at 1.5, counted by the rule of
 the main text, were 17 (CS1 2019 blocks), 57 (CS1 2019 assignments), not counted (CS1 2021 blocks), 26 (CS1 2021
 assignments) and 0 (CoAuthor); in the full time they were not counted, 54, 49, 19 and 0. In the restricted time the
 baseline interval of the CS1 2019 blocks, [1.28, 1.45], no longer contains 1.5, whereas that of the CS1 2021 blocks,
-[1.37, 1.94], does; only the CS1 2021 assignments crossed 25\% of the definitions.
+[1.37, 1.94], does. The CS1 2021 assignments newly crossed 25\% of the definitions, and the CS1 2019 assignments stayed above it.
+
+\paragraph{The first seconds of each observation interval.} Condition A is evaluated only from $W$ after the start of
+an observation interval, so no definition can detect a stall in the first $W$ seconds of an interval. These seconds
+held 1.1--2.8\% (15~s), 2.1--5.6\% (30~s) and 4.0--10.9\% (60~s) of the exposure in the default segmentation, and
+0.5--9.2\% in the two others, by dataset and window. We cut each interval $[a, b]$ to $[\max(a + 60\,\mathrm{s}, w), b]$,
+with $w$ the time of the unit's 100th interval, and dropped empty intervals, for all 90 definitions (exposure on the
+cut intervals, stalls counted when $t_0$ lay in them, the 5-minute rule applied to the cut exposure, one-stage
+intervals). The baseline stall--score correlation was $-0.073$ [$-0.100$, $-0.045$]; 9 definitions had a positive
+interval (all with a 15-s window and a writer quantile; 10 in the full time), 74 a negative one (72), and no interval
+changed from one side of zero to the other. The rank order differed for 81 definitions (80). The rate ratios reversed
+for 23 definitions between the two CS1 editions (20; 19 with a fixed $\theta$, 18 before), so this pair crossed 25\%
+of the definitions, and for 66, 53, 8 and 2 in the other pairs (66, 53, 6 and 0). The reversals of $\varphi$ at 1.5
+were 17, 57, not counted, 24 and 0 in the order of the previous paragraph (not counted, 54, 49, 19 and 0), the same
+pattern as after the 100th interval. The primary values remain those of the full time.
 
 \paragraph{Checks.} The onsets $(s, t_0)$ of the baseline agreed with those of the reference implementation in all
 7,709 units. For the window variants of 15 and 60~s and the 0.995 quantile variant (with the minimum of 200 intervals of
@@ -151,7 +168,7 @@ setting, and 20 mutants of the condition, the quantile, the segmentation and the
 
 \paragraph{Intervals.} Writers were resampled with replacement 2,000 times within each dataset with a fixed seed; the
 rate of a resample is the sum of counts over the sum of exposures of its units (units with at least 5~min of
-exposure). These one-stage intervals are the primary ones. For the 54 writer-quantile stall definitions we also
+exposure). These one-stage intervals are the primary ones. For the 54 writer-quantile stall definitions (the baseline included) we also
 computed two two-stage intervals. In the first, the key-press times of each unit were kept and the values of its
 intervals were drawn again with replacement from all of the unit's intervals; $\theta$ was recomputed by the causal
 rule and the stalls were counted again. 200 such draws were made per unit, and each writer drawn in an outer resample

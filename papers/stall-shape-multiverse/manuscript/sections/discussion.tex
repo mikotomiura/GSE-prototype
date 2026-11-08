@@ -3,23 +3,25 @@
 
 The association between a stall rate and essay score was present for most definitions and changed direction only
 where a 15-s window met a writer quantile; on the grid of default and precedented levels it was negative or
-negligible, and what moved there was its size and, among fixed pause thresholds, its presence. Adjusting for essay
-length left no stall definition negative and most values negligible, whereas for pauses it raised half of the
-definitions above $+0.1$. For researchers in educational data mining and learning analytics who relate pause, stall or
+negligible, and the reading there split by the family of $\theta$, each family reading consistently. Among fixed pause
+thresholds, all within the range in use, the direction changed between mostly negligible values. Adjusting for essay
+length moved both associations upwards: no stall definition was negative and most were negligible, whereas half of the
+pause definitions rose above $+0.1$. For researchers in educational data mining and learning analytics who relate pause, stall or
 inactivity rates to outcomes or compare them across datasets, a report should therefore contain the range of the
-conclusion across definitions and adjustments, with intervals, rather than the point value of one definition. Within
-levels in use, our result resembles earlier multiverse analyses, in which an eye-movement effect kept its existence
-and changed its size \cite{godwin2025multiverse} and boundary pausing in CS1 changed strength with the split at 2~s
-but not direction \cite{koutcheme2026keystroke}; widening the grid to levels around the default also changed the
-direction. The score association comes from adults recruited online, so its transfer to course data is untested.
+conclusion across definitions and adjustments, with intervals, rather than the point value of one definition. On the
+default and precedented stall levels, our result resembles earlier multiverse analyses, in which an eye-movement effect
+kept its existence and changed its size \cite{godwin2025multiverse} and boundary pausing in CS1 changed strength with
+the split at 2~s but not direction \cite{koutcheme2026keystroke}; widening the grid to levels around the default also
+changed the direction. The score association comes from adults recruited online, so its transfer to course data is untested.
 
 \paragraph{Why the direction can change.} A rate of labels per hour is a count, and counts carry how much and how fast
 a writer types as well as how often the writer stops. A writer-quantile pause threshold makes this explicit: its rate
 follows the rate of key presses and correlated with the score at about $+0.6$. Prior work reports the same split
 between counts and durations: pause counts can correlate positively with scores through text length, whereas pause
-durations correlate negatively \cite{schaller2026keyscore}. The two detectors also answered the adjustments
-differently: given speed, an exploratory analysis, every stall definition was negative but most fixed pause thresholds
-were positive, and given length the stall association shrank towards zero while the pause association grew. These are
+durations correlate negatively \cite{schaller2026keyscore}. Given length both detectors moved upwards, but
+given speed, an exploratory analysis, they answered differently: every stall definition was negative while most fixed
+pause thresholds were positive. The ten positive stall definitions, which pair a short window with a writer quantile,
+all turned negative given speed, so that corner may follow typing speed through the writer quantile. These are
 patterns, not a tested mechanism; the association that remains after either adjustment is the part of the rate that
 does not overlap with the covariate, and speed and length may confound or mediate it \cite{mackinnon2000equivalence}.
 
@@ -31,21 +33,22 @@ models, are the natural complement.
 
 \paragraph{What the criteria established.} By criteria set before each quantity was seen, the direction of the stall
 and pause associations with the score changed (a lenient criterion), the presence of the stall association did not
-move, adjusting for essay length left no stall definition negative, $\varphi$ against 1.5 depended on the definition
-in two CS1 cells, and the largest component of CS1 stall length stayed. The presence of the pause association, the
+move, the rank order of the datasets moved, adjusting for essay length left no stall definition negative, $\varphi$
+against 1.5 depended on the definition in two CS1 cells, and the largest component of CS1 stall length stayed. The presence of the pause association, the
 reversal of rate ratios, all sizes and the readings by class were judged after seeing results, and the speed-adjusted
 values are exploratory (S1). We did not test whether the definitional spread changes the performance of a predictor
 or a decision about when to intervene.
 
 \paragraph{Recommendation.} When reporting an association or a comparison based on a pause or stall rate, report the
 value of each axis, vary each axis over its range in prior practice and around the default, and report the spread with
-intervals, with and without adjustment for quantities that do not contain the label, such as the length of the product
-and typing speed; adjustment is an axis as well, since it can change the conclusion as a definition can. As a proposal
-formed after seeing these results, sort each definition's interval into below $-0.1$, above $+0.1$, within $\pm 0.1$
-(negligible) or imprecise (crossing a bound). Report a consistent direction or a negligible association when one class
-holds at least 90\% of the classified definitions, report that the conclusion depends on the definition otherwise, and
-give the number of imprecise intervals in either case, since a wide interval is a lack of precision rather than a
-dependence on the definition. Because these shares depend on how finely each axis is cut, apply the reading to the
-grid of the default and of levels with precedent and to the grid with the levels around the default added, and report
-both (Table~\ref{tab:read}). The same reading applies to comparisons of rates between datasets and to $\varphi$. The
-code is released for this purpose.
+intervals, with and without adjustment for quantities that do not contain the label, such as the length of the
+product; adjustment is an axis as well, since it can change the conclusion as a definition can. As a proposal formed
+after seeing these results, sort each definition's interval into below $-0.1$, above $+0.1$, within $\pm 0.1$
+(negligible) or imprecise (crossing a bound). Read a group as imprecise when at least half of its intervals are, as a
+consistent direction or a negligible association when one class holds at least 90\% of the classified definitions, and
+otherwise as dependent on the definition, a reading that includes moves between negative and negligible values; give
+the share of the leading class and the number of imprecise intervals with each reading, since the reading is sensitive
+near the 90\% bound. Because these shares depend on how finely each axis is cut and on which constructs are pooled,
+apply the reading to the grid of the default and of levels with precedent, within each family of thresholds, and to the
+grid with the levels around the default added (Table~\ref{tab:read}). The band of $\pm 0.1$ is for correlations;
+ratios and $\varphi$ need their own reference points and bands. The code is released for this purpose.

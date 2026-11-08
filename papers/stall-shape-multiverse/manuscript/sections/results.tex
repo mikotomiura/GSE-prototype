@@ -1,7 +1,7 @@
 \section{Results}
 \label{sec:results}
 
-\subsection{The direction of the label--essay-score association changes within each detector}
+\subsection{The label--essay-score association moves with the definition, in direction only at some levels}
 \label{sec:res-score}
 
 A study that reports how a pause or stall rate relates to the quality of a product usually reports one definition. We
@@ -18,7 +18,7 @@ $W = 15$~s, the level we set at half the default, and a writer-quantile $\theta$
 other windows, 57 were negative and none was positive, and on the grid of default and precedented levels
 (Table~\ref{tab:grid}) none was positive either. Across the 89 definitions the
 correlation ranged from $-0.25$ to $+0.14$ (median $-0.14$), with intervals negative for 72, positive for 10 and
-including zero for 7. In strength, 58 definitions gave a negative correlation of at least 0.1 in absolute value and 3
+including zero for 7. By point value, 58 definitions gave a negative correlation of at least 0.1 in absolute value and 3
 a positive one; all 36 fixed-second definitions were negative. The positive corner is not a floor effect of rare
 stalls (S3).
 
@@ -132,44 +132,52 @@ stall rate was positive with an interval above zero for 54 definitions, included
 none ($+0.02$ to $+0.13$; baseline $+0.057$ [$+0.029$, $+0.085$]); the 10 definitions that were positive without
 adjustment stayed positive. By the reading set before the computation, the sign became uniform: no definition was
 negative. In size, 74 of the 89 intervals lay within $\pm 0.1$, so after adjustment the stall rate carried little
-association with the score. Stall time and essay length overlap by construction, since time in a stall is time in
-which no text is added, so the adjustment also removes part of what the stall rate measures. For the fixed pause
+association with the score. Stalls and essay length overlap by construction: under the net rule a stall is a period in
+which the text does not grow, so the adjustment also removes part of what the stall rate measures. For the fixed pause
 thresholds, 15 of 18 were positive and none negative, and 9 had an interval above $+0.1$.
 
 \paragraph{Given typing speed (exploratory).} The speed covariate was chosen after seeing results
 (Section~\ref{sec:status}). With the median of intervals under 2~s, the partial correlation of score and stall rate was
 negative with an interval below zero for all 89 definitions ($-0.29$ to $-0.03$; baseline $-0.18$ [$-0.21$, $-0.15$]),
-and below $-0.1$ for 71. Six ways of measuring speed gave no positive interval and 2 of
+and below $-0.1$ for 71; the ten definitions with a positive unadjusted interval all had an interval below zero.
+Six ways of measuring speed gave no positive interval and 2 of
 534 intervals including zero (S3). For the fixed pause thresholds the speed-adjusted correlation went
 the other way: positive for 11 of 18 and negative for 4.
 
-Given speed every stall interval lay below zero; given length no point value was negative and 54 intervals lay above
-zero. The sizes differed as well: a small negative association for most definitions given speed, a mostly negligible
-one given length. Neither value is a causal effect (Section~\ref{sec:discussion}).
+Given length, the stall association moved upwards from its unadjusted median of $-0.14$: no point value was
+negative, 54 intervals lay above zero and most were negligible; the pause association moved the same way, half of it
+beyond $+0.1$. Given speed, every stall interval lay below zero, whereas most fixed pause thresholds were positive. Neither value is a causal effect (Section~\ref{sec:discussion}).
 
 \paragraph{Reading by classes of interval.} Table~\ref{tab:read} applies the reading proposed in
 Section~\ref{sec:discussion}, which was formed after seeing these results: each definition's interval is below $-0.1$,
-above $+0.1$, within $\pm 0.1$ (negligible) or imprecise (crossing a bound), and a group of definitions reads as the class
-that holds at least 90\% of its classified definitions, or as dependent on the definition. Unadjusted, the fixed stall
-thresholds read as below $-0.1$ and the fixed pause thresholds as negligible, while the full stall grid and the grid of
-default and precedented levels depended on the definition. Given length, every stall grid read as negligible, but the
-fixed pause thresholds came to depend on the definition, with 9 of 18 above $+0.1$: adjustment changed the reading as a
-definition does.
+above $+0.1$, within $\pm 0.1$ (negligible) or imprecise (crossing a bound); a group reads as imprecise when at least
+half of its intervals are imprecise, as the class that holds at least 90\% of its classified definitions, or otherwise
+as dependent on the definition, which includes moves between negative and negligible values without a change of sign.
+Unadjusted, the fixed stall thresholds read as below $-0.1$ and the fixed pause thresholds as negligible, while the full
+stall grid depended on the definition. On the grid of default and precedented levels the reading split by the family of
+$\theta$, which the grid treats as two constructs (Section~\ref{sec:grid}): the fixed 10-s threshold read as below
+$-0.1$ and the writer quantile as negligible, each consistently. Given length, every stall group read as negligible, but
+the fixed pause thresholds came to depend on the definition, with 9 of 18 above $+0.1$: adjustment changed the reading
+as a definition does. Given speed, the full grid fell just short of a consistent reading (89.9\%).
 
 \begin{table}[t]
-\centering\footnotesize
-\caption{Reading of the score association by classes of interval (a rule proposed after seeing the results). Counts:
-below $-0.1$ / within $\pm 0.1$ / above $+0.1$ / imprecise.}
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\caption{Reading of the score association by classes of interval (a rule proposed after seeing the results). Each
+cell gives the reading, the share of the leading class among the classified definitions, and the counts below
+$-0.1$ / within $\pm 0.1$ / above $+0.1$ / imprecise. Groups with the baseline: the default and precedented grid and
+its writer-quantile part; the full grid excludes it.}
 \label{tab:read}
 \begin{tabular}{@{}l l l l@{}}
 \toprule
 Group (definitions) & Unadjusted & Given length & Given speed (exploratory) \\
 \midrule
-Stalls, full grid (89) & depends: 48/17/2/22 & negligible: 0/74/1/14 & depends: 71/8/0/10 \\
-Stalls, fixed $\theta$ (36) & below: 36/0/0/0 & negligible: 0/33/0/3 & below: 36/0/0/0 \\
-Stalls, writer quantile (53) & depends: 12/17/2/22 & negligible: 0/41/1/11 & depends: 35/8/0/10 \\
-Stalls, default and precedented (12) & depends: 3/5/0/4 & negligible: 0/9/0/3 & below: 12/0/0/0 \\
-Pauses, fixed threshold (18) & negligible: 0/13/0/5 & depends: 0/6/9/3 & depends: 0/9/2/7 \\
+Stalls, full grid (89) & depends (71\%): 48/17/2/22 & negligible (98\%): 0/74/1/14 & depends (89.9\%): 71/8/0/10 \\
+Stalls, fixed $\theta$ (36) & below (100\%): 36/0/0/0 & negligible (100\%): 0/33/0/3 & below (100\%): 36/0/0/0 \\
+Stalls, writer quantile (53) & depends (54\%): 12/17/2/22 & negligible (97\%): 0/41/1/11 & depends (81\%): 35/8/0/10 \\
+Stalls, default and precedented (12) & depends (62\%): 3/5/0/4 & negligible (100\%): 0/9/0/3 & below (100\%): 12/0/0/0 \\
+\quad of which fixed 10~s (3) & below (100\%): 3/0/0/0 & negligible (100\%): 0/3/0/0 & below (100\%): 3/0/0/0 \\
+\quad of which writer quantile (9) & negligible (100\%): 0/5/0/4 & negligible (100\%): 0/6/0/3 & below (100\%): 9/0/0/0 \\
+Pauses, fixed threshold (18) & negligible (100\%): 0/13/0/5 & depends (60\%): 0/6/9/3 & depends (81\%): 0/9/2/7 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -182,21 +190,25 @@ between datasets, a count model within writers, and the decomposition of stall l
 
 \paragraph{Comparing rates between datasets.}
 \label{sec:res-ratio}
-Does a comparison of stall rates between datasets survive a change of definition? Under the baseline the rates were
+Does a comparison of stall rates between datasets, such as between cohorts of a course, survive a change of
+definition? Under the baseline the rates were
 15.1 (KLiCKe), 13.1 (CS1 2019), 8.8 (CS1 2021) and 7.1 (CoAuthor) per hour; across the 89 definitions, the CS1 2019
-rate alone ranged from 4.4 to 46.0. We counted a ratio as reversed when its point value and its
+rate alone ranged from 4.4 to 46.0. By the criterion set before the computations (25\% of definitions), the rank
+order of the four datasets moved: it differed from the baseline order for 80 of 89 definitions, although the close
+baseline rates of CS1 2019 and KLiCKe swap alone in 11 of them. We counted a ratio as reversed when its point value and its
 interval lay on the other side of 1 from the baseline ratio, a description of each definition rather than a test over
 the grid (Figure~\ref{fig:ratio}). For the two CS1 editions,
 which share the course and the recording and which we had committed to report first, 20 of 89 definitions (22\%)
 reversed the ratio, below the 25\% we had set after seeing point values (Section~\ref{sec:status}; 22 of 89 in
-the time after the 100th interval, S2); 18 of the 20 used a fixed $\theta$. Of the other pairs, CS1 2019 against KLiCKe (baseline ratio 0.86) reversed for 66 definitions (36 with a
+the time after the 100th interval, S2), but 23 (26\%), above it, when the first 60~s of each observation interval
+were also excluded (S2); 18 of the 20 used a fixed $\theta$. Of the other pairs, CS1 2019 against KLiCKe (baseline ratio 0.86) reversed for 66 definitions (36 with a
 fixed $\theta$, 30 with a writer quantile), CS1 2021 against KLiCKe for 53 (36 and 17), CS1 2019 against CoAuthor for 6
 (all writer quantile) and the two writing datasets for none; the baseline interval of CS1 2021 against CoAuthor
-included 1. Every fixed-$\theta$ definition thus reversed both comparisons with KLiCKe. In the pause family, the two CS1
-editions reversed for none of the 36 definitions, whereas the pairs with CoAuthor, whose pause rates ranged from 42 to
-498 per hour, reversed for 31 or 32 (S3). The counts are not comparable
-across pairs, whose baseline ratios and sample sizes differ; the rank order of the four datasets and the counts
-restricted to the time after the 100th interval are in S2 and S3.
+included 1. Every fixed-$\theta$ definition thus reversed both comparisons with KLiCKe. Among the
+fixed pause thresholds, the two CS1 editions reversed for none of 18, whereas the pairs with CoAuthor, whose pause rates
+ranged from 42 to 498 per hour, reversed for 14 and 13 (S3), so by the same criterion the direction of a ratio changed in the pause family too. The
+counts are not comparable across pairs, whose
+baseline ratios and sample sizes differ.
 
 \begin{figure}[t]
 \centering
@@ -237,18 +249,20 @@ star: baseline. A ratio reverses when its point value and its interval lie on th
 
 \paragraph{Departure from a constant rate within writers.}
 \label{sec:res-phi}
-Do the counts of a writer's sub-units vary more than a constant rate per writer would make them vary? We
-measured the dispersion index $\varphi$ with the writer's own rate as the expectation (Table~\ref{tab:phi},
+Do the counts of a writer's sub-units vary more than a constant rate per writer would make them vary? The answer
+decides how much dispersion a count model of stalls has to allow. We measured the dispersion index $\varphi$ with the writer's own rate as the expectation (Table~\ref{tab:phi},
 Figure~\ref{fig:phi}). Under the baseline, $\varphi$ exceeded 1 in all four CS1 cells (1.44 to 3.82) and not in
 CoAuthor sessions (1.08). Across the 89 definitions, the median $\varphi$ was close to 1 in CS1 2019 blocks and CoAuthor
 sessions (1.03 and 1.02), 1.21 in CS1 2021 blocks and 1.25 and 2.28 in the CS1 assignments; the interval exceeded 1 for
 43 to 68 definitions in the CS1 cells and for 7 in CoAuthor. The baseline lay above the median of the 89 definitions in
 every CS1 cell. The conclusion against 1.5 reversed, by the same counting rule, for 54 definitions in the CS1 2019
 assignments, 49 in the CS1 2021 blocks, 19 (21\%) in the CS1 2021 assignments and none in CoAuthor; in CS1 2019 blocks
-the baseline interval contained 1.5, so no reversal was counted. Restricted to the time after the 100th interval, the
-CS1 2021 assignments reversed for 26 (29\%), crossing 25\% (S2). In the
+the baseline interval contained 1.5, so no reversal was counted. In the
 CS1 2019 assignments and the CS1 2021 blocks, then, whether $\varphi$ lay above or below 1.5 depended on the definition;
-in the other cells the reversals stayed under 25\% or could not be counted. $\varphi$ compares variance with the mean
+in the other cells the reversals stayed under 25\% or could not be counted. Restricted to the time after the 100th
+interval, the two cells were the CS1 2019 and CS1 2021 assignments (57 and 26 reversals), because the CS1 2021 blocks
+could no longer be counted, and so they were when the first 60~s of each observation interval were also excluded
+(57 and 24; S2). $\varphi$ compares variance with the mean
 and does not show which assumption of a count model fails.
 
 \begin{table}[t]
@@ -294,7 +308,8 @@ intervals; star: baseline. Solid line: 1 (constant rate within a writer); dashed
 \paragraph{Components of stall length.}
 \label{sec:res-length}
 A map of what moves needs a side that stays. Is the decomposition of stall length as fragile as the rates? We fitted
-the decomposition for all 90 definitions (Figure~\ref{fig:length}). Under the baseline, the stall-to-stall share was
+the decomposition for all 90 definitions (Figure~\ref{fig:length}). The lengths are times from onset to resumption, so
+a change of definition changes both the stalls and the point from which they are measured. Under the baseline, the stall-to-stall share was
 0.93 (CS1 2019) and 0.92 (CS1 2021), and the writer share 0.03 in both, which can be read as the intraclass correlation
 of writers. In both CS1 editions, the stall-to-stall share stayed the largest component in every one of the 89
 definitions (0.88 to 1.00), at least 0.83 above the next component, and the writer share stayed small (0.00 to 0.05);
