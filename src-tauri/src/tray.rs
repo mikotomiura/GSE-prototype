@@ -114,6 +114,9 @@ const MENU_HANDMARK: &str = "gse-tray-handmark";
 /// 手跡のトレイの項目の状態(駆動役が書き、更新スレッドが読む)。0 = 出さない・1 = やめる・2 = 描く。
 static HANDMARK_TRAY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
+/// メニューに実際に出している手跡の項目の状態(更新スレッドが書き、押下の処理が読む)。
+static HANDMARK_TRAY_SHOWN: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
 fn handmark_item_code(t: crate::handmark_driver::TrayItem) -> u8 {
     use crate::handmark_driver::TrayItem;
     match t {
@@ -228,7 +231,11 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                 crate::stop_portrait_by_person();
             } else if event.id.as_ref() == MENU_HANDMARK {
                 // ⚠️ 選んだことは applog にも出さない(日の行に切った／戻した時刻が残るだけ)。
-                crate::handmark_toggle_from_tray(app);
+                // 押された項目の文言(メニューに出ていた状態)を渡し、駆動役の今の状態と照らす
+                crate::handmark_toggle_from_tray(
+                    app,
+                    handmark_item_from_code(HANDMARK_TRAY_SHOWN.load(Ordering::Acquire)),
+                );
             } else if event.id.as_ref() == MENU_INVITATION {
                 // ⚠️ 開いたことは記録しない（applog にも出さない・R-I1）。
                 let _ = crate::show_invitation_settings_window(app);
@@ -281,6 +288,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                         None => {
                             if menu.remove(&handmark_menu_item).is_ok() {
                                 handmark_shown = want;
+                                HANDMARK_TRAY_SHOWN
+                                    .store(handmark_item_code(want), Ordering::Release);
                             }
                         }
                         Some(label) => {

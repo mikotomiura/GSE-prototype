@@ -1,8 +1,9 @@
 // 手跡の背景の層(段 1 の後期・ADR-051)。デスクトップの高さの透明な窓の全面に、自然世界(霧・草・粒)を描く。
 // 写し方は試作(見本 Version 5)の打鍵の部分と同じ。ポインタ・クリック・ホイールの処理は無い(PR 3・5)。
 // - 風・位相・漂い・配置の種は、Rust が打鍵の時刻だけから 250 ms ごとに計算して送る(StageState)。
-//   この窓は performance.now() から位相や漂いを積まない。届いた状態へ 250 ms かけて線形に寄せるだけで、
-//   描画の回数は状態に影響しない。
+//   この窓は performance.now() や描画の間隔(dt)から位相・漂い・位置を積まない。粒の位置も草の揺れも、
+//   届いた drift・phase・layout_seed の関数で、届いた状態へ 250 ms かけて線形に寄せるだけ
+//   (描画の回数は見た目に影響しない・机上の描き直しと一致する)。
 // - 霧: どの入力にも依らない基層(漂いは Rust の drift)。
 // 窓は何も保存せず、何も返さない。推定は受け取らない。数値・文字は描かない。
 import { useEffect, useRef } from "react";
@@ -48,8 +49,9 @@ interface Blade {
 }
 
 interface Mote {
-  x: number;
-  y: number;
+  /** 初期位置(layout_seed から決まる)。 */
+  x0: number;
+  y0: number;
   r: number;
   seed: number;
   k: number;
@@ -138,7 +140,7 @@ export default function HandmarkStage() {
       }
       motes = [];
       for (let i = 0; i < 140; i++) {
-        motes.push({ x: rnd() * W, y: rnd() * H * 0.9, r: 1 + rnd() * 2.2, seed: rnd() * 6.28, k: 0.5 + rnd() });
+        motes.push({ x0: rnd() * W, y0: rnd() * H * 0.9, r: 1 + rnd() * 2.2, seed: rnd() * 6.28, k: 0.5 + rnd() });
       }
     };
 
@@ -181,16 +183,17 @@ export default function HandmarkStage() {
         : a * fbm((x / W) * 1.6 + b * 7.3, drift * 0.105 * (1 + b * 0.2) + b * 11);
     };
     const baseSway = (seed: number, drift: number): number => fbm(seed * 13.7, drift * 0.35) * 0.1;
-    const baseLift = (seed: number, drift: number): number => fbm(seed * 9.1 + 300, drift * 0.25) * 6;
+    /** 粒の縦のゆらぎ。drift だけの関数(積み上げない)。 */
+    const moteBob = (seed: number, drift: number): number => fbm(seed * 9.1 + 300, drift * 0.25);
     const gustAt = (x: number, drift: number, irreg: number): number =>
       Math.max(0, 1 + 0.9 * irreg * fbm((x / W) * 2.2 + 500, drift * 1.1));
 
-    const drawNature = (dt: number, slow: number): void => {
+    const drawNature = (calm: number): void => {
       const { speed, irreg, phase } = shown;
-      // 「動きを減らす」は基層の漂いを遅くする(粒の流れも同じ)。
-      const drift = reduceMotion ? shown.drift * slow : shown.drift;
+      // 「動きを減らす」は基層の漂いと粒の流れを遅くする(係数を掛けるだけ・積まない)。
+      const drift = shown.drift * calm;
+      const flow = phase * calm;
       const wind = Math.min(1, speed / FULL_WIND_SPEED);
-      const mdt = dt * slow;
 
       // 霧の帯。基層だけで動き、どの入力でも変わらない。
       const step = Math.max(8, Math.round(10 * S));
@@ -207,22 +210,20 @@ export default function HandmarkStage() {
         ctx.fill();
       }
 
-      // 漂う粒。基層の流れ＋打鍵の風(横)。
+      // 漂う粒。位置は drift(基層の流れ)と phase(打鍵の風の積分)の関数で、幅で折り返す。
+      //   横のずれ = (基層 6/秒 × drift + 打鍵の風 70/秒 × phase/FULL_WIND_SPEED) × 粒ごとの係数。
+      const span = W + 20;
       for (const m of motes) {
-        const vx = (6 + 70 * wind * gustAt(m.x, drift, irreg)) * m.k * S;
-        const vy = baseLift(m.seed, drift) * S;
-        m.x += (vx * mdt) / 1000;
-        m.y += (vy * mdt) / 1000;
-        if (m.x > W + 10) m.x -= W + 20;
-        if (m.y < -10) m.y += H * 0.9;
-        else if (m.y > H * 0.9 + 10) m.y -= H * 0.9;
+        const dx = (6 * drift + (70 * flow) / FULL_WIND_SPEED) * m.k * S;
+        const x = ((((m.x0 + dx) % span) + span) % span) - 10;
+        const y = m.y0 + 40 * S * moteBob(m.seed, drift);
         const r = m.r * S;
         ctx.beginPath();
-        ctx.arc(m.x, m.y, r * 1.9, 0, Math.PI * 2);
+        ctx.arc(x, y, r * 1.9, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(18,22,27,0.14)";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(255,255,255,0.7)";
         ctx.fill();
       }
@@ -252,11 +253,13 @@ export default function HandmarkStage() {
         phase: finite(msg.phase, 0),
         drift: finite(msg.drift, 0),
       };
-      if (Number.isFinite(msg.layout_seed) && msg.layout_seed !== layoutSeed) {
+      // 種が替わったとき(日が変わった・取り直した)は、寄せずにそのまま置く。
+      const seedChanged = Number.isFinite(msg.layout_seed) && msg.layout_seed !== layoutSeed;
+      if (seedChanged) {
         buildWorld(msg.layout_seed);
       }
-      if (!active) {
-        // 開いたとき(または種が替わった後の最初)は、現在値をそのまま置く。
+      if (!active || seedChanged) {
+        // 開いたとき・種が替わったときは、現在値をそのまま置く。
         from = next;
         shown = next;
         active = true;
@@ -268,18 +271,13 @@ export default function HandmarkStage() {
       recvAt = performance.now();
     };
 
-    let last: number | null = null;
     let frame: number | null = null;
     let idleTimer: number | null = null;
     const loop = (now: number): void => {
       frame = null;
       if (!active) {
-        last = null;
         return;
       }
-      // 描画が止まっていた間の分は、動きには進めない(頭打ち)。
-      const dt = Math.min(last === null ? 16 : now - last, 100);
-      last = now;
       const k = Math.min(1, (now - recvAt) / STATE_TICK_MS);
       shown = {
         speed: from.speed + (to.speed - from.speed) * k,
@@ -288,7 +286,7 @@ export default function HandmarkStage() {
         drift: from.drift + (to.drift - from.drift) * k,
       };
       ctx.clearRect(0, 0, W, H);
-      drawNature(dt, reduceMotion ? 0.3 : 1);
+      drawNature(reduceMotion ? 0.3 : 1);
       if (shown.speed > 0 || to.speed > 0) {
         frame = requestAnimationFrame(loop);
       } else {
@@ -312,7 +310,6 @@ export default function HandmarkStage() {
 
     const onResize = (): void => {
       resize();
-      last = null;
     };
     window.addEventListener("resize", onResize);
 

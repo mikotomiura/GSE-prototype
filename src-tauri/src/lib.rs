@@ -2309,7 +2309,9 @@ fn show_s1_overlay(app: &tauri::AppHandle) {
 // ===========================================================================
 // 手跡（段 1 の後期・ADR-051・1b）の配線。★ 段 1 のモードかつ macOS のときだけ駆動スレッドを起こす。
 //   純粋な部分は `handmark_driver`（出来事 `Effect` を返す）。ここは出来事を行・窓・トレイに変えるだけ。
-//   ロックの順は `HANDMARK_DRIVER` → `LogState`（出来事の実行では `LogState` のロックを取らない）。
+//   ロックの順: `LogState` のロックは `log_tx` を複製する間だけ取り、放してから `HANDMARK_DRIVER` を取る
+//   （`handmark_log_tx`）。`HANDMARK_DRIVER` を持っている間は `LogState` を取らない（出来事の実行は
+//   `try_send`・窓への依頼・トレイの印だけ）。つまり 2 つを同時には持たない。
 // ===========================================================================
 
 /// 手跡の駆動役。`None` = 段 1 でない・macOS でない・まだ起きていない。
@@ -2370,14 +2372,26 @@ fn handmark_log_tx(app: &tauri::AppHandle) -> Sender<LogEntry> {
 }
 
 /// トレイの「やめる」／「描く」。選んだことは(切った時刻と日の行以外は)記録しない。
-pub(crate) fn handmark_toggle_from_tray(app: &tauri::AppHandle) {
+///
+/// `shown` は押された項目の文言の側(メニューに出ていた状態)。駆動役の今の状態と違う(表示が古い)ときは
+/// 何もしない(「描く」を押したのに開いていたら切らない、など)。終了中も何もしない。
+pub(crate) fn handmark_toggle_from_tray(
+    app: &tauri::AppHandle,
+    shown: crate::handmark_driver::TrayItem,
+) {
     use crate::handmark_driver::TrayItem;
+    if is_shutting_down() {
+        return;
+    }
     let Some(fs) = HANDMARK_FS.get() else { return };
     let log_tx = handmark_log_tx(app);
     let mut g = handmark_lock();
     let Some(d) = g.as_mut() else { return };
     let now = epoch_ms();
-    let fx = match d.tray() {
+    if d.tray() != shown {
+        return;
+    }
+    let fx = match shown {
         TrayItem::Stop => d.turn_off(fs, now),
         TrayItem::Restore => d.turn_on(fs, now),
         TrayItem::Hidden => return,
@@ -2385,14 +2399,28 @@ pub(crate) fn handmark_toggle_from_tray(app: &tauri::AppHandle) {
     run_handmark_effects(app, &log_tx, fx);
 }
 
-/// 区間の削除: 手跡の状態ファイルと走行中の累計から、区間に入る時刻を消す。
-fn handmark_on_redact(app: &tauri::AppHandle, from_ms: u64, to_ms: u64) {
-    let Some(fs) = HANDMARK_FS.get() else { return };
+/// 区間の削除: 手跡の状態ファイルと走行中の累計から、区間に入る時刻を消す(`redact_dir` の前に呼ぶ)。
+/// 書き直せなければ状態ファイルを消す。駆動役がまだ無いときは、表に依らず状態ファイルを直接直す。
+/// 直せなかった・消せなかったときは `false`。
+fn handmark_on_redact(app: &tauri::AppHandle, from_ms: u64, to_ms: u64) -> bool {
     let log_tx = handmark_log_tx(app);
     let mut g = handmark_lock();
-    let Some(d) = g.as_mut() else { return };
-    let fx = d.on_redact(fs, from_ms, to_ms, epoch_ms());
-    run_handmark_effects(app, &log_tx, fx);
+    if let Some(d) = g.as_mut() {
+        if let Some(fs) = HANDMARK_FS.get() {
+            let (fx, ok) = d.on_redact(fs, from_ms, to_ms, epoch_ms());
+            run_handmark_effects(app, &log_tx, fx);
+            return ok;
+        }
+    }
+    drop(g);
+    let result = match HANDMARK_FS.get() {
+        Some(fs) => crate::handmark_store::scrub_state_file(fs, from_ms, to_ms),
+        None => match crate::handmark_store::DiskFs::state_only() {
+            Some(fs) => crate::handmark_store::scrub_state_file(&fs, from_ms, to_ms),
+            None => Ok(()),
+        },
+    };
+    result.is_ok()
 }
 
 /// 終了: 手跡の累計を保存し、最後の行を `End` の前に書く。
@@ -2404,6 +2432,32 @@ fn handmark_finish_before_end(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>)
     run_handmark_effects(app, log_tx, fx);
 }
 
+/// 窓の層の様子(macOS 以外は窓が無いので駆動役も起きない)。
+fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
+    #[cfg(target_os = "macos")]
+    {
+        crate::handmark_stage::status()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        crate::handmark_driver::WindowStatus::Pending
+    }
+}
+
+/// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠す。
+#[cfg(target_os = "macos")]
+struct HandmarkWindowGuard {
+    app: tauri::AppHandle,
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for HandmarkWindowGuard {
+    fn drop(&mut self) {
+        crate::handmark_stage::close(&self.app);
+        crate::tray::set_handmark_item(crate::handmark_driver::TrayItem::Hidden);
+    }
+}
+
 /// 手跡の駆動スレッド(250 ms ごと)。★ 段 1 かつ macOS のときだけ起こす。
 #[cfg(target_os = "macos")]
 fn spawn_handmark_driver(
@@ -2412,11 +2466,24 @@ fn spawn_handmark_driver(
     press_rx: crossbeam_channel::Receiver<u64>,
 ) {
     thread::spawn(move || {
+        // 抜けるとき(パニックを含む)は必ず窓を閉じる。
+        let _guard = HandmarkWindowGuard { app: app.clone() };
         let Some(fs) = std::env::current_exe()
             .ok()
             .and_then(|exe| crate::handmark_store::DiskFs::from_env(&exe))
         else {
             tracing::warn!("handmark: file locations are unavailable; no background this run");
+            // 閉じた理由の行を 1 本だけ書いてから抜ける
+            let wall = epoch_ms();
+            let today = crate::eh3::local_day(wall, UtcOffsetCache::new().get(wall));
+            let row = crate::handmark_store::unavailable_row(
+                wall,
+                today,
+                crate::analysis::handmark::gate::CloseReason::PathsUnavailable,
+            );
+            if let Err(e) = log_tx.try_send(LogEntry::HandmarkDay(row)) {
+                tracing::warn!("handmark: day row not sent: {}", log_send_error(e));
+            }
             return;
         };
         let _ = HANDMARK_FS.set(fs);
@@ -2451,7 +2518,9 @@ fn spawn_handmark_driver(
             for t in press_rx.try_iter() {
                 d.on_press(t);
             }
-            let fx = d.tick(fs, wall, today);
+            // 窓の層の様子(作れなかった・出せなかった)を、この刻みの前に駆動役へ渡す
+            let mut fx = d.on_window_status(handmark_window_status(), wall);
+            fx.extend(d.tick(fs, wall, today));
             run_handmark_effects(&app, &log_tx, fx);
         }
     });
@@ -3280,6 +3349,10 @@ fn delete_time_range(
         }
     }
 
+    // 手跡: 状態ファイルと走行中の累計からも、区間に入る切った／戻した時刻と起点を消す。
+    //   ★ `redact_dir` の失敗の分岐で状態ファイルに時刻が残らないよう、先に行う。
+    let handmark_ok = handmark_on_redact(&app, from_ms, to_ms);
+
     let (dir, _participant_id) = crate::logger::session_log_dir();
     let current = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
     let current_path = PathBuf::from(&current);
@@ -3293,9 +3366,6 @@ fn delete_time_range(
         tracing::error!("delete_time_range failed: {e:?}");
         "記録の削除に失敗しました。".to_string()
     })?;
-
-    // 手跡: 状態ファイルと走行中の累計からも、区間に入る切った／戻した時刻と起点を消す。
-    handmark_on_redact(&app, from_ms, to_ms);
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -3312,6 +3382,14 @@ fn delete_time_range(
         files_skipped = summary.files_skipped,
         "delete_time_range completed"
     );
+    // 補助の状態ファイルを直せなかったときは、成功と言わない(記録の削除そのものは済んでいる)。
+    //   手跡の語は被験者に見せない。
+    if !handmark_ok {
+        return Err(
+            "記録の削除は行いましたが、一部の補助ファイルを消せませんでした。もう一度実行してください。"
+                .to_string(),
+        );
+    }
     Ok(RedactionOutcomeDto {
         files_touched: summary.files_touched,
         lines_removed: summary.lines_removed,

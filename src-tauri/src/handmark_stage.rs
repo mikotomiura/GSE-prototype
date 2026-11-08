@@ -18,7 +18,23 @@ pub const STATE_EVENT: &str = "handmark-state";
 #[cfg(target_os = "macos")]
 mod imp {
     use super::*;
+    use std::sync::atomic::{AtomicU8, Ordering};
     use tauri::{AppHandle, Emitter, Manager, Wry};
+
+    /// 窓の様子の印(駆動役が読む)。0 = まだ・1 = 出た・2 = 失敗(作れなかった・出せなかった)。
+    static STATUS: AtomicU8 = AtomicU8::new(0);
+    /// `setup()` で窓を作れなかった(以後の `open` はすぐ失敗にする)。
+    static BUILD_FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    /// 窓の様子(駆動役が刻みごとに読む)。
+    pub fn status() -> crate::handmark_driver::WindowStatus {
+        use crate::handmark_driver::WindowStatus;
+        match STATUS.load(Ordering::Acquire) {
+            1 => WindowStatus::Shown,
+            2 => WindowStatus::Failed,
+            _ => WindowStatus::Pending,
+        }
+    }
 
     // CGWindowLevelKey（CGWindowLevel.h）のデスクトップの層（アイコンの層 kCGDesktopIconWindowLevelKey より下）。
     const K_CG_DESKTOP_WINDOW_LEVEL_KEY: i32 = 2;
@@ -61,6 +77,7 @@ mod imp {
             Ok(w) => w,
             Err(e) => {
                 tracing::warn!("handmark stage: window could not be built: {}", e);
+                BUILD_FAILED.store(true, Ordering::Release);
                 return;
             }
         };
@@ -96,6 +113,14 @@ mod imp {
                 | objc2_app_kit::NSWindowCollectionBehavior::IgnoresCycle,
         );
         ns.setIgnoresMouseEvents(true);
+        // 画面の共有・収録・スクリーンショットに写さない(NSWindowSharingNone)。読み返せなければ出さない。
+        //   macOS 15 以降の収録で効くかは画面の確かめで見る。
+        window
+            .set_content_protected(true)
+            .map_err(|e| format!("set_content_protected failed: {e}"))?;
+        if ns.sharingType() != objc2_app_kit::NSWindowSharingType::None {
+            return Err("sharingType read back is not None (fail-closed)".to_string());
+        }
         // key にしない（フォーカスを奪わない）。
         ns.orderFrontRegardless();
         Ok(())
@@ -103,17 +128,30 @@ mod imp {
 
     /// 窓を出す(メインスレッドで行う)。出せなくても何も返さない(警告だけ)。
     pub fn open(app: &AppHandle<Wry>) {
+        STATUS.store(0, Ordering::Release);
+        if BUILD_FAILED.load(Ordering::Acquire) {
+            STATUS.store(2, Ordering::Release);
+            return;
+        }
         let handle = app.clone();
-        let _ = app.run_on_main_thread(move || {
+        let dispatched = app.run_on_main_thread(move || {
             let Some(window) = handle.get_webview_window(LABEL) else {
                 tracing::warn!("handmark stage: window is not available");
+                STATUS.store(2, Ordering::Release);
                 return;
             };
-            if let Err(e) = prepare(&window) {
-                tracing::warn!("handmark stage: stage NOT shown: {}", e);
-                let _ = window.hide();
+            match prepare(&window) {
+                Ok(()) => STATUS.store(1, Ordering::Release),
+                Err(e) => {
+                    tracing::warn!("handmark stage: stage NOT shown: {}", e);
+                    let _ = window.hide();
+                    STATUS.store(2, Ordering::Release);
+                }
             }
         });
+        if dispatched.is_err() {
+            STATUS.store(2, Ordering::Release);
+        }
     }
 
     /// 窓を隠す。描画も止めさせる(状態に `null` を送る)。
@@ -134,4 +172,4 @@ mod imp {
 }
 
 #[cfg(target_os = "macos")]
-pub use imp::{close, emit_state, open, setup};
+pub use imp::{close, emit_state, open, setup, status};

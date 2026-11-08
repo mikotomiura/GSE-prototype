@@ -14,13 +14,15 @@
 use crate::analysis::handmark::assignment::Assigned;
 use crate::analysis::handmark::gate::{CloseReason, Decision, RECHECK_MS};
 use crate::analysis::handmark::state::{Stage, StageState, LIVE_LAG_MS};
-use crate::handmark_store::{turn_off, turn_on, Evaluation, HandmarkFs};
+use crate::handmark_store::{scrub_state_file, turn_off, turn_on, Evaluation, HandmarkFs};
 use crate::logger::HandmarkDayRow;
 
 /// 行を書く間隔（その日の累計の写し）。
 pub const ROW_MS: u64 = 300_000;
 /// 刻みの間隔がこれを超えたら時計の飛びとみなす（1 日）。
 pub const CLOCK_JUMP_MS: u64 = 86_400_000;
+/// 刻みの間がこれを超えたら、その間は出ていた時間に足さない(スリープ)。
+pub const SLEEP_GAP_MS: u64 = 2_000;
 /// 溜める打鍵の上限（駆動スレッドが止まっていても膨らまないように）。
 const MAX_PENDING: usize = 8192;
 
@@ -43,6 +45,17 @@ impl TrayItem {
             TrayItem::Restore => Some("描く"),
         }
     }
+}
+
+/// 窓の層が知らせる窓の様子(窓を作れない・出せないときは `Failed`)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowStatus {
+    /// まだ分からない(出す依頼の直後)。
+    Pending,
+    /// 窓が出た。
+    Shown,
+    /// 窓を作れなかった・出せなかった。
+    Failed,
 }
 
 /// 駆動役の出来事。
@@ -98,6 +111,8 @@ pub struct HandmarkDriver {
     stage_t0: u64,
     pending: Vec<u64>,
     window_open: bool,
+    /// 窓の層が「出た」と知らせた(それまでは出ていた時間を積まない)。
+    window_confirmed: bool,
     last_recheck_ms: u64,
     last_row_ms: u64,
     last_tick_ms: u64,
@@ -115,6 +130,7 @@ impl HandmarkDriver {
             stage_t0: now,
             pending: Vec::new(),
             window_open: false,
+            window_confirmed: false,
             last_recheck_ms: now,
             last_row_ms: now,
             last_tick_ms: now,
@@ -177,6 +193,7 @@ impl HandmarkDriver {
     fn open_window(&mut self, now: u64, fx: &mut Vec<Effect>) {
         self.new_stage(now);
         self.window_open = true;
+        self.window_confirmed = false;
         self.last_tick_ms = now;
         let layout_seed = self.stage.as_ref().map_or(0, |s| s.state().layout_seed);
         fx.push(Effect::OpenWindow { layout_seed });
@@ -184,6 +201,7 @@ impl HandmarkDriver {
 
     fn close_window(&mut self, fx: &mut Vec<Effect>) {
         self.window_open = false;
+        self.window_confirmed = false;
         self.stage = None;
         self.pending.clear();
         fx.push(Effect::CloseWindow);
@@ -259,8 +277,10 @@ impl HandmarkDriver {
                 stage.advance_to(target);
                 fx.push(Effect::State(stage.state()));
             }
-            if !jumped && !day_changed {
-                self.ev.add_shown(now.saturating_sub(prev_tick));
+            // 窓が出たと分かってから、かつ 1 刻みの間が 2 秒以内のときだけ(スリープの間は足さない)
+            let gap = now.saturating_sub(prev_tick);
+            if self.window_confirmed && !jumped && !day_changed && gap <= SLEEP_GAP_MS {
+                self.ev.add_shown(gap);
             }
         }
 
@@ -294,20 +314,58 @@ impl HandmarkDriver {
         fx
     }
 
-    /// 区間の削除: 状態ファイルと走行中の累計から区間内の時刻を消す。
+    /// 窓の層の様子を受け取る(次の tick より前に呼ぶ)。`Failed` なら `window_unavailable` で閉じる。
+    pub fn on_window_status(&mut self, status: WindowStatus, now: u64) -> Vec<Effect> {
+        let mut fx = Vec::new();
+        match status {
+            WindowStatus::Pending => {}
+            WindowStatus::Shown => {
+                if self.window_open {
+                    self.window_confirmed = true;
+                }
+            }
+            WindowStatus::Failed => {
+                if self.window_open {
+                    self.ev.set_window_unavailable(true);
+                    self.reconcile(now, &mut fx);
+                    self.push_row(now, &mut fx);
+                }
+            }
+        }
+        fx
+    }
+
+    /// 区間の削除: 状態ファイルと走行中の累計から区間内の時刻を消す。書き直せなければ状態ファイルを消す。
+    /// 消せなかったら `false`(呼び出し側が削除の結果に失敗を載せる)。後で `Stage` を取り直す。
     pub fn on_redact(
         &mut self,
         fs: &dyn HandmarkFs,
         from_ms: u64,
         to_ms: u64,
         now: u64,
-    ) -> Vec<Effect> {
+    ) -> (Vec<Effect>, bool) {
         let mut fx = Vec::new();
-        if self.ev.scrub_state(fs, from_ms, to_ms).is_err() {
-            self.ev.note_save_failed();
-            self.reconcile(now, &mut fx);
+        let ok = if self.ev.record.is_some() {
+            if self.ev.scrub_state(fs, from_ms, to_ms).is_ok() {
+                true
+            } else {
+                // 書けない: 状態ファイルを消す(切っていたなら印を残す)。走行中の累計は書けなかったと扱う
+                if self.ev.record.as_ref().is_some_and(|r| r.off) {
+                    let _ = fs.write_mark(self.ev.today);
+                }
+                self.ev.note_save_failed();
+                self.reconcile(now, &mut fx);
+                fs.remove_state().is_ok()
+            }
+        } else {
+            // 状態ファイルが壊れていて累計が無い: ファイルを直接直す(壊れていれば消す)
+            scrub_state_file(fs, from_ms, to_ms).is_ok()
+        };
+        if self.window_open {
+            // 区間の後の起点を取り直す(消した起点を再生が必要としないように)
+            self.new_stage(now);
         }
-        fx
+        (fx, ok)
     }
 
     /// 終了: 保存して最後の行。
@@ -415,7 +473,16 @@ mod tests {
         assert!(opened(&fx), "{fx:?}");
         // 出さない日の tick は閉じる・トレイは隠す
         let fx = d.tick(&fs, T0 + day * 4, NEXT_ON_DAY + 1);
-        let _ = fx;
+        assert!(closed(&fx), "{fx:?}");
+        assert!(!d.is_window_open());
+        assert_eq!(d.tray(), TrayItem::Hidden);
+        assert!(has(&fx, |e| *e == Effect::TrayItem(TrayItem::Hidden)));
+        // 日が変わったので、前の日の最後の行の次に新しい日の最初の行が来る
+        let last_reason = fx.iter().rev().find_map(|e| match e {
+            Effect::Row(r) => Some(r.reason),
+            _ => None,
+        });
+        assert_eq!(last_reason, Some(Some("after_table")));
     }
 
     #[test]
@@ -496,6 +563,7 @@ mod tests {
     fn shown_time_accumulates_and_survives_in_the_five_minute_row() {
         let fs = with_table();
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
         let mut now = T0;
         let mut last_row = None;
         while now < T0 + ROW_MS + 1_000 {
@@ -517,7 +585,8 @@ mod tests {
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         let _ = d.turn_off(&fs, T0 + 1_000);
         let _ = d.turn_on(&fs, T0 + 2_000);
-        let _ = d.on_redact(&fs, T0, T0 + 5_000, T0 + 6_000);
+        let (_, ok) = d.on_redact(&fs, T0, T0 + 5_000, T0 + 6_000);
+        assert!(ok);
         let rec = d.evaluation().record.as_ref().unwrap();
         assert!(rec.toggles.is_empty());
         assert!(rec.stage_starts.iter().all(|t| *t > T0 + 5_000));
@@ -581,6 +650,10 @@ mod tests {
                     last_tick = ticks[i];
                     for e in d.tick(&fs, ticks[i], ON_DAY) {
                         if let Effect::State(s) = e {
+                            // 各刻みの状態を、その刻みまでの記録の打鍵からの再生と比べる
+                            let times: Vec<u64> = presses.iter().map(|p| p.0).collect();
+                            let want = replay_live(&times, seed, T0, ticks[i]);
+                            assert_eq!(s.bits(), want.bits(), "case {case} tick {}", ticks[i] - T0);
                             last_state = Some(s);
                         }
                     }
@@ -603,7 +676,7 @@ mod tests {
         }
         all.extend(d.turn_off(&fs, T0 + 100_000));
         all.extend(d.turn_on(&fs, T0 + 101_000));
-        all.extend(d.on_redact(&fs, T0, T0 + 10, T0 + 101_500));
+        all.extend(d.on_redact(&fs, T0, T0 + 10, T0 + 101_500).0);
         all.extend(d.on_quit(&fs, T0 + 102_000));
         assert!(all.iter().any(|e| e.destination() == Destination::Window));
         for e in &all {
@@ -619,5 +692,134 @@ mod tests {
         assert_eq!(TrayItem::Hidden.label(), None);
         assert_eq!(TrayItem::Stop.label(), Some("やめる"));
         assert_eq!(TrayItem::Restore.label(), Some("描く"));
+    }
+
+    #[test]
+    fn a_window_failure_closes_with_its_reason_and_adds_no_shown_time() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        // 窓の層が失敗を知らせる前の刻みでも、出たと分かるまでは積まない
+        for i in 1..=8u64 {
+            let _ = d.tick(&fs, T0 + i * 250, ON_DAY);
+        }
+        let fx = d.on_window_status(WindowStatus::Failed, T0 + 2_250);
+        assert!(closed(&fx));
+        assert_eq!(row_reason(&fx), Some(Some("window_unavailable")));
+        assert!(!d.is_window_open());
+        assert_eq!(d.tray(), TrayItem::Hidden);
+        let rec = d.evaluation().record.as_ref().unwrap();
+        assert_eq!(rec.shown_ms, 0);
+        assert_eq!(rec.first_shown_day, None);
+        // 次の tick でも積まない
+        let _ = d.tick(&fs, T0 + 2_500, ON_DAY);
+        assert_eq!(d.evaluation().record.as_ref().unwrap().shown_ms, 0);
+        // 60 秒の検め直しでもう一度試す(窓の層が出せれば戻る)
+        let mut now = T0 + 2_500;
+        let mut reopened = false;
+        while now < T0 + 70_000 {
+            now += 250;
+            if opened(&d.tick(&fs, now, ON_DAY)) {
+                reopened = true;
+                break;
+            }
+        }
+        assert!(reopened);
+        let _ = d.on_window_status(WindowStatus::Shown, now);
+        let _ = d.tick(&fs, now + 250, ON_DAY);
+        assert!(d.evaluation().record.as_ref().unwrap().shown_ms > 0);
+        assert!(d
+            .evaluation()
+            .record
+            .as_ref()
+            .unwrap()
+            .first_shown_day
+            .is_some());
+    }
+
+    #[test]
+    fn an_hour_of_sleep_is_not_added_to_the_shown_time() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
+        let _ = d.tick(&fs, T0 + 250, ON_DAY);
+        let before = d.evaluation().record.as_ref().unwrap().shown_ms;
+        let _ = d.tick(&fs, T0 + 250 + 3_600_000, ON_DAY);
+        let after = d.evaluation().record.as_ref().unwrap().shown_ms;
+        assert_eq!(before, after, "1 時間の空白を足していない");
+        // 2 秒ちょうどまでは足す
+        let _ = d.tick(&fs, T0 + 250 + 3_600_000 + 2_000, ON_DAY);
+        assert_eq!(
+            d.evaluation().record.as_ref().unwrap().shown_ms,
+            after + 2_000
+        );
+    }
+
+    #[test]
+    fn redact_failures_remove_the_state_file_and_report_false() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.turn_off(&fs, T0 + 100);
+        fs.fail_state_write.set(true);
+        let (fx, ok) = d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000);
+        assert!(ok, "書けなくても消せたので成功");
+        assert!(closed(&fx) || !d.is_window_open());
+        assert_eq!(fs.read_state(), crate::handmark_store::ReadResult::Missing);
+        // 消すこともできない
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        fs.fail_state_write.set(true);
+        fs.fail_state_remove.set(true);
+        assert!(!d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000).1);
+        // 状態ファイルが壊れていて累計が無い起動でも、直接消す
+        let fs = with_table();
+        *fs.state.borrow_mut() = Some(b"{broken".to_vec());
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert!(d.evaluation().record.is_none());
+        assert!(d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000).1);
+        assert_eq!(fs.read_state(), crate::handmark_store::ReadResult::Missing);
+    }
+
+    #[test]
+    fn redact_takes_the_origin_again_while_the_window_is_open() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_redact(&fs, T0, T0 + 500, T0 + 1_000);
+        let starts = &d.evaluation().record.as_ref().unwrap().stage_starts;
+        assert_eq!(starts, &vec![T0 + 1_000]);
+    }
+
+    /// 500 ms ちょうどの境界: 届いた打鍵が `now − 500 ≥ p` になる刻みで初めて状態に入る。
+    #[test]
+    fn the_500ms_boundary_is_exact() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let seed = d.evaluation().draw_seed().unwrap();
+        let p = T0 + 1_000;
+        let times = [p];
+        d.on_press(p);
+        for now in [T0 + 1_499, T0 + 1_500, T0 + 1_750, T0 + 2_000, T0 + 2_250] {
+            let fx = d.tick(&fs, now, ON_DAY);
+            let st = fx.iter().find_map(|e| match e {
+                Effect::State(s) => Some(*s),
+                _ => None,
+            });
+            let want = replay_live(&times, seed, T0, now);
+            assert_eq!(st.unwrap().bits(), want.bits(), "now {}", now - T0);
+        }
+        // 1499 では入らず(速さ 0)、1500 の刻みで入る
+        let (mut d2, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        d2.on_press(p);
+        let st = |fx: &[Effect]| {
+            fx.iter()
+                .find_map(|e| match e {
+                    Effect::State(s) => Some(*s),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let a = st(&d2.tick(&fs, T0 + 1_499, ON_DAY));
+        let b = st(&d2.tick(&fs, T0 + 1_750, ON_DAY));
+        assert_eq!(a.speed, 0.0);
+        assert!(b.speed > 0.0);
     }
 }

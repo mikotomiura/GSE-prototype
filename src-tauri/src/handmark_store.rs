@@ -17,7 +17,7 @@ use crate::analysis::handmark::assignment::{
     draw_seed, load_from_bytes, Assigned, Table, TableLoad,
 };
 use crate::analysis::handmark::day::DayRecord;
-use crate::analysis::handmark::gate::{decide, Decision, StateStatus};
+use crate::analysis::handmark::gate::{decide, CloseReason, Decision, StateStatus};
 use crate::logger::HandmarkDayRow;
 
 pub const TABLE_FILE_NAME: &str = "handmark_assignment.json";
@@ -57,6 +57,8 @@ pub trait HandmarkFs {
     fn read_sha(&self) -> ReadResult;
     fn read_state(&self) -> ReadResult;
     fn write_state(&self, bytes: &[u8]) -> io::Result<()>;
+    /// 状態ファイルを消す(無ければ成功)。区間の削除で書き直せないときに使う。
+    fn remove_state(&self) -> io::Result<()>;
     fn mark_exists(&self, day: i64) -> bool;
     fn write_mark(&self, day: i64) -> io::Result<()>;
     fn remove_mark(&self, day: i64) -> io::Result<()>;
@@ -96,6 +98,17 @@ impl DiskFs {
         Some(Self {
             table,
             sha,
+            state: gse.join(STATE_FILE_NAME),
+            mark_dir: gse,
+        })
+    }
+
+    /// 表に依らず、状態ファイルと印の置き場だけを決める(駆動役がまだ無いときの区間の削除用)。
+    pub fn state_only() -> Option<Self> {
+        let gse = crate::submission::home_dir()?.join(".gse");
+        Some(Self {
+            table: PathBuf::new(),
+            sha: PathBuf::new(),
             state: gse.join(STATE_FILE_NAME),
             mark_dir: gse,
         })
@@ -191,6 +204,12 @@ impl HandmarkFs for DiskFs {
     fn write_state(&self, bytes: &[u8]) -> io::Result<()> {
         write_atomic(&self.state, bytes)
     }
+    fn remove_state(&self) -> io::Result<()> {
+        match std::fs::remove_file(&self.state) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        }
+    }
     fn mark_exists(&self, day: i64) -> bool {
         self.mark_path(day).exists()
     }
@@ -253,6 +272,8 @@ pub struct Evaluation {
     table_load: TableLoad,
     state: StateStatus,
     off_today: bool,
+    /// 窓の層が失敗を知らせた(`window_unavailable` で閉じる)。
+    window_unavailable: bool,
 }
 
 impl Evaluation {
@@ -294,6 +315,7 @@ impl Evaluation {
             table_load,
             state,
             off_today,
+            window_unavailable: false,
         }
     }
 
@@ -305,6 +327,21 @@ impl Evaluation {
             self.state,
             self.off_today,
         );
+        // 開いているはずなのに窓が出せていないときは、窓の失敗で閉じる
+        if self.window_unavailable {
+            if let Decision::Open { assigned } = self.decision {
+                self.decision = Decision::Closed {
+                    reason: CloseReason::WindowUnavailable,
+                    assigned: Some(assigned),
+                };
+            }
+        }
+    }
+
+    /// 窓の層の失敗の印を門に反映する(`true` で閉じ、`false` で戻す)。
+    pub fn set_window_unavailable(&mut self, failed: bool) {
+        self.window_unavailable = failed;
+        self.redecide();
     }
 
     /// 5 分の保存などの書き込みが失敗したことを門に戻す（この走行では出さない・次の検め直しで書けたら戻る）。
@@ -393,6 +430,54 @@ fn write_record(fs: &dyn HandmarkFs, r: &DayRecord) -> io::Result<()> {
     fs.write_state(&bytes)
 }
 
+/// 区間の削除で状態ファイルを直せなかった。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrubFailed;
+
+/// 区間の削除: 状態ファイルを直接読み、区間内の切った／戻した時刻と起点を消して書き直す。
+/// 書き直せない・壊れているときは、状態ファイルを消す(消す前に、切っていたなら印を残す)。
+/// 消せなければ `Err`。ファイルが無ければ何もしない。駆動役がまだ無いときの区間の削除にも使う。
+///
+/// 消した後の起動は 1a の `Fresh`(その日の累計 0・切っていない・`first_shown_day` 無し)になり、
+/// 日の割付は表だけから決まるので、翌日以降の割付どおりの動きは変わらない。
+pub fn scrub_state_file(fs: &dyn HandmarkFs, from_ms: u64, to_ms: u64) -> Result<(), ScrubFailed> {
+    let remove = |fs: &dyn HandmarkFs| fs.remove_state().map_err(|_| ScrubFailed);
+    match parse_state(&fs.read_state()) {
+        DayLoad::Fresh => Ok(()),
+        DayLoad::Broken => remove(fs),
+        DayLoad::Loaded(mut r) => {
+            r.scrub_range(from_ms, to_ms);
+            if write_record(fs, &r).is_ok() {
+                return Ok(());
+            }
+            if r.off {
+                // 切ったことは消えると今日また出てしまう。印だけは残す
+                let _ = fs.write_mark(r.day);
+            }
+            remove(fs)
+        }
+    }
+}
+
+/// 駆動役が起きない閉じた日の行(ホームが分からない等)。割付も表も分からない。
+pub fn unavailable_row(t_ms: u64, day: i64, reason: CloseReason) -> HandmarkDayRow {
+    HandmarkDayRow {
+        timestamp: t_ms,
+        day,
+        assigned: "unknown",
+        late_start_day: None,
+        first_shown_day: None,
+        shown_ms: 0,
+        visible_ms: None,
+        toggles: Vec::new(),
+        stage_starts: Vec::new(),
+        overflow: false,
+        table_sha256: None,
+        draw_seed: None,
+        reason: Some(reason.as_str()),
+    }
+}
+
 /// 切る／戻す操作の結果。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToggleOutcome {
@@ -477,6 +562,7 @@ pub(crate) mod testfs {
         pub fail_state_write: Cell<bool>,
         pub fail_mark_write: Cell<bool>,
         pub fail_mark_remove: Cell<bool>,
+        pub fail_state_remove: Cell<bool>,
     }
 
     fn rr(v: &RefCell<Option<Vec<u8>>>) -> ReadResult {
@@ -500,6 +586,13 @@ pub(crate) mod testfs {
                 return Err(io::Error::other("injected"));
             }
             *self.state.borrow_mut() = Some(bytes.to_vec());
+            Ok(())
+        }
+        fn remove_state(&self) -> io::Result<()> {
+            if self.fail_state_remove.get() {
+                return Err(io::Error::other("injected"));
+            }
+            *self.state.borrow_mut() = None;
             Ok(())
         }
         fn mark_exists(&self, day: i64) -> bool {
@@ -1009,5 +1102,81 @@ mod tests {
         fs.write_mark(6).unwrap();
         assert_eq!(mode(&gse.join("handmark_off_6")), 0o600);
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// 区間の削除で状態ファイルを直せないとき(書けない・壊れている)は消す。消した後は 1a の Fresh で、
+    /// 翌日の割付どおりに戻り、切っていた日の印は残る。
+    #[test]
+    fn scrub_state_file_removes_what_it_cannot_rewrite_and_fresh_is_harmless() {
+        // 書き直せる: 時刻だけ消えて残る
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        ev.note_stage_start(1_000);
+        ev.save(&fs).unwrap();
+        scrub_state_file(&fs, 0, 2_000).unwrap();
+        let DayLoad::Loaded(r) = parse_state(&fs.read_state()) else {
+            panic!("loaded");
+        };
+        assert!(r.stage_starts.is_empty());
+        // 書けない: 消す(切っていたので印は残る)
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        assert_eq!(turn_off(&fs, &mut ev, 5), ToggleOutcome::State);
+        fs.fail_state_write.set(true);
+        scrub_state_file(&fs, 0, 10).unwrap();
+        fs.fail_state_write.set(false);
+        assert_eq!(fs.read_state(), ReadResult::Missing);
+        assert!(fs.mark_exists(ON_DAY));
+        // Fresh の起動: 切った日はそのまま閉じ、翌日は割付どおりに開く
+        assert_eq!(
+            reason(&Evaluation::run(&fs, true, ON_DAY, None)),
+            Some(CloseReason::OffToday)
+        );
+        assert!(Evaluation::run(&fs, true, 20_414, None).is_open());
+        // 壊れている: 消す・消せなければ Err
+        *fs.state.borrow_mut() = Some(b"{broken".to_vec());
+        fs.fail_state_remove.set(true);
+        assert_eq!(scrub_state_file(&fs, 0, 10), Err(ScrubFailed));
+        fs.fail_state_remove.set(false);
+        scrub_state_file(&fs, 0, 10).unwrap();
+        assert_eq!(fs.read_state(), ReadResult::Missing);
+        // 無ければ何もしない
+        scrub_state_file(&fs, 0, 10).unwrap();
+        // 切っていなかった日は Fresh で、割付どおり開く(累計は 0 に戻る)
+        let fs2 = with_table();
+        let mut ev2 = Evaluation::run(&fs2, true, ON_DAY, None);
+        ev2.add_shown(5_000);
+        ev2.save(&fs2).unwrap();
+        fs2.fail_state_write.set(true);
+        scrub_state_file(&fs2, 0, u64::MAX).unwrap();
+        fs2.fail_state_write.set(false);
+        let again = Evaluation::run(&fs2, true, ON_DAY, None);
+        assert!(again.is_open());
+        assert_eq!(again.row(1).unwrap().shown_ms, 0);
+    }
+
+    #[test]
+    fn a_window_failure_closes_with_its_reason_and_can_be_cleared() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        assert!(ev.is_open());
+        ev.set_window_unavailable(true);
+        assert!(!ev.is_open());
+        assert_eq!(ev.row(1).unwrap().reason, Some("window_unavailable"));
+        assert_eq!(ev.row(1).unwrap().assigned, "on");
+        ev.set_window_unavailable(false);
+        assert!(ev.is_open());
+        // 他の理由で閉じているときは、その理由を残す
+        let fs = MemFs::default();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        ev.set_window_unavailable(true);
+        assert_eq!(ev.row(1).unwrap().reason, Some("table_missing"));
+    }
+
+    #[test]
+    fn unavailable_row_has_the_reason_and_no_other_attributes() {
+        let r = unavailable_row(5, 20_411, CloseReason::PathsUnavailable);
+        assert_eq!(r.reason, Some("paths_unavailable"));
+        assert_eq!((r.assigned, r.shown_ms), ("unknown", 0));
+        assert!(r.table_sha256.is_none() && r.draw_seed.is_none() && r.toggles.is_empty());
     }
 }
