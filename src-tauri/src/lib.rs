@@ -51,6 +51,8 @@ pub mod redaction;
 pub mod s1;
 // 段 1 の駆動役の純粋な部分（カードの状態と Action の写し・OS API と Tauri を持たない）。
 pub mod s1_driver;
+// 手跡（段 1 の後期・ADR-051）の IO 層（表・状態ファイル・印）。1a では lib.rs の本体に配線しない（1b で配線）。
+pub mod handmark_store;
 // 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
 pub mod s1_day_state;
 // 段 1 の再生（`gse-replay --probes`・`--day-questions`・記録から調停器を回し直して照合する・純粋）。

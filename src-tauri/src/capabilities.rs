@@ -110,6 +110,8 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     "probe_frame",
     "probe_suppressed",
     "day_question",
+    // 段 1 の後期（ADR-051・手跡 PR 1）: 手跡の日ごとの累計の写し。段 1 のときだけ `config_gated`。
+    "handmark_day",
 ];
 
 /// **閾値ゲート付き**の行種 (ADR-013 D1)。
@@ -305,6 +307,7 @@ fn s1_line_types(s1: bool) -> Vec<&'static str> {
         vec![
             "activity_label",
             "day_question",
+            "handmark_day",
             "probe_frame",
             "probe_suppressed",
         ]
@@ -530,6 +533,7 @@ mod tests {
             "invitation_condition",
             "activity_label",
             "day_question",
+            "handmark_day",
             "probe_frame",
             "probe_suppressed",
         ];
@@ -555,6 +559,7 @@ mod tests {
             vec![
                 "activity_label",
                 "day_question",
+                "handmark_day",
                 "probe_frame",
                 "probe_suppressed"
             ]

@@ -6,6 +6,8 @@ pub mod engine;
 // `gse-replay --features` が呼ぶ。⚠️ `features.rs` / `engine.rs` とは独立 (HMM_VERSION 非依存)。
 pub mod feat_offline;
 pub mod features;
+// 手跡（段 1 の後期・ADR-051）の純粋な部分。IO を持たない。
+pub mod handmark;
 pub mod heads;
 pub mod intervention;
 pub mod intervention_eval;

@@ -897,6 +897,39 @@ pub struct DayQuestionRow {
     pub debug: bool,
 }
 
+/// `handmark_day` 行の中身（段 1 の後期・ADR-051 D4）。その日の累計の写し。
+///
+/// ★ 書く値はすべて型の決まった数・真偽・固定の文字列・16 進だけ（外部由来の文字列を入れない）。
+/// ★ 打鍵の時刻・キー・風の値（速さ・不規則さ・位相）を持つ欄は無い。
+/// 机上では日ごとに最後の行を採る。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HandmarkDayRow {
+    /// 書いた時刻（UTC の ms）。
+    pub timestamp: u64,
+    /// 現地の日の番号（`eh3::local_day`・現地の分は書かない）。
+    pub day: i64,
+    /// `before`・`late_first`・`on`・`off`・`after`・`unknown`。
+    pub assigned: &'static str,
+    pub late_start_day: Option<i64>,
+    pub first_shown_day: Option<i64>,
+    pub shown_ms: u64,
+    /// 見えていた時間（1a・1b では常に `None`・PR 2 で計り方が決まる）。
+    pub visible_ms: Option<u64>,
+    /// 切った／戻した（時刻・出す側か）。
+    pub toggles: Vec<(u64, bool)>,
+    pub stage_starts: Vec<u64>,
+    pub overflow: bool,
+    /// 64 桁の小文字の 16 進（それ以外は書かない）。
+    pub table_sha256: Option<String>,
+    pub draw_seed: Option<u64>,
+    /// 出せなかった理由（固定の文字列）。
+    pub reason: Option<&'static str>,
+}
+
+/// `handmark_day` の `assigned` に書いてよい値。
+pub const HANDMARK_ASSIGNED_VALUES: [&str; 6] =
+    ["before", "late_first", "on", "off", "after", "unknown"];
+
 /// 日の終わりの問いの項目の文の仮の版（S-DQ の候補の表からの仮の文・妥当性は無いものとして扱う・S1-F7）。
 pub const DAY_QUESTION_ITEMS_VERSION: &str = "dq-draft-1";
 
@@ -1281,6 +1314,9 @@ pub enum LogEntry {
     /// 段 1: 日の終わりの問い（ADR-048 D3・閉じた時刻に 1 行）。★ 時差は書かない（計画の判断 4）。
     /// ⚠️ 自由記述・理由を持たない（`data-privacy` ルール 7）。回答は 1..5 の 1 項目か `null`。
     DayQuestion(DayQuestionRow),
+    /// 段 1 の後期: 手跡の日ごとの累計の写し（ADR-051 D4）。机上では日ごとに最後の行を採る。
+    /// ⚠️ 打鍵の時刻・キー・風の値を持たない（`HandmarkDayRow`）。
+    HandmarkDay(HandmarkDayRow),
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
     ///
@@ -1358,6 +1394,7 @@ impl LogEntry {
             LogEntry::ProbeFrame { .. } => "probe_frame",
             LogEntry::ProbeSuppressed { .. } => "probe_suppressed",
             LogEntry::DayQuestion(_) => "day_question",
+            LogEntry::HandmarkDay(_) => "handmark_day",
             // ★ ここから下は**行を書かない制御エントリ**である
             //   (`BlockEnd` / `Rotate` は `meta`(session_end/session_start) を副作用で書くが、
             //   ⚠️ それは `meta` 行であってこのエントリ自身の行ではない)。
@@ -1925,6 +1962,68 @@ fn format_day_question_line(r: &DayQuestionRow) -> String {
         opt(r.latency_ms),
         opt(r.duration_ms),
     )
+}
+
+/// `handmark_day` 行の本文（改行なし）。数・真偽・固定の文字列・16 進だけを書く。
+fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
+    let opt_i = |v: Option<i64>| v.map_or_else(|| "null".to_string(), |x| x.to_string());
+    let opt_u = |v: Option<u64>| v.map_or_else(|| "null".to_string(), |x| x.to_string());
+    // ★ 固定の語以外は書かない（外部由来の文字列を入れない）
+    let assigned = if HANDMARK_ASSIGNED_VALUES.contains(&r.assigned) {
+        r.assigned
+    } else {
+        "unknown"
+    };
+    let reason = r
+        .reason
+        .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'))
+        .map_or_else(|| "null".to_string(), |s| format!("\"{s}\""));
+    let sha = r
+        .table_sha256
+        .as_deref()
+        .filter(|s| s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+        .map_or_else(|| "null".to_string(), |s| format!("\"{s}\""));
+    let seed = r
+        .draw_seed
+        .map_or_else(|| "null".to_string(), |v| format!("\"{v:016x}\""));
+    let toggles = r
+        .toggles
+        .iter()
+        .map(|(t, on)| format!(r#"{{"t":{t},"on":{on}}}"#))
+        .collect::<Vec<_>>()
+        .join(",");
+    let starts = r
+        .stage_starts
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        concat!(
+            r#"{{"type":"handmark_day","t":{},"day":{},"assigned":"{}","late_start_day":{},"#,
+            r#""first_shown_day":{},"shown_ms":{},"visible_ms":{},"toggles":[{}],"#,
+            r#""stage_starts":[{}],"overflow":{},"table_sha256":{},"draw_seed":{},"reason":{}}}"#
+        ),
+        r.timestamp,
+        r.day,
+        assigned,
+        opt_i(r.late_start_day),
+        opt_i(r.first_shown_day),
+        r.shown_ms,
+        opt_u(r.visible_ms),
+        toggles,
+        starts,
+        r.overflow,
+        sha,
+        seed,
+        reason,
+    )
+}
+
+/// 検査用: `handmark_day` の行の本文（`handmark_guard` が書く行のキーを見る）。
+#[cfg(test)]
+pub(crate) fn format_handmark_day_line_for_test(r: &HandmarkDayRow) -> String {
+    format_handmark_day_line(r)
 }
 
 /// `invitation_present` 行の本文（改行なし）。時刻しか書けない形にしてある（理由・状態・回数を持たない）。
@@ -2754,6 +2853,10 @@ impl SessionLogger {
                                     "{}",
                                     mark_debug(format_day_question_line(&row), row.debug)
                                 );
+                                dirty = true;
+                            }
+                            LogEntry::HandmarkDay(row) => {
+                                let _ = writeln!(writer, "{}", format_handmark_day_line(&row));
                                 dirty = true;
                             }
                             LogEntry::BlockEnd => {
@@ -4282,6 +4385,79 @@ mod tests {
         }
     }
 
+    fn sample_handmark_day_row() -> HandmarkDayRow {
+        HandmarkDayRow {
+            timestamp: 1_800_000_000_000,
+            day: 20_411,
+            assigned: "on",
+            late_start_day: Some(20_410),
+            first_shown_day: Some(20_410),
+            shown_ms: 3_600_000,
+            visible_ms: None,
+            toggles: vec![(1_799_999_000_000, false), (1_799_999_500_000, true)],
+            stage_starts: vec![1_799_990_000_000],
+            overflow: false,
+            table_sha256: Some("ab".repeat(32)),
+            draw_seed: Some(0x0123_4567_89ab_cdef),
+            reason: None,
+        }
+    }
+
+    /// `handmark_day` の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る）。
+    #[test]
+    fn handmark_day_line_is_fixed_and_valid_json() {
+        let line = format_handmark_day_line(&sample_handmark_day_row());
+        assert_eq!(
+            line,
+            format!(
+                concat!(
+                    r#"{{"type":"handmark_day","t":1800000000000,"day":20411,"assigned":"on","late_start_day":20410,"#,
+                    r#""first_shown_day":20410,"shown_ms":3600000,"visible_ms":null,"#,
+                    r#""toggles":[{{"t":1799999000000,"on":false}},{{"t":1799999500000,"on":true}}],"#,
+                    r#""stage_starts":[1799990000000],"overflow":false,"table_sha256":"{}","#,
+                    r#""draw_seed":"0123456789abcdef","reason":null}}"#
+                ),
+                "ab".repeat(32)
+            )
+        );
+        let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
+        assert_eq!(v["draw_seed"], "0123456789abcdef");
+        // 閉じた日: 出せなかった理由・空の配列・null
+        let mut r = sample_handmark_day_row();
+        r.assigned = "unknown";
+        r.late_start_day = None;
+        r.first_shown_day = None;
+        r.shown_ms = 0;
+        r.toggles.clear();
+        r.stage_starts.clear();
+        r.table_sha256 = None;
+        r.draw_seed = None;
+        r.reason = Some("table_missing");
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert_eq!(v["reason"], "table_missing");
+        assert_eq!(v["toggles"], serde_json::json!([]));
+        assert!(v["table_sha256"].is_null() && v["draw_seed"].is_null());
+    }
+
+    /// 外部由来の文字列は書けない（固定の語・64 桁の小文字の 16 進以外は落とす）。
+    #[test]
+    fn handmark_day_line_refuses_free_strings() {
+        let mut r = sample_handmark_day_row();
+        r.assigned = "x\"y";
+        r.reason = Some("bad\"reason");
+        r.table_sha256 = Some("AB".repeat(32));
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert_eq!(v["assigned"], "unknown");
+        assert!(v["reason"].is_null());
+        assert!(v["table_sha256"].is_null());
+        r.table_sha256 = Some("a".repeat(63));
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert!(v["table_sha256"].is_null());
+    }
+
     /// 段 1 の 3 行種の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る）。
     /// M5 の 3 本目の判断 3: 印は真のときだけ末尾に足し、偽なら 1 バイトも変えない。
     #[test]
@@ -4461,6 +4637,7 @@ mod tests {
                 reason: crate::analysis::probe_arbiter::SuppressReason::Away,
             },
             LogEntry::DayQuestion(sample_day_question_row()),
+            LogEntry::HandmarkDay(sample_handmark_day_row()),
             LogEntry::Key {
                 vk_code: 0x41,
                 timestamp: 1,
