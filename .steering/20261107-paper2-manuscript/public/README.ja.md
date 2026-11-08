@@ -9,7 +9,6 @@
 
 <p align="center">
   <a href="https://doi.org/10.5281/zenodo.24047695"><img alt="DOI 10.5281/zenodo.24047695" src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.24047695-1682d4"></a>
-  <img alt="Manuscript: submitted to JEDM" src="https://img.shields.io/badge/manuscript-submitted%20to%20JEDM-6250d6">
   <a href="LICENSE-MIT"><img alt="Code: MIT or Apache-2.0" src="https://img.shields.io/badge/code-MIT%20%7C%20Apache--2.0-2f6f9f"></a>
   <a href="LICENSE-docs"><img alt="Results and figures: CC BY 4.0" src="https://img.shields.io/badge/results%20%26%20figures-CC%20BY%204.0-d66e28"></a>
   <img alt="Python 3" src="https://img.shields.io/badge/python-3-4b8bbe">
@@ -20,7 +19,7 @@
 ---
 
 原稿 *What moves with the pause definition and the adjustment: a multiverse diagnostic of pause and stall labels in
-keystroke logs*（三浦尊統・Journal of Educational Data Mining に 2026 年 11 月に投稿）に付随するリポジトリです。
+keystroke logs*（三浦尊統・2026）に付随するリポジトリです。
 
 ## 1 枚で見る問題
 
