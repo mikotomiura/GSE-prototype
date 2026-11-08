@@ -1,7 +1,7 @@
 # 休止の定義と調整で何が動くか
 
 原稿 *What moves with the pause definition and the adjustment: a multiverse diagnostic of pause and stall labels in
-keystroke logs*（Mikoto Miura・Journal of Educational Data Mining に投稿）のコード・条件・集計の結果です。[English](README.md)
+keystroke logs*（三浦尊統・Journal of Educational Data Mining に投稿）のコード・条件・集計の結果です。[English](README.md)
 
 ![90 通りの定義での停滞の率と作文の得点](docs/media/score.svg)
 
