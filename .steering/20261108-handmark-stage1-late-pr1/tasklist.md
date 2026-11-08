@@ -11,4 +11,5 @@
 - [x] cargo fmt・clippy・test・emit_schema（parity は /finish-task）
 - [x] code-reviewer・security-checker・/cross-review（Codex を 3 巡・判断 4〜6）
 - [x] 1b: 記録の検査を駆動役の出口に差し替え・scrub_state を削除の経路に配線（判断 8〜10）
+- [x] 画面の確かめ（判断 11）
 - [ ] /finish-task（push・PR は研究者に確かめてから）
