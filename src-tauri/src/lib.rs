@@ -2432,16 +2432,11 @@ fn handmark_finish_before_end(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>)
     run_handmark_effects(app, log_tx, fx);
 }
 
-/// 窓の層の様子(macOS 以外は窓が無いので駆動役も起きない)。
+/// 窓の層の様子。★ 呼ぶのは macOS の駆動スレッドだけ（macOS 以外は窓も駆動役も無い。
+/// `cfg` を付けないと Windows の clippy が未使用で赤になる・2026-11-08 の CI で実測）。
+#[cfg(target_os = "macos")]
 fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
-    #[cfg(target_os = "macos")]
-    {
-        crate::handmark_stage::status()
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        crate::handmark_driver::WindowStatus::Pending
-    }
+    crate::handmark_stage::status()
 }
 
 /// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠す。
