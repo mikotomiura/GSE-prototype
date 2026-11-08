@@ -102,32 +102,69 @@ fn build(a: &Args) -> Result<(Table, Vec<u8>, String, String), String> {
     Ok((table, bytes, hex, sha_text))
 }
 
-/// 一時ファイルに書いて `sync_all` する（本番の書き込み）。
+/// 一時ファイルを作って書き、`sync_all` する（本番の書き込み）。
+/// `create_new` なので既存のファイルやリンクを辿らず、truncate もしない。unix では 0600。
 fn write_synced(p: &Path, data: &[u8]) -> std::io::Result<()> {
-    let mut f = std::fs::File::create(p)?;
+    let mut o = std::fs::OpenOptions::new();
+    o.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        o.mode(0o600);
+    }
+    let mut f = o.open(p)?;
     f.write_all(data)?;
     f.sync_all()
 }
 
-/// 出力を書く。`force` でなければ、どちらかが既にあれば何も書かずに失敗する。
-fn write_outputs(out: &Path, bytes: &[u8], sha_text: &str, force: bool) -> Result<(), String> {
-    write_outputs_with(out, bytes, sha_text, force, &write_synced)
+/// 一時ファイルを宛先に公開する（本番）。`force` なら `rename`（置き換える）。
+/// そうでなければ `hard_link`（宛先がすでにあれば、壊れたリンクでも失敗し、置き換えない）で公開して一時ファイルを消す。
+fn publish(tmp: &Path, dest: &Path, force: bool) -> std::io::Result<()> {
+    if force {
+        std::fs::rename(tmp, dest)
+    } else {
+        std::fs::hard_link(tmp, dest)?;
+        let _ = std::fs::remove_file(tmp);
+        Ok(())
+    }
 }
 
-/// 両方を一時ファイルに書いてから、表、`.sha256` の順に `rename` する（途中で失敗したら一時ファイルを消し、
-/// 既存のファイルには触れない）。`write` は差し替えて失敗を注入できる。
+/// 出力を書く。`force` でなければ、どちらかが既にあれば何も書かずに失敗する。
+fn write_outputs(out: &Path, bytes: &[u8], sha_text: &str, force: bool) -> Result<(), String> {
+    write_outputs_with(out, bytes, sha_text, force, &write_synced, &publish)
+}
+
+/// 実行ごとに一意な一時ファイルの名前（`<名前>.<pid>.<ナノ秒>.tmp`）。
+fn unique_tmp(out: &Path, name: &str) -> PathBuf {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    out.join(format!("{name}.{}.{nanos}.tmp", std::process::id()))
+}
+
+/// 両方を自分の一時ファイルに書いてから、表、`.sha256` の順に公開する。途中で失敗したら自分の一時ファイル
+/// を消す。`write` と `publish` は差し替えて失敗を注入できる。
+///
+/// - `--force` なし: 公開は `hard_link`（既存の宛先を置き換えない）。`.sha256` の公開が失敗したら、
+///   今回自分が公開した表を消して元に戻す（表も `.sha256` も残らない）。
+/// - `--force`: 公開は `rename`。`.sha256` の `rename` だけが失敗すると、新しい表と古い `.sha256` が
+///   残りうる。この組み合わせは SHA-256 が合わないので、アプリの門は `sha_mismatch` で閉じる
+///   （出さない側に倒れる）。
 fn write_outputs_with(
     out: &Path,
     bytes: &[u8],
     sha_text: &str,
     force: bool,
     write: &dyn Fn(&Path, &[u8]) -> std::io::Result<()>,
+    publish: &dyn Fn(&Path, &Path, bool) -> std::io::Result<()>,
 ) -> Result<(), String> {
     let (t, s) = (out.join(TABLE_NAME), out.join(SHA_NAME));
+    // 早い失敗のための確かめ（本番の門は hard_link）。壊れたリンクも「ある」とみなす。
     let exists_check = || -> Result<(), String> {
         if !force {
             for p in [&t, &s] {
-                if p.exists() {
+                if std::fs::symlink_metadata(p).is_ok() {
                     return Err(format!(
                         "{} already exists (use --force to overwrite)",
                         p.display()
@@ -139,34 +176,34 @@ fn write_outputs_with(
     };
     exists_check()?;
     std::fs::create_dir_all(out).map_err(|e| format!("create {}: {e}", out.display()))?;
-    let (t_tmp, s_tmp) = (
-        out.join(format!("{TABLE_NAME}.tmp")),
-        out.join(format!("{SHA_NAME}.tmp")),
-    );
-    let cleanup = || {
-        let _ = std::fs::remove_file(&t_tmp);
-        let _ = std::fs::remove_file(&s_tmp);
+    let (t_tmp, s_tmp) = (unique_tmp(out, TABLE_NAME), unique_tmp(out, SHA_NAME));
+    // 消すのは自分が作った一時ファイルだけ
+    let cleanup = |created: &[&Path]| {
+        for p in created {
+            let _ = std::fs::remove_file(p);
+        }
     };
-    let staged = write(&t_tmp, bytes)
-        .map_err(|e| format!("write {}: {e}", t_tmp.display()))
-        .and_then(|()| {
-            write(&s_tmp, sha_text.as_bytes())
-                .map_err(|e| format!("write {}: {e}", s_tmp.display()))
-        })
-        // rename の直前にもう一度、存在を確かめる
-        .and_then(|()| exists_check());
-    if let Err(e) = staged {
-        cleanup();
-        return Err(e);
+    if let Err(e) = write(&t_tmp, bytes) {
+        cleanup(&[&t_tmp]);
+        return Err(format!("write {}: {e}", t_tmp.display()));
     }
-    std::fs::rename(&t_tmp, &t).map_err(|e| {
-        cleanup();
-        format!("rename {}: {e}", t.display())
-    })?;
-    std::fs::rename(&s_tmp, &s).map_err(|e| {
-        cleanup();
-        format!("rename {}: {e}", s.display())
-    })
+    if let Err(e) = write(&s_tmp, sha_text.as_bytes()) {
+        cleanup(&[&t_tmp, &s_tmp]);
+        return Err(format!("write {}: {e}", s_tmp.display()));
+    }
+    if let Err(e) = publish(&t_tmp, &t, force) {
+        cleanup(&[&t_tmp, &s_tmp]);
+        return Err(format!("publish {}: {e}", t.display()));
+    }
+    if let Err(e) = publish(&s_tmp, &s, force) {
+        if !force {
+            // 今回自分が公開した表だけを消して元に戻す
+            let _ = std::fs::remove_file(&t);
+        }
+        cleanup(&[&t_tmp, &s_tmp]);
+        return Err(format!("publish {}: {e}", s.display()));
+    }
+    Ok(())
 }
 
 fn run() -> Result<String, String> {
@@ -274,7 +311,7 @@ mod tests {
             }
             write_synced(p, data)
         };
-        assert!(write_outputs_with(&d, &b2, &s2, true, &failing).is_err());
+        assert!(write_outputs_with(&d, &b2, &s2, true, &failing, &publish).is_err());
         assert_eq!(std::fs::read(d.join(TABLE_NAME)).unwrap(), b1);
         assert_eq!(std::fs::read_to_string(d.join(SHA_NAME)).unwrap(), s1);
         let names: Vec<String> = std::fs::read_dir(&d)
@@ -286,8 +323,123 @@ mod tests {
         calls.set(1);
         let first_fails =
             |_: &Path, _: &[u8]| -> std::io::Result<()> { Err(std::io::Error::other("injected")) };
-        assert!(write_outputs_with(&d, &b2, &s2, true, &first_fails).is_err());
+        assert!(write_outputs_with(&d, &b2, &s2, true, &first_fails, &publish).is_err());
         assert_eq!(std::fs::read(d.join(TABLE_NAME)).unwrap(), b1);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    fn tmp_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("gse-hm-table-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        d
+    }
+
+    fn names(d: &Path) -> Vec<String> {
+        std::fs::read_dir(d)
+            .map(|r| {
+                r.map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// 2 つ目の公開だけを失敗させる（1 つ目は本番の公開）。
+    fn sha_publish_fails(tmp: &Path, dest: &Path, force: bool) -> std::io::Result<()> {
+        if dest.file_name().is_some_and(|n| n == SHA_NAME) {
+            return Err(std::io::Error::other("injected"));
+        }
+        publish(tmp, dest, force)
+    }
+
+    #[test]
+    fn without_force_a_failed_second_publish_leaves_neither_file() {
+        let d = tmp_dir("pub-noforce");
+        let (_, b, _, sha) = build(&args(1)).unwrap();
+        let r = write_outputs_with(&d, &b, &sha, false, &write_synced, &sha_publish_fails);
+        assert!(r.is_err());
+        assert!(names(&d).is_empty(), "{:?}", names(&d));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn with_force_a_failed_second_rename_leaves_a_pair_the_app_rejects() {
+        use gse_next_lib::analysis::handmark::assignment::{load_from_bytes, TableLoad};
+        let d = tmp_dir("pub-force");
+        let (_, b1, _, s1) = build(&args(1)).unwrap();
+        let (_, b2, _, s2) = build(&args(2)).unwrap();
+        assert_ne!(b1, b2);
+        write_outputs(&d, &b1, &s1, false).unwrap();
+        let r = write_outputs_with(&d, &b2, &s2, true, &write_synced, &sha_publish_fails);
+        assert!(r.is_err());
+        // 新しい表と古い .sha256 が残る。門の検めは sha_mismatch（出さない側）
+        let t = std::fs::read(d.join(TABLE_NAME)).unwrap();
+        let s = std::fs::read_to_string(d.join(SHA_NAME)).unwrap();
+        assert_eq!((&t, &s), (&b2, &s1));
+        assert_eq!(load_from_bytes(Some(&t), Some(&s)), TableLoad::ShaMismatch);
+        assert!(
+            names(&d).iter().all(|n| !n.ends_with(".tmp")),
+            "{:?}",
+            names(&d)
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn temp_names_are_unique_per_call_and_never_follow_existing_files() {
+        let d = tmp_dir("uniq");
+        std::fs::create_dir_all(&d).unwrap();
+        let a = unique_tmp(&d, TABLE_NAME);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        let b = unique_tmp(&d, TABLE_NAME);
+        assert_ne!(a, b);
+        assert!(a.to_string_lossy().ends_with(".tmp"));
+        // create_new: 既にあれば失敗し、中身を変えない
+        std::fs::write(&a, b"keep").unwrap();
+        assert!(write_synced(&a, b"x").is_err());
+        assert_eq!(std::fs::read(&a).unwrap(), b"keep");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            write_synced(&b, b"x").unwrap();
+            assert_eq!(
+                std::fs::metadata(&b).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// 宛先に壊れたシンボリックリンクがあれば、`--force` なしでは失敗して何も書かない。
+    #[cfg(unix)]
+    #[test]
+    fn a_dangling_symlink_at_the_destination_blocks_without_force() {
+        let (_, b, _, sha) = build(&args(1)).unwrap();
+        for victim in [TABLE_NAME, SHA_NAME] {
+            let d = tmp_dir("dangling");
+            std::fs::create_dir_all(&d).unwrap();
+            let target = d.join("elsewhere");
+            std::os::unix::fs::symlink(&target, d.join(victim)).unwrap();
+            assert!(write_outputs(&d, &b, &sha, false).is_err(), "{victim}");
+            assert!(!target.exists(), "リンク先を作ってはいけない");
+            assert!(names(&d).iter().all(|n| !n.ends_with(".tmp")));
+            let other = if victim == TABLE_NAME {
+                SHA_NAME
+            } else {
+                TABLE_NAME
+            };
+            assert!(std::fs::symlink_metadata(d.join(other)).is_err());
+            let _ = std::fs::remove_dir_all(&d);
+        }
+        // 事前の確かめを通り抜けても、本番の公開（hard_link）が置き換えない
+        let d = tmp_dir("dangling-link");
+        std::fs::create_dir_all(&d).unwrap();
+        let tmp = d.join("src.tmp");
+        std::fs::write(&tmp, b"x").unwrap();
+        let dest = d.join("dest");
+        let target = d.join("elsewhere");
+        std::os::unix::fs::symlink(&target, &dest).unwrap();
+        assert!(publish(&tmp, &dest, false).is_err());
+        assert!(!target.exists());
         let _ = std::fs::remove_dir_all(&d);
     }
 
