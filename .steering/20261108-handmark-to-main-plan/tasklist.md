@@ -26,5 +26,6 @@
 - [x] /cross-review 2 巡目（判断 8）
 - [x] /cross-review 3 巡目（HIGH 0 件・MEDIUM 4 件を直して閉じた・判断 9）
 - [x] ADR-051 を研究者が本文を読むまで Proposed に
+- [x] 研究者が本文を読み、ADR-051 を Accepted にした（判断 11）
 - [x] code-reviewer と /cross-review（Codex を加えた。差分は文書だけで、O1・段 1 の記録の本文は送っていない）
-- [ ] /finish-task（push・PR は研究者に確かめてから）
+- [x] /finish-task（研究者の承認で #399 を [skip ci] でマージ）
