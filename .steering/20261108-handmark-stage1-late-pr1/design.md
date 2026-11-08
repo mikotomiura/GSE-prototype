@@ -35,7 +35,7 @@
 
 ## 2. 割付の表（判断 1-1・ADR-051 D4）
 
-- 置き場所: 配布形は `s1::marker_path_for(exe, levels)` の親（`s1.mode` と同じフォルダ）の `handmark_assignment.json` と `handmark_assignment.sha256`。開発・検証は環境変数 `GSE_HANDMARK_TABLE=<表のパス>` で、SHA-256 のファイルは同じフォルダの同じ名前で拡張子を `.sha256` に替えたもの。
+- 置き場所: 配布形は `s1::marker_path_for(exe, levels)` の親（`s1.mode` と同じフォルダ）の `handmark_assignment.json` と `handmark_assignment.sha256`。開発・検証は環境変数 `GSE_HANDMARK_TABLE=<表のパス>`（★ 環境変数 `GSE_DEBUG` が `"1"` のときだけ読む。配布形は `s1.mode` の隣の表だけ）で、SHA-256 のファイルは同じフォルダの同じ名前で拡張子を `.sha256` に替えたもの。
 - 形式（`serde(deny_unknown_fields)`・`version` は 1 だけ）:
   ```json
   {"version":1,"s1_start_day":20400,"early_days":10,"late_start_day":20410,"days":[true,false,false,true]}

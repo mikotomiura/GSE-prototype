@@ -172,3 +172,51 @@ fn the_handmark_day_schema_has_exactly_the_designed_fields() {
     keys.sort_unstable();
     assert_eq!(keys, want);
 }
+
+/// スキーマの定義 `name` の中の `enum` の文字列をすべて集める。
+fn schema_enum(name: &str) -> Vec<String> {
+    let schema = schemars::schema_for!(crate::schema_dto::LogEntryDto);
+    let v = serde_json::to_value(&schema).unwrap();
+    fn walk(v: &serde_json::Value, out: &mut Vec<String>) {
+        match v {
+            serde_json::Value::Object(m) => {
+                if let Some(a) = m.get("enum").and_then(|e| e.as_array()) {
+                    out.extend(a.iter().filter_map(|x| x.as_str().map(String::from)));
+                }
+                m.values().for_each(|x| walk(x, out));
+            }
+            serde_json::Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    walk(&v["definitions"][name], &mut out);
+    out.sort();
+    out
+}
+
+/// 理由・割付の値の 3 つの真実源（Rust の列挙・logger の許す値・スキーマの enum）が一致する。
+#[test]
+fn reasons_and_assigned_values_agree_across_enum_logger_and_schema() {
+    use crate::analysis::handmark::assignment::Assigned;
+    use crate::analysis::handmark::gate::CloseReason;
+    let mut reasons: Vec<String> = CloseReason::ALL
+        .iter()
+        .map(|r| r.as_str().to_string())
+        .collect();
+    reasons.sort();
+    assert_eq!(reasons, schema_enum("HandmarkReasonDto"));
+    let mut assigned: Vec<String> = Assigned::ALL
+        .iter()
+        .map(|a| a.as_str().to_string())
+        .collect();
+    assigned.push("unknown".into());
+    assigned.sort();
+    let mut logger: Vec<String> = crate::logger::HANDMARK_ASSIGNED_VALUES
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    logger.sort();
+    assert_eq!(assigned, logger);
+    assert_eq!(assigned, schema_enum("HandmarkAssignedDto"));
+}

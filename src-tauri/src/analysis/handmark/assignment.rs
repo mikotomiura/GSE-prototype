@@ -9,6 +9,8 @@ use super::state::SplitMix64;
 
 /// 表の版（これだけを受ける）。
 pub const TABLE_VERSION: u32 = 1;
+/// 日の番号の常識の範囲（`eh3::local_day` の数え方で 1970 年から約 2700 年）。
+pub const DAY_RANGE: std::ops::RangeInclusive<i64> = 0..=1_000_000;
 /// `days` の長さの上限。
 pub const MAX_DAYS: usize = 400;
 
@@ -35,6 +37,14 @@ pub enum Assigned {
 }
 
 impl Assigned {
+    pub const ALL: [Assigned; 5] = [
+        Assigned::Before,
+        Assigned::LateFirst,
+        Assigned::On,
+        Assigned::Off,
+        Assigned::After,
+    ];
+
     pub fn as_str(self) -> &'static str {
         match self {
             Assigned::Before => "before",
@@ -52,11 +62,11 @@ impl Table {
         if self.version != TABLE_VERSION {
             return Err(format!("unsupported version {}", self.version));
         }
-        let expected = self
-            .s1_start_day
-            .checked_add(i64::from(self.early_days))
-            .ok_or("day overflow")?;
-        if self.late_start_day != expected {
+        if !DAY_RANGE.contains(&self.s1_start_day) || !DAY_RANGE.contains(&self.late_start_day) {
+            return Err("day out of range".into());
+        }
+        let expected = i128::from(self.s1_start_day) + i128::from(self.early_days);
+        if i128::from(self.late_start_day) != expected {
             return Err("late_start_day != s1_start_day + early_days".into());
         }
         if self.days.is_empty() || self.days.len() > MAX_DAYS {
@@ -83,7 +93,7 @@ impl Table {
         if day == self.late_start_day {
             return Assigned::LateFirst;
         }
-        let idx = day - self.late_start_day - 1;
+        let idx = i128::from(day) - i128::from(self.late_start_day) - 1;
         match usize::try_from(idx).ok().and_then(|i| self.days.get(i)) {
             Some(true) => Assigned::On,
             Some(false) => Assigned::Off,
@@ -206,9 +216,8 @@ pub fn generate(
         version: TABLE_VERSION,
         s1_start_day,
         early_days,
-        late_start_day: s1_start_day
-            .checked_add(i64::from(early_days))
-            .ok_or("day overflow")?,
+        late_start_day: i64::try_from(i128::from(s1_start_day) + i128::from(early_days))
+            .map_err(|_| "day overflow")?,
         days,
     };
     table.validate()?;
@@ -326,6 +335,51 @@ mod tests {
         // 壊れた表（未知のキー）は Broken
         let bytes = br#"{"version":1,"s1_start_day":1,"early_days":1,"late_start_day":2,"days":[true],"x":1}"#;
         assert_eq!(load_from_bytes(Some(bytes), Some("0")), TableLoad::Broken);
+    }
+
+    #[test]
+    fn day_arithmetic_does_not_overflow_at_the_boundaries() {
+        let t = sample();
+        assert_eq!(t.assigned(i64::MIN), Assigned::Before);
+        assert_eq!(t.assigned(i64::MAX), Assigned::After);
+        // 範囲の端
+        let ok = Table {
+            version: 1,
+            s1_start_day: 0,
+            early_days: 1,
+            late_start_day: 1,
+            days: vec![true],
+        };
+        assert!(ok.validate().is_ok());
+        let top = Table {
+            version: 1,
+            s1_start_day: 1_000_000,
+            early_days: 0,
+            late_start_day: 1_000_000,
+            days: vec![true],
+        };
+        assert!(top.validate().is_ok());
+        assert_eq!(top.assigned(i64::MAX), Assigned::After);
+        // 範囲の外・オーバーフローする値は壊れた表
+        for (s, e, l) in [
+            (-1i64, 1u32, 0i64),
+            (1_000_001, 0, 1_000_001),
+            (i64::MAX, 1, i64::MAX),
+            (i64::MAX, u32::MAX, i64::MAX),
+            (1_000_000, 1, 1_000_001),
+        ] {
+            let t = Table {
+                version: 1,
+                s1_start_day: s,
+                early_days: e,
+                late_start_day: l,
+                days: vec![true],
+            };
+            assert!(t.validate().is_err(), "{s} {e} {l}");
+        }
+        assert!(generate(1, i64::MAX, 1, 1, 3).is_err());
+        assert!(generate(1, 1_000_000, 1, 1, 3).is_err());
+        assert!(generate(1, 999_999, 1, 1, 3).is_ok());
     }
 
     #[test]

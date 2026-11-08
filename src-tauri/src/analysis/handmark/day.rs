@@ -90,6 +90,19 @@ impl DayRecord {
         }
     }
 
+    /// 区間 `[from_ms, to_ms]`（両端を含む）に入る `toggles` と `stage_starts` の要素を消す（区間の削除）。
+    /// 消したものがあれば真。`shown_ms`・`off`・`overflow` は時刻でないので変えない。
+    pub fn scrub_range(&mut self, from_ms: u64, to_ms: u64) -> bool {
+        if from_ms > to_ms {
+            return false;
+        }
+        let inside = |t: u64| from_ms <= t && t <= to_ms;
+        let (a, b) = (self.toggles.len(), self.stage_starts.len());
+        self.toggles.retain(|x| !inside(x.t));
+        self.stage_starts.retain(|t| !inside(*t));
+        a != self.toggles.len() || b != self.stage_starts.len()
+    }
+
     /// 読み込んだ中身を検める。
     pub fn is_valid(&self) -> bool {
         self.version == STATE_VERSION
@@ -149,6 +162,27 @@ mod tests {
         assert!(!ok.overflow);
         ok.set_off(1, true);
         assert!(ok.is_valid());
+    }
+
+    #[test]
+    fn scrub_range_removes_only_inner_times_inclusive() {
+        let mut r = DayRecord::new(1);
+        for t in [10u64, 20, 30] {
+            r.set_off(t, t != 20);
+            r.note_stage_start(t + 1);
+        }
+        r.add_shown(7);
+        assert!(!r.scrub_range(40, 50));
+        assert!(!r.scrub_range(30, 10));
+        assert!(r.scrub_range(20, 21));
+        assert_eq!(
+            r.toggles.iter().map(|t| t.t).collect::<Vec<_>>(),
+            vec![10, 30]
+        );
+        assert_eq!(r.stage_starts, vec![11, 31]);
+        assert_eq!(r.shown_ms, 7);
+        assert!(r.scrub_range(0, u64::MAX));
+        assert!(r.toggles.is_empty() && r.stage_starts.is_empty());
     }
 
     #[test]

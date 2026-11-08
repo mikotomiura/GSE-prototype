@@ -161,16 +161,12 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
     //   ★ `probe_frame`（段 1 の問いの枠: seed・起点・調停器の定数）も同じ側。中身は系の設定だけで、
     //   行動も申告も含まない。削除した区間の候補の行（`probe_assignment`・`probe_suppressed`）は消える
     //   （`.steering/20261105-gse-m5-probe-wiring-plan/decisions.md` 判断 8）。
-    //   ★ `handmark_day`（手跡のその日の累計の写し）は行を残す。割付・SHA-256・種・出せなかった理由は日の属性で、
-    //   消すと ITT の分母が欠ける。削除区間に入る `toggles` / `stage_starts` の要素だけを
-    //   [`scrub_handmark_day`] が消す（`.steering/20261108-handmark-stage1-late-pr1/decisions.md` 判断 1-2）。
+    //   ★ `handmark_day`（手跡のその日の累計の写し）は `t` で消える（判断 4: 区間の中の写しが残ると
+    //   その時間帯にアプリが動いていたことと `shown_ms` の差が読める）。区間の外の行に残る `toggles` /
+    //   `stage_starts` のうち区間に入る要素は [`scrub_handmark_day`] が消す。
     if matches!(
         line_type,
-        Some("meta")
-            | Some("session_meta")
-            | Some("invitation_condition")
-            | Some("probe_frame")
-            | Some("handmark_day")
+        Some("meta") | Some("session_meta") | Some("invitation_condition") | Some("probe_frame")
     ) {
         return None;
     }
@@ -271,7 +267,8 @@ pub fn retain_outside_range<'a>(
 
 /// `handmark_day` の行から、区間 `[from_ms, to_ms]`（両端を含む）に入る `toggles` と `stage_starts` の要素を消す。
 ///
-/// 行は残す（割付・SHA-256・種・出せなかった理由は日の属性）。消すものが無い・`handmark_day` でない・
+/// `t` が区間に入る行は [`retain_outside_range`] が行ごと落とす。ここで扱うのは区間の外に残る行で、
+/// 割付・SHA-256・種・出せなかった理由は残す。消すものが無い・`handmark_day` でない・
 /// 区間が逆のときは `None`（行に触らない）。`shown_ms` は時刻ではなく量なので変えない。
 pub fn scrub_handmark_day(line: &str, from_ms: u64, to_ms: u64) -> Option<String> {
     if from_ms > to_ms {
@@ -688,7 +685,7 @@ mod tests {
             // ★ `meta` / `session_meta` は**常に残す**側である (D6 決定 3)。
             if matches!(
                 line_type,
-                "meta" | "session_meta" | "invitation_condition" | "probe_frame" | "handmark_day"
+                "meta" | "session_meta" | "invitation_condition" | "probe_frame"
             ) {
                 continue;
             }
@@ -741,11 +738,7 @@ mod tests {
             .filter(|t| {
                 !matches!(
                     *t,
-                    "meta"
-                        | "session_meta"
-                        | "invitation_condition"
-                        | "probe_frame"
-                        | "handmark_day"
+                    "meta" | "session_meta" | "invitation_condition" | "probe_frame"
                 )
             })
             .collect();
@@ -900,12 +893,16 @@ mod tests {
         r#"{"type":"handmark_day","t":9000,"day":20411,"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":600000,"visible_ms":null,"toggles":[{"t":1000,"on":false},{"t":3000,"on":true},{"t":8000,"on":false}],"stage_starts":[500,2500,7000],"overflow":false,"table_sha256":null,"draw_seed":"0123456789abcdef","reason":"off_today"}"#
     }
 
-    /// `handmark_day` は行ごとは消えない。削除区間に入る切った／戻した時刻と起点だけが消える。
+    /// `t` が区間に入る `handmark_day` の行は行ごと消える。区間の外なら残り、要素だけが消える。
     #[test]
-    fn handmark_day_row_is_kept_and_only_inner_times_are_scrubbed() {
-        let row = handmark_row();
-        assert_eq!(line_timestamp(row), None);
+    fn handmark_day_row_is_dropped_when_t_is_inside_and_scrubbed_otherwise() {
+        let row = handmark_row(); // t = 9000
+        assert_eq!(line_timestamp(row), Some(9_000));
+        let (kept, removed) = retain_outside_range([row], 9_000, 9_000);
+        assert_eq!((kept.len(), removed), (0, 1));
         let (kept, removed) = retain_outside_range([row], 0, u64::MAX);
+        assert_eq!((kept.len(), removed), (0, 1));
+        let (kept, removed) = retain_outside_range([row], 2_000, 5_000);
         assert_eq!((kept.len(), removed), (1, 0));
         let out = scrub_handmark_day(row, 2_000, 5_000).expect("changed");
         let v: serde_json::Value = serde_json::from_str(&out).unwrap();
@@ -968,6 +965,10 @@ mod tests {
         let before = std::fs::read(&path).unwrap();
         assert_eq!(redact_file(&path, 200_000, 300_000).unwrap(), 0);
         assert_eq!(std::fs::read(&path).unwrap(), before);
+        // t（9000）が区間に入れば行ごと消える
+        assert_eq!(redact_file(&path, 8_000, 10_000).unwrap(), 1);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.lines().collect::<Vec<_>>(), vec![key]);
         let _ = std::fs::remove_dir_all(&d);
     }
 

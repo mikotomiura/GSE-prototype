@@ -5,7 +5,7 @@
 //!
 //! ## 呼び出しの契約
 //!
-//! 打鍵 `p` は `advance_to(p)` の後に `press(p)` で入れる（時刻順）。`advance_to` は 250ms の格子の点
+//! 打鍵 `p` は `press(p)` で入れる（時刻順。中で先に `advance_to(p)` を呼ぶ）。`advance_to` は 250ms の格子の点
 //! （絶対時刻の 250 の倍数）まで刻みを進める。格子を過ぎてから届いた打鍵は、その時刻のまま輪に入るが
 //! すでに進んだ刻みには効かない（ライブで遅れて届くとき、再生と差が出うる。1b で受信の時刻を渡す側が
 //! 守る）。描画の回数は状態に影響しない（`advance_to` を何回に分けても同じ）。
@@ -119,8 +119,14 @@ impl Stage {
         }
     }
 
-    /// 打鍵の時刻（UTC の ms）を入れる。
+    /// 打鍵の時刻（UTC の ms）を入れる。先に `advance_to(t_ms)` を呼ぶので、呼び出し側が進め忘れても
+    /// （未来の時刻が入っても）再生と食い違わない。
     pub fn press(&mut self, t_ms: u64) {
+        self.advance_to(t_ms);
+        self.push(t_ms);
+    }
+
+    fn push(&mut self, t_ms: u64) {
         self.ring[self.next] = t_ms;
         self.next = (self.next + 1) % CAP;
         self.len = (self.len + 1).min(CAP);
@@ -183,9 +189,8 @@ impl Stage {
 
     /// `t` 以下の格子の点まで刻みを進める（`t` が格子の手前なら何もしない）。
     pub fn advance_to(&mut self, t: u64) {
-        while self.grid_t + TICK_MS <= t {
-            self.grid_t += TICK_MS;
-            let g = self.grid_t;
+        while let Some(g) = self.grid_t.checked_add(TICK_MS).filter(|g| *g <= t) {
+            self.grid_t = g;
             self.tick(g);
         }
     }
@@ -220,54 +225,51 @@ pub fn replay(presses: &[u64], seed: u64, t0: u64, t: u64) -> StageState {
 mod tests {
     use super::*;
 
-    /// 試作の `Wind::tick` と同じ式で `speed`・`irreg` を出す（式の写しの対照）。
-    fn run(presses: &[u64], until: u64) -> Stage {
+    /// 試作 `handmark_wind.rs` のテストと同じく、打鍵を輪に直接入れて 1 刻みだけ `tick` する。
+    fn raw(presses: &[u64]) -> Stage {
         let mut s = Stage::new(1, 0);
         for &p in presses {
-            s.advance_to(p);
-            s.press(p);
+            s.push(p);
         }
-        s.advance_to(until);
         s
     }
 
     #[test]
     fn no_presses_means_no_wind() {
-        let s = run(&[], 10_000);
+        let mut s = raw(&[]);
+        s.tick(10_000);
         let st = s.state();
-        assert_eq!((st.speed, st.irreg, st.phase), (0.0, 0.0, 0.0));
+        assert_eq!((st.speed, st.irreg), (0.0, 0.0));
     }
 
     #[test]
     fn steady_typing_matches_the_window_formula() {
-        // 毎秒 10 打を 2 秒（100ms おき）。格子の点 2750 で: rate = 0.5、speed = 0.5 * 前 + 0.5 * 0.5。
+        // 毎秒 10 打を 2 秒（100ms おき）。rate = 10 * 0.05 = 0.5、speed = 0.5 * 0 + 0.5 * 0.5。
         let presses: Vec<u64> = (0..20u64).map(|i| 1_000 + i * 100).collect();
-        let mut s = Stage::new(1, 0);
-        for &p in &presses {
-            s.advance_to(p);
-            s.press(p);
-        }
-        // 最後の打鍵は 2900。速さは 0.25 に向かう途中で、定常（0.5）を超えない。
-        s.advance_to(2_950);
+        let mut s = raw(&presses);
+        s.tick(2_950);
         let st = s.state();
-        assert!(st.speed > 0.0 && st.speed <= 0.5, "{st:?}");
+        assert!((st.speed - 0.25).abs() < 1e-12, "{st:?}");
         assert_eq!(st.irreg, 0.0);
-        assert!(st.phase > 0.0);
     }
 
     #[test]
     fn the_rate_is_capped_and_the_wind_decays_to_zero() {
         let presses: Vec<u64> = (0..40u64).map(|i| 1_000 + i * 25).collect();
-        let s = run(&presses, 2_000);
-        assert!(s.state().speed <= 14.0 * SPEED_PER_KEY);
-        let mut s = s;
-        let mut last = s.state().speed;
+        let mut s = raw(&presses);
+        s.tick(2_000);
+        assert!(
+            (s.state().speed - 0.5 * 14.0 * SPEED_PER_KEY).abs() < 1e-12,
+            "{:?}",
+            s.state()
+        );
+        // 最後の打鍵（1975ms）から 1 秒を過ぎると 0.25 秒ごとに減って 0 になる。
         let mut now = 3_000;
-        s.advance_to(now);
-        last = last.max(s.state().speed);
+        s.tick(now);
+        let mut last = s.state().speed;
         for _ in 0..200 {
             now += TICK_MS;
-            s.advance_to(now);
+            s.tick(now);
             let v = s.state().speed;
             assert!(v <= last, "{v} > {last}");
             last = v;
@@ -283,7 +285,8 @@ mod tests {
             t += g;
             presses.push(t);
         }
-        let s = run(&presses, t + 10);
+        let mut s = raw(&presses);
+        s.tick(t + 10);
         let st = s.state();
         assert!(st.irreg > 0.0 && st.irreg <= 1.0, "{st:?}");
     }
@@ -292,12 +295,39 @@ mod tests {
     fn the_ring_keeps_only_the_newest_presses() {
         let mut s = Stage::new(1, 0);
         for i in 0..(CAP as u64 + 10) {
-            s.press(i);
+            s.push(i);
         }
         assert_eq!(s.len, CAP);
         let times: Vec<u64> = s.times().collect();
         assert_eq!(times.first().copied(), Some(10));
         assert_eq!(times.last().copied(), Some(CAP as u64 + 9));
+    }
+
+    /// `press` が先に進めるので、`advance_to` を呼ばずに（未来の時刻を直接）入れても再生と一致する。
+    #[test]
+    fn press_alone_matches_replay_even_with_future_times() {
+        for i in 0..200u64 {
+            let presses = random_presses(i);
+            let t = presses.last().copied().unwrap_or(1_000_000) + 3_000;
+            let mut s = Stage::new(9, 999_000);
+            for &p in &presses {
+                s.press(p); // advance_to を呼ばない
+            }
+            s.advance_to(t);
+            assert_eq!(
+                s.state().bits(),
+                replay(&presses, 9, 999_000, t).bits(),
+                "case {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_grid_does_not_overflow_near_u64_max() {
+        let mut s = Stage::new(1, u64::MAX);
+        s.advance_to(u64::MAX);
+        s.press(u64::MAX);
+        assert!(s.state().drift.is_finite());
     }
 
     #[test]

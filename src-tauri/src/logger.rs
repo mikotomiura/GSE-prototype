@@ -1974,9 +1974,16 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
     } else {
         "unknown"
     };
+    let reason_ok =
+        |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'_');
+    // 理由は `CloseReason::as_str` の固定の語だけのはず。外れたら開発中に気づく（本番は null に落とす）。
+    debug_assert!(
+        r.reason.is_none_or(reason_ok),
+        "handmark_day: invalid reason string"
+    );
     let reason = r
         .reason
-        .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'))
+        .filter(|s| reason_ok(s))
         .map_or_else(|| "null".to_string(), |s| format!("\"{s}\""));
     let sha = r
         .table_sha256
@@ -4445,17 +4452,35 @@ mod tests {
     fn handmark_day_line_refuses_free_strings() {
         let mut r = sample_handmark_day_row();
         r.assigned = "x\"y";
-        r.reason = Some("bad\"reason");
         r.table_sha256 = Some("AB".repeat(32));
         let v: serde_json::Value =
             serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
         assert_eq!(v["assigned"], "unknown");
-        assert!(v["reason"].is_null());
         assert!(v["table_sha256"].is_null());
         r.table_sha256 = Some("a".repeat(63));
         let v: serde_json::Value =
             serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
         assert!(v["table_sha256"].is_null());
+    }
+
+    /// 不正な理由は本番では null に落とし、開発中（debug）は `debug_assert` で止まる。
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "invalid reason string")]
+    fn handmark_day_invalid_reason_trips_the_debug_assert() {
+        let mut r = sample_handmark_day_row();
+        r.reason = Some("bad\"reason");
+        let _ = format_handmark_day_line(&r);
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn handmark_day_invalid_reason_is_null_in_release() {
+        let mut r = sample_handmark_day_row();
+        r.reason = Some("bad\"reason");
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert!(v["reason"].is_null());
     }
 
     /// 段 1 の 3 行種の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る）。

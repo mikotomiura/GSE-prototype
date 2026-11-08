@@ -24,6 +24,24 @@ pub const TABLE_FILE_NAME: &str = "handmark_assignment.json";
 pub const SHA_FILE_NAME: &str = "handmark_assignment.sha256";
 pub const STATE_FILE_NAME: &str = "handmark_day_state.json";
 pub const TABLE_ENV_VAR: &str = "GSE_HANDMARK_TABLE";
+/// 開発・検証の環境変数を読んでよいかを決める環境変数（`lib.rs` の `ensure_debug_enabled` と同じ値の見方）。
+pub const DEBUG_ENV_VAR: &str = "GSE_DEBUG";
+/// 読むファイルの大きさの上限（これを超えたら壊れている側に倒す）。
+pub const MAX_FILE_BYTES: u64 = 64 * 1024;
+
+/// `GSE_HANDMARK_TABLE` を読んでよいか（`GSE_DEBUG` が `"1"` のときだけ）。
+pub fn table_env_allowed(gse_debug: Option<&str>) -> bool {
+    gse_debug == Some("1")
+}
+
+/// 環境変数の表の指定のうち、読んでよいものだけを返す（純関数）。配布形は `s1.mode` の隣の表だけ。
+pub fn effective_table_env(gse_debug: Option<&str>, table_env: Option<String>) -> Option<String> {
+    if table_env_allowed(gse_debug) {
+        table_env
+    } else {
+        None
+    }
+}
 
 /// 読んだ結果。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,7 +87,10 @@ impl DiskFs {
     /// 配布形（`exe` から `s1.mode` の隣）か環境変数の表で作る。ホームが分からなければ `None`。
     pub fn from_env(exe: &Path) -> Option<Self> {
         let marker = crate::s1::marker_path_for(exe, crate::g1::exe_to_folder_levels());
-        let env = std::env::var(TABLE_ENV_VAR).ok();
+        let env = effective_table_env(
+            std::env::var(DEBUG_ENV_VAR).ok().as_deref(),
+            std::env::var(TABLE_ENV_VAR).ok(),
+        );
         let (table, sha) = table_paths(env.as_deref(), marker.as_deref())?;
         let gse = crate::submission::home_dir()?.join(".gse");
         Some(Self {
@@ -86,22 +107,67 @@ impl DiskFs {
 }
 
 fn read_file(p: &Path) -> ReadResult {
-    match std::fs::read(p) {
-        Ok(b) => ReadResult::Bytes(b),
+    use std::io::Read;
+    let meta = match std::fs::metadata(p) {
+        Ok(m) => m,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return ReadResult::Missing,
+        Err(_) => return ReadResult::Unreadable,
+    };
+    // 通常のファイルでなければ、大きすぎれば、壊れている側に倒す（読み込みで固まらない）
+    if !meta.is_file() || meta.len() > MAX_FILE_BYTES {
+        return ReadResult::Unreadable;
+    }
+    let mut buf = Vec::new();
+    match std::fs::File::open(p).and_then(|f| f.take(MAX_FILE_BYTES + 1).read_to_end(&mut buf)) {
+        Ok(_) if buf.len() as u64 <= MAX_FILE_BYTES => ReadResult::Bytes(buf),
+        Ok(_) => ReadResult::Unreadable,
         Err(e) if e.kind() == io::ErrorKind::NotFound => ReadResult::Missing,
         Err(_) => ReadResult::Unreadable,
     }
 }
 
-/// 一時ファイルに書いてから置き換える（`s1_day_state::save` と同じ作法）。
+/// 所有者だけが読み書きできる形で開く（unix は 0600。既存のファイルがあっても締める）。
+fn create_private(path: &Path) -> io::Result<std::fs::File> {
+    let mut o = std::fs::OpenOptions::new();
+    o.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        o.mode(0o600);
+    }
+    let f = o.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // `mode()` は新規作成のときにしか効かない（redaction.rs の作法）
+        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(f)
+}
+
+/// ディレクトリを作り、unix では 0700 に締める。
+fn ensure_private_dir(dir: &Path) -> io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}
+
+/// 一時ファイルに書いてから置き換える（`s1_day_state::save` と同じ作法）。unix では 0600 で作り、
+/// 一時ファイルの残骸は先に消す。
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
+        ensure_private_dir(dir)?;
     }
     let tmp = path.with_extension("json.tmp");
+    // 残骸（古い権限のもの）を引き継がない
+    let _ = std::fs::remove_file(&tmp);
     {
         use std::io::Write;
-        let mut f = std::fs::File::create(&tmp)?;
+        let mut f = create_private(&tmp)?;
         f.write_all(bytes)?;
         f.sync_all()?;
     }
@@ -129,8 +195,8 @@ impl HandmarkFs for DiskFs {
         self.mark_path(day).exists()
     }
     fn write_mark(&self, day: i64) -> io::Result<()> {
-        std::fs::create_dir_all(&self.mark_dir)?;
-        std::fs::File::create(self.mark_path(day))?.sync_all()
+        ensure_private_dir(&self.mark_dir)?;
+        create_private(&self.mark_path(day))?.sync_all()
     }
     fn remove_mark(&self, day: i64) -> io::Result<()> {
         match std::fs::remove_file(self.mark_path(day)) {
@@ -183,6 +249,10 @@ pub struct Evaluation {
     pub table: Option<Table>,
     pub table_sha256: Option<String>,
     pub today: i64,
+    s1_mode: bool,
+    table_load: TableLoad,
+    state: StateStatus,
+    off_today: bool,
 }
 
 impl Evaluation {
@@ -194,7 +264,6 @@ impl Evaluation {
             TableLoad::Ok { table, sha256 } => (Some(table.clone()), Some(sha256.clone())),
             _ => (None, None),
         };
-        let had_prior = prior.is_some();
         let mut record = match prior {
             Some(r) => Some(r),
             None => match parse_state(&fs.read_state()) {
@@ -204,18 +273,14 @@ impl Evaluation {
             },
         };
         let mut state = StateStatus::Broken;
-        let mut rolled = false;
         if let Some(r) = record.as_mut() {
-            rolled = r.roll_to(today);
+            r.roll_to(today);
             state = StateStatus::Ok;
-            if !had_prior || rolled {
-                // 読んだ中身（日付を替えたもの）をそのまま書き直す
-                if write_record(fs, r).is_err() {
-                    state = StateStatus::Unwritable;
-                }
+            // 起動でも検め直しでも毎回、読んだ（走行中の）中身をそのまま書き直して試す
+            if write_record(fs, r).is_err() {
+                state = StateStatus::Unwritable;
             }
         }
-        let _ = rolled;
         let off_today =
             fs.mark_exists(today) || record.as_ref().is_some_and(|r| r.off && r.day == today);
         let decision = decide(s1_mode, &table_load, today, state, off_today);
@@ -225,7 +290,37 @@ impl Evaluation {
             table,
             table_sha256: sha,
             today,
+            s1_mode,
+            table_load,
+            state,
+            off_today,
         }
+    }
+
+    fn redecide(&mut self) {
+        self.decision = decide(
+            self.s1_mode,
+            &self.table_load,
+            self.today,
+            self.state,
+            self.off_today,
+        );
+    }
+
+    /// 5 分の保存などの書き込みが失敗したことを門に戻す（この走行では出さない・次の検め直しで書けたら戻る）。
+    pub fn note_save_failed(&mut self) {
+        self.state = StateStatus::Unwritable;
+        self.redecide();
+    }
+
+    /// 区間の削除: 走行中の累計から区間内の切った／戻した時刻と起点を消し、状態ファイルへ書く。
+    /// 書けなかったら `Err`（累計は消えた後の形でメモリに残る）。lib.rs の削除の経路への配線は 1b。
+    pub fn scrub_state(&mut self, fs: &dyn HandmarkFs, from_ms: u64, to_ms: u64) -> io::Result<()> {
+        let Some(r) = self.record.as_mut() else {
+            return Ok(());
+        };
+        r.scrub_range(from_ms, to_ms);
+        write_record(fs, r)
     }
 
     pub fn is_open(&self) -> bool {
@@ -306,32 +401,38 @@ pub enum ToggleOutcome {
     NotPersisted,
 }
 
-/// 切る。走行中は必ず出さない側（メモリの `off`）に倒す。
+/// 切る。走行中は必ず出さない側に倒す（開いていれば `Closed{OffToday}` にする）。
 pub fn turn_off(fs: &dyn HandmarkFs, ev: &mut Evaluation, now_ms: u64) -> ToggleOutcome {
-    let Some(r) = ev.record.as_mut() else {
-        // 状態ファイルが壊れていて累計が無い: 印だけ試す
-        return if fs.write_mark(ev.today).is_ok() {
-            ToggleOutcome::MarkOnly
-        } else {
-            ToggleOutcome::NotPersisted
-        };
+    let outcome = match ev.record.as_mut() {
+        None => {
+            // 状態ファイルが壊れていて累計が無い: 印だけ試す
+            if fs.write_mark(ev.today).is_ok() {
+                ToggleOutcome::MarkOnly
+            } else {
+                ToggleOutcome::NotPersisted
+            }
+        }
+        Some(r) => {
+            r.set_off(now_ms, true);
+            if write_record(fs, r).is_ok() {
+                ToggleOutcome::State
+            } else if fs.write_mark(ev.today).is_ok() {
+                ToggleOutcome::MarkOnly
+            } else {
+                ToggleOutcome::NotPersisted
+            }
+        }
     };
-    r.set_off(now_ms, true);
-    if write_record(fs, r).is_ok() {
-        return ToggleOutcome::State;
-    }
-    if fs.write_mark(ev.today).is_ok() {
-        ToggleOutcome::MarkOnly
-    } else {
-        ToggleOutcome::NotPersisted
-    }
+    ev.off_today = true;
+    ev.redecide();
+    outcome
 }
 
 /// 戻せなかった（出さないまま）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestoreFailed;
 
-/// 戻す。状態ファイルに書けて、印があれば消せたときだけ戻る。失敗したら出さないまま（`Err`）。
+/// 戻す。状態ファイルに書けて、印があれば消せたときだけ戻り、門を判定し直す。失敗したら出さないまま（`Err`）。
 pub fn turn_on(fs: &dyn HandmarkFs, ev: &mut Evaluation, now_ms: u64) -> Result<(), RestoreFailed> {
     let Some(r) = ev.record.as_mut() else {
         return Err(RestoreFailed);
@@ -343,6 +444,8 @@ pub fn turn_on(fs: &dyn HandmarkFs, ev: &mut Evaluation, now_ms: u64) -> Result<
         r.off = true;
         return Err(RestoreFailed);
     }
+    ev.off_today = false;
+    ev.redecide();
     Ok(())
 }
 
@@ -567,8 +670,9 @@ mod tests {
         fs.fail_state_write.set(true);
         fs.fail_mark_write.set(true);
         assert_eq!(turn_off(&fs, &mut ev, 5_000), ToggleOutcome::NotPersisted);
-        // この走行ではメモリの off が真（出さない側）
-        assert!(ev.record.as_ref().unwrap().off);
+        // この走行では出さない側（門が閉じ、行の理由も off_today）
+        assert!(!ev.is_open());
+        assert_eq!(ev.row(1).unwrap().reason, Some("off_today"));
         drop(ev);
         let ev = Evaluation::run(&fs, true, ON_DAY, None);
         assert_eq!(reason(&ev), Some(CloseReason::StateUnwritable));
@@ -599,6 +703,9 @@ mod tests {
         let fs = with_table();
         let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
         assert_eq!(turn_off(&fs, &mut ev, 1), ToggleOutcome::State);
+        assert!(!ev.is_open());
+        assert_eq!(reason(&ev), Some(CloseReason::OffToday));
+        assert_eq!(ev.row(1).unwrap().assigned, "on");
         assert_eq!(
             reason(&Evaluation::run(&fs, true, ON_DAY, None)),
             Some(CloseReason::OffToday)
@@ -606,9 +713,11 @@ mod tests {
         // 戻す操作が失敗したら出さないまま
         fs.fail_state_write.set(true);
         assert!(turn_on(&fs, &mut ev, 2).is_err());
-        assert!(ev.record.as_ref().unwrap().off);
+        assert!(!ev.is_open());
         fs.fail_state_write.set(false);
         assert!(turn_on(&fs, &mut ev, 3).is_ok());
+        assert!(ev.is_open());
+        assert_eq!(ev.row(3).unwrap().reason, None);
         assert!(Evaluation::run(&fs, true, ON_DAY, None).is_open());
         // 印があって消せないときも戻らない
         let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
@@ -617,7 +726,7 @@ mod tests {
         fs.fail_state_write.set(false);
         fs.fail_mark_remove.set(true);
         assert!(turn_on(&fs, &mut ev, 5).is_err());
-        assert!(ev.record.as_ref().unwrap().off);
+        assert!(!ev.is_open());
     }
 
     /// 同じ日の途中で 2 回起動しても、表示の量が 0 に戻らず、最後の行を採れば二重に数えない。
@@ -713,6 +822,157 @@ mod tests {
         // 空の状態ファイルは壊れている側
         std::fs::write(&fs.state, b"").unwrap();
         assert_eq!(parse_state(&fs.read_state()), DayLoad::Broken);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// 書けない → 同じ日の検め直しでも閉じたまま（検め直しのたびに書き込みを試す）。
+    #[test]
+    fn an_unwritable_state_stays_closed_at_every_recheck() {
+        let fs = with_table();
+        let ev = Evaluation::run(&fs, true, ON_DAY, None);
+        assert!(ev.is_open());
+        fs.fail_state_write.set(true);
+        let ev2 = Evaluation::run(&fs, true, ON_DAY, ev.record.clone());
+        assert_eq!(reason(&ev2), Some(CloseReason::StateUnwritable));
+        let ev3 = Evaluation::run(&fs, true, ON_DAY, ev2.record.clone());
+        assert_eq!(reason(&ev3), Some(CloseReason::StateUnwritable));
+        // 書けるようになれば次の検め直しで戻る
+        fs.fail_state_write.set(false);
+        assert!(Evaluation::run(&fs, true, ON_DAY, ev3.record.clone()).is_open());
+    }
+
+    /// 5 分の保存の失敗は門に戻る。
+    #[test]
+    fn a_failed_periodic_save_closes_the_gate() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        ev.add_shown(10);
+        fs.fail_state_write.set(true);
+        assert!(ev.save(&fs).is_err());
+        ev.note_save_failed();
+        assert!(!ev.is_open());
+        assert_eq!(ev.row(1).unwrap().reason, Some("state_unwritable"));
+        // 次の検め直しでも書けなければ閉じたまま
+        let ev2 = Evaluation::run(&fs, true, ON_DAY, ev.record.clone());
+        assert_eq!(reason(&ev2), Some(CloseReason::StateUnwritable));
+    }
+
+    /// 今日の区間を消す → row() を作り直しても、状態ファイルを読み直しても時刻が無い。
+    #[test]
+    fn scrub_state_removes_the_times_from_memory_and_from_the_state_file() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        ev.note_stage_start(1_000);
+        ev.note_stage_start(5_000);
+        turn_off(&fs, &mut ev, 2_000);
+        assert!(turn_on(&fs, &mut ev, 3_000).is_ok());
+        ev.add_shown(77);
+        ev.save(&fs).unwrap();
+        ev.scrub_state(&fs, 900, 3_500).unwrap();
+        let row = ev.row(9).unwrap();
+        assert_eq!(row.stage_starts, vec![5_000]);
+        assert!(row.toggles.is_empty());
+        assert_eq!(row.shown_ms, 77);
+        let DayLoad::Loaded(disk) = parse_state(&fs.read_state()) else {
+            panic!("state must load");
+        };
+        assert!(disk.toggles.is_empty());
+        assert_eq!(disk.stage_starts, vec![5_000]);
+        // 起動し直しても戻らない
+        let again = Evaluation::run(&fs, true, ON_DAY, None);
+        assert_eq!(again.row(10).unwrap().stage_starts, vec![5_000]);
+        assert!(again.row(10).unwrap().toggles.is_empty());
+        // 書けないときは Err
+        fs.fail_state_write.set(true);
+        assert!(ev.scrub_state(&fs, 0, u64::MAX).is_err());
+    }
+
+    #[test]
+    fn the_env_table_is_read_only_when_gse_debug_is_one() {
+        assert!(table_env_allowed(Some("1")));
+        for v in [
+            None,
+            Some(""),
+            Some("0"),
+            Some("true"),
+            Some("11"),
+            Some(" 1"),
+        ] {
+            assert!(!table_env_allowed(v), "{v:?}");
+        }
+        let t = Some("/x/t.json".to_string());
+        assert_eq!(effective_table_env(Some("1"), t.clone()), t);
+        assert_eq!(effective_table_env(None, t.clone()), None);
+        assert_eq!(effective_table_env(Some("0"), t), None);
+    }
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "gse-handmark-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn read_file_treats_non_files_and_big_files_as_unreadable() {
+        let d = temp_dir("read");
+        assert_eq!(read_file(&d.join("none")), ReadResult::Missing);
+        // ディレクトリ
+        assert_eq!(read_file(&d), ReadResult::Unreadable);
+        // 上限ちょうどは読める・1 バイト超えは読まない
+        let ok = d.join("ok");
+        std::fs::write(&ok, vec![b'a'; MAX_FILE_BYTES as usize]).unwrap();
+        assert!(matches!(read_file(&ok), ReadResult::Bytes(b) if b.len() as u64 == MAX_FILE_BYTES));
+        let big = d.join("big");
+        std::fs::write(&big, vec![b'a'; MAX_FILE_BYTES as usize + 1]).unwrap();
+        assert_eq!(read_file(&big), ReadResult::Unreadable);
+        // 状態ファイルとしては壊れている側
+        assert_eq!(parse_state(&read_file(&big)), DayLoad::Broken);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn state_tmp_marks_and_dir_are_owner_only_on_unix() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        let d = temp_dir("perm");
+        let gse = d.join("gse");
+        let fs = DiskFs {
+            table: d.join("t.json"),
+            sha: d.join("t.sha256"),
+            state: gse.join(STATE_FILE_NAME),
+            mark_dir: gse.clone(),
+        };
+        // 古い権限の一時ファイルの残骸と、緩い権限の既存の状態ファイルがあっても締める
+        std::fs::create_dir_all(&gse).unwrap();
+        std::fs::set_permissions(&gse, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let tmp = fs.state.with_extension("json.tmp");
+        std::fs::write(&tmp, b"stale").unwrap();
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::write(&fs.state, b"{}").unwrap();
+        std::fs::set_permissions(&fs.state, std::fs::Permissions::from_mode(0o644)).unwrap();
+        fs.write_state(b"{}").unwrap();
+        assert_eq!(mode(&fs.state), 0o600);
+        assert!(!tmp.exists());
+        assert_eq!(mode(&gse), 0o700);
+        // 印: 既存の緩い印も締める
+        std::fs::write(gse.join("handmark_off_5"), b"").unwrap();
+        std::fs::set_permissions(
+            gse.join("handmark_off_5"),
+            std::fs::Permissions::from_mode(0o644),
+        )
+        .unwrap();
+        fs.write_mark(5).unwrap();
+        assert_eq!(mode(&gse.join("handmark_off_5")), 0o600);
+        fs.write_mark(6).unwrap();
+        assert_eq!(mode(&gse.join("handmark_off_6")), 0o600);
         let _ = std::fs::remove_dir_all(&d);
     }
 }
