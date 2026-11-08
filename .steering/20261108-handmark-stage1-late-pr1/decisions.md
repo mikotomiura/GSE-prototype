@@ -62,3 +62,17 @@
 - 変異 4 つで赤: 0.5 秒の遅れを外す（ライブと再生の一致のテストが赤）・窓を閉じない（3 件）・時計の飛びを見ない・区間の削除を状態に当てない。
 - 押下は既存の受信ループの `is_press && !recording::is_paused()` の中で段 1 の押下と並べて渡す（フックのコールバックの外）。区間の削除は `redact_dir` の後に `handmark_on_redact`。
 - 実装役が決めた細部（blockers.md）はそのまま採る: 押下は有界のチャンネル（4096）で駆動スレッドへ・駆動は段 1 かつ macOS のときだけ・窓は隠したまま作る・日が変わって窓が出たままなら新しい日の種で取り直す・トレイの出し入れは既存の 1 秒の更新で反映。
+
+## 判断 9: 1b のレビュー（code-reviewer・security-checker・Codex）の指摘
+
+- **研究者の選択**: 背景の窓は画面の共有・収録・スクリーンショットに写さない（`NSWindowSharingNone`）。macOS 15 以降の収録で効くかは画面の確かめで見る。
+- **Claude が直すと決めたもの**:
+  - HIGH: 窓を作れない・`prepare` が失敗したのに、駆動役は出ているものとして `shown_ms` と `first_shown_day` を積む（code-reviewer・Codex が一致）→ 窓の層の失敗の印を駆動役が読み、新しい閉じる理由 `window_unavailable` で閉じる。
+  - HIGH: 粒の位置を描画の間隔から積んでいる（code-reviewer。Codex も P2 で同じ）。ADR-051 D5（描画の回数を状態に影響させない）に反し、机上の描き直しとライブの見た目がずれる → 位置を Rust から届く値（`drift`・`phase`・`layout_seed`）の関数にする。
+  - 同じ日のスリープの時間を出ていた時間に足す（Codex）→ 1 刻みの間が 2 秒を超えたら、その間は足さない。
+  - 区間の削除が失敗の分岐で状態ファイルに残る（security-checker・code-reviewer）→ `handmark_on_redact` を `redact_dir` の前に移す。状態ファイルに書けない・壊れているときはファイルを消す。駆動役がまだ無いときも状態ファイルを直接消す側に倒す。消せなかったら削除の結果に失敗を載せる。区間の削除の後は `Stage` を取り直す。
+  - 駆動スレッドがパニックで死ぬと窓が出続ける（code-reviewer）→ 抜けるときに必ず窓を閉じるガード。
+  - 表の場所が取れないと行を 1 本も書かない（code-reviewer）→ 新しい閉じる理由 `paths_unavailable` の行を 1 本書く。
+  - 窓の capability を `core:event:allow-listen`・`allow-unlisten` だけに絞る（security-checker）。
+  - LOW: 終了中のトレイの押下を弾く・押した文言と駆動役の状態を照らす・トレイの差し込み位置を招待の項目と食い違わないようにする・日が変わって種が替わったら寄せずに置く・出さない日の tick のテストに assert を足す・ロックの順のコメントを実際に合わせる・一致のテストを各刻みの状態で比べる（Codex）。
+- **schema**: 閉じる理由が 2 つ増えるので `schema/current.json` が変わる。gse-dataset の同期をもう一度出す。
