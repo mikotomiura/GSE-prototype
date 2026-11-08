@@ -17,7 +17,7 @@
   - `turn_off(fs, now)` / `turn_on(fs, now)`: 1a の関数を呼び、門の結果に合わせて `CloseWindow` / `OpenWindow` と行。
   - `on_redact(fs, from, to)`: `scrub_state` を呼ぶ（区間の削除の経路から）。
   - `on_quit(fs, now)`: `save` と最後の行。
-- `Effect`: `OpenWindow { layout_seed }`・`CloseWindow`・`State(StageState)`・`Row(HandmarkDayRow)`・`TrayItem(TrayItem)`（`Hidden`・`Stop`〔「背景を今日は止める」〕・`Restore`〔「背景を戻す」〕）。
+- `Effect`: `OpenWindow { layout_seed }`・`CloseWindow`・`State(StageState)`・`Row(HandmarkDayRow)`・`TrayItem(TrayItem)`（`Hidden`・`Stop`〔「やめる」〕・`Restore`〔「描く」〕）。
 - トレイの項目を出すのは、今日の割付が `LateFirst` か `On` のときだけ（出す日でない日に止める・戻すは意味を持たない）。門が `off_today` で閉じているときは `Restore`、開いているときは `Stop`、それ以外は `Hidden`。
 - 再生との一致: `replay` に、記録の打鍵の時刻と同じ遅れの規則（`target = now − 500` まで）を当てる関数を `analysis::handmark::state` に足し、ライブの `tick` の列と再生が `to_bits` で一致することを、500 ms 以内の遅れの打鍵を含む 200 通りでテストする。
 
@@ -42,7 +42,7 @@
 
 ## 4. トレイ（`tray.rs`）
 
-- main の `tray.rs` の作り（招待の項目の差し込み `menu.insert(item, 2)`・`request_quit`）に合わせ、項目を 1 つ差し込む。文言は「背景を今日は止める」／「背景を戻す」で、`TrayItem` で出し分け、`Hidden` では出さない。
+- main の `tray.rs` の作り（招待の項目の差し込み `menu.insert(item, 2)`・`request_quit`）に合わせ、項目を 1 つ差し込む。文言は「やめる」／「描く」で、`TrayItem` で出し分け、`Hidden` では出さない。
 - 既存のテスト `tray_labels_never_leak_cognitive_state` の対象にこの 2 つの文言を足す。
 
 ## 5. 検査
