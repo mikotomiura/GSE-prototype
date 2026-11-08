@@ -3,6 +3,8 @@
 原稿 *What moves with the pause definition and the adjustment: a multiverse diagnostic of pause and stall labels in
 keystroke logs*（三浦尊統・Journal of Educational Data Mining に投稿）のコード・条件・集計の結果です。[English](README.md)
 
+アーカイブ: [10.5281/zenodo.24047695](https://doi.org/10.5281/zenodo.24047695)
+
 ![90 通りの定義での停滞の率と作文の得点](docs/media/score.svg)
 
 窓で停滞を検出する検出器を、研究用に公開された 4 つの打鍵のデータ（入門プログラミングの授業の 2 つの年版 CS1 2019・

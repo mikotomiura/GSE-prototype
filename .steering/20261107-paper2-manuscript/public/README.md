@@ -4,6 +4,8 @@ Code, conditions and aggregate results of the manuscript *What moves with the pa
 multiverse diagnostic of pause and stall labels in keystroke logs* (Mikoto Miura, submitted to the Journal of
 Educational Data Mining). [日本語](README.ja.md)
 
+Archive: [10.5281/zenodo.24047695](https://doi.org/10.5281/zenodo.24047695)
+
 ![Stall rate and essay score across 90 definitions](docs/media/score.svg)
 
 A window-based stall detector was applied to four keystroke datasets released for research (two editions of an

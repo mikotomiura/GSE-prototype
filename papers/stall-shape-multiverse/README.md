@@ -10,5 +10,5 @@ adjustments and which stay.
   files under `manuscript/figdata/` and `manuscript/appendix/tab_*.tex` hold aggregate values by definition and are
   generated from the aggregate result files; they contain no per-writer values.
 
-The public data are not redistributed here. The code, the conditions and the aggregate results will be archived with a
-DOI before submission.
+The public data are not redistributed here. The code, the conditions and the aggregate results are archived at
+https://doi.org/10.5281/zenodo.24047695 (https://github.com/mikotomiura/stall-shape-multiverse).

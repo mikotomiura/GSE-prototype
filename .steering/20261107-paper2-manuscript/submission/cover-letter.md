@@ -25,7 +25,7 @@ results differ, and Supplement S8 sets them side by side. Neither manuscript is 
 Status of the analyses. Every computation ran under conditions committed to the author's version control before it
 ran; these are not third-party registrations. Supplement S1 lists their order and marks which conclusions rest on
 criteria set in advance and which were described after seeing the results. The conditions, the code and the aggregate
-results are archived at [DOI].
+results are archived at https://doi.org/10.5281/zenodo.24047695.
 
 The manuscript has not been published and is not under consideration elsewhere. No new data were collected; the
 datasets are used under the terms of their authors, and for one of them only aggregate values are published by
