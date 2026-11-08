@@ -97,6 +97,8 @@ pub struct Stage {
     grid_start: u64,
     drift_offset: f64,
     layout_seed: u32,
+    #[cfg(test)]
+    ticks_run: u64,
 }
 
 impl Stage {
@@ -116,6 +118,8 @@ impl Stage {
             grid_start: g0,
             drift_offset: (a >> 11) as f64 / (1u64 << 53) as f64 * DRIFT_SPAN_S,
             layout_seed: (b >> 32) as u32,
+            #[cfg(test)]
+            ticks_run: 0,
         }
     }
 
@@ -166,6 +170,10 @@ impl Stage {
 
     /// 1 刻み（250ms）。`now` は格子の点。
     fn tick(&mut self, now: u64) {
+        #[cfg(test)]
+        {
+            self.ticks_run += 1;
+        }
         let prev_speed = self.speed;
         let last_sec = self
             .times()
@@ -188,11 +196,27 @@ impl Stage {
     }
 
     /// `t` 以下の格子の点まで刻みを進める（`t` が格子の手前なら何もしない）。
+    ///
+    /// 止まっている区間（速さも不規則さも 0 で、最後の打鍵から `IRREG_MS` より長い）は、刻みで状態が
+    /// 変わらない（`drift` は格子から計算する）ので、まとめて進める。
     pub fn advance_to(&mut self, t: u64) {
         while let Some(g) = self.grid_t.checked_add(TICK_MS).filter(|g| *g <= t) {
+            if self.is_idle() {
+                self.grid_t += (t - self.grid_t) / TICK_MS * TICK_MS;
+                return;
+            }
             self.grid_t = g;
             self.tick(g);
         }
+    }
+
+    /// 以後の刻みが状態を変えない（打鍵が無いまま）。
+    fn is_idle(&self) -> bool {
+        self.speed == 0.0
+            && self.irreg == 0.0
+            && self.times().last().is_none_or(|last| {
+                self.grid_t.saturating_sub(last) > IRREG_MS && last <= self.grid_t
+            })
     }
 
     /// いまの状態。
@@ -208,11 +232,17 @@ impl Stage {
 }
 
 /// 打鍵の時刻の列（昇順）から、時刻 `t` の状態を出す。ライブも再生もこの順で `Stage` に流す。
+///
+/// 入力の契約: ライブは `t0`（手跡を出し始めた時刻）より前の打鍵を受けないので、`p < t0` の打鍵は
+/// 入れない（記録に開始前の打鍵が混ざっていても、ライブと同じ状態になる）。
 pub fn replay(presses: &[u64], seed: u64, t0: u64, t: u64) -> StageState {
     let mut s = Stage::new(seed, t0);
     for &p in presses {
         if p > t {
             break;
+        }
+        if p < t0 {
+            continue;
         }
         s.advance_to(p);
         s.press(p);
@@ -320,6 +350,61 @@ mod tests {
                 "case {i}"
             );
         }
+    }
+
+    #[test]
+    fn replay_ignores_presses_before_t0() {
+        let a = replay(&[900], 5, 1_000, 1_250);
+        let b = replay(&[], 5, 1_000, 1_250);
+        assert_eq!(a.bits(), b.bits());
+        // t0 ちょうどは入る
+        let c = replay(&[1_000], 5, 1_000, 1_250);
+        assert_ne!(c.bits(), b.bits());
+    }
+
+    /// 素朴に 1 刻みずつ回す参照の実装。
+    fn naive_advance(s: &mut Stage, t: u64) {
+        while let Some(g) = s.grid_t.checked_add(TICK_MS).filter(|g| *g <= t) {
+            s.grid_t = g;
+            s.tick(g);
+        }
+    }
+
+    #[test]
+    fn fast_forward_matches_the_naive_step_loop_including_long_gaps() {
+        for i in 0..200u64 {
+            let mut r = SplitMix64::new(i + 77);
+            let mut fast = Stage::new(3, 500_000);
+            let mut slow = Stage::new(3, 500_000);
+            let mut t = 500_000u64;
+            for _ in 0..r.below(40) {
+                // ときどき長い空白（数分〜数時間）
+                t += 1 + match r.below(4) {
+                    0 => 600_000 + r.below(3_600_000),
+                    1 => 9_000 + r.below(30_000),
+                    _ => r.below(400),
+                };
+                fast.advance_to(t);
+                naive_advance(&mut slow, t);
+                fast.push(t);
+                slow.push(t);
+                assert_eq!(fast.state().bits(), slow.state().bits(), "case {i} t {t}");
+            }
+            let end = t + 7_200_000;
+            fast.advance_to(end);
+            naive_advance(&mut slow, end);
+            assert_eq!(fast.state().bits(), slow.state().bits(), "case {i} end");
+        }
+    }
+
+    #[test]
+    fn a_year_of_silence_takes_few_iterations() {
+        let t0 = 1_000_000u64;
+        let mut s = Stage::new(1, t0);
+        s.press(t0 + 1_000);
+        s.advance_to(t0 + 365 * 86_400_000);
+        assert!(s.ticks_run < 1_000, "{}", s.ticks_run);
+        assert_eq!(s.state().speed, 0.0);
     }
 
     #[test]

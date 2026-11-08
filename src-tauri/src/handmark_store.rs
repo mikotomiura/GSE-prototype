@@ -329,14 +329,17 @@ impl Evaluation {
 
     /// 出ていた時間を足す（開いているときだけ呼ぶ）。
     pub fn add_shown(&mut self, ms: u64) {
-        if let Some(r) = self.record.as_mut() {
+        let today = self.today;
+        // 時計が巻き戻って今日と記録の日が違う間は足さない
+        if let Some(r) = self.record.as_mut().filter(|r| r.day == today) {
             r.add_shown(ms);
         }
     }
 
     /// 手跡を出し始めた時刻を足す。
     pub fn note_stage_start(&mut self, t: u64) {
-        if let Some(r) = self.record.as_mut() {
+        let today = self.today;
+        if let Some(r) = self.record.as_mut().filter(|r| r.day == today) {
             r.note_stage_start(t);
         }
     }
@@ -403,6 +406,7 @@ pub enum ToggleOutcome {
 
 /// 切る。走行中は必ず出さない側に倒す（開いていれば `Closed{OffToday}` にする）。
 pub fn turn_off(fs: &dyn HandmarkFs, ev: &mut Evaluation, now_ms: u64) -> ToggleOutcome {
+    let today = ev.today;
     let outcome = match ev.record.as_mut() {
         None => {
             // 状態ファイルが壊れていて累計が無い: 印だけ試す
@@ -413,8 +417,11 @@ pub fn turn_off(fs: &dyn HandmarkFs, ev: &mut Evaluation, now_ms: u64) -> Toggle
             }
         }
         Some(r) => {
-            r.set_off(now_ms, true);
-            if write_record(fs, r).is_ok() {
+            // 記録の日が今日と違う間（時計の巻き戻り）は記録に足さない。印だけ試す
+            if r.day == today {
+                r.set_off(now_ms, true);
+            }
+            if r.day == today && write_record(fs, r).is_ok() {
                 ToggleOutcome::State
             } else if fs.write_mark(ev.today).is_ok() {
                 ToggleOutcome::MarkOnly
@@ -434,7 +441,8 @@ pub struct RestoreFailed;
 
 /// 戻す。状態ファイルに書けて、印があれば消せたときだけ戻り、門を判定し直す。失敗したら出さないまま（`Err`）。
 pub fn turn_on(fs: &dyn HandmarkFs, ev: &mut Evaluation, now_ms: u64) -> Result<(), RestoreFailed> {
-    let Some(r) = ev.record.as_mut() else {
+    let today = ev.today;
+    let Some(r) = ev.record.as_mut().filter(|r| r.day == today) else {
         return Err(RestoreFailed);
     };
     let prev = r.clone();
@@ -885,6 +893,33 @@ mod tests {
         // 書けないときは Err
         fs.fail_state_write.set(true);
         assert!(ev.scrub_state(&fs, 0, u64::MAX).is_err());
+    }
+
+    /// 日 D に切って保存 → 時計が D-1 に戻って検め直し → D に戻って検め直し → 切ったまま。
+    #[test]
+    fn a_clock_that_goes_back_does_not_forget_that_it_was_turned_off() {
+        let fs = with_table();
+        let d = ON_DAY;
+        let mut ev = Evaluation::run(&fs, true, d, None);
+        assert_eq!(turn_off(&fs, &mut ev, 1_000), ToggleOutcome::State);
+        let saved = ev.record.clone();
+        // D-1 に戻る: 記録は変えず、足さない
+        let mut back = Evaluation::run(&fs, true, d - 1, saved.clone());
+        back.add_shown(5_000);
+        back.note_stage_start(2_000);
+        turn_off(&fs, &mut back, 3_000);
+        assert_eq!(back.record, saved);
+        // D に戻る
+        let ev2 = Evaluation::run(&fs, true, d, back.record.clone());
+        assert!(!ev2.is_open());
+        assert_eq!(ev2.row(9).unwrap().reason, Some("off_today"));
+        assert!(ev2.record.as_ref().unwrap().off);
+        assert_eq!(ev2.record.as_ref().unwrap().shown_ms, 0);
+        // 起動し直しても切ったまま（巻き戻りの間に状態ファイルが別の日で上書きされていない）
+        assert_eq!(
+            reason(&Evaluation::run(&fs, true, d, None)),
+            Some(CloseReason::OffToday)
+        );
     }
 
     #[test]

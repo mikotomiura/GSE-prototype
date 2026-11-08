@@ -102,34 +102,71 @@ fn build(a: &Args) -> Result<(Table, Vec<u8>, String, String), String> {
     Ok((table, bytes, hex, sha_text))
 }
 
-/// 出力を書く。`force` でなければ、どちらかが既にあれば何も書かずに失敗する（`create_new`）。
+/// 一時ファイルに書いて `sync_all` する（本番の書き込み）。
+fn write_synced(p: &Path, data: &[u8]) -> std::io::Result<()> {
+    let mut f = std::fs::File::create(p)?;
+    f.write_all(data)?;
+    f.sync_all()
+}
+
+/// 出力を書く。`force` でなければ、どちらかが既にあれば何も書かずに失敗する。
 fn write_outputs(out: &Path, bytes: &[u8], sha_text: &str, force: bool) -> Result<(), String> {
+    write_outputs_with(out, bytes, sha_text, force, &write_synced)
+}
+
+/// 両方を一時ファイルに書いてから、表、`.sha256` の順に `rename` する（途中で失敗したら一時ファイルを消し、
+/// 既存のファイルには触れない）。`write` は差し替えて失敗を注入できる。
+fn write_outputs_with(
+    out: &Path,
+    bytes: &[u8],
+    sha_text: &str,
+    force: bool,
+    write: &dyn Fn(&Path, &[u8]) -> std::io::Result<()>,
+) -> Result<(), String> {
     let (t, s) = (out.join(TABLE_NAME), out.join(SHA_NAME));
-    if !force {
-        for p in [&t, &s] {
-            if p.exists() {
-                return Err(format!(
-                    "{} already exists (use --force to overwrite)",
-                    p.display()
-                ));
+    let exists_check = || -> Result<(), String> {
+        if !force {
+            for p in [&t, &s] {
+                if p.exists() {
+                    return Err(format!(
+                        "{} already exists (use --force to overwrite)",
+                        p.display()
+                    ));
+                }
             }
         }
-    }
-    std::fs::create_dir_all(out).map_err(|e| format!("create {}: {e}", out.display()))?;
-    let write = |p: &Path, data: &[u8]| -> Result<(), String> {
-        let mut o = std::fs::OpenOptions::new();
-        o.write(true);
-        if force {
-            o.create(true).truncate(true);
-        } else {
-            o.create_new(true);
-        }
-        o.open(p)
-            .and_then(|mut f| f.write_all(data))
-            .map_err(|e| format!("write {}: {e}", p.display()))
+        Ok(())
     };
-    write(&t, bytes)?;
-    write(&s, sha_text.as_bytes())
+    exists_check()?;
+    std::fs::create_dir_all(out).map_err(|e| format!("create {}: {e}", out.display()))?;
+    let (t_tmp, s_tmp) = (
+        out.join(format!("{TABLE_NAME}.tmp")),
+        out.join(format!("{SHA_NAME}.tmp")),
+    );
+    let cleanup = || {
+        let _ = std::fs::remove_file(&t_tmp);
+        let _ = std::fs::remove_file(&s_tmp);
+    };
+    let staged = write(&t_tmp, bytes)
+        .map_err(|e| format!("write {}: {e}", t_tmp.display()))
+        .and_then(|()| {
+            write(&s_tmp, sha_text.as_bytes())
+                .map_err(|e| format!("write {}: {e}", s_tmp.display()))
+        })
+        // rename の直前にもう一度、存在を確かめる
+        .and_then(|()| exists_check());
+    if let Err(e) = staged {
+        cleanup();
+        return Err(e);
+    }
+    std::fs::rename(&t_tmp, &t).map_err(|e| {
+        cleanup();
+        format!("rename {}: {e}", t.display())
+    })?;
+    std::fs::rename(&s_tmp, &s).map_err(|e| {
+        cleanup();
+        format!("rename {}: {e}", s.display())
+    })
 }
 
 fn run() -> Result<String, String> {
@@ -216,6 +253,41 @@ mod tests {
         assert_eq!(std::fs::read(d.join(TABLE_NAME)).unwrap(), b2);
         assert_eq!(std::fs::read_to_string(d.join(SHA_NAME)).unwrap(), s2);
         assert!(parse_args(["--force"].map(String::from)).is_err());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// 2 つ目の一時ファイルの書き込みに失敗しても、既存の 2 つのファイルは元のまま・一時ファイルは残らない。
+    #[test]
+    fn a_failed_second_temp_write_leaves_the_existing_pair_untouched() {
+        let d = std::env::temp_dir().join(format!("gse-hm-table-atomic-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let (_, b1, _, s1) = build(&args(1)).unwrap();
+        let (_, b2, _, s2) = build(&args(2)).unwrap();
+        write_outputs(&d, &b1, &s1, false).unwrap();
+        let calls = std::cell::Cell::new(0);
+        let failing = |p: &Path, data: &[u8]| -> std::io::Result<()> {
+            calls.set(calls.get() + 1);
+            if calls.get() == 2 {
+                // 2 つ目で失敗する（途中まで書いた一時ファイルを残す失敗）
+                std::fs::write(p, b"partial")?;
+                return Err(std::io::Error::other("injected"));
+            }
+            write_synced(p, data)
+        };
+        assert!(write_outputs_with(&d, &b2, &s2, true, &failing).is_err());
+        assert_eq!(std::fs::read(d.join(TABLE_NAME)).unwrap(), b1);
+        assert_eq!(std::fs::read_to_string(d.join(SHA_NAME)).unwrap(), s1);
+        let names: Vec<String> = std::fs::read_dir(&d)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.iter().all(|n| !n.ends_with(".tmp")), "{names:?}");
+        // 1 つ目で失敗しても同じ
+        calls.set(1);
+        let first_fails =
+            |_: &Path, _: &[u8]| -> std::io::Result<()> { Err(std::io::Error::other("injected")) };
+        assert!(write_outputs_with(&d, &b2, &s2, true, &first_fails).is_err());
+        assert_eq!(std::fs::read(d.join(TABLE_NAME)).unwrap(), b1);
         let _ = std::fs::remove_dir_all(&d);
     }
 

@@ -49,9 +49,10 @@ impl DayRecord {
         }
     }
 
-    /// 日付が変わったら今日にして、日の量を空に戻す（`first_shown_day` は残す）。変わったら真。
+    /// 日付が進んだら今日にして、日の量を空に戻す（`first_shown_day` は残す）。変わったら真。
+    /// 時計が巻き戻った（`today < day`）ときは何も変えない（その間は呼び出し側が足さない）。
     pub fn roll_to(&mut self, today: i64) -> bool {
-        if self.day == today {
+        if today <= self.day {
             return false;
         }
         let first = self.first_shown_day;
@@ -130,6 +131,16 @@ mod tests {
         assert!(r.toggles.is_empty() && r.stage_starts.is_empty());
         assert!(!r.off && !r.overflow);
         assert_eq!(r.first_shown_day, Some(10));
+    }
+
+    #[test]
+    fn roll_ignores_a_clock_that_went_back() {
+        let mut r = DayRecord::new(10);
+        r.set_off(1, true);
+        r.add_shown(5);
+        let before = r.clone();
+        assert!(!r.roll_to(9));
+        assert_eq!(r, before);
     }
 
     #[test]
