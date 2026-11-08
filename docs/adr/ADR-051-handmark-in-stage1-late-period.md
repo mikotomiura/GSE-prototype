@@ -139,7 +139,7 @@
 
 | 順 | PR | 中身 |
 |---|---|---|
-| 0 | 文書 | ADR-050・本 ADR・README・地図 R10（計画のタスクの PR）。残りの glossary「手跡」・理論 §1.4・文献 [P485]〜[P554] は、別の引き継ぎ `next-session-gse-handmark-pr0-glossary-theory.md` で入れる |
+| 0 | 文書 | ADR-050・本 ADR・README・地図 R10（計画のタスクの PR）。残りの glossary「手跡」・理論 §1.4・文献 [P485]〜[P554] は、引き継ぎ `next-session-gse-handmark-mac.md` の節 B で入れる |
 | 1 | 後期を始められる最小の切れ端 | 割付の表・日ごとの行種と schema・入口の門・状態の純関数・背景の層（打鍵だけ）・切る／戻す・記録の検査。大きすぎれば、1a（OS 非依存）と 1b（背景と配線）に割って続けて出す |
 | 2 | 帯 | 下の縁の帯と、見えていた時間 |
 | 3 | カーソルとクリック | 読み・状態の関数への入力・`pointer_bin` の近似の写像 |
@@ -198,7 +198,7 @@
 
 ## Migration
 
-1. PR 0 で、ADR-050・本 ADR・README を main に入れる（計画のタスクの PR）。PR 0 の残りとして、glossary「手跡」と理論 §1.4 を枝 `docs/tangibility-design` から持ち込む（`next-session-gse-handmark-pr0-glossary-theory.md`）。持ち込むとき、枝が足した文献 [P485]〜[P554] を同じ番号で `docs/references.md` に足す。main の P は [P484] で止まっているので、番号はぶつからない（2026-11-08 に確かめた）。DOI の重なりは、足すときに確かめる。
+1. PR 0 で、ADR-050・本 ADR・README を main に入れる（計画のタスクの PR）。PR 0 の残りとして、glossary「手跡」と理論 §1.4 を枝 `docs/tangibility-design` から持ち込む（`next-session-gse-handmark-mac.md` の節 B）。持ち込むとき、枝が足した文献 [P485]〜[P554] を同じ番号で `docs/references.md` に足す。main の P は [P484] で止まっているので、番号はぶつからない（2026-11-08 に確かめた）。DOI の重なりは、足すときに確かめる。
 2. 段 1 の事前登録の改訂のタスクに、D3 の値（δ・区間・分け方・3 値）と D4 の割付の方法を渡す（S1-F1・F2・F3 と、漏れの新しい項目）。
 3. PR 1〜7 の引き継ぎを `.steering/_handoff/` に置く。
 

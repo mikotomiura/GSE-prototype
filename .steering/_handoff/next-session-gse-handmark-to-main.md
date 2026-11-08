@@ -1,6 +1,6 @@
 # 引き継ぎ —— 手跡を main に入れる（地図 R10）
 
-> **使用済み（2026-11-08）**: このメモから `.steering/20261108-handmark-to-main-plan/` を始め、計画は ADR-051 にまとめた。次の入口は `next-session-gse-handmark-pr1-late-slice.md`（PR 1）・`next-session-gse-handmark-pr0-glossary-theory.md`（PR 0 の残り）・`next-session-gse-handmark-pr2-7-list.md`・`next-session-gse-handmark-windows.md`。
+> **使用済み（2026-11-08）**: このメモから `.steering/20261108-handmark-to-main-plan/` を始め、計画は ADR-051 にまとめた。次の入口は `next-session-gse-handmark-mac.md`（PR 1・PR 0 の残り・PR 2〜7）と `next-session-gse-handmark-windows.md`。
 
 > 作成: 2026-11-08（Mac のセッション）。研究者が「新しいセッションで始める」を選んだ。このメモは入口で、一次ではない。
 
