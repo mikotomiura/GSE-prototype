@@ -1,0 +1,192 @@
+{
+ "band": 0.1,
+ "share": 0.9,
+ "stall": {
+  "stall_all89": {
+   "raw": {
+    "n": 89,
+    "counts": {
+     "negligible": 17,
+     "imprecise": 22,
+     "above": 2,
+     "below": 48
+    },
+    "reading": "depends"
+   },
+   "length": {
+    "n": 89,
+    "counts": {
+     "imprecise": 14,
+     "above": 1,
+     "negligible": 74
+    },
+    "reading": "negligible"
+   },
+   "speed": {
+    "n": 89,
+    "counts": {
+     "negligible": 8,
+     "imprecise": 10,
+     "below": 71
+    },
+    "reading": "depends"
+   }
+  },
+  "stall_fixed36": {
+   "raw": {
+    "n": 36,
+    "counts": {
+     "below": 36
+    },
+    "reading": "below"
+   },
+   "length": {
+    "n": 36,
+    "counts": {
+     "imprecise": 3,
+     "negligible": 33
+    },
+    "reading": "negligible"
+   },
+   "speed": {
+    "n": 36,
+    "counts": {
+     "below": 36
+    },
+    "reading": "below"
+   }
+  },
+  "stall_quantile53": {
+   "raw": {
+    "n": 53,
+    "counts": {
+     "negligible": 17,
+     "imprecise": 22,
+     "above": 2,
+     "below": 12
+    },
+    "reading": "depends"
+   },
+   "length": {
+    "n": 53,
+    "counts": {
+     "imprecise": 11,
+     "above": 1,
+     "negligible": 41
+    },
+    "reading": "negligible"
+   },
+   "speed": {
+    "n": 53,
+    "counts": {
+     "negligible": 8,
+     "imprecise": 10,
+     "below": 35
+    },
+    "reading": "depends"
+   }
+  },
+  "stall_default_precedent12_incl_b0": {
+   "raw": {
+    "n": 12,
+    "counts": {
+     "imprecise": 4,
+     "negligible": 5,
+     "below": 3
+    },
+    "reading": "depends"
+   },
+   "length": {
+    "n": 12,
+    "counts": {
+     "imprecise": 3,
+     "negligible": 9
+    },
+    "reading": "negligible"
+   },
+   "speed": {
+    "n": 12,
+    "counts": {
+     "below": 12
+    },
+    "reading": "below"
+   }
+  },
+  "stall_default_precedent_fixed3": {
+   "raw": {
+    "n": 3,
+    "counts": {
+     "below": 3
+    },
+    "reading": "below"
+   },
+   "length": {
+    "n": 3,
+    "counts": {
+     "negligible": 3
+    },
+    "reading": "negligible"
+   },
+   "speed": {
+    "n": 3,
+    "counts": {
+     "below": 3
+    },
+    "reading": "below"
+   }
+  },
+  "stall_default_precedent_quantile9_incl_b0": {
+   "raw": {
+    "n": 9,
+    "counts": {
+     "imprecise": 4,
+     "negligible": 5
+    },
+    "reading": "negligible"
+   },
+   "length": {
+    "n": 9,
+    "counts": {
+     "imprecise": 3,
+     "negligible": 6
+    },
+    "reading": "negligible"
+   },
+   "speed": {
+    "n": 9,
+    "counts": {
+     "below": 9
+    },
+    "reading": "below"
+   }
+  }
+ },
+ "pause_fixed18": {
+  "raw": {
+   "n": 18,
+   "counts": {
+    "negligible": 13,
+    "imprecise": 5
+   },
+   "reading": "negligible"
+  },
+  "length": {
+   "n": 18,
+   "counts": {
+    "negligible": 6,
+    "above": 9,
+    "imprecise": 3
+   },
+   "reading": "depends"
+  },
+  "speed": {
+   "n": 18,
+   "counts": {
+    "imprecise": 7,
+    "negligible": 9,
+    "above": 2
+   },
+   "reading": "depends"
+  }
+ }
+}

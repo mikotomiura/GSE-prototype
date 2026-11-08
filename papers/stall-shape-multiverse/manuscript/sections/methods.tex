@@ -12,8 +12,8 @@ character press and a deletion a deletion press (S2). KLiCKe \cite{tian2025klick
 written in 2022 by adults in the United States, recruited online, with English as a first or second language; each
 wrote one essay on one of four prompts adapted from the SAT, with a 30-minute timer and the submit button disabled until
 30 minutes had passed. Trained raters scored each essay on a six-point holistic rubric; each essay was scored by at
-least two raters, scores two or more points apart were discussed, and the corpus gives the mean, in steps of 0.5
-\cite{tian2025klicke}. The task, a timed argumentative essay scored on a holistic rubric, has the format of writing
+least two raters, scores two or more points apart were discussed, and the corpus gives the mean, in steps of 0.5; weighted
+Cohen's $\kappa$ was 0.60 before and 0.76 after the discussion \cite{tian2025klicke}. The task, a timed argumentative essay scored on a holistic rubric, has the format of writing
 assessment in education, although the writers were not sampled from a course. CoAuthor is a dataset of creative and argumentative writing with suggestions from a language model
 \cite{lee2022coauthor}; it is writing outside an educational setting and enters as a contrast with a different
 recording, not as an educational sample. The method needs two fields per key press: its time and whether it inserted
@@ -63,7 +63,8 @@ condition A rises from false to true at time $s$ and stays true until $t_0 = s +
 $\theta$ is the value at $s$ and is held until $t_0$, condition A is evaluated only from $W$ after the start of an
 observation interval, $t_0$ must fall within the interval, and a new onset requires condition A to become false and
 rise again.
-The stall lasts from $s$ to the next character press in the same observation interval (the resumption); its length is
+The stall lasts from $s$ to the first character press after $t_0$ in the same observation interval (the
+resumption); its length is
 measured from $t_0$, so it can be short if typing resumes soon after the onset. Under the characters-only rule an onset
 requires no character press for at least $W + \theta$, more than 15~s in our grid; under the net rule, deletions can make
 condition A hold while characters are still being typed, so the label is a stop in net character production and
@@ -115,9 +116,11 @@ are in use, and separately where they part (53 definitions with a writer quantil
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{The four axes of the stall detector. The baseline level is marked with an asterisk. The grid of levels with
-precedent keeps the default window and condition, the writer-relative and the 10-s thresholds, and the three
-segmentations (12 definitions).}
+\caption{The four axes of the stall detector. The baseline level is marked with an asterisk. The grid of default and
+precedented levels keeps the default window and condition, which have no use outside the detector, and the levels with
+precedent outside it: writer-relative thresholds as a kind, the 10-s threshold and the three segmentations (12
+definitions, including the baseline). A fixed $\theta$ is a hold after condition A rises, so a 10-s $\theta$ is not the
+same construct as a 10-s pause threshold.}
 \label{tab:grid}
 \begin{tabularx}{\textwidth}{@{}l l X@{}}
 \toprule
@@ -176,11 +179,8 @@ variation. Stalls that did not resume within their interval are excluded (S5). W
 decomposition of counts, whose estimates did not recover simulated components (S6).
 
 \paragraph{Intervals.} All intervals are 95\% percentile intervals from 2,000 resamples of writers, with each
-writer's labels as detected. For the writer-quantile $\theta$ of the stall detector we also computed two-stage
-intervals that redraw $\theta$ within each resampled writer; by a reading set before the second of these, they are
-reported as a sensitivity analysis. Under them the score and ratio conclusions read the same; for $\varphi$ they
-were shifted above the point values and are not a comparison, so the $\varphi$ intervals leave out the variation of
-$\theta$ (S2). The interval of a
+writer's labels as detected. Two-stage intervals that also redraw the writer-quantile $\theta$ are a
+sensitivity analysis (S2). The interval of a
 definition shows sampling variation; the spread across definitions shows definitional variation, and we set the two
 side by side \cite{robitzsch2022multiverse}. Definitions share axes and are not independent, so we read counts as
 proportions of the grid and do not test the grid as a whole \cite{simonsohn2020specification}.
@@ -189,17 +189,14 @@ proportions of the grid and do not test the grid as a whole \cite{simonsohn2020s
 \label{sec:status}
 
 Every computation ran under conditions committed in the author's repository before it ran; these are not third-party
-registrations. S1 gives the order of the computations and the status of each conclusion; after a first internal
-pre-submission check of this manuscript we added four computations, and after a second we recomputed the two-stage
-intervals with a causal draw, which by the reading set in advance returned the primary intervals to the one-stage
-ones. The
-speed covariate was chosen twice after seeing results, so the speed-adjusted values are exploratory. Three points bear
+registrations. S1 gives the order of the computations, including those added after seeing results,
+and the status of each conclusion. The speed covariate was chosen twice after seeing results, so the speed-adjusted values are exploratory. Three points bear
 on the claims. The criterion for a reversal of a rate ratio (25\% of the
 definitions for a pair) was set after the number of reversed point values per pair had been seen, and the pair committed
 to be reported first, the two CS1 editions, did not reach it. The criterion for a reversal of the score association
 required only one definition with an interval on the other side of zero, which is lenient, so we report the full
-distribution. After the second check we also required the point value to lie on the other side, which changed no
-count, and stopped counting reversals where the baseline interval itself contains the boundary. Descriptions of strength are counted after seeing the results.
+distribution; requiring the point value to lie there as well, a rule added later, changed no count. Sizes, the
+reading by classes of interval and the grid of default and precedented levels were set after seeing the results.
 
 The author used Claude (Anthropic) to search the literature, to write the analysis scripts under these conditions and
 to check the numbers in the text against the result files; every number in the text was compared with the result files.

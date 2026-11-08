@@ -36,6 +36,9 @@ counting rule that a reversal needs both the point value and the interval on the
 new intervals replace the one-stage ones only if at most 5\% of point values fall outside their intervals; 27\% of
 the $\varphi$ values did, so the primary intervals returned to the one-stage ones (the score association,
 positive for 10 definitions under the one-stage intervals, had been positive for 14 under those of order 7) \\
+10 & [D] & After a third internal check, no new computation: the reading by classes of interval, with imprecise intervals
+as a class of their own, and the grid of default and precedented levels, counted from the existing intervals (in the
+archive) \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -54,14 +57,15 @@ zero). For pauses the reading was stated over all 36 definitions and was met the
 text reports the 18 fixed-threshold definitions, in which it is also met, and treats the 18 writer-quantile ones as a
 control. Presence of the pause association: by the stall criterion applied after seeing the results, it moves on the
 18 (56\% of intervals exclude zero) and not on the 36 (78\%) & [A] \\
-Three-way reading of direction (90\% of definitions in one class) & [D] \\
+Reading by classes of interval (90\% of classified definitions in one class; imprecise intervals counted apart) and
+the grid of default and precedented levels & [D] \\
 Presence of the association does not move (criterion: 25--75\% of intervals excluding zero) & [A] \\
 Strength of the association (negligible to small) & [D] \\
 Given typing speed, negative for all stall definitions & [E] \\
 Given essay length, negative for none & [A] \\
 Rank order of datasets changes (criterion: 25\% of definitions) & [P] \\
 Rate ratios reverse, point value and interval on the other side of 1 (criterion set after seeing reversed point values) & [D] \\
-Within-writer $\varphi$ reverses at 1.5 & [P, A] \\
+Within-writer $\varphi$ reverses at 1.5 (in 2 of the 4 CS1 cells over 25\%) & [P, A] \\
 CS1 stall-to-stall share stays the largest & [A] \\
 \bottomrule
 \end{tabularx}
@@ -133,10 +137,11 @@ the full time) changed the baseline stall--score correlation from $-0.063$ to $-
 definitions instead of 10 had a positive interval, 74 a negative one, and no interval changed from one side of zero to
 the other. The rank order differed for 80 definitions, as before. The rate ratios reversed for 22 definitions between
 the two CS1 editions (20 before; 19 with a fixed $\theta$, 18 before), 66, 53, 8 and 2 for the other pairs (66, 53, 6
-and 0 before). The reversals of $\varphi$ at 1.5, counted with the
-interval alone, were 17, 57, 53, 26 and 0 (in the full time: not counted, 54, 49, 19 and 0); the CS1 2019 blocks can be
-counted only in the restricted time, where the baseline interval [1.28, 1.45] no longer contains 1.5, and only the CS1
-2021 assignments crossed 25\% of the definitions.
+and 0 before). The reversals of $\varphi$ at 1.5, counted by the rule of
+the main text, were 17 (CS1 2019 blocks), 57 (CS1 2019 assignments), not counted (CS1 2021 blocks), 26 (CS1 2021
+assignments) and 0 (CoAuthor); in the full time they were not counted, 54, 49, 19 and 0. In the restricted time the
+baseline interval of the CS1 2019 blocks, [1.28, 1.45], no longer contains 1.5, whereas that of the CS1 2021 blocks,
+[1.37, 1.94], does; only the CS1 2021 assignments crossed 25\% of the definitions.
 
 \paragraph{Checks.} The onsets $(s, t_0)$ of the baseline agreed with those of the reference implementation in all
 7,709 units. For the window variants of 15 and 60~s and the 0.995 quantile variant (with the minimum of 200 intervals of
@@ -175,7 +180,10 @@ against CoAuthor); and the reversals of $\varphi$ at 1.5 were 42 (CS1 2019 assig
 
 Table~\ref{tab:s3} lists, for each definition, the pooled stall rates, the rank of the datasets, two rate ratios, the
 score association with and without adjustment for speed (median interval $< 2$~s) and for essay and observation
-length, and the share of KLiCKe writers with no stall. Table~\ref{tab:spause} gives the pause family. The rank order
+length, and the share of KLiCKe writers with no stall. Table~\ref{tab:spause} gives the pause family. In the pause family the rate ratio reversed for no definition between
+the two CS1 editions, for 32 between CS1 2019 and CoAuthor (14 fixed, 18 quantile), for 31 between CoAuthor and KLiCKe
+(13 and 18), and for 5 and 3 between the CS1 editions and KLiCKe (all fixed); by the criterion set after seeing point
+values, the direction of a ratio changed with the definition in the pause family too. The rank order
 of the four datasets differed from the baseline order for 80 of 89 definitions; the baseline rates of CS1 2019 and
 KLiCKe are close, and their swap alone accounts for 11 of the 80. Within the four prompts of KLiCKe, as point values only, the median of the
 prompt correlations between stall rate and score was negative for 74 definitions and positive for 15. Among the 10

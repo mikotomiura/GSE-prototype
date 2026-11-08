@@ -1,26 +1,27 @@
 \section{Discussion}
 \label{sec:discussion}
 
-The association between a keystroke label rate and essay score was present for most stall definitions, but its
-direction changed within both detectors; among fixed pause thresholds its presence moved as well, and most values were
-negligible. Adjusting for essay length left no stall definition negative and most values negligible. For researchers
-in educational data mining and learning analytics who relate pause, stall or inactivity rates to outcomes or compare
-them across datasets, a report should therefore contain the range of the conclusion across definitions and
-adjustments, with intervals, rather than the point value of one definition. Compared with earlier multiverse analyses,
-what moved here was of a different kind: an eye-movement effect kept its existence and changed its size
-\cite{godwin2025multiverse}, and boundary pausing in CS1 changed strength with the split at 2~s but not direction
-\cite{koutcheme2026keystroke}; here the existence of the stall association stayed, and its direction changed.
+The association between a stall rate and essay score was present for most definitions and changed direction only
+where a 15-s window met a writer quantile; on the grid of default and precedented levels it was negative or
+negligible, and what moved there was its size and, among fixed pause thresholds, its presence. Adjusting for essay
+length left no stall definition negative and most values negligible, whereas for pauses it raised half of the
+definitions above $+0.1$. For researchers in educational data mining and learning analytics who relate pause, stall or
+inactivity rates to outcomes or compare them across datasets, a report should therefore contain the range of the
+conclusion across definitions and adjustments, with intervals, rather than the point value of one definition. Within
+levels in use, our result resembles earlier multiverse analyses, in which an eye-movement effect kept its existence
+and changed its size \cite{godwin2025multiverse} and boundary pausing in CS1 changed strength with the split at 2~s
+but not direction \cite{koutcheme2026keystroke}; widening the grid to levels around the default also changed the
+direction. The score association comes from adults recruited online, so its transfer to course data is untested.
 
 \paragraph{Why the direction can change.} A rate of labels per hour is a count, and counts carry how much and how fast
 a writer types as well as how often the writer stops. A writer-quantile pause threshold makes this explicit: its rate
 follows the rate of key presses and correlated with the score at about $+0.6$. Prior work reports the same split
 between counts and durations: pause counts can correlate positively with scores through text length, whereas pause
-durations correlate negatively \cite{schaller2026keyscore}. Adjusting for speed, an exploratory analysis, left a
-negative association for every stall definition but a mostly positive one for the fixed pause thresholds, so after
-speed is removed the two labels carry different parts of the rate; adjusting for essay length left no stall
-definition negative. These are patterns, not a tested mechanism; the association that remains after either adjustment
-is the part of the rate that does not overlap with the covariate, and speed and length may confound or mediate it
-\cite{mackinnon2000equivalence}.
+durations correlate negatively \cite{schaller2026keyscore}. The two detectors also answered the adjustments
+differently: given speed, an exploratory analysis, every stall definition was negative but most fixed pause thresholds
+were positive, and given length the stall association shrank towards zero while the pause association grew. These are
+patterns, not a tested mechanism; the association that remains after either adjustment is the part of the rate that
+does not overlap with the covariate, and speed and length may confound or mediate it \cite{mackinnon2000equivalence}.
 
 \paragraph{Existing answers to arbitrary thresholds.} Mixture models, personalised thresholds, state models, location
 classes and controls for typing skill (Section~\ref{sec:related}) each choose a threshold, a model or a control. The
@@ -28,26 +29,23 @@ diagnostic applies to them in the same way: vary the choice they make and report
 that keep the uncertainty of the choice, such as probabilistic assignment of pauses to components or averaging over
 models, are the natural complement.
 
-\paragraph{What the criteria established.} By criteria set before each quantity was seen, the direction of the
-score association changed within both detectors (a lenient criterion), the presence of the stall association did not
-move, adjusting for essay length left no stall definition negative, within-writer departure from a constant rate
-depended on the definition in CS1, and the largest component of CS1 stall length stayed. The presence of the pause
-association, the reversal of rate ratios and all sizes were judged after seeing results, and the speed-adjusted values
-are exploratory (S1). We did not test whether the definitional spread changes the performance of a predictor or a
-decision about when to intervene.
+\paragraph{What the criteria established.} By criteria set before each quantity was seen, the direction of the stall
+and pause associations with the score changed (a lenient criterion), the presence of the stall association did not
+move, adjusting for essay length left no stall definition negative, $\varphi$ against 1.5 depended on the definition
+in two CS1 cells, and the largest component of CS1 stall length stayed. The presence of the pause association, the
+reversal of rate ratios, all sizes and the readings by class were judged after seeing results, and the speed-adjusted
+values are exploratory (S1). We did not test whether the definitional spread changes the performance of a predictor
+or a decision about when to intervene.
 
 \paragraph{Recommendation.} When reporting an association or a comparison based on a pause or stall rate, report the
 value of each axis, vary each axis over its range in prior practice and around the default, and report the spread with
 intervals, with and without adjustment for quantities that do not contain the label, such as the length of the product
 and typing speed; adjustment is an axis as well, since it can change the conclusion as a definition can. As a proposal
-formed after seeing these results, read the spread by three classes of interval (below $-0.1$, above $+0.1$, within
-$\pm 0.1$): report a consistent direction or a negligible association only if one class holds at least 90\% of the
-definitions, and otherwise report that the conclusion depends on the definition. Because the share depends on how
-finely each axis is cut, apply the reading twice, to the grid of levels with precedent and to the grid with the levels
-around the default added, and report both. In our data the reading gave one answer only for the fixed stall thresholds
-over the full grid (Section~\ref{sec:res-adjust}).
-On the grid of levels with precedent, the speed-adjusted stall association read as consistently negative, and the
-other readings still depended on the definition; whether a reading is definite depends on the grid, so the two grids
-should be reported together.
-The same reading applies to comparisons of rates between datasets and to the choice of a count model. The code is
-released for this purpose.
+formed after seeing these results, sort each definition's interval into below $-0.1$, above $+0.1$, within $\pm 0.1$
+(negligible) or imprecise (crossing a bound). Report a consistent direction or a negligible association when one class
+holds at least 90\% of the classified definitions, report that the conclusion depends on the definition otherwise, and
+give the number of imprecise intervals in either case, since a wide interval is a lack of precision rather than a
+dependence on the definition. Because these shares depend on how finely each axis is cut, apply the reading to the
+grid of the default and of levels with precedent and to the grid with the levels around the default added, and report
+both (Table~\ref{tab:read}). The same reading applies to comparisons of rates between datasets and to $\varphi$. The
+code is released for this purpose.
