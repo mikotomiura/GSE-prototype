@@ -52,3 +52,4 @@
 - [x] Zenodo を publish（2026-11-08・研究者の確認の後）。record の zip を取り直し、手元と SHA-256（37219bd7…）が一致
 - [x] 投稿（2026-11-08・JEDM 1486・submission/submission-record.md）
 - [x] 公開 repo の README を作り直した（ロゴ・検出器の GIF・定義の格子・動くもの残るもの・英日。38e4a04・GitHub で全画像の表示を確かめた）。Zenodo 0.1.0 は README の変更を含まない
+- [x] 公開 repo から投稿先・状態の表記を外した（README のバッジと文・main.tex の冒頭のコメント）。履歴を 1 コミット（8e4890b）に作り直して force push。GitHub は古いコミットを SHA で当面開ける（Support への削除依頼はしない・研究者の判断）。Zenodo 0.1.0 の zip の README には残る（原稿が版の DOI を引くのでそのまま・研究者の判断）
