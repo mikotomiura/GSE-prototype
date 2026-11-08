@@ -1,4 +1,6 @@
 pub mod clipboard;
+// 手跡のポインタの読みの型と正準の箱への写し（OS 非依存・`#[cfg]` なし）。
+pub mod handmark_pointer;
 pub mod hook;
 pub mod ime;
 // ⚠️★ **OS 非依存**にしてあるので `#[cfg]` を付けない。
