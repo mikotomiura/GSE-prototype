@@ -7,7 +7,7 @@
 \label{app:status}
 
 \paragraph{Order of the computations.} Every computation ran under a written condition committed to the author's version
-control before it ran. The conditions are in the archive (in Japanese, with an English summary). They are records in
+control before it ran. The conditions are in the archive, in Japanese; an English summary will accompany them. They are records in
 the author's repository, not third-party registrations: their order is shown by the repository, not by an independent
 time stamp.
 
@@ -20,21 +20,22 @@ Order & Status & Computation and what was fixed before it \\
 for 9 definitions, an estimator-level comparison (in the archive); the criteria for ``moves'' (25\% of definitions) and for
 overdispersion \\
 2 & [A] & Length decomposition for all 90 definitions; the criterion that the stall-to-stall share stays the largest \\
-3 & [A] & Intervals for rates, ratios and $\varphi$; the KLiCKe score association; the criteria for a reversal of a
-ratio (25\% of definitions for a pair) and of the score association (one definition with an interval on the other side
-of zero) \\
+3 & [A] & Intervals for rates, ratios and $\varphi$; the KLiCKe score association; the criterion for a reversal of
+the score association (one definition with an interval on the other side of zero) and, set after the reversed point
+values had been seen and before the intervals, for a ratio (25\% of definitions for a pair) \\
 4 & [E] & Partial association given the key-press rate (withdrawn as a covariate, below) \\
 5 & [E] & Partial association given typing speed (median interval $< 2$~s) \\
 6 & [E] & Six ways of measuring speed and the within-prompt adjustment; the reading sentence stated in
 Section~\ref{sec:res-adjust} \\
-7 & [A] & After the first review of the manuscript: the pause family (36 definitions), intervals with the writer
+7 & [A] & After a first internal pre-submission check: the pause family (36 definitions), intervals with the writer
 quantile estimated again, and the adjustment for essay and observation length; the readings of each, including that
 the two-stage intervals replace the earlier ones regardless of which is narrower \\
 8 & [A] & The restriction of all 90 definitions to the time after each unit's 100th interval (S2); its readings \\
-9 & [A] & After the second review: two-stage intervals with the writer quantile estimated causally (S2), the
+9 & [A] & After a second internal check: two-stage intervals with the writer quantile estimated causally (S2), the
 counting rule that a reversal needs both the point value and the interval on the other side, and the reading that the
 new intervals replace the one-stage ones only if at most 5\% of point values fall outside their intervals; 27\% of
-the $\varphi$ values did, so the one-stage intervals stayed primary \\
+the $\varphi$ values did, so the primary intervals returned to the one-stage ones (the score association,
+positive for 10 definitions under the one-stage intervals, had been positive for 14 under those of order 7) \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -49,15 +50,17 @@ after seeing results; [D] descriptive, counted after seeing results.
 Conclusion & Status \\
 \midrule
 Direction of the stall--score and pause--score association changes (criterion: one definition on the other side of
-zero). For pauses the reading was stated over all 36 definitions and was met there; the main text reports the 18
-fixed-threshold definitions, in which it is also met, and treats the 18 writer-quantile ones as a control & [A] \\
+zero). For pauses the reading was stated over all 36 definitions and was met there, through the control alone; the main
+text reports the 18 fixed-threshold definitions, in which it is also met, and treats the 18 writer-quantile ones as a
+control. Presence of the pause association: by the stall criterion applied after seeing the results, it moves on the
+18 (56\% of intervals exclude zero) and not on the 36 (78\%) & [A] \\
 Three-way reading of direction (90\% of definitions in one class) & [D] \\
 Presence of the association does not move (criterion: 25--75\% of intervals excluding zero) & [A] \\
 Strength of the association (negligible to small) & [D] \\
 Given typing speed, negative for all stall definitions & [E] \\
 Given essay length, negative for none & [A] \\
 Rank order of datasets changes (criterion: 25\% of definitions) & [P] \\
-Rate ratios reverse beyond sampling variation (criterion set after seeing reversed point values) & [D] \\
+Rate ratios reverse, point value and interval on the other side of 1 (criterion set after seeing reversed point values) & [D] \\
 Within-writer $\varphi$ reverses at 1.5 & [P, A] \\
 CS1 stall-to-stall share stays the largest & [A] \\
 \bottomrule
@@ -130,7 +133,9 @@ the full time) changed the baseline stall--score correlation from $-0.063$ to $-
 definitions instead of 10 had a positive interval, 74 a negative one, and no interval changed from one side of zero to
 the other. The rank order differed for 80 definitions, as before. The rate ratios reversed for 22 definitions between
 the two CS1 editions (20 before; 19 with a fixed $\theta$, 18 before), 66, 53, 8 and 2 for the other pairs (66, 53, 6
-and 0 before). The reversals of $\varphi$ at 1.5 were 17, 57, 53, 26 and 0 (18, 54, 49, 19 and 0 before); only the CS1
+and 0 before). The reversals of $\varphi$ at 1.5, counted with the
+interval alone, were 17, 57, 53, 26 and 0 (in the full time: not counted, 54, 49, 19 and 0); the CS1 2019 blocks can be
+counted only in the restricted time, where the baseline interval [1.28, 1.45] no longer contains 1.5, and only the CS1
 2021 assignments crossed 25\% of the definitions.
 
 \paragraph{Checks.} The onsets $(s, t_0)$ of the baseline agreed with those of the reference implementation in all
@@ -152,14 +157,14 @@ $\varphi$ fell outside their intervals, and under the baseline the CS1 2019 to K
 longer contained the point value 0.865. We read the shift as the effect of drawing early intervals from the whole unit,
 where the causal rule uses only the intervals so far.
 
-In the second, set after the second review, each interval of a unit received a Poisson(1) weight, and $\theta$ at each
+In the second, set after the second internal check, each interval of a unit received a Poisson(1) weight, and $\theta$ at each
 time was the weighted quantile of the intervals before it, so that the draw is causal as well; again 200 draws per unit.
 With unit weights it reproduced the detector's counts in every block of every unit. Its intervals had the same width
 as the one-stage ones (median ratio 1.00), and all 54 score values and 324 ratios lay inside them, but 74 of 270 values
 of $\varphi$ lay below their intervals (CS1 2019 blocks 33, CS1 2019 assignments 32, CS1 2021 blocks 5, CoAuthor 3,
 CS1 2021 assignments 1): the redrawn $\theta$ adds its own variation to the counts within a writer and so raises
-$\varphi$. By the reading set before the computation (more than 5\% outside in any quantity), the one-stage intervals
-stayed primary. Under the second two-stage intervals, counting a reversal only when the point value and the interval
+$\varphi$. By the reading set before the computation (more than 5\% outside in any quantity), the primary intervals
+returned to the one-stage ones. Under the second two-stage intervals, counting a reversal only when the point value and the interval
 are on the other side, the score association was positive for the same 10 definitions and negative for 74; the ratio
 reversals were 20 (the two CS1 editions), 66 (CS1 2019 against KLiCKe), 53 (CS1 2021 against KLiCKe) and 7 (CS1 2019
 against CoAuthor); and the reversals of $\varphi$ at 1.5 were 42 (CS1 2019 assignments), 39 (CS1 2021 blocks) and 18
@@ -170,7 +175,13 @@ against CoAuthor); and the reversals of $\varphi$ at 1.5 were 42 (CS1 2019 assig
 
 Table~\ref{tab:s3} lists, for each definition, the pooled stall rates, the rank of the datasets, two rate ratios, the
 score association with and without adjustment for speed (median interval $< 2$~s) and for essay and observation
-length, and the share of KLiCKe writers with no stall. Table~\ref{tab:spause} gives the pause family. For pauses,
+length, and the share of KLiCKe writers with no stall. Table~\ref{tab:spause} gives the pause family. The rank order
+of the four datasets differed from the baseline order for 80 of 89 definitions; the baseline rates of CS1 2019 and
+KLiCKe are close, and their swap alone accounts for 11 of the 80. Within the four prompts of KLiCKe, as point values only, the median of the
+prompt correlations between stall rate and score was negative for 74 definitions and positive for 15. Among the 10
+definitions with a positive score interval, the share of KLiCKe writers with no stall was 0.1--1.3\%, against
+0.1--35\% across all 89, so the positive corner is not a floor effect of rare stalls. The definitions that lowered
+$\varphi$ most split the observation at key-press gaps of 5~min or used a fixed 30-s threshold. For pauses,
 the number of definitions whose $\varphi$ interval lay on the other side of 1.5 from the baseline stall $\varphi$ was 26
 (CS1 2019 blocks), 1 (CS1 2019 assignments), 8 (CS1 2021 blocks), 1 (CS1 2021 assignments) and 6 (CoAuthor sessions);
 we report these counts without a reading.
@@ -181,7 +192,10 @@ including zero / positive) out of 89, with their range: maximum interval 1~s, me
 2~s, intervals between two character presses only, 87/2/0, $-0.29$ to $-0.02$; median of 10--750~ms (the measure of
 \citeN{koutcheme2026keystroke}), 89/0/0, $-0.28$ to $-0.03$; 2~s, median, within prompts (weighted mean over the four
 prompts), 89/0/0, $-0.28$ to $-0.03$. Under the baseline the partial correlation was $-0.17$ to $-0.19$ for every
-measure. The correlation of the stall rate with speed ranged from $-0.35$ to $+0.07$ over the 89 definitions.
+measure. The correlation of the stall rate with speed ranged from $-0.35$ to $+0.07$ over the 89 definitions. The
+reading set in advance, that the direction would ``also depend on how speed is measured'' if any interval included zero
+or was positive, was met by the 2 intervals that included zero; by the counting rule of the main text no direction
+reversed.
 
 \paragraph{Key-press rate (reference only).} The score correlated with the key-press rate at 0.62 [0.60, 0.63]. Given
 the key-press rate, the partial correlation of score and stall rate ranged from $-0.054$ to $+0.106$, positive with an

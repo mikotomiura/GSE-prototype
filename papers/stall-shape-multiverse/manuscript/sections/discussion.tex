@@ -1,23 +1,26 @@
 \section{Discussion}
 \label{sec:discussion}
 
-The association between a keystroke label rate and essay score was present for most definitions, but its direction
-changed within both detectors, and adjusting for essay length left no definition negative. For researchers in
-educational data mining and learning analytics who relate pause, stall or inactivity rates to outcomes or compare them
-across datasets, a report should therefore contain the range of the conclusion across definitions and adjustments,
-with intervals, rather than the point value of one definition. Compared with earlier multiverse analyses, what moved
-here was of a different kind: an eye-movement effect kept its existence and changed its size
+The association between a keystroke label rate and essay score was present for most stall definitions, but its
+direction changed within both detectors; among fixed pause thresholds its presence moved as well, and most values were
+negligible. Adjusting for essay length left no stall definition negative and most values negligible. For researchers
+in educational data mining and learning analytics who relate pause, stall or inactivity rates to outcomes or compare
+them across datasets, a report should therefore contain the range of the conclusion across definitions and
+adjustments, with intervals, rather than the point value of one definition. Compared with earlier multiverse analyses,
+what moved here was of a different kind: an eye-movement effect kept its existence and changed its size
 \cite{godwin2025multiverse}, and boundary pausing in CS1 changed strength with the split at 2~s but not direction
-\cite{koutcheme2026keystroke}; here the existence of the association stayed, and its direction changed.
+\cite{koutcheme2026keystroke}; here the existence of the stall association stayed, and its direction changed.
 
 \paragraph{Why the direction can change.} A rate of labels per hour is a count, and counts carry how much and how fast
 a writer types as well as how often the writer stops. A writer-quantile pause threshold makes this explicit: its rate
-follows the rate of key presses and correlated with the score at about $+0.6$. Prior work reports the same split between counts and durations:
-pause counts can correlate positively with scores through text length, whereas pause durations correlate negatively
-\cite{schaller2026keyscore}. Adjusting for speed, an exploratory analysis, left a negative association for every stall
-definition; adjusting for essay length left no negative one. These are patterns, not a tested mechanism; the
-association that remains after either adjustment is the part of the rate that does not overlap with the covariate, and
-speed and length may confound or mediate it \cite{mackinnon2000equivalence}.
+follows the rate of key presses and correlated with the score at about $+0.6$. Prior work reports the same split
+between counts and durations: pause counts can correlate positively with scores through text length, whereas pause
+durations correlate negatively \cite{schaller2026keyscore}. Adjusting for speed, an exploratory analysis, left a
+negative association for every stall definition but a mostly positive one for the fixed pause thresholds, so after
+speed is removed the two labels carry different parts of the rate; adjusting for essay length left no stall
+definition negative. These are patterns, not a tested mechanism; the association that remains after either adjustment
+is the part of the rate that does not overlap with the covariate, and speed and length may confound or mediate it
+\cite{mackinnon2000equivalence}.
 
 \paragraph{Existing answers to arbitrary thresholds.} Mixture models, personalised thresholds, state models, location
 classes and controls for typing skill (Section~\ref{sec:related}) each choose a threshold, a model or a control. The
@@ -25,27 +28,26 @@ diagnostic applies to them in the same way: vary the choice they make and report
 that keep the uncertainty of the choice, such as probabilistic assignment of pauses to components or averaging over
 models, are the natural complement.
 
-\paragraph{What the criteria established.} By criteria set before each quantity was seen: the direction of the
-score association changed within both detectors (a lenient criterion, one definition on the other side of zero; for
-pauses, from negligible positive to small negative values), and the presence of an association did not move (S1);
-adjusting for essay length left no definition negative; within-writer departure from a constant rate depended on the
-definition; the largest component of CS1 stall length stayed, a weak contrast. The reversal of rate ratios was counted against a criterion set after seeing point values, which
-the two CS1 editions did not reach (Section~\ref{sec:status}). The strength of the association is described after seeing the results,
-and the speed-adjusted values are exploratory. We did not test whether the definitional spread changes the performance
-of a predictor or a decision about when to intervene.
+\paragraph{What the criteria established.} By criteria set before each quantity was seen, the direction of the
+score association changed within both detectors (a lenient criterion), the presence of the stall association did not
+move, adjusting for essay length left no stall definition negative, within-writer departure from a constant rate
+depended on the definition in CS1, and the largest component of CS1 stall length stayed. The presence of the pause
+association, the reversal of rate ratios and all sizes were judged after seeing results, and the speed-adjusted values
+are exploratory (S1). We did not test whether the definitional spread changes the performance of a predictor or a
+decision about when to intervene.
 
 \paragraph{Recommendation.} When reporting an association or a comparison based on a pause or stall rate, report the
 value of each axis, vary each axis over its range in prior practice and around the default, and report the spread with
 intervals, with and without adjustment for quantities that do not contain the label, such as the length of the product
-and typing speed. As a proposal formed after seeing these results, classify each definition by its interval:
-below $-0.1$, above $+0.1$, within $\pm 0.1$ (negligible), or none of these; report a direction or a negligible
-association only if one class holds at least 90\% of the definitions, and otherwise report that the conclusion depends
-on the definition. Apply the reading twice, to a grid of levels with precedent and to the grid with the levels around
-the default added, and report both. In our data only the fixed stall thresholds gave one reading (36 of 36 below
-$-0.1$); the writer-quantile stall thresholds, the fixed pause thresholds (13 of 18 negligible) and the length- and
-speed-adjusted stall associations (74 of 89 negligible; 71 of 89 below $-0.1$) depended on the definition. On the
-grid without the 15-s window, the unadjusted stall association still depended on it (36 of 59 below $-0.1$), whereas
-the length-adjusted association read as negligible (56 of 59) and the speed-adjusted one as below $-0.1$ (59 of 59), so
-the reading of an adjusted association depended on whether the grid included a level without precedent.
-The same reading applies to comparisons of rates
-between datasets and to the choice of a count model. The code is released for this purpose.
+and typing speed; adjustment is an axis as well, since it can change the conclusion as a definition can. As a proposal
+formed after seeing these results, read the spread by three classes of interval (below $-0.1$, above $+0.1$, within
+$\pm 0.1$): report a consistent direction or a negligible association only if one class holds at least 90\% of the
+definitions, and otherwise report that the conclusion depends on the definition. Because the share depends on how
+finely each axis is cut, apply the reading twice, to the grid of levels with precedent and to the grid with the levels
+around the default added, and report both. In our data the reading gave one answer only for the fixed stall thresholds
+over the full grid (Section~\ref{sec:res-adjust}).
+On the grid of levels with precedent, the speed-adjusted stall association read as consistently negative, and the
+other readings still depended on the definition; whether a reading is definite depends on the grid, so the two grids
+should be reported together.
+The same reading applies to comparisons of rates between datasets and to the choice of a count model. The code is
+released for this purpose.

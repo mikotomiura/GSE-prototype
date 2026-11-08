@@ -13,13 +13,14 @@ written in 2022 by adults in the United States, recruited online, with English a
 wrote one essay on one of four prompts adapted from the SAT, with a 30-minute timer and the submit button disabled until
 30 minutes had passed. Trained raters scored each essay on a six-point holistic rubric; each essay was scored by at
 least two raters, scores two or more points apart were discussed, and the corpus gives the mean, in steps of 0.5
-\cite{tian2025klicke}. CoAuthor is a dataset of creative and argumentative writing with suggestions from a language model
+\cite{tian2025klicke}. The task, a timed argumentative essay scored on a holistic rubric, has the format of writing
+assessment in education, although the writers were not sampled from a course. CoAuthor is a dataset of creative and argumentative writing with suggestions from a language model
 \cite{lee2022coauthor}; it is writing outside an educational setting and enters as a contrast with a different
 recording, not as an educational sample. The method needs two fields per key press: its time and whether it inserted
 or deleted a character.
 
-A writer is a student (CS1, KLiCKe) or a participant (CoAuthor). We excluded the units of writers with less than 10
-minutes of observation (47 CS1 2019 assignments, 84 KLiCKe essays, 2 CoAuthor sessions and none in CS1 2021) and, in the count analyses, units with
+A writer is a student (CS1) or a participant (KLiCKe, CoAuthor). We excluded the units of writers with less than 10
+minutes of observation (the time within the observation intervals, not the time on the KLiCKe timer) (47 CS1 2019 assignments, 84 KLiCKe essays, 2 CoAuthor sessions and none in CS1 2021) and, in the count analyses, units with
 less than 5 minutes of exposure. KLiCKe is the only dataset with an outcome that we used: in the 2019 CS1 release the
 grade table was withdrawn by the data authors as erroneous, and the 2021 grades were not used because only 31 writers
 were on the seen side. Holdouts set aside in earlier work have no confirmatory role here; two had been opened in the
@@ -58,7 +59,10 @@ writers and the length decomposition (S8).
 
 A stall is detected from three ingredients (Figure~\ref{fig:detector}). Let \emph{condition A} hold at time $t$ when,
 in the window $(t - W, t]$, the number of character presses minus the number of deletion presses is less than one. When
-condition A rises from false to true at time $s$ and stays true until $t_0 = s + \theta$, an onset is raised at $t_0$.
+condition A rises from false to true at time $s$ and stays true until $t_0 = s + \theta$, an onset is raised at $t_0$;
+$\theta$ is the value at $s$ and is held until $t_0$, condition A is evaluated only from $W$ after the start of an
+observation interval, $t_0$ must fall within the interval, and a new onset requires condition A to become false and
+rise again.
 The stall lasts from $s$ to the next character press in the same observation interval (the resumption); its length is
 measured from $t_0$, so it can be short if typing resumes soon after the onset. Under the characters-only rule an onset
 requires no character press for at least $W + \theta$, more than 15~s in our grid; under the net rule, deletions can make
@@ -111,19 +115,22 @@ are in use, and separately where they part (53 definitions with a writer quantil
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{The four axes of the stall detector. The baseline level is marked with an asterisk.}
+\caption{The four axes of the stall detector. The baseline level is marked with an asterisk. The grid of levels with
+precedent keeps the default window and condition, the writer-relative and the 10-s thresholds, and the three
+segmentations (12 definitions).}
 \label{tab:grid}
 \begin{tabularx}{\textwidth}{@{}l l X@{}}
 \toprule
 Axis & Levels & Source of the levels \\
 \midrule
-Window $W$ & 15, 30$^\ast$, 60~s & 30~s is the default; 15 and 60~s are half and double the default (we found no prior
-use of a 15-s window) \\
-Threshold $\theta$ & writer quantile 0.95, 0.99$^\ast$, 0.995; fixed 10, 30~s & writer-relative thresholds
-\cite{chukharev2014pauses}; fixed thresholds in writing span about 0.25--10~s \cite{torrance2024methods}, and 30~s equals
-the default window \\
+Window $W$ & 15, 30$^\ast$, 60~s & 30~s is the default; 15 and 60~s are half and double the default; we found no
+use of a window length outside the detector \\
+Threshold $\theta$ & writer quantile 0.95, 0.99$^\ast$, 0.995; fixed 10, 30~s & writer-relative thresholds are in use
+(an ex-Gaussian bound per writer \cite{chukharev2014pauses}, ten times the within-word median \cite{guo2020scenario}),
+though not at these quantiles; fixed thresholds in writing span about 0.25--10~s \cite{torrance2024methods}, so 10~s
+has precedent and 30~s, set equal to the default window, has none \\
 Condition A & net$^\ast$ (characters $-$ deletions $< 1$); characters only ($< 1$) & whether deletions cancel character
-presses \\
+presses; neither rule has a use outside the detector \\
 Observation & default intervals$^\ast$; split at key-press gaps of 5~min; of 30~min & 5~min of inactivity as
 time-on-task \cite{hart2023time}; 30~min as a session timeout \cite{halfaker2015session} \\
 \bottomrule
@@ -171,7 +178,9 @@ decomposition of counts, whose estimates did not recover simulated components (S
 \paragraph{Intervals.} All intervals are 95\% percentile intervals from 2,000 resamples of writers, with each
 writer's labels as detected. For the writer-quantile $\theta$ of the stall detector we also computed two-stage
 intervals that redraw $\theta$ within each resampled writer; by a reading set before the second of these, they are
-reported as a sensitivity analysis, under which every conclusion reads the same (S2). The interval of a
+reported as a sensitivity analysis. Under them the score and ratio conclusions read the same; for $\varphi$ they
+were shifted above the point values and are not a comparison, so the $\varphi$ intervals leave out the variation of
+$\theta$ (S2). The interval of a
 definition shows sampling variation; the spread across definitions shows definitional variation, and we set the two
 side by side \cite{robitzsch2022multiverse}. Definitions share axes and are not independent, so we read counts as
 proportions of the grid and do not test the grid as a whole \cite{simonsohn2020specification}.
@@ -180,15 +189,17 @@ proportions of the grid and do not test the grid as a whole \cite{simonsohn2020s
 \label{sec:status}
 
 Every computation ran under conditions committed in the author's repository before it ran; these are not third-party
-registrations. S1 gives the order of the computations and the status of each conclusion; after the first round of
-review of this manuscript we added four computations, and after the second we recomputed the two-stage intervals
-with a causal draw, which by the reading set in advance left the one-stage intervals primary. The
+registrations. S1 gives the order of the computations and the status of each conclusion; after a first internal
+pre-submission check of this manuscript we added four computations, and after a second we recomputed the two-stage
+intervals with a causal draw, which by the reading set in advance returned the primary intervals to the one-stage
+ones. The
 speed covariate was chosen twice after seeing results, so the speed-adjusted values are exploratory. Three points bear
 on the claims. The criterion for a reversal of a rate ratio (25\% of the
 definitions for a pair) was set after the number of reversed point values per pair had been seen, and the pair committed
 to be reported first, the two CS1 editions, did not reach it. The criterion for a reversal of the score association
 required only one definition with an interval on the other side of zero, which is lenient, so we report the full
-distribution. Descriptions of strength are counted after seeing the results.
+distribution. After the second check we also required the point value to lie on the other side, which changed no
+count, and stopped counting reversals where the baseline interval itself contains the boundary. Descriptions of strength are counted after seeing the results.
 
 The author used Claude (Anthropic) to search the literature, to write the analysis scripts under these conditions and
 to check the numbers in the text against the result files; every number in the text was compared with the result files.

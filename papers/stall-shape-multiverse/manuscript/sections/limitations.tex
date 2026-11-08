@@ -16,9 +16,11 @@ rates. We did not compare groups within a dataset.
 reconstructed from edit events) and the length of units, so differences between them are not attributed to a cause.
 
 \paragraph{Intervals and samples.} The primary intervals hold each writer's quantile threshold as detected and leave
-out its variation. Two resamples that redraw it did not widen the intervals: the first, which drew early intervals from
-the whole unit, placed 18 of 54 score values below their intervals; the second, which draws only from the intervals so
-far, kept every score and ratio value inside its interval but placed 74 of 270 values of $\varphi$ below theirs (S2).
+out its variation. A resample that redraws it causally left the score and ratio conclusions as they were, but for
+$\varphi$ it was shifted above the point values, so how the variation of the threshold bears on $\varphi$ is not
+resolved (S2). The default observation intervals depend on the companion study's estimator; every result is also
+reported for two segmentations that need only the time of each key press and whether it inserted or deleted a
+character.
 A definition changes the time in which a stall can be detected (the writer-quantile family
 cannot detect before the 100th interval, 3.2--10.3\% of the exposure), which units reach 5 minutes of exposure and, for $\varphi$, which writers
 have stalls at all, so definitions differ in their samples as well as their labels. Restricting all definitions to the time after the 100th interval
