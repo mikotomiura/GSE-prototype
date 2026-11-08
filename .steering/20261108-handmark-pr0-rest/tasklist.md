@@ -10,5 +10,5 @@
 - [x] theory/README.md の 1 行
 - [x] 枝の ADR-040 に振り直しの注（枝 1b2fd57b・未 push）
 - [x] 機械の確かめ（本文の [Pn] がすべて登録済み・禁止用語 0 件）
-- [ ] code-reviewer と /cross-review（Codex を加える）
+- [x] code-reviewer と /cross-review（Codex を加える・3 巡・判断 2〜4）
 - [ ] /finish-task（push・PR は研究者に確かめてから・[skip ci]）
