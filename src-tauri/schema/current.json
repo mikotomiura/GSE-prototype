@@ -1451,6 +1451,114 @@
           ]
         }
       }
+    },
+    {
+      "description": "段 1 の後期の手跡の、その日の累計の写し（ADR-051 D4）。`meta.s1_mode` があるときだけ出る。\n\n書く時点は起動（門の判定の後）・日付の変わり目・終了・5 分ごと。**机上では日ごとに最後の行を採る** （`shown_ms` は再起動をまたいで累計なので、同じ日の行を足し合わせない）。 `day` は現地の日の番号（4:00 区切り）。現地の分は書かない。 区間指定削除では行を残し、削除区間に入る `toggles` と `stage_starts` の要素だけを消す （割付・SHA-256・種・出せなかった理由は日の属性で、消すと ITT の分母が欠ける）。 打鍵の時刻・キー・風の値（速さ・不規則さ・位相）を持つ欄は無い。",
+      "type": "object",
+      "required": [
+        "assigned",
+        "day",
+        "overflow",
+        "shown_ms",
+        "stage_starts",
+        "t",
+        "toggles",
+        "type"
+      ],
+      "properties": {
+        "assigned": {
+          "$ref": "#/definitions/HandmarkAssignedDto"
+        },
+        "day": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "draw_seed": {
+          "description": "描画の種（16 桁の 16 進の文字列。JSON の数の精度を避ける）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "first_shown_day": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "late_start_day": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "overflow": {
+          "description": "`toggles` か `stage_starts` が 1 日 64 個を超えた。",
+          "type": "boolean"
+        },
+        "reason": {
+          "description": "出せなかった理由（出せたら `null`）。",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HandmarkReasonDto"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shown_ms": {
+          "description": "その日に出ていた時間（ms）。",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "stage_starts": {
+          "description": "手跡を出し始めた時刻（再生で位相の起点に使う）。",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "table_sha256": {
+          "description": "割付の表のバイト列の SHA-256（64 桁の小文字の 16 進）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toggles": {
+          "description": "切った（`on: false`）／戻した（`on: true`）時刻。",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HandmarkToggleDto"
+          }
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "handmark_day"
+          ]
+        },
+        "visible_ms": {
+          "description": "見えていた時間。1a・1b では常に `null`（計り方は帯と一緒に後で決まる）。",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     }
   ],
   "definitions": {
@@ -1596,6 +1704,52 @@
         "incubation",
         "idle"
       ]
+    },
+    "HandmarkAssignedDto": {
+      "description": "手跡のその日の割付。`unknown` は表が読めないなど。",
+      "type": "string",
+      "enum": [
+        "before",
+        "late_first",
+        "on",
+        "off",
+        "after",
+        "unknown"
+      ]
+    },
+    "HandmarkReasonDto": {
+      "description": "手跡を出せなかった（出さなかった）理由。",
+      "type": "string",
+      "enum": [
+        "table_missing",
+        "table_broken",
+        "sha_missing",
+        "sha_mismatch",
+        "state_broken",
+        "state_unwritable",
+        "off_today",
+        "assigned_off",
+        "before_late",
+        "after_table"
+      ]
+    },
+    "HandmarkToggleDto": {
+      "description": "手跡の切った／戻した。",
+      "type": "object",
+      "required": [
+        "on",
+        "t"
+      ],
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     },
     "HeadIdDto": {
       "description": "ADR-006 Phase 2b: どの domain head がセッションを採点したか (session_meta)。\n\n`task_kind` (被験者の宣言) と対にして残す。ルーティング表が変われば 同じ `task_kind` でも別の head になるため、実際に走った推論器を記録する。 `writing_fallback` = Creative / Other を Writing head で採点している状態 (Creative は ADR-006 #3 からの意図的な逸脱、Other は ADR-037 D2)。",

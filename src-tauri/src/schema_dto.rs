@@ -622,6 +622,72 @@ pub enum LogEntryDto {
         #[serde(skip_serializing_if = "Option::is_none")]
         debug: Option<bool>,
     },
+    /// 段 1 の後期の手跡の、その日の累計の写し（ADR-051 D4）。`meta.s1_mode` があるときだけ出る。
+    ///
+    /// 書く時点は起動（門の判定の後）・日付の変わり目・終了・5 分ごと。**机上では日ごとに最後の行を採る**
+    /// （`shown_ms` は再起動をまたいで累計なので、同じ日の行を足し合わせない）。
+    /// `day` は現地の日の番号（4:00 区切り）。現地の分は書かない。
+    /// 区間指定削除では行を残し、削除区間に入る `toggles` と `stage_starts` の要素だけを消す
+    /// （割付・SHA-256・種・出せなかった理由は日の属性で、消すと ITT の分母が欠ける）。
+    /// 打鍵の時刻・キー・風の値（速さ・不規則さ・位相）を持つ欄は無い。
+    HandmarkDay {
+        t: u64,
+        day: i64,
+        assigned: HandmarkAssignedDto,
+        late_start_day: Option<i64>,
+        first_shown_day: Option<i64>,
+        /// その日に出ていた時間（ms）。
+        shown_ms: u64,
+        /// 見えていた時間。1a・1b では常に `null`（計り方は帯と一緒に後で決まる）。
+        visible_ms: Option<u64>,
+        /// 切った（`on: false`）／戻した（`on: true`）時刻。
+        toggles: Vec<HandmarkToggleDto>,
+        /// 手跡を出し始めた時刻（再生で位相の起点に使う）。
+        stage_starts: Vec<u64>,
+        /// `toggles` か `stage_starts` が 1 日 64 個を超えた。
+        overflow: bool,
+        /// 割付の表のバイト列の SHA-256（64 桁の小文字の 16 進）。
+        table_sha256: Option<String>,
+        /// 描画の種（16 桁の 16 進の文字列。JSON の数の精度を避ける）。
+        draw_seed: Option<String>,
+        /// 出せなかった理由（出せたら `null`）。
+        reason: Option<HandmarkReasonDto>,
+    },
+}
+
+/// 手跡の切った／戻した。
+#[derive(Serialize, JsonSchema)]
+pub struct HandmarkToggleDto {
+    pub t: u64,
+    pub on: bool,
+}
+
+/// 手跡のその日の割付。`unknown` は表が読めないなど。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandmarkAssignedDto {
+    Before,
+    LateFirst,
+    On,
+    Off,
+    After,
+    Unknown,
+}
+
+/// 手跡を出せなかった（出さなかった）理由。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandmarkReasonDto {
+    TableMissing,
+    TableBroken,
+    ShaMissing,
+    ShaMismatch,
+    StateBroken,
+    StateUnwritable,
+    OffToday,
+    AssignedOff,
+    BeforeLate,
+    AfterTable,
 }
 
 /// 段 1 の候補を出さなかった理由。

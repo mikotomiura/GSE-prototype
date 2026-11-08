@@ -1181,6 +1181,9 @@ enum ReplayEvent {
     /// 読み飛ばし専用。段 1 の日の終わりの問い（記録のみ・推論へ流さない）。
     #[serde(rename = "day_question")]
     DayQuestion(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。手跡のその日の累計の写し（記録のみ・推論へ流さない・ADR-051 D4）。
+    #[serde(rename = "handmark_day")]
+    HandmarkDay(#[allow(dead_code)] serde_json::Value),
     /// ⚠️★★★ **O1 の監査 criterion**（ADR-031 D1）。★ 読み飛ばし専用。
     ///
     /// ⚠️★★★ **2026-09-14 に足し忘れて実測で踏んだ。**★ `activity_label` 行を 1 本足した
@@ -1296,6 +1299,7 @@ impl ReplayEvent {
             ReplayEvent::ProbeFrame(_) => None,
             ReplayEvent::ProbeSuppressed(_) => None,
             ReplayEvent::DayQuestion(_) => None,
+            ReplayEvent::HandmarkDay(_) => None,
             // ⚠️★★★ 監査 criterion（ADR-031）。★ 記録のみで推論へ流さない。
             ReplayEvent::ActivityLabel(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
@@ -4358,6 +4362,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::ProbeFrame(_)
             | ReplayEvent::ProbeSuppressed(_)
             | ReplayEvent::DayQuestion(_)
+            | ReplayEvent::HandmarkDay(_)
             // ⚠️★★★ 監査 criterion (ADR-031)。★ 記録のみで推論へ流さない。
             | ReplayEvent::ActivityLabel(_)
             | ReplayEvent::SessionMeta { .. }
@@ -7168,6 +7173,10 @@ not json\n";
             (
                 "day_question",
                 r#"{"type":"day_question","t":2,"shown_ts":1,"in_eod_window":false,"target_day":20000,"trigger":"pickup","delayed":true,"answered":false,"closed_by":"dismiss","items_version":"dq-draft-1","motivation":null,"latency_ms":null,"duration_ms":null}"#,
+            ),
+            (
+                "handmark_day",
+                r#"{"type":"handmark_day","t":2,"day":20411,"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":0,"visible_ms":null,"toggles":[],"stage_starts":[],"overflow":false,"table_sha256":null,"draw_seed":null,"reason":"table_missing"}"#,
             ),
         ];
 
