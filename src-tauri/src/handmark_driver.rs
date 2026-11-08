@@ -320,8 +320,10 @@ impl HandmarkDriver {
         match status {
             WindowStatus::Pending => {}
             WindowStatus::Shown => {
-                if self.window_open {
+                if self.window_open && !self.window_confirmed {
                     self.window_confirmed = true;
+                    // 計測の起点を置き直す(出たと分かる前の時間を入れない)
+                    self.last_tick_ms = now;
                 }
             }
             WindowStatus::Failed => {
@@ -349,13 +351,21 @@ impl HandmarkDriver {
             if self.ev.scrub_state(fs, from_ms, to_ms).is_ok() {
                 true
             } else {
-                // 書けない: 状態ファイルを消す(切っていたなら印を残す)。走行中の累計は書けなかったと扱う
-                if self.ev.record.as_ref().is_some_and(|r| r.off) {
-                    let _ = fs.write_mark(self.ev.today);
-                }
+                // 書けない: 切っていたなら印を書けたときだけ状態ファイルを消す。印も書けなければ
+                //   消さず、区間の時刻を落とし off を保つ最小の形で書き直す。それも駄目なら失敗を返す。
+                let off = self.ev.record.as_ref().is_some_and(|r| r.off);
+                let day = self.ev.today;
                 self.ev.note_save_failed();
                 self.reconcile(now, &mut fx);
-                fs.remove_state().is_ok()
+                if !off || fs.write_mark(day).is_ok() {
+                    fs.remove_state().is_ok()
+                } else {
+                    let mut min = crate::analysis::handmark::day::DayRecord::new(day);
+                    min.off = true;
+                    serde_json::to_vec(&min)
+                        .ok()
+                        .is_some_and(|b| fs.write_state(&b).is_ok())
+                }
             }
         } else {
             // 状態ファイルが壊れていて累計が無い: ファイルを直接直す(壊れていれば消す)
@@ -821,5 +831,37 @@ mod tests {
         let b = st(&d2.tick(&fs, T0 + 1_750, ON_DAY));
         assert_eq!(a.speed, 0.0);
         assert!(b.speed > 0.0);
+    }
+
+    /// Pending の刻み → 遅れて Shown → 次の刻みで、Shown より前の時間が `shown_ms` に入らない。
+    #[test]
+    fn time_before_the_window_was_confirmed_is_not_counted() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        for i in 1..=6u64 {
+            let _ = d.tick(&fs, T0 + i * 250, ON_DAY);
+        }
+        assert_eq!(d.evaluation().record.as_ref().unwrap().shown_ms, 0);
+        let _ = d.on_window_status(WindowStatus::Shown, T0 + 1_600);
+        let _ = d.tick(&fs, T0 + 1_750, ON_DAY);
+        assert_eq!(d.evaluation().record.as_ref().unwrap().shown_ms, 150);
+    }
+
+    /// 切っていて、状態ファイルも印も書けない: 状態ファイルを消さず失敗を返し、再起動で切ったまま。
+    #[test]
+    fn redact_keeps_the_off_state_when_nothing_can_be_written() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.turn_off(&fs, T0 + 100);
+        fs.fail_state_write.set(true);
+        fs.fail_mark_write.set(true);
+        let (_, ok) = d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000);
+        assert!(!ok);
+        fs.fail_state_write.set(false);
+        fs.fail_mark_write.set(false);
+        assert_ne!(fs.read_state(), crate::handmark_store::ReadResult::Missing);
+        let (d2, fx) = HandmarkDriver::new(&fs, true, T0 + 3_000, ON_DAY);
+        assert!(!d2.is_window_open());
+        assert_eq!(row_reason(&fx), Some(Some("off_today")));
     }
 }

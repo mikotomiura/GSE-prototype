@@ -450,11 +450,21 @@ pub fn scrub_state_file(fs: &dyn HandmarkFs, from_ms: u64, to_ms: u64) -> Result
             if write_record(fs, &r).is_ok() {
                 return Ok(());
             }
-            if r.off {
-                // 切ったことは消えると今日また出てしまう。印だけは残す
-                let _ = fs.write_mark(r.day);
+            if !r.off {
+                return remove(fs);
             }
-            remove(fs)
+            // 切っていた日: 切ったことが失われないよう、印を書けたときだけ状態ファイルを消す。
+            if fs.write_mark(r.day).is_ok() {
+                return remove(fs);
+            }
+            // 印を書けない: 消さない(消すと停止が失われる)。区間の時刻を落とし、`off` を保つ最小の形で
+            // 書き直すことを試す。それも駄目なら消さずに失敗として返す(区間の時刻が残りうる)。
+            let mut min = DayRecord::new(r.day);
+            min.off = true;
+            match write_record(fs, &min) {
+                Ok(()) => Ok(()),
+                Err(_) => Err(ScrubFailed),
+            }
         }
     }
 }
@@ -1152,6 +1162,29 @@ mod tests {
         let again = Evaluation::run(&fs2, true, ON_DAY, None);
         assert!(again.is_open());
         assert_eq!(again.row(1).unwrap().shown_ms, 0);
+    }
+
+    /// 状態ファイルと印の書き込みが同時に失敗する → 失敗を返し、状態ファイルを消さず、再起動で切ったまま。
+    #[test]
+    fn scrub_keeps_the_off_state_when_neither_the_state_nor_the_mark_can_be_written() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        ev.note_stage_start(1_000);
+        assert_eq!(turn_off(&fs, &mut ev, 5), ToggleOutcome::State);
+        fs.fail_state_write.set(true);
+        fs.fail_mark_write.set(true);
+        assert_eq!(scrub_state_file(&fs, 0, 10_000), Err(ScrubFailed));
+        fs.fail_state_write.set(false);
+        fs.fail_mark_write.set(false);
+        // 状態ファイルは消されず、off を保っている(区間の時刻は残りうる)
+        let DayLoad::Loaded(r) = parse_state(&fs.read_state()) else {
+            panic!("state must stay");
+        };
+        assert!(r.off);
+        assert_eq!(
+            reason(&Evaluation::run(&fs, true, ON_DAY, None)),
+            Some(CloseReason::OffToday)
+        );
     }
 
     #[test]
