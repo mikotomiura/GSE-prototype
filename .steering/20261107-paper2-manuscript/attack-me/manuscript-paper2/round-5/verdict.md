@@ -65,3 +65,37 @@
 4. Codex C1（検出できない時間）: 限界に書くだけにするか、定義ごとの検出できない時間の割合を数えるか（条件を先にコミットする計算になる）。
 5. 題に調整を入れるか。
 6. 閉じ方: 判定が minor なので、直した後はメインが一覧の各項目を照合して閉じ、投稿の準備（DOI・条件の英訳の要約・送付状）へ進むか。
+
+## 8. 閉じる（メインの照合・2026-11-08・対象 commit 698b06ca）
+
+研究者の判断 8 で、round 6 は回さず、メインが直す一覧の各項目を原稿で照合して閉じる。判定の推移: round 1〜4 major → round 5 minor（E「査読に回す」）。round 6 は回していない。
+
+| # | 直ったか | 位置（698b06ca） | 新しい矛盾 |
+|---|---|---|---|
+| A | 直った。群の「精度不足」は区間の半分以上が精度不足のとき。規則（結果 4.1・考察）と要約（抄録・序論・結論）が 4 つの読みでそろう | results.tex:153・discussion.tex:47・abstract.tex:19 | なし（round9_classes.py で数え直し、読みは変わらない） |
+| B | 直った。「levels in use」は 0 件。「default and precedented」にそろえた | 全文 grep | なし |
+| C | 直った。表 5 に系統で分けた 2 行（固定 10 秒 3 は下・分位 9 は無視できる）。考察と結論は系統で読みが分かれると書く | results.tex:178–179・conclusion.tex:6 | なし |
+| D | 直った。「By criteria set before」の文は有無と向きで終え、格子と大きさは別の文 | abstract.tex:9–10・discussion.tex:34 | なし |
+| E | 直った。抄録・序論・結論に「基準（点を見た後）より下」。計算 9 で「各区間の始めの 1 分を外すと上」を添えた | abstract.tex:15・introduction.tex:41・conclusion.tex:9 | なし（主の値は 22% のまま、感度で 26%） |
+| F | 直った。停滞と休止を分けて書く（休止の固定の閾値は大半が無視できる・13/18） | abstract.tex:11–12・discussion.tex 冒頭 | なし |
+| G | 直った。「両方が正の側へ動いた」 | results.tex:147・discussion.tex:8・conclusion.tex:8 | なし |
+| H | 直った。結果 4.4 に 100 個目より後の文、S2 は "newly" | results.tex:261–263・supplement.tex:147 | 計算 9 の値（57 と 24）を同じ文に足した |
+| I | 直った | results.tex:4 | なし |
+| J | 直った。順位の変化 80/89（[P]）と 11 の入れ替わり | results.tex:196–198 | なし |
+| K | 直った。正の 10 通りは速さの調整で全部負（探索）・経路の 1 文 | discussion.tex:22–26 | なし |
+| L | 直った。表 5 に主の類の割合（切り捨て）・89.9% と境の近さ | results.tex:161・174 | なし |
+| M | 直った。抄録と結論は「1.5 を超えるか」。overdispersion は関連研究・方法・補足の一般語だけ | abstract.tex:16・conclusion.tex:10 | なし |
+| N | 大部分。題に調整を入れた・結論を「In this sample」に・方法の細部を S2 へ。⚠️ 本文は 6,759 → 7,276 語（+517）で、E の「長さ」の向きとは逆に伸びた（考察の書き直し・表 5 の系統の行・計算 9 の文） | main.tex:31・conclusion.tex:12 | 語数の増え（下の 4c） |
+| O | 直った（53 と 54 は「基準を含む 54」で両立・"below −0.1" は点の値の数え方を明記・表 5 の分母の注） | results.tex:176・supplement.tex | なし |
+| C1 | 計算 9 で数えた（conditions-round9.md・b9ce9885 の後）。始めの W 秒は露出の 0.5〜10.9%。共通の基準で得点の区間の符号の入れ替わり 0・正 9。25% をまたいだ 2 つ（CS1 の比 20 → 23・CS1 2021 の課題の φ 19 → 24）を先に置いた読みどおり添えた | methods.tex:83–86・limitations.tex・supplement.tex（S2 の新しい段落）・S1 順序 11 | なし |
+| C2 | 直った。長さは onset から再開まで | results.tex:311・methods.tex:68 | なし |
+| C3 | 直った。±0.1 は相関の帯で、比と φ には別の帯が要る | discussion.tex:53 | なし |
+| C4 | 直った。net の規則の言い方 | results.tex:135 | なし |
+| 監査 3-a | 直った（"in which it is also met"） | supplement.tex:60 | なし |
+| 監査 3-c・1-c | 直った（休止の比は固定 18 の 14 と 13、読みの文） | results.tex:207–208 | なし |
+| 監査 2-b | 直った（推奨から速さを外した） | discussion.tex 推奨の段落 | なし |
+| 監査 1-b | 直った（題を結論の側に） | main.tex:31 | なし |
+
+- 4c. 本文 7,276 語（698b06ca・texcount -inc -sum -merge・序論〜結論）。round 5 の対象 4bbed897 の 6,759 語から +517。抄録 298 語（keywords を含む）。7 語の n-gram 119 件（前 92）。
+- ビルド: 0 errors・0 undefined・overfull 2。公開物の検査（GSE・[Vn]・パス・round・判断）0 件。
+- 閉じた後に残すこと: DOI・条件の英訳の要約・送付状（同著者の査読中の論文の匿名性）。本文の語数は投稿の前に研究者と見直す（JEDM に語数の上限の規定は無い・取得した範囲の原文）。
