@@ -51,3 +51,4 @@
 - [x] Zenodo の下書き 24047695・DOI 10.5281/zenodo.24047695 を予約・zip（md5 2622e3b1…）を上げた・原稿と README に DOI
 - [x] Zenodo を publish（2026-11-08・研究者の確認の後）。record の zip を取り直し、手元と SHA-256（37219bd7…）が一致
 - [x] 投稿（2026-11-08・JEDM 1486・submission/submission-record.md）
+- [x] 公開 repo の README を作り直した（ロゴ・検出器の GIF・定義の格子・動くもの残るもの・英日。38e4a04・GitHub で全画像の表示を確かめた）。Zenodo 0.1.0 は README の変更を含まない
