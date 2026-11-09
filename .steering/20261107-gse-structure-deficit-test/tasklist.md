@@ -25,10 +25,10 @@
 - [x] 職場の PC の引き継ぎを書く
 
 ## 職場の PC（研究者）
-- [ ] P-D1・P-Q・P-REPRO
-- [ ] 本計算（6 組）
+- [x] P-D1・P-Q・P-REPRO（P-Q 外れ 0・P-REPRO tau 6,741・mli 1,363 の葉で外れ 0）
+- [x] 本計算（6 組・HP Z2・run_id 20261109T122107-1576・約 12 時間 40 分・終了コード 0）
 
 ## 結果の後
-- [ ] notes.md（読みの形 A・B・C）・report.py の表
-- [ ] code-reviewer ＋ /cross-review（Codex）
+- [x] notes.md（読みの形 A・B・C）・report.py の表（CoAuthor の主のセルは形 B・CS1 C5 k = 5 は形 C）
+- [x] code-reviewer ＋ /cross-review（Codex）（HIGH なし・判断 13 で直した）
 - [ ] push・PR は研究者が確かめてから
