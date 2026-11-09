@@ -154,6 +154,7 @@ fn the_handmark_day_schema_has_exactly_the_designed_fields() {
         "shown_ms",
         "visible_ms",
         "toggles",
+        "input_toggles",
         "stage_starts",
         "overflow",
         "table_sha256",

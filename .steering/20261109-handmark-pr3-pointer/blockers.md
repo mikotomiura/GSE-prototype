@@ -11,3 +11,13 @@
 7. 合成の一点（`trace_replay`）: 区間が重なる・逆順の行は前を優先（直前に採った行の終端以前の行は捨て、始めを直前の終端へ切り詰める）。`t0` 以前の行は使わない。向きは `SplitMix64::new(seed ^ timestamp).below(16)`。座標は f64 で計算して f32 に落とす。表の `cos 45°` は clippy の approx_constant のため `FRAC_1_SQRT_2` を使う（表の末位が 1 ulp 変わるだけ）。
 8. ライブの一致のテストは、`tick` を 16ms ちょうど（格子の時刻）ごとに呼び、読みは合成の一点を順に返す。窓を最初に開く tick（`t0`）では読まない前提。epoch は両方 0 で、`bits()`（世代込み）が一致する。確かめていないこと: 16ms ちょうどでない呼び出し間隔でのライブと再生の差（仕様の外）。
 9. 確かめていないこと: macOS の実機読み（A5 以降）・窓の受け取り・Windows の CI（`input/handmark_pointer.rs` は cfg なしの `pub`）。
+
+## A5（入力ごとの入れ切りの記録・実装役が決めた細部）
+
+10. 状態ファイルの `version` は **1 のまま**。`input_toggles`・`cursor_off`・`click_off` は `serde(default)` の追加で、古い状態ファイル（欄なし）をそのまま読める。上げると `is_valid` が古いファイルを Broken にして当日の累計が消えるため。逆向き（新しいファイルを古いバイナリで読む）は `deny_unknown_fields` で Broken になるが、配布は前に進むだけなので扱わない。固定のテストは、古い形を読めるテスト（`the_old_json_shape_is_still_read`）と新しい形の固定（`json_shape_is_fixed`）に分けた。
+11. 関数は既存の `turn_off`/`turn_on` に合わせて 2 本: `turn_input_off(fs, ev, input, now) -> ToggleOutcome`（`State` か `NotPersisted`。印は作らない＝`MarkOnly` は返さない）・`turn_input_on(...) -> Result<(), RestoreFailed>`（書けなければ前の状態へ戻して Err）。駆動役の `set_input` が `on` で振り分ける。`Evaluation::inputs_on() -> (カーソルが入っている, クリックが入っている)` を足した（累計が無いときは `(true, true)`・そのとき窓は開かない）。
+12. 記録の日が今日と違う間（時計の巻き戻り）は、切る側は状態（`cursor_off`/`click_off`）だけ切って記録には足さない・入れる側は `RestoreFailed`（`turn_on` と同じ作法）。
+13. 区間の削除で書き直せず最小の形に落とすとき（`scrub_state_file` と駆動役の `on_redact`）は、`DayRecord::minimal_keeping_off` で `off` に加え `cursor_off`/`click_off` も残す（切った側に倒す）。時刻の列は全部落とす。
+14. `schema_dto` の `input_toggles` は `serde(default)`（schemars では必須から外れる）。PR 3 より前の行（欄なし）が schema に対して有効なままになる。gse-dataset の同期で確かめてほしい。
+15. `handmark_guard.rs` の `the_handmark_day_schema_has_exactly_the_designed_fields` は A5 の時点で赤になるので、欄名の一覧に `input_toggles` を足した（A7 の予定の一部を前倒し）。
+16. `capabilities.rs` は行種の名前の一覧だけで欄の列挙は無いので変更なし。

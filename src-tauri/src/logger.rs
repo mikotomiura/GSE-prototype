@@ -917,6 +917,8 @@ pub struct HandmarkDayRow {
     pub visible_ms: Option<u64>,
     /// 切った／戻した（時刻・出す側か）。
     pub toggles: Vec<(u64, bool)>,
+    /// 入力ごとに切った／戻した（時刻・`cursor` か `click`・入れた側か）。ポインタの値は持たない。
+    pub input_toggles: Vec<(u64, &'static str, bool)>,
     pub stage_starts: Vec<u64>,
     pub overflow: bool,
     /// 64 桁の小文字の 16 進（それ以外は書かない）。
@@ -1999,6 +2001,14 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
         .map(|(t, on)| format!(r#"{{"t":{t},"on":{on}}}"#))
         .collect::<Vec<_>>()
         .join(",");
+    // ★ 入力の種類は固定の 2 語だけ（それ以外は書かない）
+    let input_toggles = r
+        .input_toggles
+        .iter()
+        .filter(|(_, input, _)| matches!(*input, "cursor" | "click"))
+        .map(|(t, input, on)| format!(r#"{{"t":{t},"input":"{input}","on":{on}}}"#))
+        .collect::<Vec<_>>()
+        .join(",");
     let starts = r
         .stage_starts
         .iter()
@@ -2009,7 +2019,7 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
         concat!(
             r#"{{"type":"handmark_day","t":{},"day":{},"assigned":"{}","late_start_day":{},"#,
             r#""first_shown_day":{},"shown_ms":{},"visible_ms":{},"toggles":[{}],"#,
-            r#""stage_starts":[{}],"overflow":{},"table_sha256":{},"draw_seed":{},"reason":{}}}"#
+            r#""input_toggles":[{}],"stage_starts":[{}],"overflow":{},"table_sha256":{},"draw_seed":{},"reason":{}}}"#
         ),
         r.timestamp,
         r.day,
@@ -2019,6 +2029,7 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
         r.shown_ms,
         opt_u(r.visible_ms),
         toggles,
+        input_toggles,
         starts,
         r.overflow,
         sha,
@@ -4402,6 +4413,7 @@ mod tests {
             shown_ms: 3_600_000,
             visible_ms: None,
             toggles: vec![(1_799_999_000_000, false), (1_799_999_500_000, true)],
+            input_toggles: vec![(1_799_999_200_000, "cursor", false)],
             stage_starts: vec![1_799_990_000_000],
             overflow: false,
             table_sha256: Some("ab".repeat(32)),
@@ -4410,7 +4422,8 @@ mod tests {
         }
     }
 
-    /// `handmark_day` の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る）。
+    /// `handmark_day` の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る。
+    /// `input_toggles` は handmark-pr3 の判断 3 で見直し済み）。
     #[test]
     fn handmark_day_line_is_fixed_and_valid_json() {
         let line = format_handmark_day_line(&sample_handmark_day_row());
@@ -4421,6 +4434,7 @@ mod tests {
                     r#"{{"type":"handmark_day","t":1800000000000,"day":20411,"assigned":"on","late_start_day":20410,"#,
                     r#""first_shown_day":20410,"shown_ms":3600000,"visible_ms":null,"#,
                     r#""toggles":[{{"t":1799999000000,"on":false}},{{"t":1799999500000,"on":true}}],"#,
+                    r#""input_toggles":[{{"t":1799999200000,"input":"cursor","on":false}}],"#,
                     r#""stage_starts":[1799990000000],"overflow":false,"table_sha256":"{}","#,
                     r#""draw_seed":"0123456789abcdef","reason":null}}"#
                 ),
@@ -4436,6 +4450,7 @@ mod tests {
         r.first_shown_day = None;
         r.shown_ms = 0;
         r.toggles.clear();
+        r.input_toggles.clear();
         r.stage_starts.clear();
         r.table_sha256 = None;
         r.draw_seed = None;
@@ -4444,6 +4459,7 @@ mod tests {
             serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
         assert_eq!(v["reason"], "table_missing");
         assert_eq!(v["toggles"], serde_json::json!([]));
+        assert_eq!(v["input_toggles"], serde_json::json!([]));
         assert!(v["table_sha256"].is_null() && v["draw_seed"].is_null());
     }
 
@@ -4451,6 +4467,10 @@ mod tests {
     #[test]
     fn handmark_day_line_refuses_free_strings() {
         let mut r = sample_handmark_day_row();
+        r.input_toggles = vec![(1, "cursor", true), (2, "x\"y", false), (3, "click", false)];
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert_eq!(v["input_toggles"].as_array().map(Vec::len), Some(2));
         r.assigned = "x\"y";
         r.table_sha256 = Some("AB".repeat(32));
         let v: serde_json::Value =

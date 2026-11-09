@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use crate::analysis::handmark::assignment::{
     draw_seed, load_from_bytes, Assigned, Table, TableLoad,
 };
-use crate::analysis::handmark::day::DayRecord;
+use crate::analysis::handmark::day::{DayRecord, PointerInput};
 use crate::analysis::handmark::gate::{decide, CloseReason, Decision, StateStatus};
 use crate::logger::HandmarkDayRow;
 
@@ -364,6 +364,14 @@ impl Evaluation {
         self.decision.is_open()
     }
 
+    /// 入力ごとの入れ切り `(カーソルが入っている, クリックが入っている)`。累計が無い（状態ファイルが
+    /// 壊れている）ときは窓が開かないので値に意味はなく、両方入っているとして返す。
+    pub fn inputs_on(&self) -> (bool, bool) {
+        self.record
+            .as_ref()
+            .map_or((true, true), |r| (!r.cursor_off, !r.click_off))
+    }
+
     /// 出ていた時間を足す（開いているときだけ呼ぶ）。
     pub fn add_shown(&mut self, ms: u64) {
         let today = self.today;
@@ -416,6 +424,12 @@ impl Evaluation {
             toggles: rec.map_or_else(Vec::new, |r| {
                 r.toggles.iter().map(|t| (t.t, t.on)).collect()
             }),
+            input_toggles: rec.map_or_else(Vec::new, |r| {
+                r.input_toggles
+                    .iter()
+                    .map(|t| (t.t, t.input.as_str(), t.on))
+                    .collect()
+            }),
             stage_starts: rec.map_or_else(Vec::new, |r| r.stage_starts.clone()),
             overflow: rec.is_some_and(|r| r.overflow),
             table_sha256: self.table_sha256.clone(),
@@ -459,7 +473,7 @@ pub fn scrub_state_file(fs: &dyn HandmarkFs, from_ms: u64, to_ms: u64) -> Result
             }
             // 印を書けない: 消さない(消すと停止が失われる)。区間の時刻を落とし、`off` を保つ最小の形で
             // 書き直すことを試す。それも駄目なら消さずに失敗として返す(区間の時刻が残りうる)。
-            let mut min = DayRecord::new(r.day);
+            let mut min = r.minimal_keeping_off();
             min.off = true;
             match write_record(fs, &min) {
                 Ok(()) => Ok(()),
@@ -480,6 +494,7 @@ pub fn unavailable_row(t_ms: u64, day: i64, reason: CloseReason) -> HandmarkDayR
         shown_ms: 0,
         visible_ms: None,
         toggles: Vec::new(),
+        input_toggles: Vec::new(),
         stage_starts: Vec::new(),
         overflow: false,
         table_sha256: None,
@@ -549,6 +564,54 @@ pub fn turn_on(fs: &dyn HandmarkFs, ev: &mut Evaluation, now_ms: u64) -> Result<
     }
     ev.off_today = false;
     ev.redecide();
+    Ok(())
+}
+
+/// 入力ごとに切る。走行の中では、書けなくても必ず切った状態にする（切った側に倒す）。
+/// 結果は状態ファイルに書けたか（`State`）か書けなかったか（`NotPersisted`・印は作らない）。
+/// 累計が無い（状態ファイルが壊れている）ときは何も持てず `NotPersisted`（そのとき窓は開かない）。
+/// 記録の日が今日と違う間（時計の巻き戻り）は状態だけ切り、記録には足さない。
+pub fn turn_input_off(
+    fs: &dyn HandmarkFs,
+    ev: &mut Evaluation,
+    input: PointerInput,
+    now_ms: u64,
+) -> ToggleOutcome {
+    let today = ev.today;
+    let Some(r) = ev.record.as_mut() else {
+        return ToggleOutcome::NotPersisted;
+    };
+    if r.day == today {
+        r.set_input(now_ms, input, false);
+        if write_record(fs, r).is_ok() {
+            return ToggleOutcome::State;
+        }
+    } else {
+        match input {
+            PointerInput::Cursor => r.cursor_off = true,
+            PointerInput::Click => r.click_off = true,
+        }
+    }
+    ToggleOutcome::NotPersisted
+}
+
+/// 入力ごとに戻す。状態ファイルに書けたときだけ戻り、書けなければ切ったまま（`Err`）。
+pub fn turn_input_on(
+    fs: &dyn HandmarkFs,
+    ev: &mut Evaluation,
+    input: PointerInput,
+    now_ms: u64,
+) -> Result<(), RestoreFailed> {
+    let today = ev.today;
+    let Some(r) = ev.record.as_mut().filter(|r| r.day == today) else {
+        return Err(RestoreFailed);
+    };
+    let prev = r.clone();
+    r.set_input(now_ms, input, true);
+    if write_record(fs, r).is_err() {
+        *r = prev;
+        return Err(RestoreFailed);
+    }
     Ok(())
 }
 
@@ -1211,5 +1274,145 @@ mod tests {
         assert_eq!(r.reason, Some("paths_unavailable"));
         assert_eq!((r.assigned, r.shown_ms), ("unknown", 0));
         assert!(r.table_sha256.is_none() && r.draw_seed.is_none() && r.toggles.is_empty());
+    }
+    use crate::analysis::handmark::day::PointerInput as PI;
+
+    #[test]
+    fn an_input_toggle_goes_to_the_row_and_the_state_file() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        assert_eq!(ev.inputs_on(), (true, true));
+        assert_eq!(
+            turn_input_off(&fs, &mut ev, PI::Cursor, 1_000),
+            ToggleOutcome::State
+        );
+        assert_eq!(ev.inputs_on(), (false, true));
+        assert!(turn_input_on(&fs, &mut ev, PI::Cursor, 2_000).is_ok());
+        assert_eq!(
+            turn_input_off(&fs, &mut ev, PI::Click, 3_000),
+            ToggleOutcome::State
+        );
+        assert_eq!(ev.inputs_on(), (true, false));
+        let row = ev.row(9).unwrap();
+        assert_eq!(
+            row.input_toggles,
+            vec![
+                (1_000, "cursor", false),
+                (2_000, "cursor", true),
+                (3_000, "click", false)
+            ]
+        );
+        // 全体の「やめる」は入力ごとの状態に触れない
+        turn_off(&fs, &mut ev, 4_000);
+        assert_eq!(ev.inputs_on(), (true, false));
+        // 起動で状態ファイルから戻る
+        let again = Evaluation::run(&fs, true, ON_DAY, None);
+        assert_eq!(again.inputs_on(), (true, false));
+        assert_eq!(again.row(10).unwrap().input_toggles.len(), 3);
+        // 翌日は両方入った状態に戻り、記録は空
+        let next = Evaluation::run(&fs, true, ON_DAY + 3, again.record.clone());
+        assert_eq!(next.inputs_on(), (true, true));
+        assert!(next.row(11).unwrap().input_toggles.is_empty());
+        let boot = Evaluation::run(&fs, true, ON_DAY + 3, None);
+        assert_eq!(boot.inputs_on(), (true, true));
+    }
+
+    #[test]
+    fn a_failed_write_keeps_the_input_off_and_cannot_turn_it_on() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        fs.fail_state_write.set(true);
+        // 切るのは書けなくても切った状態にする
+        assert_eq!(
+            turn_input_off(&fs, &mut ev, PI::Click, 1_000),
+            ToggleOutcome::NotPersisted
+        );
+        assert_eq!(ev.inputs_on(), (true, false));
+        // 入れるのは書けなければ切ったまま
+        assert!(turn_input_on(&fs, &mut ev, PI::Click, 2_000).is_err());
+        assert_eq!(ev.inputs_on(), (true, false));
+        assert_eq!(
+            ev.row(1).unwrap().input_toggles.len(),
+            1,
+            "the failed on is not recorded"
+        );
+        // 書けるようになれば入れられる
+        fs.fail_state_write.set(false);
+        assert!(turn_input_on(&fs, &mut ev, PI::Click, 3_000).is_ok());
+        assert_eq!(ev.inputs_on(), (true, true));
+        // 状態が壊れている（累計が無い）ときは何も持たず、入れられもしない
+        let fs = with_table();
+        *fs.state.borrow_mut() = Some(b"{broken".to_vec());
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        assert!(ev.record.is_none());
+        assert_eq!(
+            turn_input_off(&fs, &mut ev, PI::Cursor, 1),
+            ToggleOutcome::NotPersisted
+        );
+        assert!(turn_input_on(&fs, &mut ev, PI::Cursor, 2).is_err());
+    }
+
+    #[test]
+    fn input_toggles_overflow_uses_the_existing_flag() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        for i in 0..70u64 {
+            let _ = turn_input_off(&fs, &mut ev, PI::Cursor, i);
+        }
+        let row = ev.row(1).unwrap();
+        assert_eq!(
+            row.input_toggles.len(),
+            crate::analysis::handmark::day::MAX_PER_DAY
+        );
+        assert!(row.overflow);
+        assert_eq!(ev.inputs_on(), (false, true));
+    }
+
+    #[test]
+    fn scrub_removes_input_toggles_from_the_row_the_state_file_and_the_running_total() {
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        turn_input_off(&fs, &mut ev, PI::Cursor, 1_000);
+        turn_input_off(&fs, &mut ev, PI::Click, 2_000);
+        assert!(turn_input_on(&fs, &mut ev, PI::Cursor, 3_000).is_ok());
+        // 走行中の累計（と、そこから作る行）
+        ev.scrub_state(&fs, 1_500, 2_500).unwrap();
+        let row = ev.row(9).unwrap();
+        assert_eq!(
+            row.input_toggles,
+            vec![(1_000, "cursor", false), (3_000, "cursor", true)]
+        );
+        // 状態（切った）は時刻でないので残る
+        assert_eq!(ev.inputs_on(), (true, false));
+        // 状態ファイル
+        let DayLoad::Loaded(disk) = parse_state(&fs.read_state()) else {
+            panic!("state must load");
+        };
+        assert_eq!(disk.input_toggles.len(), 2);
+        // 駆動役が無いときの状態ファイルの直接の削除
+        scrub_state_file(&fs, 0, 1_000).unwrap();
+        let DayLoad::Loaded(disk) = parse_state(&fs.read_state()) else {
+            panic!("state must load");
+        };
+        assert_eq!(disk.input_toggles.len(), 1);
+        assert_eq!(disk.input_toggles[0].t, 3_000);
+        assert!(!disk.cursor_off && disk.click_off);
+        // 起動し直しても戻らない
+        let again = Evaluation::run(&fs, true, ON_DAY, None);
+        assert_eq!(
+            again.row(10).unwrap().input_toggles,
+            vec![(3_000, "cursor", true)]
+        );
+    }
+
+    #[test]
+    fn an_old_state_file_without_input_fields_loads_with_both_inputs_on() {
+        let fs = with_table();
+        let old = r#"{"version":1,"day":20411,"shown_ms":5,"toggles":[],"off":false,"first_shown_day":20411,"stage_starts":[],"overflow":false}"#;
+        *fs.state.borrow_mut() = Some(old.as_bytes().to_vec());
+        let ev = Evaluation::run(&fs, true, ON_DAY, None);
+        assert!(ev.record.is_some());
+        assert_eq!(ev.inputs_on(), (true, true));
+        assert_eq!(ev.row(1).unwrap().shown_ms, 5);
     }
 }

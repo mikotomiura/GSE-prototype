@@ -360,7 +360,10 @@ impl HandmarkDriver {
                 if !off || fs.write_mark(day).is_ok() {
                     fs.remove_state().is_ok()
                 } else {
-                    let mut min = crate::analysis::handmark::day::DayRecord::new(day);
+                    let mut min = self.ev.record.as_ref().map_or_else(
+                        || crate::analysis::handmark::day::DayRecord::new(day),
+                        |r| r.minimal_keeping_off(),
+                    );
                     min.off = true;
                     serde_json::to_vec(&min)
                         .ok()
