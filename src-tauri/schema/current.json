@@ -1487,6 +1487,14 @@
           ],
           "format": "int64"
         },
+        "input_toggles": {
+          "description": "入力ごとに切った／戻した（カーソル・クリック）。ポインタの値は持たない。区間指定削除では `toggles` と同じく区間に入る要素を消す。古い行には無い。",
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HandmarkInputToggleDto"
+          }
+        },
         "late_start_day": {
           "type": [
             "integer",
@@ -1495,7 +1503,7 @@
           "format": "int64"
         },
         "overflow": {
-          "description": "`toggles` か `stage_starts` が 1 日 64 個を超えた。",
+          "description": "`toggles`・`input_toggles`・`stage_starts` のどれかが 1 日 64 個を超えた。",
           "type": "boolean"
         },
         "reason": {
@@ -1715,6 +1723,36 @@
         "off",
         "after",
         "unknown"
+      ]
+    },
+    "HandmarkInputToggleDto": {
+      "description": "手跡の入力ごとの切った／戻した。",
+      "type": "object",
+      "required": [
+        "input",
+        "on",
+        "t"
+      ],
+      "properties": {
+        "input": {
+          "$ref": "#/definitions/HandmarkPointerInputDto"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    "HandmarkPointerInputDto": {
+      "description": "入力ごとの入れ切りの対象。",
+      "type": "string",
+      "enum": [
+        "cursor",
+        "click"
       ]
     },
     "HandmarkReasonDto": {

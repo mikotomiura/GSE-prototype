@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 pub const STATE_VERSION: u32 = 1;
-/// `toggles` と `stage_starts` の 1 日の上限。超えたら新しいものを入れず `overflow` を真にする。
+/// `toggles`・`input_toggles`・`stage_starts` の 1 日の上限。超えたら新しいものを入れず `overflow` を真にする。
 pub const MAX_PER_DAY: usize = 64;
 
 /// 切った／戻した時刻（UTC の ms）。
@@ -13,6 +13,33 @@ pub const MAX_PER_DAY: usize = 64;
 #[serde(deny_unknown_fields)]
 pub struct Toggle {
     pub t: u64,
+    pub on: bool,
+}
+
+/// 入力ごとの入れ切りの対象（ポインタの 2 つの入力）。JSON では `"cursor"` / `"click"`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PointerInput {
+    Cursor,
+    Click,
+}
+
+impl PointerInput {
+    /// 行に書く固定の語。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PointerInput::Cursor => "cursor",
+            PointerInput::Click => "click",
+        }
+    }
+}
+
+/// 入力ごとに切った／戻した時刻（UTC の ms）。ポインタの値は持たない（時刻・入力の種類・入れたかだけ）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InputToggle {
+    pub t: u64,
+    pub input: PointerInput,
     pub on: bool,
 }
 
@@ -33,6 +60,15 @@ pub struct DayRecord {
     /// 手跡を出し始めた時刻（再生で位相の起点に使う）。
     pub stage_starts: Vec<u64>,
     pub overflow: bool,
+    /// 入力ごとの切った／戻した（PR 3）。古い状態ファイルには無い（空として読む）。
+    #[serde(default)]
+    pub input_toggles: Vec<InputToggle>,
+    /// カーソルの入力を切っている（古い状態ファイルには無い・入っているとして読む）。
+    #[serde(default)]
+    pub cursor_off: bool,
+    /// クリックの入力を切っている。
+    #[serde(default)]
+    pub click_off: bool,
 }
 
 impl DayRecord {
@@ -46,7 +82,20 @@ impl DayRecord {
             first_shown_day: None,
             stage_starts: Vec::new(),
             overflow: false,
+            input_toggles: Vec::new(),
+            cursor_off: false,
+            click_off: false,
         }
+    }
+
+    /// 区間の削除で書き直せないときの「切った状態を保つ最小の形」: 時刻を全部落とし、`off` と
+    /// 入力ごとの切った状態（切った側）だけ残す。
+    pub fn minimal_keeping_off(&self) -> Self {
+        let mut min = Self::new(self.day);
+        min.off = self.off;
+        min.cursor_off = self.cursor_off;
+        min.click_off = self.click_off;
+        min
     }
 
     /// 日付が進んだら今日にして、日の量を空に戻す（`first_shown_day` は残す）。変わったら真。
@@ -82,6 +131,20 @@ impl DayRecord {
         }
     }
 
+    /// 入力ごとに切った／戻した。`on` が入れた。状態は必ず更新し、記録は上限を超えたら足さず
+    /// `overflow` を立てる（`toggles` と同じ規則）。
+    pub fn set_input(&mut self, t: u64, input: PointerInput, on: bool) {
+        match input {
+            PointerInput::Cursor => self.cursor_off = !on,
+            PointerInput::Click => self.click_off = !on,
+        }
+        if self.input_toggles.len() >= MAX_PER_DAY {
+            self.overflow = true;
+        } else {
+            self.input_toggles.push(InputToggle { t, input, on });
+        }
+    }
+
     /// 手跡を出し始めた時刻を足す。
     pub fn note_stage_start(&mut self, t: u64) {
         if self.stage_starts.len() >= MAX_PER_DAY {
@@ -91,17 +154,23 @@ impl DayRecord {
         }
     }
 
-    /// 区間 `[from_ms, to_ms]`（両端を含む）に入る `toggles` と `stage_starts` の要素を消す（区間の削除）。
-    /// 消したものがあれば真。`shown_ms`・`off`・`overflow` は時刻でないので変えない。
+    /// 区間 `[from_ms, to_ms]`（両端を含む）に入る `toggles`・`input_toggles`・`stage_starts` の要素を消す
+    /// （区間の削除）。消したものがあれば真。`shown_ms`・`off`・`cursor_off`・`click_off`・`overflow` は
+    /// 時刻でないので変えない。
     pub fn scrub_range(&mut self, from_ms: u64, to_ms: u64) -> bool {
         if from_ms > to_ms {
             return false;
         }
         let inside = |t: u64| from_ms <= t && t <= to_ms;
-        let (a, b) = (self.toggles.len(), self.stage_starts.len());
+        let (a, b, c) = (
+            self.toggles.len(),
+            self.stage_starts.len(),
+            self.input_toggles.len(),
+        );
         self.toggles.retain(|x| !inside(x.t));
+        self.input_toggles.retain(|x| !inside(x.t));
         self.stage_starts.retain(|t| !inside(*t));
-        a != self.toggles.len() || b != self.stage_starts.len()
+        a != self.toggles.len() || b != self.stage_starts.len() || c != self.input_toggles.len()
     }
 
     /// 読み込んだ中身を検める。
@@ -109,6 +178,7 @@ impl DayRecord {
         self.version == STATE_VERSION
             && self.toggles.len() <= MAX_PER_DAY
             && self.stage_starts.len() <= MAX_PER_DAY
+            && self.input_toggles.len() <= MAX_PER_DAY
     }
 }
 
@@ -196,13 +266,68 @@ mod tests {
         assert!(r.toggles.is_empty() && r.stage_starts.is_empty());
     }
 
+    /// 古い形（PR 3 より前・`input_toggles` などが無い）の状態ファイルを読める。
+    #[test]
+    fn the_old_json_shape_is_still_read() {
+        let old = r#"{"version":1,"day":20410,"shown_ms":0,"toggles":[{"t":5,"on":false}],"off":true,"first_shown_day":null,"stage_starts":[],"overflow":false}"#;
+        let r: DayRecord = serde_json::from_str(old).unwrap();
+        assert!(r.is_valid() && r.off);
+        assert!(r.input_toggles.is_empty() && !r.cursor_off && !r.click_off);
+        assert_eq!(r.toggles, vec![Toggle { t: 5, on: false }]);
+    }
+
     #[test]
     fn json_shape_is_fixed() {
         let mut r = DayRecord::new(20_410);
         r.set_off(5, true);
+        r.set_input(6, PointerInput::Cursor, false);
+        r.set_input(7, PointerInput::Click, false);
+        r.set_input(8, PointerInput::Cursor, true);
         assert_eq!(
             serde_json::to_string(&r).unwrap(),
-            r#"{"version":1,"day":20410,"shown_ms":0,"toggles":[{"t":5,"on":false}],"off":true,"first_shown_day":null,"stage_starts":[],"overflow":false}"#
+            concat!(
+                r#"{"version":1,"day":20410,"shown_ms":0,"toggles":[{"t":5,"on":false}],"off":true,"#,
+                r#""first_shown_day":null,"stage_starts":[],"overflow":false,"#,
+                r#""input_toggles":[{"t":6,"input":"cursor","on":false},{"t":7,"input":"click","on":false},{"t":8,"input":"cursor","on":true}],"#,
+                r#""cursor_off":false,"click_off":true}"#
+            )
         );
+        let back: DayRecord = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn input_toggles_overflow_scrub_and_roll() {
+        let mut r = DayRecord::new(1);
+        for i in 0..(MAX_PER_DAY as u64 + 3) {
+            r.set_input(i, PointerInput::Cursor, i % 2 == 1);
+        }
+        assert_eq!(r.input_toggles.len(), MAX_PER_DAY);
+        assert!(r.overflow);
+        assert!(r.is_valid());
+        // 溢れた後も状態は最新（最後の i = 66 は偶数 → 切った）
+        assert!(r.cursor_off);
+        // 区間の削除: 入力の記録も消え、状態は変わらない
+        let mut r = DayRecord::new(1);
+        for t in [10u64, 20, 30] {
+            r.set_input(t, PointerInput::Click, t == 20);
+        }
+        assert!(!r.scrub_range(40, 50));
+        assert!(r.scrub_range(20, 20));
+        assert_eq!(
+            r.input_toggles.iter().map(|x| x.t).collect::<Vec<_>>(),
+            vec![10, 30]
+        );
+        assert!(r.click_off, "the state is not a time and stays");
+        // 日が変わると両方入った状態に戻り、記録は空
+        assert!(r.roll_to(2));
+        assert!(r.input_toggles.is_empty() && !r.cursor_off && !r.click_off);
+        // 最小の形は切った状態を保ち、時刻を落とす
+        let mut r = DayRecord::new(3);
+        r.set_off(1, true);
+        r.set_input(2, PointerInput::Cursor, false);
+        let m = r.minimal_keeping_off();
+        assert!(m.off && m.cursor_off && !m.click_off);
+        assert!(m.toggles.is_empty() && m.input_toggles.is_empty());
     }
 }

@@ -642,9 +642,12 @@ pub enum LogEntryDto {
         visible_ms: Option<u64>,
         /// 切った（`on: false`）／戻した（`on: true`）時刻。
         toggles: Vec<HandmarkToggleDto>,
+        /// 入力ごとに切った／戻した（カーソル・クリック）。ポインタの値は持たない。区間指定削除では `toggles` と同じく区間に入る要素を消す。古い行には無い。
+        #[serde(default)]
+        input_toggles: Vec<HandmarkInputToggleDto>,
         /// 手跡を出し始めた時刻（再生で位相の起点に使う）。
         stage_starts: Vec<u64>,
-        /// `toggles` か `stage_starts` が 1 日 64 個を超えた。
+        /// `toggles`・`input_toggles`・`stage_starts` のどれかが 1 日 64 個を超えた。
         overflow: bool,
         /// 割付の表のバイト列の SHA-256（64 桁の小文字の 16 進）。
         table_sha256: Option<String>,
@@ -660,6 +663,22 @@ pub enum LogEntryDto {
 pub struct HandmarkToggleDto {
     pub t: u64,
     pub on: bool,
+}
+
+/// 手跡の入力ごとの切った／戻した。
+#[derive(Serialize, JsonSchema)]
+pub struct HandmarkInputToggleDto {
+    pub t: u64,
+    pub input: HandmarkPointerInputDto,
+    pub on: bool,
+}
+
+/// 入力ごとの入れ切りの対象。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandmarkPointerInputDto {
+    Cursor,
+    Click,
 }
 
 /// 手跡のその日の割付。`unknown` は表が読めないなど。

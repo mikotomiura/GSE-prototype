@@ -7,3 +7,5 @@ pub mod assignment;
 pub mod day;
 pub mod gate;
 pub mod state;
+pub mod trace;
+pub mod trace_replay;

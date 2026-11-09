@@ -53,6 +53,8 @@ pub mod s1;
 pub mod s1_driver;
 // 手跡（段 1 の後期・ADR-051）の IO 層（表・状態ファイル・印）。1a では lib.rs の本体に配線しない（1b で配線）。
 pub mod handmark_driver;
+// ポインタのスレッドの純粋な部分（OS API を呼ばない・cfg なし）。
+pub mod handmark_pointer_thread;
 // 手跡の背景の窓(macOS だけ・ADR-051)。駆動役の出来事だけが開け閉めする。
 #[cfg(target_os = "macos")]
 pub mod handmark_stage;
@@ -2322,6 +2324,11 @@ static HANDMARK_FS: std::sync::OnceLock<crate::handmark_store::DiskFs> = std::sy
 static HANDMARK_PRESS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
     std::sync::OnceLock::new();
 
+/// ポインタのスレッドへの門(駆動役が `Effect::PointerGate` で書く)。ビット 0 = 窓が開いている・
+/// 1 = カーソルが入っている・2 = クリックが入っている。0 = 閉じている。
+#[cfg(target_os = "macos")]
+static HANDMARK_POINTER_GATE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
 /// 手跡の駆動役へ打鍵の時刻を送る(口が無ければ何もしない・満杯なら捨てる)。
 fn handmark_send_press(t_ms: u64) {
     if let Some(tx) = HANDMARK_PRESS_TX.get() {
@@ -2359,6 +2366,19 @@ fn run_handmark_effects(
             #[cfg(not(target_os = "macos"))]
             Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
+            // ポインタのスレッドへの入れ切り(Atomic に書くだけ)と、トレイの「カーソル」「クリック」の項目の状態。
+            Effect::PointerGate {
+                open,
+                cursor,
+                click,
+            } => {
+                #[cfg(target_os = "macos")]
+                HANDMARK_POINTER_GATE.store(
+                    u8::from(open) | (u8::from(cursor) << 1) | (u8::from(click) << 2),
+                    std::sync::atomic::Ordering::Release,
+                );
+                crate::tray::set_handmark_inputs_from_gate(open, cursor, click);
+            }
         }
     }
 }
@@ -2397,6 +2417,49 @@ pub(crate) fn handmark_toggle_from_tray(
         TrayItem::Hidden => return,
     };
     run_handmark_effects(app, &log_tx, fx);
+}
+
+/// トレイの「カーソル」「クリック」。`shown_checked` は押された項目の、メニューに出ていた印(入っていれば true)。
+/// 選んだことは(日の行の入れ切りの時刻以外は)記録しない。
+///
+/// 照合は純関数 `handmark_driver::decide_tray_input`: 駆動役の今の状態が出ていた印と違う(表示が古い)ときは
+/// 何もしない。窓を出していないとき・終了中も何もしない。
+/// ロックの順は `handmark_toggle_from_tray` と同じ(`HANDMARK_DRIVER` を持つ間 `LogState` を取らない)。
+pub(crate) fn handmark_set_input_from_tray(
+    app: &tauri::AppHandle,
+    input: crate::analysis::handmark::day::PointerInput,
+    shown_checked: bool,
+) -> bool {
+    if is_shutting_down() {
+        return false;
+    }
+    let Some(fs) = HANDMARK_FS.get() else {
+        tracing::warn!("handmark: input press ignored (file locations are unavailable)");
+        return false;
+    };
+    let log_tx = handmark_log_tx(app);
+    let mut g = handmark_lock();
+    let Some(d) = g.as_mut() else {
+        tracing::warn!("handmark: input press ignored (no driver)");
+        return false;
+    };
+    let items = d.input_items();
+    let Some(on) = crate::handmark_driver::decide_tray_input(shown_checked, items, input) else {
+        // 押下を捨てたときだけ理由を残す(2026-11-09 の画面の確かめで、効いたように見えて記録に
+        // 残らない押下が 2 回の走行であり、再現できなかった)。入れ切りの種類と状態だけで、ポインタの値は無い。
+        tracing::warn!(
+            "handmark: input press ignored ({})",
+            if items.is_some() {
+                "menu mark is stale"
+            } else {
+                "window is not open"
+            }
+        );
+        return false;
+    };
+    let fx = d.set_input(fs, input, on, epoch_ms());
+    run_handmark_effects(app, &log_tx, fx);
+    true
 }
 
 /// 区間の削除: 手跡の状態ファイルと走行中の累計から、区間に入る時刻を消す(`redact_dir` の前に呼ぶ)。
@@ -2439,7 +2502,18 @@ fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
     crate::handmark_stage::status()
 }
 
-/// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠す。
+/// 駆動役を捨てる(駆動スレッドがパニックで抜けたときに、その後のトレイの押下が古い駆動役で門を
+/// 開け直さないように)。ロックが毒を受けていても取れる。★ 終了の処理中は残す(`handmark_finish_before_end`
+/// が最後の行を書くのに駆動役が要る)。
+#[cfg(any(target_os = "macos", test))]
+fn handmark_clear_driver() {
+    if is_shutting_down() {
+        return;
+    }
+    *handmark_lock() = None;
+}
+
+/// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠し、駆動役を捨てる。
 #[cfg(target_os = "macos")]
 struct HandmarkWindowGuard {
     app: tauri::AppHandle,
@@ -2448,8 +2522,50 @@ struct HandmarkWindowGuard {
 #[cfg(target_os = "macos")]
 impl Drop for HandmarkWindowGuard {
     fn drop(&mut self) {
+        // ★ 駆動役を捨てるのが最初(以後のトレイの押下は `handmark_lock()` が `None` を返して何もしない)。
+        // 後にすると、閉じた後の隙間のトレイの押下が古い駆動役から `PointerGate { open: true }` を出して門と
+        // トレイの項目を開け直し、駆動役が居ないので誰も閉じない。
+        handmark_clear_driver();
         crate::handmark_stage::close(&self.app);
         crate::tray::set_handmark_item(crate::handmark_driver::TrayItem::Hidden);
+        crate::tray::set_handmark_inputs(None);
+        // ポインタのスレッドも読むのをやめる(閉じた門)
+        HANDMARK_POINTER_GATE.store(0, std::sync::atomic::Ordering::Release);
+    }
+}
+
+/// 手跡のポインタのスレッド。★ 段 1 かつ macOS のときだけ起こす。`HANDMARK_DRIVER` のロックを取らず、
+/// 門の Atomic・一時停止・主画面の大きさだけを読む。読んだ値・座標・場は窓以外へ出さない
+/// (ログ・エラー文にも入れない・ADR-050 D2)。時計は起動からの単調な ms（駆動役の壁時計とは別）。
+#[cfg(target_os = "macos")]
+fn spawn_handmark_pointer(app: tauri::AppHandle) {
+    let spawned = thread::Builder::new()
+        .name("gse-handmark-pointer".to_string())
+        .spawn(move || {
+            // 時計はこのスレッドの起動からの単調な ms（壁時計は NTP・手動の変更で飛ぶ）。記録しないので
+            // 絶対の時刻に揃える必要は無い。窓は届くまでのずれの最小からの差で遅れを見る。
+            let started = std::time::Instant::now();
+            // ループの本体は `handmark_pointer_thread::run_loop`（本文検査の下）。ここは OS・Tauri に触る口を渡すだけ。
+            crate::handmark_pointer_thread::run_loop(
+                || HANDMARK_POINTER_GATE.load(std::sync::atomic::Ordering::Acquire),
+                crate::recording::is_paused,
+                || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+                || {
+                    let (w, h) = crate::handmark_stage::screen_size_pt();
+                    crate::input::handmark_pointer::to_point(
+                        crate::input::handmark_pointer_macos::read(),
+                        w,
+                        h,
+                    )
+                },
+                |s, now| crate::handmark_stage::emit_trace(&app, s, now),
+                |r, now| crate::handmark_stage::emit_ripple(&app, r, now),
+                |ms| thread::sleep(Duration::from_millis(ms)),
+                is_shutting_down,
+            );
+        });
+    if spawned.is_err() {
+        tracing::warn!("handmark: pointer thread could not be started");
     }
 }
 
@@ -7016,6 +7132,7 @@ pub fn run() {
                     let (hm_tx, hm_rx) = crossbeam_channel::bounded::<u64>(4096);
                     let _ = HANDMARK_PRESS_TX.set(hm_tx);
                     spawn_handmark_driver(app.handle().clone(), log_tx_handmark, hm_rx);
+                    spawn_handmark_pointer(app.handle().clone());
                 }
                 #[cfg(not(target_os = "macos"))]
                 let _ = log_tx_handmark;
@@ -8270,5 +8387,47 @@ mod s1_driver_wiring_tests {
         let code = squash(&production_code());
         assert!(code
             .contains("Some(r@(SkipReason::DontRemember|SkipReason::Dismissed))=>r,_=>returnErr("));
+    }
+}
+
+#[cfg(test)]
+mod handmark_wiring_tests {
+    use super::*;
+    use crate::handmark_store::testfs::with_table;
+
+    /// 駆動スレッドがロックを持ったままパニックしても（ロックが毒を受けても）、駆動役を捨てられ、
+    /// 以後のトレイの押下の入口（`handmark_lock()` の `as_mut()`）は `None` で何もしない。
+    #[test]
+    fn a_panicked_driver_thread_leaves_no_driver_for_later_presses() {
+        let fs = with_table();
+        let (d, _) =
+            crate::handmark_driver::HandmarkDriver::new(&fs, true, 1_800_000_000_000, 20_411);
+        *handmark_lock() = Some(d);
+        assert!(handmark_lock()
+            .as_mut()
+            .is_some_and(|d| d.input_items().is_some()));
+        // ロックを持ったままパニックするスレッド（毒を作る）。
+        let r = std::thread::spawn(|| {
+            let _g = handmark_lock();
+            panic!("driver thread panicked");
+        })
+        .join();
+        assert!(r.is_err());
+        assert!(
+            HANDMARK_DRIVER.is_poisoned(),
+            "positive control: the lock is poisoned"
+        );
+        handmark_clear_driver();
+        assert!(handmark_lock().is_none(), "the driver is gone");
+        // 押下の入口: 駆動役が無ければ照合にも進まない。
+        let items = handmark_lock().as_ref().and_then(|d| d.input_items());
+        assert_eq!(
+            crate::handmark_driver::decide_tray_input(
+                true,
+                items,
+                crate::analysis::handmark::day::PointerInput::Cursor
+            ),
+            None
+        );
     }
 }

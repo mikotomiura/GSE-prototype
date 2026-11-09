@@ -265,7 +265,7 @@ pub fn retain_outside_range<'a>(
     (kept, removed)
 }
 
-/// `handmark_day` の行から、区間 `[from_ms, to_ms]`（両端を含む）に入る `toggles` と `stage_starts` の要素を消す。
+/// `handmark_day` の行から、区間 `[from_ms, to_ms]`（両端を含む）に入る `toggles`・`input_toggles`・`stage_starts` の要素を消す。
 ///
 /// `t` が区間に入る行は [`retain_outside_range`] が行ごと落とす。ここで扱うのは区間の外に残る行で、
 /// 割付・SHA-256・種・出せなかった理由は残す。消すものが無い・`handmark_day` でない・
@@ -283,6 +283,18 @@ pub fn scrub_handmark_day(line: &str, from_ms: u64, to_ms: u64) -> Option<String
     let mut changed = false;
     if let Some(arr) = obj
         .get_mut("toggles")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        let before = arr.len();
+        arr.retain(|e| {
+            !e.get("t")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(inside)
+        });
+        changed |= arr.len() != before;
+    }
+    if let Some(arr) = obj
+        .get_mut("input_toggles")
         .and_then(serde_json::Value::as_array_mut)
     {
         let before = arr.len();
@@ -938,6 +950,39 @@ mod tests {
         assert_eq!(scrub_handmark_day(row, 5_000, 2_000), None);
         let key = r#"{"type":"key","t":3000,"category":"alphabetic","press":true}"#;
         assert_eq!(scrub_handmark_day(key, 0, 10_000), None);
+    }
+
+    /// `input_toggles`（入力ごとの入れ切り）も区間に入る要素だけが消え、それしか消えないときも 1 件と数える。
+    #[test]
+    fn handmark_day_input_toggles_are_scrubbed_like_toggles() {
+        let row = r#"{"type":"handmark_day","t":9000,"day":20411,"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":600000,"visible_ms":null,"toggles":[],"input_toggles":[{"t":1000,"input":"cursor","on":false},{"t":3000,"input":"click","on":false},{"t":8000,"input":"cursor","on":true}],"stage_starts":[],"overflow":false,"table_sha256":null,"draw_seed":"0123456789abcdef","reason":null}"#;
+        let out = scrub_handmark_day(row, 2_000, 5_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            v["input_toggles"],
+            serde_json::json!([{"t":1000,"input":"cursor","on":false},{"t":8000,"input":"cursor","on":true}])
+        );
+        // 両端を含む・全部覆えば空で行は残る・外は触らない
+        let out = scrub_handmark_day(row, 3_000, 3_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["input_toggles"].as_array().unwrap().len(), 2);
+        let out = scrub_handmark_day(row, 0, 10_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["input_toggles"], serde_json::json!([]));
+        assert_eq!(scrub_handmark_day(row, 20_000, 30_000), None);
+        // 古い行（`input_toggles` が無い）はそのまま扱える
+        assert_eq!(scrub_handmark_day(handmark_row(), 20_000, 30_000), None);
+        // 数え方: `input_toggles` だけが消える行も 1 件
+        let (kept, removed) = retain_outside_range([row], 2_000, 5_000);
+        assert_eq!((kept.len(), removed), (1, 0), "retain は行を落とさない側");
+        let d = tmp_dir("handmark-input-scrub");
+        let path = d.join("gse_20261109_000000.ndjson");
+        std::fs::write(&path, format!("{row}\n")).unwrap();
+        assert_eq!(redact_file(&path, 2_000, 5_000).unwrap(), 1);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains(r#""t":3000"#) && text.contains(r#""t":1000"#));
+        assert_eq!(redact_file(&path, 200_000, 300_000).unwrap(), 0);
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     /// ファイルを通しても、行は残って要素だけが消える（消すものが他に無くてもファイルを書き換える）。

@@ -699,6 +699,12 @@ jobs:
       - run: npm ci
       - name: TypeScript type check
         run: npx tsc --noEmit
+      # 手跡の窓の枠・受け取り・場の補間の node のテスト（`.ts` を型を除いて直接読むので Node 22.18 以上が要る。
+      # 足りなければ静かに失敗せず、理由を言って落とす）。
+      - name: Handmark window logic tests (node --test)
+        run: |
+          node -e "const [a,b]=process.versions.node.split('.').map(Number); if (a<22||(a===22&&b<18)) { console.error('node >= 22.18 is required, got '+process.versions.node); process.exit(1); }"
+          npm run test:handmark
       - name: Vite production build
         run: npm run build
       # ★ PreReg-1 ビネット構成の機械検査 (禁止語 / 隣接象限 / 均等配置 / 不透明 ID)。
