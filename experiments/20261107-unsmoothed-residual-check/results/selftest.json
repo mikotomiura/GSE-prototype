@@ -1,0 +1,175 @@
+{
+ "run_id": "20261109T131347-1951",
+ "mutate": [],
+ "P-KIT": {
+  "passed": true,
+  "returncode": 0,
+  "tail": "check_rejects_count_mismatch\nok test_coauthor_adapter\nok test_cs1_adapter\nok test_edge_inputs\nok test_grid\nok test_regenerate_inputs\nok test_releases\nok test_run_symbol\nok test_thinned_mask\nok test_ticks_before_first_press\nok test_unsmoothed_symbol_edges\nok test_variants_match_symbolize\nselftest ok\n"
+ },
+ "P-RAW": {
+  "passed": true,
+  "rows": 128623,
+  "mismatched": 0
+ },
+ "P-U": {
+  "passed": true,
+  "rows": 128623,
+  "run_rows": 524,
+  "mismatched": 0,
+  "edge_cases": 507,
+  "edge_mismatched": 0
+ },
+ "P-THIN": {
+  "passed": true,
+  "times_ok": true,
+  "complete": true,
+  "kept_rows": 19,
+  "pflag_ok": true,
+  "symbols_ok": true
+ },
+ "P-RES-CAL": {
+  "passed": true,
+  "x": {
+   "mean": -0.0005342225030931878,
+   "var": 0.9991309237350974,
+   "max_lag_median_abs": 0.006317838416782188
+  },
+  "y": {
+   "mean": 0.004038983518511291,
+   "var": 1.0000675912769703,
+   "max_lag_median_abs": 0.008218086916491948
+  }
+ },
+ "P-RES-MIS": {
+  "passed": true,
+  "r1_true_median": -0.0061506966317625535,
+  "r1_r0_median": 0.5731114816738155,
+  "r1_r0_median_y": 0.0009824941887878527
+ },
+ "P-CRN": {
+  "passed": true,
+  "same_across_models": true,
+  "differ_across_columns": true,
+  "repeatable": true
+ },
+ "P-NPZ": {
+  "passed": true,
+  "cells": 156,
+  "mismatched": 0
+ },
+ "P-SAME": {
+  "passed": true,
+  "cells": 75,
+  "differing": 0,
+  "ref_has_folds": true,
+  "ref_from_tau_extend": true
+ },
+ "P-PIN": {
+  "passed": true,
+  "real_returncode": 0,
+  "modified_copy_returncode": 4
+ },
+ "seconds": 138.25164341926575,
+ "all_passed": true,
+ "mutations": {
+  "m41": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-RAW": false
+   },
+   "hit": true
+  },
+  "m42": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-U": false
+   },
+   "hit": true
+  },
+  "m43": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-THIN": false
+   },
+   "hit": true
+  },
+  "m44": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-THIN": false
+   },
+   "hit": true
+  },
+  "m45": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-RES-CAL": false
+   },
+   "hit": true
+  },
+  "m46": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-RES-CAL": false
+   },
+   "hit": true
+  },
+  "m47": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-RES-MIS": false
+   },
+   "hit": true
+  },
+  "m48": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-CRN": false
+   },
+   "hit": true
+  },
+  "m49": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-NPZ": false
+   },
+   "hit": true
+  },
+  "m50": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-SAME": false
+   },
+   "hit": true
+  },
+  "m51": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PIN": false
+   },
+   "hit": true
+  }
+ }
+}

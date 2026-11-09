@@ -1,0 +1,22 @@
+{
+ "fit.py n coauthor": 0,
+ "residual.py n coauthor": 0,
+ "fit.py n cs1": 0,
+ "residual.py n cs1": 0,
+ "fit.py o coauthor": 0,
+ "residual.py o coauthor": 0,
+ "fit.py o cs1": 0,
+ "residual.py o cs1": 0,
+ "fit.py u coauthor": 0,
+ "residual.py u coauthor": 0,
+ "fit.py u cs1": 0,
+ "residual.py u cs1": 0,
+ "parts_complete": true,
+ "npz_check_ok": true,
+ "same_panel": true,
+ "o_without_sidecar_same": true,
+ "tables_md": true,
+ "readings_present": true,
+ "passed": true,
+ "seconds": 376.0155556201935
+}

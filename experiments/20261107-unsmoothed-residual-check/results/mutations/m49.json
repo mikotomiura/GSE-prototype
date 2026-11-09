@@ -1,0 +1,13 @@
+{
+ "run_id": "20261109T131347-1951",
+ "mutate": [
+  "m49"
+ ],
+ "P-NPZ": {
+  "passed": false,
+  "cells": 156,
+  "mismatched": 128
+ },
+ "seconds": 14.493910789489746,
+ "all_passed": false
+}

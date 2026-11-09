@@ -1,0 +1,14 @@
+{
+ "run_id": "20261109T131347-1951",
+ "mutate": [
+  "m48"
+ ],
+ "P-CRN": {
+  "passed": false,
+  "same_across_models": false,
+  "differ_across_columns": true,
+  "repeatable": true
+ },
+ "seconds": 0.04075932502746582,
+ "all_passed": false
+}
