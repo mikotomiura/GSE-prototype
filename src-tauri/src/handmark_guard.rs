@@ -780,10 +780,8 @@ fn only_the_stage_window_knows_the_trace_and_ripple_events() {
     for ext in ["js", "jsx", "mjs"] {
         assert!(TS_EXTS.contains(&ext), "{ext} を走査しない");
     }
-    for name in [
-        crate::handmark_stage::TRACE_EVENT,
-        crate::handmark_stage::RIPPLE_EVENT,
-    ] {
+    for name in [stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT")] {
+        let name = name.as_str();
         assert!(
             others_naming(name, &files).is_empty(),
             "{name} を手跡の窓の外のコードが知っている: {:?}",
@@ -811,6 +809,22 @@ fn only_the_stage_window_knows_the_trace_and_ripple_events() {
             );
         }
     }
+}
+
+/// `handmark_stage.rs` の `pub const <name>: &str = "...";` の値をソースから読む。
+/// `handmark_stage` は macOS だけのモジュールなので、Windows でも走るこの検査は定数を参照せずにソースを読む
+/// （2026-11-09 の CI で、定数を参照して Windows のビルドが止まった）。
+fn stage_event(name: &str) -> String {
+    let src = include_str!("handmark_stage.rs");
+    let head = format!("pub const {name}: &str = \"");
+    let line = src
+        .lines()
+        .find(|l| l.trim_start().starts_with(&head))
+        .unwrap_or_else(|| panic!("{name} が handmark_stage.rs に無い"));
+    let rest = &line.trim_start()[head.len()..];
+    let v = &rest[..rest.find('"').expect("閉じない文字列")];
+    assert!(v.starts_with("handmark-"), "{name} の値が想定外: {v}");
+    v.to_string()
 }
 
 /// `src-tauri/src/` の Rust の本文（相対パス, 本文）。
@@ -863,11 +877,12 @@ fn only_the_stage_rs_names_the_events_and_nobody_uses_listen_any() {
         files.len()
     );
     assert!(files.iter().any(|(n, _)| n == "handmark_stage.rs"));
+    let (trace, ripple) = (stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT"));
     let events = [
         "TRACE_EVENT",
         "RIPPLE_EVENT",
-        crate::handmark_stage::TRACE_EVENT,
-        crate::handmark_stage::RIPPLE_EVENT,
+        trace.as_str(),
+        ripple.as_str(),
     ];
     assert_eq!(
         rs_files_naming(&events, &["handmark_stage.rs"], &files),
