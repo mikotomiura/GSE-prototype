@@ -12,9 +12,12 @@
 //! `analysis::handmark::state::replay_live` で再現した状態と `to_bits` で一致する。
 
 use crate::analysis::handmark::assignment::Assigned;
+use crate::analysis::handmark::day::PointerInput;
 use crate::analysis::handmark::gate::{CloseReason, Decision, RECHECK_MS};
 use crate::analysis::handmark::state::{Stage, StageState, LIVE_LAG_MS};
-use crate::handmark_store::{scrub_state_file, turn_off, turn_on, Evaluation, HandmarkFs};
+use crate::handmark_store::{
+    scrub_state_file, turn_input_off, turn_input_on, turn_off, turn_on, Evaluation, HandmarkFs,
+};
 use crate::logger::HandmarkDayRow;
 
 /// 行を書く間隔（その日の累計の写し）。
@@ -61,11 +64,21 @@ pub enum WindowStatus {
 /// 駆動役の出来事。
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
-    OpenWindow { layout_seed: u32 },
+    OpenWindow {
+        layout_seed: u32,
+    },
     CloseWindow,
     State(StageState),
     Row(HandmarkDayRow),
     TrayItem(TrayItem),
+    /// ポインタのスレッドへの入れ切り（窓を出している・カーソルが入っている・クリックが入っている）。
+    /// 窓を開く・閉じる・入れ切りが変わる・日が変わる・門が閉じるたびに、その時点の値で 1 回出す。
+    /// `open` は窓を出していること（全体の「やめる」で閉じれば false。入力ごとの状態は保つ）。
+    PointerGate {
+        open: bool,
+        cursor: bool,
+        click: bool,
+    },
 }
 
 /// 出来事の行き先。
@@ -82,9 +95,10 @@ impl Effect {
     pub fn destination(&self) -> Destination {
         match self {
             Effect::Row(_) => Destination::Log,
-            Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {
-                Destination::Window
-            }
+            Effect::OpenWindow { .. }
+            | Effect::CloseWindow
+            | Effect::State(_)
+            | Effect::PointerGate { .. } => Destination::Window,
             Effect::TrayItem(_) => Destination::Tray,
         }
     }
@@ -117,6 +131,8 @@ pub struct HandmarkDriver {
     last_row_ms: u64,
     last_tick_ms: u64,
     last_tray: TrayItem,
+    /// 最後に出した `(open, cursor, click)`（閉じた初期の値から始める。変わらなければ出さない）。
+    last_gate: (bool, bool, bool),
 }
 
 impl HandmarkDriver {
@@ -135,6 +151,7 @@ impl HandmarkDriver {
             last_row_ms: now,
             last_tick_ms: now,
             last_tray: TrayItem::Hidden,
+            last_gate: (false, true, true),
         };
         let mut fx = Vec::new();
         d.push_row(now, &mut fx);
@@ -142,6 +159,7 @@ impl HandmarkDriver {
             d.open_window(now, &mut fx);
         }
         d.sync_tray(&mut fx);
+        d.sync_gate(false, &mut fx);
         (d, fx)
     }
 
@@ -180,6 +198,51 @@ impl HandmarkDriver {
             self.last_tray = t;
             fx.push(Effect::TrayItem(t));
         }
+    }
+
+    /// ポインタの入れ切りを出す。値が変わったとき（`force` なら変わらなくても）1 回。
+    fn sync_gate(&mut self, force: bool, fx: &mut Vec<Effect>) {
+        let (cursor, click) = self.ev.inputs_on();
+        let g = (self.window_open, cursor, click);
+        if force || g != self.last_gate {
+            self.last_gate = g;
+            fx.push(Effect::PointerGate {
+                open: g.0,
+                cursor: g.1,
+                click: g.2,
+            });
+        }
+    }
+
+    /// 窓を出している間だけ `Some((カーソルが入っているか, クリックが入っているか))`（トレイの項目用）。
+    pub fn input_items(&self) -> Option<(bool, bool)> {
+        self.window_open.then(|| self.ev.inputs_on())
+    }
+
+    /// トレイの「カーソル」「クリック」。`on` が入れる側。窓を出していないときは何もしない。
+    /// 切るのは書けなくても切る・入れるのは書けなければ切ったまま（`turn_input_on` の作法）。
+    pub fn set_input(
+        &mut self,
+        fs: &dyn HandmarkFs,
+        input: PointerInput,
+        on: bool,
+        now: u64,
+    ) -> Vec<Effect> {
+        let mut fx = Vec::new();
+        if !self.window_open {
+            return fx;
+        }
+        let applied = if on {
+            turn_input_on(fs, &mut self.ev, input, now).is_ok()
+        } else {
+            turn_input_off(fs, &mut self.ev, input, now);
+            true
+        };
+        if applied {
+            self.push_row(now, &mut fx);
+            self.sync_gate(false, &mut fx);
+        }
+        fx
     }
 
     fn new_stage(&mut self, now: u64) {
@@ -292,6 +355,7 @@ impl HandmarkDriver {
             }
             self.push_row(now, &mut fx);
         }
+        self.sync_gate(day_changed, &mut fx);
         fx
     }
 
@@ -301,6 +365,7 @@ impl HandmarkDriver {
         turn_off(fs, &mut self.ev, now);
         self.reconcile(now, &mut fx);
         self.push_row(now, &mut fx);
+        self.sync_gate(false, &mut fx);
         fx
     }
 
@@ -310,6 +375,7 @@ impl HandmarkDriver {
         if turn_on(fs, &mut self.ev, now).is_ok() {
             self.reconcile(now, &mut fx);
             self.push_row(now, &mut fx);
+            self.sync_gate(false, &mut fx);
         }
         fx
     }
@@ -331,6 +397,7 @@ impl HandmarkDriver {
                     self.ev.set_window_unavailable(true);
                     self.reconcile(now, &mut fx);
                     self.push_row(now, &mut fx);
+                    self.sync_gate(false, &mut fx);
                 }
             }
         }
@@ -378,6 +445,7 @@ impl HandmarkDriver {
             // 区間の後の起点を取り直す(消した起点を再生が必要としないように)
             self.new_stage(now);
         }
+        self.sync_gate(false, &mut fx);
         (fx, ok)
     }
 
@@ -689,8 +757,15 @@ mod tests {
         }
         all.extend(d.turn_off(&fs, T0 + 100_000));
         all.extend(d.turn_on(&fs, T0 + 101_000));
+        all.extend(d.set_input(&fs, PointerInput::Cursor, false, T0 + 101_200));
+        all.extend(d.set_input(&fs, PointerInput::Click, false, T0 + 101_300));
+        all.extend(d.set_input(&fs, PointerInput::Cursor, true, T0 + 101_400));
         all.extend(d.on_redact(&fs, T0, T0 + 10, T0 + 101_500).0);
         all.extend(d.on_quit(&fs, T0 + 102_000));
+        assert!(all
+            .iter()
+            .any(|e| matches!(e, Effect::PointerGate { .. })
+                && e.destination() == Destination::Window));
         assert!(all.iter().any(|e| e.destination() == Destination::Window));
         for e in &all {
             if e.destination() == Destination::Log {
@@ -698,6 +773,111 @@ mod tests {
             }
         }
         assert!(all.iter().filter(|e| matches!(e, Effect::Row(_))).count() >= 4);
+    }
+
+    fn gates(fx: &[Effect]) -> Vec<(bool, bool, bool)> {
+        fx.iter()
+            .filter_map(|e| match e {
+                Effect::PointerGate {
+                    open,
+                    cursor,
+                    click,
+                } => Some((*open, *cursor, *click)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn an_input_toggle_emits_the_pointer_gate_once_with_the_current_values() {
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        // 窓を開いた起動で 1 回（開いている・両方入っている）
+        assert_eq!(gates(&fx), vec![(true, true, true)]);
+        assert_eq!(d.input_items(), Some((true, true)));
+        let fx = d.set_input(&fs, PointerInput::Cursor, false, T0 + 1_000);
+        assert_eq!(gates(&fx), vec![(true, false, true)]);
+        assert_eq!(d.input_items(), Some((false, true)));
+        // 行にも入る（記録へ向かうのは Row だけ）
+        let row = fx.iter().find_map(|e| match e {
+            Effect::Row(r) => Some(r.clone()),
+            _ => None,
+        });
+        assert_eq!(
+            row.unwrap().input_toggles,
+            vec![(T0 + 1_000, "cursor", false)]
+        );
+        let fx = d.set_input(&fs, PointerInput::Click, false, T0 + 2_000);
+        assert_eq!(gates(&fx), vec![(true, false, false)]);
+        let fx = d.set_input(&fs, PointerInput::Cursor, true, T0 + 3_000);
+        assert_eq!(gates(&fx), vec![(true, true, false)]);
+        // 通常の tick では出ない（変わっていない）
+        assert!(gates(&d.tick(&fs, T0 + 3_250, ON_DAY)).is_empty());
+    }
+
+    #[test]
+    fn a_failed_write_cuts_an_input_but_cannot_turn_it_on() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        fs.fail_state_write.set(true);
+        let fx = d.set_input(&fs, PointerInput::Click, false, T0 + 1_000);
+        assert_eq!(gates(&fx), vec![(true, true, false)], "書けなくても切る");
+        // 入れるのは書けなければ切ったまま（出来事も出さない）
+        let fx = d.set_input(&fs, PointerInput::Click, true, T0 + 2_000);
+        assert!(fx.is_empty());
+        assert_eq!(d.input_items(), Some((true, false)));
+    }
+
+    #[test]
+    fn stopping_closes_the_gate_but_keeps_the_inputs_and_drawing_restores_it() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.set_input(&fs, PointerInput::Cursor, false, T0 + 500);
+        let fx = d.turn_off(&fs, T0 + 1_000);
+        assert_eq!(
+            gates(&fx),
+            vec![(false, false, true)],
+            "open=false・入力ごとの状態は保つ"
+        );
+        assert_eq!(d.input_items(), None, "窓が無い間はトレイの項目を出さない");
+        // 窓が無い間の入れ切りは何もしない
+        assert!(d
+            .set_input(&fs, PointerInput::Click, false, T0 + 1_500)
+            .is_empty());
+        let fx = d.turn_on(&fs, T0 + 2_000);
+        assert_eq!(gates(&fx), vec![(true, false, true)]);
+        assert_eq!(d.input_items(), Some((false, true)));
+    }
+
+    #[test]
+    fn a_new_day_puts_both_inputs_back_and_emits_the_gate_once() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.set_input(&fs, PointerInput::Cursor, false, T0 + 500);
+        let _ = d.set_input(&fs, PointerInput::Click, false, T0 + 600);
+        let fx = d.tick(&fs, T0 + 1_000, ON_DAY + 3);
+        assert_eq!(gates(&fx), vec![(true, true, true)]);
+        assert_eq!(d.input_items(), Some((true, true)));
+        // 変わらないままの日替わりでも、日が変わるたびに 1 回出す
+        let fx = d.tick(&fs, T0 + 1_000 + 86_400_000, ON_DAY + 6);
+        assert_eq!(gates(&fx).len(), 1, "{fx:?}");
+        // 出さない日に変われば閉じた値が出る
+        let fx = d.tick(&fs, T0 + 2_000 + 2 * 86_400_000, ON_DAY + 7);
+        assert!(gates(&fx).last().is_some_and(|g| !g.0), "{fx:?}");
+    }
+
+    #[test]
+    fn closing_the_gate_by_a_failure_or_an_unwritable_state_emits_the_gate() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let fx = d.on_window_status(WindowStatus::Failed, T0 + 100);
+        assert_eq!(gates(&fx), vec![(false, true, true)]);
+        // 起動から閉じている日は、起動で何も出さない（閉じた初期の値のまま）
+        let fs2 = MemFs::default();
+        let (_, fx) = HandmarkDriver::new(&fs2, true, T0, ON_DAY);
+        assert!(gates(&fx).is_empty());
+        let (_, fx) = HandmarkDriver::new(&fs, false, T0, ON_DAY);
+        assert!(fx.is_empty());
     }
 
     #[test]

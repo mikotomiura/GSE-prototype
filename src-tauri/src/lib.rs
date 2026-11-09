@@ -2361,6 +2361,8 @@ fn run_handmark_effects(
             #[cfg(not(target_os = "macos"))]
             Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
+            // ポインタのスレッドへの入れ切り。配線は B2（今は受け取って捨てる）。
+            Effect::PointerGate { .. } => {}
         }
     }
 }

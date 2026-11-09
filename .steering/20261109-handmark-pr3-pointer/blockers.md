@@ -21,3 +21,10 @@
 14. `schema_dto` の `input_toggles` は `serde(default)`（schemars では必須から外れる）。PR 3 より前の行（欄なし）が schema に対して有効なままになる。gse-dataset の同期で確かめてほしい。
 15. `handmark_guard.rs` の `the_handmark_day_schema_has_exactly_the_designed_fields` は A5 の時点で赤になるので、欄名の一覧に `input_toggles` を足した（A7 の予定の一部を前倒し）。
 16. `capabilities.rs` は行種の名前の一覧だけで欄の列挙は無いので変更なし。
+
+## A6（駆動役・実装役が決めた細部）
+
+17. `Effect::PointerGate` は `last_gate`（`(open, cursor, click)`・初期値は閉じた `(false, true, true)`）と比べて、変わったときだけ出す。例外は日が変わる `tick` で、変わらなくても 1 回出す（仕様の「日が変わるたびに」）。初期値を閉じた側にしたので、閉じた日の起動・段 1 でない走行では何も出ない（既存の「段 1 でなければ出来事なし」のテストを保つ）。
+18. `set_input` は窓を出していないとき何もしない（トレイの項目も出ない）。切った・入れたら行も 1 つ出す（`turn_off` と同じ）。入れるのが書けずに失敗したときは出来事を何も出さない。
+19. `lib.rs` の `run_handmark_effects` は網羅の match なので `Effect::PointerGate { .. } => {}`（受け取って捨てる）を足しただけ。配線は B2。
+20. 駆動役の `on_redact` の最小の形も `minimal_keeping_off` を使う（A5 の 13）。
