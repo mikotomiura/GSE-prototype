@@ -39,3 +39,12 @@
 - fmt・clippy・`cargo test --workspace`（lib 1241 件）・emit_schema の byte-equal を自分で走らせ直して緑。
 - 本番を壊す変異 5 つ: スレッドに `tracing::debug!` を足す → ソースの検査が赤／`PointerSample` に `Debug` → テストのビルドが止まる／`redaction.rs` で `input_toggles` を消さない → 1 件赤／`day.rs` の `retain` を外す → 2 件赤／`PointerGate` の行き先を記録にする → 3 件赤。
 - 実装役が決めた細部（blockers.md の 10〜26）はそのまま採る。状態ファイルの version は 1 のまま（足した欄は `serde(default)` で、上げると古いファイルが壊れた扱いになり当日の累計が消える）。schema の `input_toggles` も `serde(default)`（PR 3 より前の行も有効）。
+
+## 判断 10: 実装 B の実装役の報告を確かめる（2026-11-09）
+
+- fmt・clippy・`cargo test --workspace`（lib 1254 件）・emit_schema の byte-equal・`tsc --noEmit`・`npm run test:handmark`（14 件）を自分で走らせ直して緑。
+- `lib.rs` の配線をコードで読んだ: ポインタのスレッドは `HANDMARK_DRIVER` のロックを取らず、門は `AtomicU8`、駆動スレッドの終わり（`HandmarkWindowGuard`）で門も閉じる。
+- 窓の TS は場の定数（`BEND_MAX`・`MOTE_MAX`・格子の大きさ・`BOX_W`）を手で写していて、機械で照らしていなかった。Rust の定数と TS の `export const` を照らす検査を足した（`the_window_copies_the_field_constants_exactly`・陽性対照つき・0fad9062）。
+- 変異: TS の `BEND_MAX` だけ変える → 1 件赤／跡を `emit`（全窓）で送る → 1 件赤／窓の TTL で消さない → node の 1 件赤。
+- 実装役が決めた細部（blockers.md の 27〜40）はそのまま採る。payload の欄名は試作に合わせて camelCase、送った時刻 `tMs` を足した（窓が遅れた値を捨てるため）。CI の node は step の先頭で 22.18 未満なら理由を言って落とす。
+- 確かめていないこと（画面の確かめで見る）: 実機の読み・窓の描画・格子の粗さ・トレイの押下（`CheckMenuItem` の自動反転と言い直し）・一時停止で跡が消えること。Windows の clippy は CI で見る。
