@@ -595,6 +595,183 @@ fn the_macos_read_touches_only_the_pointer() {
     assert!(nsevent_reads(&planted).iter().any(|r| r == "keyCode"));
 }
 
+// ---- 窓の TS（PR 3・ADR-050 D3・D4） ----
+
+/// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。
+const WINDOW: [(&str, &str); 2] = [
+    (
+        "HandmarkStage.tsx",
+        include_str!("../../src/components/HandmarkStage.tsx"),
+    ),
+    (
+        "handmarkStageTrace.ts",
+        include_str!("../../src/components/handmarkStageTrace.ts"),
+    ),
+];
+
+/// 窓は何も保存せず、何も返さず、外へ送らない。
+#[test]
+fn the_window_does_not_store_send_back_or_talk_to_the_network() {
+    assert_clean(
+        "窓",
+        &WINDOW,
+        &[
+            "localStorage",
+            "sessionStorage",
+            "indexedDB",
+            "invoke",
+            "@tauri-apps/api/core",
+            "fetch",
+            "WebSocket",
+            "XMLHttpRequest",
+            "EventSource",
+            "sendBeacon",
+            "postMessage",
+            "cookie",
+            "caches",
+            "console",
+        ],
+    );
+}
+
+/// `src/` の `.ts`・`.tsx`（名前, 本文）。
+fn ts_sources() -> Vec<(String, String)> {
+    fn walk_ts(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk_ts(&p, out);
+            } else if p
+                .extension()
+                .and_then(|x| x.to_str())
+                .is_some_and(|x| x == "ts" || x == "tsx")
+            {
+                if let Ok(text) = std::fs::read_to_string(&p) {
+                    let name = p
+                        .file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    out.push((name, text));
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src");
+    walk_ts(&root, &mut out);
+    out
+}
+
+/// イベント名を本文（コメントの行を除く）に含むファイルの名前（手跡の窓の 2 ファイルを除く）。
+fn others_naming(name: &str, files: &[(String, String)]) -> Vec<String> {
+    files
+        .iter()
+        .filter(|(n, _)| !WINDOW.iter().any(|(w, _)| w == n))
+        .filter(|(_, text)| body(text).contains(name))
+        .map(|(n, _)| n.clone())
+        .collect()
+}
+
+/// 場と波紋のイベント名は手跡の窓だけが知る（`target` なしの `listen` で他の窓に届かないように）。
+#[test]
+fn only_the_stage_window_knows_the_trace_and_ripple_events() {
+    let files = ts_sources();
+    assert!(files.len() > 5, "src/ の走査が空回り: {}", files.len());
+    for name in [
+        crate::handmark_stage::TRACE_EVENT,
+        crate::handmark_stage::RIPPLE_EVENT,
+    ] {
+        assert!(
+            others_naming(name, &files).is_empty(),
+            "{name} を手跡の窓の外のコードが知っている: {:?}",
+            others_naming(name, &files)
+        );
+        // 手跡の窓は実際に聞いている（探し方が空回りしていない）
+        assert!(
+            body(WINDOW[0].1).contains(name),
+            "{name} を HandmarkStage.tsx が聞いていない"
+        );
+        // 陽性対照: 他のファイルが名前を書いたら見つかる
+        let mut planted = files.clone();
+        planted.push(("Planted.tsx".to_string(), format!("listen('{name}')")));
+        assert_eq!(
+            others_naming(name, &planted),
+            vec!["Planted.tsx".to_string()]
+        );
+    }
+}
+
+/// 送りは手跡の窓だけへ（`emit_to`）。全窓へ流す `emit` を使わない。
+#[test]
+fn the_stage_emits_only_to_its_own_window() {
+    let src = FILES[7].1;
+    assert_eq!(FILES[7].0, "handmark_stage.rs");
+    let all = [".", "emit", "("].concat();
+    assert!(hits(src, &[all.as_str()]).is_empty());
+    assert!(body(src).contains("emit_to"));
+    assert_eq!(hits(&format!("{all}\n{src}"), &[all.as_str()]).len(), 1);
+}
+
+/// 窓の側で配列・表を作ってよい名前（名前を決めた固定数の枠: 草・粒・波紋・場の 3 本の配列）。
+const ALLOWED_LISTS: [&str; 6] = ["blades", "motes", "ripples", "bend", "pullX", "pullY"];
+const LIST_MAKERS: [&str; 9] = [
+    "[]",
+    "Array.from",
+    "Array(",
+    "new Map",
+    "new Set",
+    "new WeakMap",
+    ".push(",
+    ".unshift(",
+    ".splice(",
+];
+/// 値を持たない配列の書き方で、許す行（React の useEffect の依存の配列が空であること）。
+const ALLOWED_LINES: [&str; 1] = ["}, []);"];
+
+/// 配列・表を作る行のうち、許す名前のどれにも当たらない行。
+fn unnamed_lists(src: &str) -> Vec<String> {
+    body(src)
+        .lines()
+        .filter(|l| !ALLOWED_LINES.contains(&l.trim()))
+        .filter(|l| LIST_MAKERS.iter().any(|m| l.contains(m)))
+        .filter(|l| {
+            !ALLOWED_LISTS.iter().any(|a| {
+                [" =", ".push(", ": "]
+                    .iter()
+                    .any(|t| l.contains(&format!("{a}{t}")))
+            })
+        })
+        .map(|l| l.trim().to_string())
+        .collect()
+}
+
+/// 窓の側の列は、名前を許した枠だけ（位置・押下の列を作らない）。
+#[test]
+fn the_window_lists_only_named_slots() {
+    for (name, src) in WINDOW {
+        let bad = unnamed_lists(src);
+        assert!(
+            bad.is_empty(),
+            "列: {name} に名前の一覧の外の配列・表: {bad:?}"
+        );
+        // 陽性対照: 一覧に無い名前で作る行を足すと見つかる
+        for maker in LIST_MAKERS {
+            let planted = format!("const trail = x{maker}y;\n{src}");
+            assert_eq!(
+                unnamed_lists(&planted).len(),
+                1,
+                "列: 対照が赤にならない（{maker}）"
+            );
+        }
+        // 陽性対照 2: 許した名前の枠なら通る（探し方が過剰でない）
+        let named = format!("const blades = x[];\n{src}");
+        assert!(unnamed_lists(&named).is_empty());
+    }
+}
+
 // ---- 列（D4） ----
 
 /// `struct name { ... }` の定義の本文（波括弧の対応で切る）。タプル構造体・無い名前は `None`。

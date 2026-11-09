@@ -1,16 +1,44 @@
 // 手跡の背景の層(段 1 の後期・ADR-051)。デスクトップの高さの透明な窓の全面に、自然世界(霧・草・粒)を描く。
-// 写し方は試作(見本 Version 5)の打鍵の部分と同じ。ポインタ・クリック・ホイールの処理は無い(PR 3・5)。
+// 写し方は試作(見本 Version 5)と同じ。ホイールの処理だけが無い(PR 5)。
 // - 風・位相・漂い・配置の種は、Rust が打鍵の時刻だけから 250 ms ごとに計算して送る(StageState)。
 //   この窓は performance.now() や描画の間隔(dt)から位相・漂い・位置を積まない。粒の位置も草の揺れも、
 //   届いた drift・phase・layout_seed の関数で、届いた状態へ 250 ms かけて線形に寄せるだけ
 //   (描画の回数は見た目に影響しない・机上の描き直しと一致する)。
+// - ポインタ(PR 3): Rust が 16 × 10 の格子の「跡の場」を持ち、33 ms ごとに送る(`handmark-trace`)。窓はそれを
+//   次の写しまで線形に寄せ、草 1 本・粒 1 つの位置で双一次補間して読むだけで、跡の値を積まない。
+//   場が 1 秒来なければ 0 にする。クリックの波紋は `handmark-ripple` で届き、6 枠に入れて 1.6 秒で消す。
 // - 霧: どの入力にも依らない基層(漂いは Rust の drift)。
 // 窓は何も保存せず、何も返さない。推定は受け取らない。数値・文字は描かない。
 import { useEffect, useRef } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import {
+  BOX_W,
+  TRACE_TICK_MS,
+  addRipple,
+  clearField,
+  clearRipples,
+  decodeCells,
+  fieldIsZero,
+  lerpField,
+  makeField,
+  makeReceiver,
+  makeRipples,
+  receive,
+  receiveRipple,
+  rippleAge,
+  sampleField,
+  sweepRipples,
+  traceExpired,
+} from "./handmarkStageTrace";
+import type { RippleMessage, TraceMessage } from "./handmarkStageTrace";
 
 /** 状態を知らせるイベント名(src-tauri/src/handmark_stage.rs の STATE_EVENT)。閉じたときは null。 */
 const STATE_EVENT = "handmark-state";
+/** 跡の場・波紋の種のイベント名(src-tauri/src/handmark_stage.rs の TRACE_EVENT・RIPPLE_EVENT)。 */
+const TRACE_EVENT = "handmark-trace";
+const RIPPLE_EVENT = "handmark-ripple";
+/** 寿命を過ぎた波紋・古い場を、描画が止まっていても消すための時計の知らせの間隔。 */
+const CLOCK_TICK_MS = 250;
 
 /** 状態が届く間隔(analysis/handmark/state.rs の TICK_MS)。受け取った状態へこの時間をかけて寄せる。 */
 const STATE_TICK_MS = 250;
@@ -163,6 +191,27 @@ export default function HandmarkStage() {
     let shown: Shown = { speed: 0, irreg: 0, phase: 0, drift: 0 };
     let recvAt = performance.now();
 
+    // ---- ポインタ(Rust から届く跡の場と波紋)。窓は積まず、届いた値を寄せて読むだけ ----
+    const fieldFrom = makeField();
+    const fieldTo = makeField();
+    const fieldShown = makeField();
+    const rippleSlots = makeRipples();
+    const receiver = makeReceiver();
+    let traceRecvAt = performance.now();
+    /** 最後に場を受け取った時刻。まだなら -Infinity(期限切れ扱い)。 */
+    let lastTraceAt = -Infinity;
+    /** 場に 0 でない値がある(描画を絞らない)。 */
+    let fieldLive = false;
+
+    const resetPointer = (): void => {
+      clearField(fieldFrom);
+      clearField(fieldTo);
+      clearField(fieldShown);
+      clearRipples(rippleSlots);
+      lastTraceAt = -Infinity;
+      fieldLive = false;
+    };
+
     const dualStroke = (width: number, darkA: number, lightA: number): void => {
       ctx.globalAlpha = darkA;
       ctx.strokeStyle = "#12161b";
@@ -215,8 +264,12 @@ export default function HandmarkStage() {
       const span = W + 20;
       for (const m of motes) {
         const dx = (6 * drift + (70 * flow) / FULL_WIND_SPEED) * m.k * S;
-        const x = ((((m.x0 + dx) % span) + span) % span) - 10;
-        const y = m.y0 + 40 * S * moteBob(m.seed, drift);
+        const x0 = ((((m.x0 + dx) % span) + span) % span) - 10;
+        const y0 = m.y0 + 40 * S * moteBob(m.seed, drift);
+        // 跡の場: いまの位置で読み、描く位置に足す(粒の本体の位置は積まない)。
+        const pulled = sampleField(fieldShown, (x0 / W) * BOX_W, y0 / H);
+        const x = x0 + pulled.pullX * H;
+        const y = y0 + pulled.pullY * H;
         const r = m.r * S;
         ctx.beginPath();
         ctx.arc(x, y, r * 1.9, 0, Math.PI * 2);
@@ -232,7 +285,9 @@ export default function HandmarkStage() {
       for (const bl of blades) {
         const sway = baseSway(bl.seed, drift);
         const gust = wind * gustAt(bl.x, drift, irreg) * (0.32 + 0.22 * Math.sin((bl.x / W) * 9 - phase * 3 + bl.depth));
-        const bend = (sway + gust) * bl.h;
+        // 跡の場: 草 1 本の根元と先の中ほどの正準の位置で読み、倒しに足す。
+        const pushed = sampleField(fieldShown, (bl.x / W) * BOX_W, (bl.y - bl.h / 2) / H).bend;
+        const bend = (sway + gust + pushed) * bl.h;
         ctx.beginPath();
         ctx.moveTo(bl.x, bl.y);
         ctx.quadraticCurveTo(bl.x + bend * 0.25, bl.y - bl.h * 0.55, bl.x + bend, bl.y - bl.h + Math.abs(bend) * 0.25);
@@ -240,10 +295,33 @@ export default function HandmarkStage() {
       }
     };
 
+    const ring = (px: number, py: number, e: number, a: number, k: number, lag: number): void => {
+      const tt = Math.max(0, e - lag);
+      if (tt <= 0) return;
+      ctx.beginPath();
+      ctx.ellipse(px, py, (8 + 150 * tt) * S * k, (5 + 90 * tt) * S * k, 0, 0, Math.PI * 2);
+      dualStroke(1.3 * S, 0.18 * a, 0.7 * a);
+    };
+    // 波紋。押した点から 2 重の輪が広がり、1.6 秒で消える。位置は正準の箱から画面へ戻す。
+    const drawRipples = (now: number): void => {
+      for (const rp of rippleSlots.ripples) {
+        const t = rippleAge(rp, now);
+        if (t === null) continue;
+        const px = (rp.x / BOX_W) * W;
+        const py = rp.y * H;
+        const e = 1 - Math.pow(1 - t, 3);
+        const a = Math.pow(1 - t, 1.5);
+        ring(px, py, e, a, 1, 0);
+        ring(px, py, e, a, 0.62, 0.18);
+      }
+    };
+
     // 届いた状態を受け取り、いま見せている値からその状態へ寄せ始める。null は窓が閉じたこと。
     const onState = (msg: StageStateMessage | null): void => {
       if (msg === null) {
+        // 窓が閉じた: 状態も、場も波紋も消す(世代は次に開いたとき進んだ値が届く)。
         active = false;
+        resetPointer();
         ctx.clearRect(0, 0, W, H);
         return;
       }
@@ -285,9 +363,19 @@ export default function HandmarkStage() {
         phase: from.phase + (to.phase - from.phase) * k,
         drift: from.drift + (to.drift - from.drift) * k,
       };
+      // 跡の場: 届いた場へ次の写しまで線形に寄せる。1 秒来なければ 0(描画の回数では積まない)。
+      sweepPointer(now);
+      lerpField(fieldFrom, fieldTo, (now - traceRecvAt) / TRACE_TICK_MS, fieldShown);
       ctx.clearRect(0, 0, W, H);
       drawNature(reduceMotion ? 0.3 : 1);
-      if (shown.speed > 0 || to.speed > 0) {
+      drawRipples(now);
+      if (
+        shown.speed > 0 ||
+        to.speed > 0 ||
+        fieldLive ||
+        now - traceRecvAt < TRACE_TICK_MS * 2 ||
+        rippleSlots.ripples.some((rp) => rippleAge(rp, now) !== null)
+      ) {
         frame = requestAnimationFrame(loop);
       } else {
         // 風が無い間は霧と粒の漂いだけを 1 秒に約 10 回描く(負荷を抑える)。
@@ -297,6 +385,53 @@ export default function HandmarkStage() {
         }, IDLE_FRAME_MS);
       }
     };
+    // 寿命を過ぎた波紋を消し、場が 1 秒来なければ場を 0 にする(描画が止まっていても時計の知らせで呼ぶ)。
+    const sweepPointer = (now: number): void => {
+      sweepRipples(rippleSlots, now);
+      if (fieldLive && traceExpired(lastTraceAt, now)) {
+        clearField(fieldFrom);
+        clearField(fieldTo);
+        clearField(fieldShown);
+        fieldLive = false;
+      }
+    };
+
+    // 届いた場を受ける。世代が進んだら場と波紋を消し、古い・遅れすぎた値は捨てる。
+    const onTrace = (msg: TraceMessage): void => {
+      const now = performance.now();
+      const v = receive(receiver, msg, now);
+      if (v.reset) {
+        resetPointer();
+      }
+      if (!v.use) {
+        return;
+      }
+      // 寄せ始める値は、いま見せている値
+      lerpField(fieldFrom, fieldTo, (now - traceRecvAt) / TRACE_TICK_MS, fieldShown);
+      fieldFrom.bend.set(fieldShown.bend);
+      fieldFrom.pullX.set(fieldShown.pullX);
+      fieldFrom.pullY.set(fieldShown.pullY);
+      if (!decodeCells(msg.cells, fieldTo)) {
+        return;
+      }
+      traceRecvAt = now;
+      lastTraceAt = now;
+      fieldLive = !fieldIsZero(fieldTo);
+      if (active) kick();
+    };
+
+    // 届いた波紋の種を 6 枠のどれかへ入れる(窓の時計で年齢を決める)。
+    const onRipple = (msg: RippleMessage): void => {
+      const now = performance.now();
+      if (!receiveRipple(receiver, msg.tMs, now)) {
+        return;
+      }
+      if (Number.isFinite(msg.x) && Number.isFinite(msg.y)) {
+        addRipple(rippleSlots, msg.x, msg.y, now);
+        if (active) kick();
+      }
+    };
+
     // 風が起きたら、絞っていた描画をすぐ戻す。
     function kick(): void {
       if (idleTimer !== null) {
@@ -312,9 +447,14 @@ export default function HandmarkStage() {
       resize();
     };
     window.addEventListener("resize", onResize);
+    const clockTimer = window.setInterval(() => {
+      sweepPointer(performance.now());
+    }, CLOCK_TICK_MS);
 
     let disposed = false;
     let unlisten: (() => void) | null = null;
+    let unlistenTrace: (() => void) | null = null;
+    let unlistenRipple: (() => void) | null = null;
     const win = getCurrentWebviewWindow();
     // listen に失敗したら背景は動かないだけ。
     win
@@ -326,6 +466,24 @@ export default function HandmarkStage() {
         else unlisten = fn;
       })
       .catch(() => {});
+    win
+      .listen<TraceMessage>(TRACE_EVENT, (event) => {
+        onTrace(event.payload);
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenTrace = fn;
+      })
+      .catch(() => {});
+    win
+      .listen<RippleMessage>(RIPPLE_EVENT, (event) => {
+        onRipple(event.payload);
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenRipple = fn;
+      })
+      .catch(() => {});
 
     return () => {
       disposed = true;
@@ -333,7 +491,10 @@ export default function HandmarkStage() {
       window.removeEventListener("resize", onResize);
       if (frame !== null) cancelAnimationFrame(frame);
       if (idleTimer !== null) window.clearTimeout(idleTimer);
+      window.clearInterval(clockTimer);
       if (unlisten !== null) unlisten();
+      if (unlistenTrace !== null) unlistenTrace();
+      if (unlistenRipple !== null) unlistenRipple();
     };
   }, []);
 
