@@ -21,8 +21,8 @@ A synthetic release is added 100 ms after each press (earlier if the next press 
 sooner). Every second, five features are computed over the key events of the last 30 s:
 the median flight time, the share of deletions, the mean burst length, the number of pauses
 of 2 s or more, and the share of deletions followed by such a pause. Each feature is
-normalized against a fixed reference value, and two weighted sums give a raw friction
-value x and a raw fluency value y. These are smoothed exponentially (weight 0.3 while
+normalized against a fixed reference value, and two weighted sums give two raw composite
+values x and y (not read as states). These are smoothed exponentially (weight 0.3 while
 typing; 0.15, 0.18 or 0.25 during pauses, by pause length) and mapped to a 5 x 5 grid,
 giving symbols 0 to 24. Symbol 25 replaces the grid symbol at the first typing second after
 a run of 14 or more consecutive deletions. During pauses the features are replaced by
