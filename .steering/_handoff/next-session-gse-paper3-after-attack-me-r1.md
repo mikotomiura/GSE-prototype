@@ -20,7 +20,7 @@
 ## 1 ここまでに済んだこと
 
 - paper-write Step 0〜5 の計画: 投稿先 UMUAI（購読モデル・APC なし）・英語・MacTeX・本文 7,000 語・図表 4（判断 3〜4・`paper-write/venue-fit.md`・`length-log.md`）。外枠は `papers/per-person-learning/manuscript/outline.md`。
-- 文献のラウンド 1 回（[V386]〜[V509]・`docs/literature/20261107-per-person-gain-comparison-baselines.md`）。
+- 文献のラウンド 1 回（[V386]・[V387]・[V497]〜[V509]・`docs/literature/20261107-per-person-gain-comparison-baselines.md`）。
 - 記号化の書き直し（`papers/per-person-learning/kit/symbols/`・作業記録 `.steering/20261107-gse-paper3-symbol-reimpl/`）: 元の replay と、合成 300 本・CoAuthor 1,157 セッション・CS1 2021 の 177 課題で記号と x・y の bit まで一致。/cross-review 2 巡。
 - attack-me outline round 1: major revision（R1〜R3・Codex が major、編集者は「直してから回す」）。
 - 文献の調べ 1 ラウンド（判断 12・判断 14・2026-11-07）: `docs/literature/20261107-per-person-shrinkage-prior-art.md`・[V510]〜[V533]・コミット 515712eb。τ の MAP は話者適応の MAP の離散 HMM 版で、多水準 HMM の特殊な場合ではない。「他人で選ぶ・同じ人の後の時点で測る」は入力の言語モデルの個人化の流儀で C3 の新規性に数えない。HMM と 1 次のマルコフの同じデータの中の比べは [V517] がある。外枠への持ち込みは判断 14（外枠はまだ直していない）。

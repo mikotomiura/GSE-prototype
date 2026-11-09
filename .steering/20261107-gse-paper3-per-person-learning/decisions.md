@@ -70,7 +70,7 @@
 - 留保: 0 件の判定（共通の構造で上積みが消えることの直接の測定・後の時点の予測での HMM と 1 次のマルコフの比べ）は「今回の探索では見つからなかった」水準で、臨床 EMA と UMUAI の網羅は足りない。
 
 ## 判断 15（2026-11-09）文献番号の振り直し
-- 決定: この枝で足した [V388]〜[V425]（38 件）を [V497]〜[V534] へ、順を変えずに付け替えた（番号 + 109）。[V496]（Dunn & Smyth 1996）はそのまま残し、表では [V497] の前に置いた。置き換えたのは references.md・文献のカード 2 枚・_index.md・この記録の decisions.md と tasklist.md・attack-me round 1 の後の引き継ぎの 7 ファイル（373 か所）。papers/ と experiments/ には該当する番号が無かった。
+- 決定: この枝で足した [V388]〜[V425]（38 件）を [V497]〜[V534] へ、順を変えずに付け替えた（番号 + 109）。[V496]（Dunn & Smyth 1996）はそのまま残し、表では [V497] の前に置いた。置き換えたのは references.md・文献のカード 2 枚・_index.md・この記録の decisions.md と tasklist.md・attack-me round 1 の後の引き継ぎの 7 ファイル（旧い番号の [Vn] 373 か所・置き換えの前のコミットで数えた）と、unsmoothed-residual-check の decisions.md の注記 1 行。範囲の書き方「[V386]〜[V400]」（[V386]・[V387] は main に既にある）は、機械の置き換えで「[V386]〜[V509]」になったので「[V386]・[V387]・[V497]〜[V509]」に直した（/cross-review の指摘）。papers/ と experiments/ には該当する番号が無かった。
 - 理由: main の末尾は [V387] で、[V388]〜[V412] は `docs/gse-daily-item-scale-literature`・`docs/gse-stage1-prereg-revision` の枝が、[V413]〜[V495] は `docs/public-data-findings-paper`・`docs/gse-paper2-stall-shape` の枝が別の文献に使っていた（2026-11-09 に origin の全枝の references.md を照合）。どの番号もまだ main に無く、この枝が最も新しいので、この枝が退く。citation-ssot の「振り直さない」は main に入った番号の安定のための規則で、まだどこにも入っていない枝どうしのぶつかりは、後から来た側が退くほかに直せない。
 - 留意 1: [V534]（Garcés-Manzanera 2026, doi:10.1016/j.rmal.2026.100381）は、論文 2 の枝に [V448] と [V488] として既にある（論文 2 の枝の中でも 2 重）。この枝と論文 2 の枝の後に入る方が、マージのときに後の番号を tombstone（→ 先の番号）にする。
-- 留意 2: 他の枝どうし（daily-item / stage1-prereg と public-data / paper2）は番号の範囲が重ならない。次に番号を足す枝は、origin の全枝の最大（この判断の後で [V534]）の次から採る。
+- 留意 2: 他の枝どうし（daily-item / stage1-prereg と public-data / paper2）は番号の範囲が重ならない。次に番号を足す枝は、fetch してから origin の全枝の最大（この判断の後で [V534]）の次から採る。同時に採る枝や push していない番号は見えないので、マージの前にも同じ照合をする。
