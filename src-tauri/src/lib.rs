@@ -2437,8 +2437,18 @@ pub(crate) fn handmark_set_input_from_tray(
     let log_tx = handmark_log_tx(app);
     let mut g = handmark_lock();
     let Some(d) = g.as_mut() else { return };
-    let Some(on) = crate::handmark_driver::decide_tray_input(shown_checked, d.input_items(), input)
-    else {
+    let items = d.input_items();
+    let Some(on) = crate::handmark_driver::decide_tray_input(shown_checked, items, input) else {
+        // 押下を捨てたときだけ理由を残す(2026-11-09 の画面の確かめで、効いたように見えて記録に
+        // 残らない押下が 2 回の走行であり、再現できなかった)。入れ切りの種類と状態だけで、ポインタの値は無い。
+        tracing::warn!(
+            "handmark: input press ignored ({})",
+            if items.is_some() {
+                "menu mark is stale"
+            } else {
+                "window is not open"
+            }
+        );
         return;
     };
     let fx = d.set_input(fs, input, on, epoch_ms());

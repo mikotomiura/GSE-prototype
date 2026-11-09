@@ -1245,3 +1245,21 @@ fn the_window_copies_the_field_constants_exactly() {
     let gone = ts.replacen("export const GRID_W = 16;", "", 1);
     assert_eq!(trace_const_mismatches(&gone), vec!["GRID_W"]);
 }
+
+/// 手跡の窓は WKWebView の既定（suspend）のままだと、数分でタイマーと描画が絞られて粗く遅くなる
+/// （2026-11-09 の画面の確かめ）。窓の作りが絞りを切っていることを縛る。
+fn stage_disables_throttling(src: &str) -> bool {
+    let body = strip_test_items(src);
+    body.contains(&["BackgroundThrottlingPolicy", "::Disabled"].concat())
+        && body.contains(".background_throttling(")
+}
+
+#[test]
+fn the_stage_window_is_not_throttled_when_covered() {
+    let src = include_str!("handmark_stage.rs");
+    assert!(stage_disables_throttling(src));
+    // 陽性対照: 指定を外すと赤になる。
+    let gone = src.replace(".background_throttling(", ".no_such_call(");
+    assert_ne!(gone, src, "対照の置き換えが当たっていない");
+    assert!(!stage_disables_throttling(&gone));
+}

@@ -136,6 +136,10 @@ mod imp {
         .skip_taskbar(true)
         .focused(false)
         .visible(false)
+        // この窓は作業中の窓にならず、他のアプリの窓に覆われることが多い。WKWebView の既定
+        // （inactiveSchedulingPolicy = suspend）では、数分でタイマーと描画が絞られ、背景が粗く遅くなる
+        // （2026-11-09 の画面の確かめ）。この窓だけ絞りを切る（macOS 14 以降で効く・wry 0.54）。
+        .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
         .build()
         {
             Ok(w) => w,

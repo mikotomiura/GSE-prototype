@@ -308,7 +308,12 @@ fn handmark_input_request(
 /// 入力の項目が押された。`which` は添字。押された時点で出ていた印を駆動役へ渡す（照合は
 /// `handmark_driver::decide_tray_input`）。
 fn handmark_input_pressed(app: &AppHandle, which: usize) {
-    if let Some((input, checked)) = handmark_input_request(which) {
+    let req = handmark_input_request(which);
+    if req.is_none() {
+        // 表示の印が分からない押下は捨てる。捨てたことだけ残す(lib.rs の handmark_set_input_from_tray の注記)。
+        tracing::warn!("handmark: input press ignored (menu mark unknown)");
+    }
+    if let Some((input, checked)) = req {
         crate::handmark_set_input_from_tray(app, input, checked);
     }
 }
