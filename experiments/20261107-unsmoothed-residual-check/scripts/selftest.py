@@ -269,22 +269,22 @@ def p_npz(seed):
             flat.update(F.flat_params(w, par))
         p = os.path.join(td, "p.npz")
         np.savez_compressed(p, **flat)
-        z = np.load(p)
-        for w, units in enumerate(writers):
-            _, test = DT.split(len(units), 1, Hh)
-            ev = ml.Eval(ml.seqs_of([units[i] for i in test]), ml.pflags_of([units[i] for i in test]))
-            res = outs[w]
-            for s in ml.STRUCTS:
-                nm = ml.sname(s)
-                cells += 1
-                bad += int(ev.ll(F.get_pool(z, w, nm)) != res["pool"][nm])
+        with np.load(p) as z:  # 閉じてから一時フォルダを抜ける（Windows は開いたままのファイルを消せない）
+            for w, units in enumerate(writers):
+                _, test = DT.split(len(units), 1, Hh)
+                ev = ml.Eval(ml.seqs_of([units[i] for i in test]), ml.pflags_of([units[i] for i in test]))
+                res = outs[w]
+                for s in ml.STRUCTS:
+                    nm = ml.sname(s)
+                    cells += 1
+                    bad += int(ev.ll(F.get_pool(z, w, nm)) != res["pool"][nm])
+                    for k in map(str, ks_make):
+                        for t in ml.TAU_KEYS:
+                            cells += 1
+                            bad += int(ev.ll(F.get_self(z, w, nm, k, t)) != res["k"][k]["self"][nm][t])
                 for k in map(str, ks_make):
-                    for t in ml.TAU_KEYS:
-                        cells += 1
-                        bad += int(ev.ll(F.get_self(z, w, nm, k, t)) != res["k"][k]["self"][nm][t])
-            for k in map(str, ks_make):
-                cells += 1
-                bad += int(ev.ll_r1(*F.get_r1(z, w, k)) != res["k"][k]["r1"])
+                    cells += 1
+                    bad += int(ev.ll_r1(*F.get_r1(z, w, k)) != res["k"][k]["r1"])
     return dict(passed=cells > 0 and bad == 0, cells=cells, mismatched=bad)
 
 
