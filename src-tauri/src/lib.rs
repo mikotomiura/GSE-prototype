@@ -2434,11 +2434,13 @@ pub(crate) fn handmark_set_input_from_tray(
         return false;
     }
     let Some(fs) = HANDMARK_FS.get() else {
+        tracing::warn!("handmark: input press ignored (file locations are unavailable)");
         return false;
     };
     let log_tx = handmark_log_tx(app);
     let mut g = handmark_lock();
     let Some(d) = g.as_mut() else {
+        tracing::warn!("handmark: input press ignored (no driver)");
         return false;
     };
     let items = d.input_items();
