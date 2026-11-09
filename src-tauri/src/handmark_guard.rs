@@ -841,7 +841,8 @@ fn rs_sources() -> Vec<(String, String)> {
                 if let Ok(text) = std::fs::read_to_string(&p) {
                     let rel = p
                         .strip_prefix(root)
-                        .map(|r| r.to_string_lossy().to_string())
+                        // 区切りを `/` にそろえる（Windows では `\` になり、許可の一覧と合わない・2026-11-09 の CI）
+                        .map(|r| r.to_string_lossy().replace('\\', "/"))
                         .unwrap_or_default();
                     out.push((rel, text));
                 }
