@@ -128,11 +128,17 @@ impl TraceField {
             vx: 0.0,
             vy: 0.0,
             last: None,
-            prev_down: false,
+            // 最初の一点までは押されているとみなす（開いたとき押しっぱなしで波紋を出さない）。
+            prev_down: true,
             last_input: None,
             grid_t: t0 / STEP_MS * STEP_MS,
             epoch: 0,
         }
+    }
+
+    /// 8 秒以内に入力（動きか押下）があった（場が 0 へ戻りきっていない）。
+    pub fn is_active(&self) -> bool {
+        self.last_input.is_some()
     }
 
     /// 最後に処理した刻みの時刻。

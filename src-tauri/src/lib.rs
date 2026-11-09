@@ -53,6 +53,8 @@ pub mod s1;
 pub mod s1_driver;
 // 手跡（段 1 の後期・ADR-051）の IO 層（表・状態ファイル・印）。1a では lib.rs の本体に配線しない（1b で配線）。
 pub mod handmark_driver;
+// ポインタのスレッドの純粋な部分（OS API を呼ばない・cfg なし）。
+pub mod handmark_pointer_thread;
 // 手跡の背景の窓(macOS だけ・ADR-051)。駆動役の出来事だけが開け閉めする。
 #[cfg(target_os = "macos")]
 pub mod handmark_stage;
