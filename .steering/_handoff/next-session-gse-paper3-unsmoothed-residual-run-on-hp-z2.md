@@ -73,3 +73,14 @@ JOBS=16 bash run.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/unsmoothed_residu
 - 赤の内容: `scripts/selftest.py` の `p_npz`（P-NPZ）が値ではなく後片付けで例外。`np.load(p)` で開いた npz を閉じないまま `tempfile.TemporaryDirectory()` を抜けるため、Windows で `p.npz` が消せず `PermissionError: [WinError 32]`（別のプロセスが使用中）。Mac では起きない Windows だけの事象と見られる。直していない。
 - 本計算（n・o・u）・変異 11 個・配管の合成の通し・P-REPRO には進んでいない。`results/` に残った門のファイル（pin_check・manifest の照合 2 つ・check_same 2 つ・selftest_inherited）はコミットしていない。
 - 次: Mac で直す（例: `with np.load(p) as z:`）かは研究者が決める。P-PIN が照らすのは tau-extend の 3 ファイルだけなので、selftest.py を直しても P-PIN は変わらない（上の記録の後で確かめた）。所見と直し方は `next-session-gse-paper3-unsmoothed-residual-fix-p-npz-on-mac.md`。
+
+### 2 回目（2026-11-09）—— 直しの後・全段が通った
+
+- 直し: HP Z2 で研究者の承認を得て `selftest.py` の `p_npz` を `with np.load(p) as z:` に直した（`ba0b0bc5`・判断 11）。HP Z2 で `--only P-NPZ` 緑（156 セル・外れ 0）・m49 は終了コード 3。
+- 場所・版は 1 回目と同じ（worktree・Python 3.11.9・numpy 2.4.4・JOBS=16・構造の足りなさの試験と並走）。run_id `20261109T131347-1951`。
+- 段の時刻: 開始 13:13:47 → [13:13:49] 門の単体と P-D1 → [13:13:59] 引き継ぐ陽性対照 → [13:25:04] 足す陽性対照と変異 → [13:29:42] 配管の合成の通し → [13:35:58] 当てはめ n coauthor → [13:36:48] 残差 n coauthor → [13:36:52] 当てはめ n cs1 → [13:47:15] 残差 n cs1 → [13:47:28] 当てはめ o coauthor → [14:06:22] 残差 o coauthor → [14:06:41] 当てはめ o cs1 → [15:33:36] 残差 o cs1 → [15:36:02] P-REPRO → 当てはめ u coauthor → [16:01:43] 残差 u coauthor → [16:02:05] 当てはめ u cs1 → [17:36:40] 残差 u cs1 → [17:39:36] provenance → [17:39:37] 済んだ。終了コード 0。合わせて約 4 時間 26 分。
+- 門: selftest の全対照が緑・変異 11 個（m41〜m51）がすべて当たり・引き継ぐ対照が緑・配管の合成の通しが緑。
+- P-REPRO: `passed` true・`mismatched` 0・照らした葉 5,751・最大の相対差 0.0（許容 1e-9）。
+- `npz_check.mismatched` は 6 つ（n・o・u × CoAuthor・CS1）とも 0（照らした数 CoAuthor 1,887・CS1 1,702）。
+- `provenance.json`: `pin_ok` true・`git_dirty_paths` 空。`summary.json` と `provenance.json` の `run_id` は同じ。
+- 結果の値（`summary.json`・`tables.md` の中身）は開いていない。書き手ごとの値と母数は `DATA_DIR/landscape/` にあり、repo に入れていない。
