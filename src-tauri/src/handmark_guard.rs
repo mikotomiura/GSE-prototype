@@ -439,14 +439,46 @@ fn short_name(full: &str) -> &str {
 }
 
 /// 記録の側が知ってはならないポインタの型の名前（型から実行時に得る・改名すれば検査が追従する）。
-fn pointer_type_names() -> [String; 5] {
+fn pointer_type_names() -> [String; 7] {
     [
         short_name(std::any::type_name::<PointerSample>()).to_string(),
         short_name(std::any::type_name::<TraceState>()).to_string(),
         short_name(std::any::type_name::<TraceField>()).to_string(),
         short_name(std::any::type_name::<RipplePoint>()).to_string(),
         short_name(std::any::type_name::<PointerOut>()).to_string(),
+        short_name(std::any::type_name::<Point>()).to_string(),
+        short_name(std::any::type_name::<Step>()).to_string(),
     ]
+}
+
+/// `src` の本文（コメント・テストを除く）が識別子 `name` を、識別子の単位で（`Point` が `PointerGate` や
+/// `Points` に当たらないように）含むか。
+fn contains_ident(src: &str, name: &str) -> bool {
+    let b = body(src);
+    let bytes = b.as_bytes();
+    b.match_indices(name).any(|(i, _)| {
+        let before = i.checked_sub(1).and_then(|k| bytes.get(k));
+        !ident(before) && !ident(bytes.get(i + name.len()))
+    })
+}
+
+/// どのファイルも識別子を（識別子の単位で）含まないこと。陽性対照: 先頭に識別子を足せば見つかり、
+/// 識別子の一部（前後に字を付けた語）では見つからない。
+fn assert_clean_idents(row: &str, files: &[(&str, &str)], names: &[&str]) {
+    for (file, src) in files {
+        for n in names {
+            assert!(!contains_ident(src, n), "{row}: {file} が識別子 {n} を含む");
+            assert!(
+                contains_ident(&format!("let _ = {n};\n{src}"), n),
+                "{row}: 陽性対照が赤にならない（{file} に {n}）"
+            );
+            assert!(
+                !contains_ident(&format!("let _ = {n}s; let _ = x{n};\n{src}"), n)
+                    || contains_ident(src, n),
+                "{row}: 識別子の単位で見ていない（{n}）"
+            );
+        }
+    }
 }
 
 // ---- 型の層 ----
@@ -514,6 +546,9 @@ fn pointer_files_do_not_touch_the_recorders_files_network_or_the_estimator() {
             "eprintln",
             "dbg!",
             "std::fs",
+            "fs::",
+            "OpenOptions",
+            "applog",
             "File",
             "std::net",
             "reqwest",
@@ -536,11 +571,16 @@ fn the_record_side_does_not_know_the_pointer_types() {
         ("schema_dto.rs", include_str!("schema_dto.rs")),
         ("submission.rs", include_str!("submission.rs")),
         ("packaging.rs", include_str!("packaging.rs")),
+        ("applog.rs", include_str!("applog.rs")),
+        ("redaction.rs", include_str!("redaction.rs")),
+        ("handmark_driver.rs", include_str!("handmark_driver.rs")),
+        ("handmark_store.rs", include_str!("handmark_store.rs")),
+        ("o1.rs", include_str!("o1.rs")),
     ];
     let names = pointer_type_names();
     let needles: Vec<&str> = names.iter().map(String::as_str).collect();
-    assert_eq!(needles.len(), 5);
-    assert_clean("提出物", &record_side, &needles);
+    assert_eq!(needles.len(), 7);
+    assert_clean_idents("提出物", &record_side, &needles);
 }
 
 // ---- macOS の読みの境界 ----
@@ -634,7 +674,10 @@ fn the_window_does_not_store_send_back_or_talk_to_the_network() {
     );
 }
 
-/// `src/` の `.ts`・`.tsx`（名前, 本文）。
+/// 窓の側のコードとして走査する拡張子。
+const TS_EXTS: [&str; 5] = ["ts", "tsx", "js", "jsx", "mjs"];
+
+/// `src/` の `.ts`・`.tsx`・`.js`・`.jsx`・`.mjs` と、直下の `index.html`（名前, 本文）。
 fn ts_sources() -> Vec<(String, String)> {
     fn walk_ts(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
         let Ok(rd) = std::fs::read_dir(dir) else {
@@ -647,7 +690,7 @@ fn ts_sources() -> Vec<(String, String)> {
             } else if p
                 .extension()
                 .and_then(|x| x.to_str())
-                .is_some_and(|x| x == "ts" || x == "tsx")
+                .is_some_and(|x| TS_EXTS.contains(&x))
             {
                 if let Ok(text) = std::fs::read_to_string(&p) {
                     let name = p
@@ -662,6 +705,10 @@ fn ts_sources() -> Vec<(String, String)> {
     let mut out = Vec::new();
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src");
     walk_ts(&root, &mut out);
+    let index = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../index.html");
+    if let Ok(text) = std::fs::read_to_string(&index) {
+        out.push(("index.html".to_string(), text));
+    }
     out
 }
 
@@ -670,7 +717,14 @@ fn others_naming(name: &str, files: &[(String, String)]) -> Vec<String> {
     files
         .iter()
         .filter(|(n, _)| !WINDOW.iter().any(|(w, _)| w == n))
-        .filter(|(_, text)| body(text).contains(name))
+        .filter(|(n, text)| {
+            if n.ends_with(".html") {
+                // HTML は Rust の字句の読みに通さない（アポストロフィで崩れる）。コメントも含めて見る。
+                text.contains(name)
+            } else {
+                body(text).contains(name)
+            }
+        })
         .map(|(n, _)| n.clone())
         .collect()
 }
@@ -680,6 +734,14 @@ fn others_naming(name: &str, files: &[(String, String)]) -> Vec<String> {
 fn only_the_stage_window_knows_the_trace_and_ripple_events() {
     let files = ts_sources();
     assert!(files.len() > 5, "src/ の走査が空回り: {}", files.len());
+    // 走査の対象: index.html を読んでいる・拡張子の一覧に js 系を含む。
+    assert!(
+        files.iter().any(|(n, _)| n == "index.html"),
+        "index.html を走査していない"
+    );
+    for ext in ["js", "jsx", "mjs"] {
+        assert!(TS_EXTS.contains(&ext), "{ext} を走査しない");
+    }
     for name in [
         crate::handmark_stage::TRACE_EVENT,
         crate::handmark_stage::RIPPLE_EVENT,
@@ -694,12 +756,136 @@ fn only_the_stage_window_knows_the_trace_and_ripple_events() {
             body(WINDOW[0].1).contains(name),
             "{name} を HandmarkStage.tsx が聞いていない"
         );
-        // 陽性対照: 他のファイルが名前を書いたら見つかる
+        // 陽性対照: 他のファイルが名前を書いたら見つかる（拡張子ごと・HTML も）
+        for planted_name in [
+            "Planted.tsx",
+            "planted.js",
+            "planted.jsx",
+            "planted.mjs",
+            "planted.html",
+        ] {
+            let mut planted = files.clone();
+            planted.push((planted_name.to_string(), format!("listen('{name}')")));
+            assert_eq!(
+                others_naming(name, &planted),
+                vec![planted_name.to_string()],
+                "対照が赤にならない（{planted_name}）"
+            );
+        }
+    }
+}
+
+/// `src-tauri/src/` の Rust の本文（相対パス, 本文）。
+fn rs_sources() -> Vec<(String, String)> {
+    fn walk_rs(root: &std::path::Path, dir: &std::path::Path, out: &mut Vec<(String, String)>) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk_rs(root, &p, out);
+            } else if p.extension().and_then(|x| x.to_str()) == Some("rs") {
+                if let Ok(text) = std::fs::read_to_string(&p) {
+                    let rel = p
+                        .strip_prefix(root)
+                        .map(|r| r.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    out.push((rel, text));
+                }
+            }
+        }
+    }
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut out = Vec::new();
+    walk_rs(&root, &root, &mut out);
+    out
+}
+
+/// `needles` のどれかを本文（コメント・テストを除く）に含む Rust のファイル（`allowed` と、この検査自身を除く）。
+fn rs_files_naming(needles: &[&str], allowed: &[&str], files: &[(String, String)]) -> Vec<String> {
+    files
+        .iter()
+        .filter(|(n, _)| n != "handmark_guard.rs" && !allowed.contains(&n.as_str()))
+        .filter(|(_, text)| {
+            let b = body(text);
+            needles.iter().any(|w| b.contains(*w))
+        })
+        .map(|(n, _)| n.clone())
+        .collect()
+}
+
+/// 場・波紋のイベント名（定数名と文字列）を参照するのは `handmark_stage.rs` だけ。全窓から聞く `listen_any` は使わない。
+#[test]
+fn only_the_stage_rs_names_the_events_and_nobody_uses_listen_any() {
+    let files = rs_sources();
+    assert!(
+        files.len() > 30,
+        "src-tauri/src の走査が空回り: {}",
+        files.len()
+    );
+    assert!(files.iter().any(|(n, _)| n == "handmark_stage.rs"));
+    let events = [
+        "TRACE_EVENT",
+        "RIPPLE_EVENT",
+        crate::handmark_stage::TRACE_EVENT,
+        crate::handmark_stage::RIPPLE_EVENT,
+    ];
+    assert_eq!(
+        rs_files_naming(&events, &["handmark_stage.rs"], &files),
+        Vec::<String>::new()
+    );
+    let listen_any = ["listen", "_any"].concat();
+    assert_eq!(
+        rs_files_naming(&[listen_any.as_str()], &[], &files),
+        Vec::<String>::new()
+    );
+    // 陽性対照: 他のファイルが書いたら見つかる（実行時に連結して作り、この検査自身に語を残さない）。
+    for w in events.iter().copied().chain([listen_any.as_str()]) {
         let mut planted = files.clone();
-        planted.push(("Planted.tsx".to_string(), format!("listen('{name}')")));
+        planted.push((
+            "planted.rs".to_string(),
+            format!("fn f() {{ let _ = \"{w}\"; {w}; }}"),
+        ));
         assert_eq!(
-            others_naming(name, &planted),
-            vec!["Planted.tsx".to_string()]
+            rs_files_naming(&[w], &["handmark_stage.rs"], &planted),
+            vec!["planted.rs".to_string()],
+            "対照が赤にならない（{w}）"
+        );
+    }
+    // 陽性対照 2: 許したファイル（handmark_stage.rs）は本当にその名前を使っている（探し方が空回りしていない）。
+    let stage = files
+        .iter()
+        .find(|(n, _)| n == "handmark_stage.rs")
+        .expect("stage");
+    assert!(body(&stage.1).contains("TRACE_EVENT") && body(&stage.1).contains("RIPPLE_EVENT"));
+}
+
+/// 窓へ送る口（`emit_trace`・`emit_ripple`）と画面の大きさ（`screen_size_pt`）を呼べるのは `lib.rs`
+/// （ポインタのスレッドの配線）と `handmark_stage.rs`（定義）だけ。
+#[test]
+fn only_lib_and_the_stage_call_the_emit_and_screen_size_functions() {
+    let files = rs_sources();
+    let names = ["emit_trace", "emit_ripple", "screen_size_pt"];
+    assert_eq!(
+        rs_files_naming(&names, &["lib.rs", "handmark_stage.rs"], &files),
+        Vec::<String>::new()
+    );
+    // 許したファイルは本当に使っている（空回りしていない）。
+    for allowed in ["lib.rs", "handmark_stage.rs"] {
+        let f = files.iter().find(|(n, _)| n == allowed).expect(allowed);
+        assert!(
+            names.iter().any(|w| body(&f.1).contains(w)),
+            "{allowed} が使っていない"
+        );
+    }
+    // 陽性対照
+    for w in names {
+        let mut planted = files.clone();
+        planted.push(("planted.rs".to_string(), format!("fn f() {{ {w}(); }}")));
+        assert_eq!(
+            rs_files_naming(&names, &["lib.rs", "handmark_stage.rs"], &planted),
+            vec!["planted.rs".to_string()]
         );
     }
 }
@@ -717,10 +903,14 @@ fn the_stage_emits_only_to_its_own_window() {
 
 /// 窓の側で配列・表を作ってよい名前（名前を決めた固定数の枠: 草・粒・波紋・場の 3 本の配列）。
 const ALLOWED_LISTS: [&str; 6] = ["blades", "motes", "ripples", "bend", "pullX", "pullY"];
-const LIST_MAKERS: [&str; 9] = [
+const LIST_MAKERS: [&str; 13] = [
     "[]",
     "Array.from",
     "Array(",
+    "new Float32Array",
+    "new Array",
+    ".concat(",
+    "[...",
     "new Map",
     "new Set",
     "new WeakMap",

@@ -32,7 +32,7 @@ mod imp {
     static SCREEN_H_BITS: AtomicU32 = AtomicU32::new(0);
 
     /// 主画面の大きさ（point）。未設定なら `(0.0, 0.0)`（`to_point` が `None` にする）。
-    pub fn screen_size_pt() -> (f64, f64) {
+    pub(crate) fn screen_size_pt() -> (f64, f64) {
         (
             f64::from(f32::from_bits(SCREEN_W_BITS.load(Ordering::Acquire))),
             f64::from(f32::from_bits(SCREEN_H_BITS.load(Ordering::Acquire))),
@@ -243,12 +243,12 @@ mod imp {
     }
 
     /// 跡の場を手跡の窓だけへ配る（全窓へ流す `emit` は使わない）。`t_ms` はポインタのスレッドの単調な ms。
-    pub fn emit_trace(app: &AppHandle<Wry>, state: &TraceState, t_ms: u64) {
+    pub(crate) fn emit_trace(app: &AppHandle<Wry>, state: &TraceState, t_ms: u64) {
         let _ = app.emit_to(LABEL, TRACE_EVENT, trace_payload(state, t_ms));
     }
 
     /// 波紋の種を手跡の窓だけへ配る。
-    pub fn emit_ripple(app: &AppHandle<Wry>, r: &RipplePoint, t_ms: u64) {
+    pub(crate) fn emit_ripple(app: &AppHandle<Wry>, r: &RipplePoint, t_ms: u64) {
         let _ = app.emit_to(
             LABEL,
             RIPPLE_EVENT,
@@ -300,4 +300,7 @@ mod imp {
 }
 
 #[cfg(target_os = "macos")]
-pub use imp::{close, emit_ripple, emit_state, emit_trace, open, screen_size_pt, setup, status};
+pub use imp::{close, emit_state, open, setup, status};
+// 窓へ送る口と画面の大きさは crate の中だけ（呼べるのは `lib.rs` のポインタのスレッドだけ・検査が縛る）。
+#[cfg(target_os = "macos")]
+pub(crate) use imp::{emit_ripple, emit_trace, screen_size_pt};
