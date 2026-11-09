@@ -17,7 +17,7 @@
 - [x] 記号化の書き直し（別タスク・判断 9・.steering/20261107-gse-paper3-symbol-reimpl/）
 - [x] attack-me outline round 1（major・判断 10〜13）
 - [x] 文献の調べ 1 ラウンド（判断 12・判断 14・`docs/literature/20261107-per-person-shrinkage-prior-art.md`・[V401]〜[V424]）
-- [ ] 新しい小さな試験（平滑の無い記号・擬似残差の検査）の条件を先にコミット（判断 11・/start-task）
+- [x] 新しい小さな試験（平滑の無い記号・擬似残差の検査）の条件を先にコミット（判断 11・/start-task）→ 2026-11-09 に結果と外枠の直し（`.steering/20261107-gse-paper3-unsmoothed-residual-check/` 判断 12〜14）
 - [ ] 構造の足りなさの試験の結果を待つ（別のセッション・職場の PC）
 - [ ] 当てはめのコードの公開の準備（判断 13）
 - [ ] 外枠を verdict の直す順で直す → attack-me round 2
