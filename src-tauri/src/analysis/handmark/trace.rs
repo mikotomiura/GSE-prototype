@@ -78,6 +78,8 @@ pub struct Step {
 pub struct RipplePoint {
     pub x: f32,
     pub y: f32,
+    /// 押下が始まった刻みの場の世代（窓が、切る前に送られた波紋を捨てるのに使う）。
+    pub epoch: u32,
 }
 
 /// 窓へ渡す場の写し。`cells[i][0..3]` は `bend`・`pull_x`・`pull_y`、`i = j * GRID_W + col`。
@@ -166,12 +168,27 @@ impl TraceField {
             && self.cells.iter().all(|c| c.iter().all(|v| *v == 0.0))
     }
 
+    /// 時計が戻ったとき。場・速さ・最後の一点を 0 に戻し（世代を進め）、格子を `t0`（UTC の ms ではなく
+    /// 呼び手の時計）から取り直す。
+    pub fn rebase(&mut self, t0: u64) {
+        self.reset();
+        self.grid_t = t0 / STEP_MS * STEP_MS;
+    }
+
     /// `t` 以下の格子の点まで、読みなしの刻みで進める（`t` が格子の手前なら何もしない）。
     /// 止まっている区間（`is_idle`）は刻みで何も変わらないので、まとめて進める。
+    /// 埋める刻みは `cursor_on: false`（速さを 0 に戻す）。
     pub fn advance_to(&mut self, t: u64) {
+        self.advance_held(t, false);
+    }
+
+    /// `advance_to` と同じだが、埋める刻みの `cursor_on` を指定する。`true`（カーソルが入っていて、
+    /// その刻みは読めなかった）なら速さを保つ（場へは足さない）。ライブの `tick` が呼び出しの間の刻みを
+    /// 埋めるのに使う。
+    pub fn advance_held(&mut self, t: u64, cursor_on: bool) {
         let idle_step = Step {
             sample: None,
-            cursor_on: false,
+            cursor_on,
             click_on: false,
         };
         while self.grid_t.saturating_add(STEP_MS) <= t {
@@ -219,7 +236,10 @@ impl TraceField {
                 self.last = Some((p.x, p.y, tick));
                 cursor_at = Some((p.x, p.y));
             }
-            _ => {
+            // 入っているが読めなかった刻み: 速さは保つ（場へは足さない）。0 に戻すと、呼び出しの間隔が
+            // 揺れて飛ばした刻みのたびに倒しが弱まる。
+            (true, None) => {}
+            (false, _) => {
                 self.vx = 0.0;
                 self.vy = 0.0;
             }
@@ -271,7 +291,11 @@ impl TraceField {
         let mut ripple = None;
         if let Some(p) = input.sample {
             if input.click_on && p.left_down && !self.prev_down {
-                ripple = Some(RipplePoint { x: p.x, y: p.y });
+                ripple = Some(RipplePoint {
+                    x: p.x,
+                    y: p.y,
+                    epoch: self.epoch,
+                });
                 self.last_input = Some(tick);
             }
             // 入れていないときも更新する（入れ直した瞬間に押しっぱなしで波紋を出さない）。
@@ -483,21 +507,74 @@ mod tests {
         assert!(f.step(on(down)).is_some());
     }
 
+    fn max_bend(f: &TraceField) -> f32 {
+        f.state()
+            .cells
+            .iter()
+            .map(|c| c[0].abs())
+            .fold(0.0, f32::max)
+    }
+
     #[test]
     fn a_still_cursor_far_apart_in_ticks_does_not_jump() {
-        // 読みなしの刻みを挟んでも、刻みの差で割る（速さが跳ね上がらない）。
+        // 読めなかった刻み（カーソルは入っている）を挟んでも、刻みの差で割る（速さが跳ね上がらない）。
+        let mut f = TraceField::new(0);
+        f.step(on(pt(0.2, 0.5)));
+        f.advance_held(f.grid_t() + 160, true);
+        f.step(on(pt(0.3, 0.5)));
+        let held = max_bend(&f);
+        // 0.1 箱 / (11 刻み × 0.016) = 約 0.57 箱/秒 → cv ≈ 0.89 以下。
+        assert!(held > 0.0 && held <= 0.9);
+        // 同じ 0.1 を 1 刻みで動いたとみなす（跳ねる）場合より、倒しは小さい。
+        let mut j = TraceField::new(0);
+        j.step(on(pt(0.2, 0.5)));
+        j.step(on(pt(0.3, 0.5)));
+        assert!(held < max_bend(&j));
+        // 読みなしを `cursor_on: false` で埋めても（速さは 0 へ戻るが）跳ねない。
         let mut f = TraceField::new(0);
         f.step(on(pt(0.2, 0.5)));
         f.advance_to(f.grid_t() + 160);
         f.step(on(pt(0.3, 0.5)));
-        let bend = f
-            .state()
-            .cells
-            .iter()
-            .map(|c| c[0].abs())
-            .fold(0.0, f32::max);
-        // 0.1 箱 / (11 刻み × 0.016) = 約 0.57 箱/秒 → cv ≈ 0.89 以下。
-        assert!(bend > 0.0 && bend <= 0.9);
+        let b = max_bend(&f);
+        assert!(b > 0.0 && b <= 0.9);
+    }
+
+    #[test]
+    fn a_missed_read_with_the_cursor_on_keeps_the_speed_and_adds_nothing() {
+        let mut f = TraceField::new(0);
+        for p in circle(30) {
+            f.step(on(p));
+        }
+        let (vx, vy) = (f.vx, f.vy);
+        assert!(vx != 0.0 || vy != 0.0);
+        let cells = f.cells;
+        let miss = Step {
+            sample: None,
+            cursor_on: true,
+            click_on: true,
+        };
+        f.step(miss);
+        assert!((f.vx, f.vy) == (vx, vy), "the speed is kept");
+        // 場は減衰するだけで、足し込まれない（絶対値が増えるマスが無い）。
+        for (a, b) in cells.iter().zip(f.cells.iter()) {
+            assert!(b[0].abs() <= a[0].abs() && b[1].abs() <= a[1].abs());
+        }
+        // 入っていない刻み（`cursor_on: false`）は今までどおり 0 に戻す。
+        f.step(Step {
+            sample: None,
+            cursor_on: false,
+            click_on: true,
+        });
+        assert!(f.vx == 0.0 && f.vy == 0.0);
+    }
+
+    #[test]
+    fn rebase_zeroes_advances_epoch_and_retakes_the_grid() {
+        let mut f = run(&circle(40));
+        let e = f.state().epoch;
+        f.rebase(2_005);
+        assert!(f.state().is_zero() && f.state().epoch == e + 1);
+        assert!(f.grid_t() == 2_000);
     }
 
     #[test]

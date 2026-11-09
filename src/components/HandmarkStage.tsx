@@ -4,7 +4,7 @@
 //   この窓は performance.now() や描画の間隔(dt)から位相・漂い・位置を積まない。粒の位置も草の揺れも、
 //   届いた drift・phase・layout_seed の関数で、届いた状態へ 250 ms かけて線形に寄せるだけ
 //   (描画の回数は見た目に影響しない・机上の描き直しと一致する)。
-// - ポインタ(PR 3): Rust が 16 × 10 の格子の「跡の場」を持ち、33 ms ごとに送る(`handmark-trace`)。窓はそれを
+// - ポインタ(PR 3): Rust が 16 × 10 の格子の「跡の場」を持ち、32 ms ごとに送る(`handmark-trace`)。窓はそれを
 //   次の写しまで線形に寄せ、草 1 本・粒 1 つの位置で双一次補間して読むだけで、跡の値を積まない。
 //   場が 1 秒来なければ 0 にする。クリックの波紋は `handmark-ripple` で届き、6 枠に入れて 1.6 秒で消す。
 // - 霧: どの入力にも依らない基層(漂いは Rust の drift)。
@@ -423,7 +423,7 @@ export default function HandmarkStage() {
     // 届いた波紋の種を 6 枠のどれかへ入れる(窓の時計で年齢を決める)。
     const onRipple = (msg: RippleMessage): void => {
       const now = performance.now();
-      if (!receiveRipple(receiver, msg.tMs, now)) {
+      if (!receiveRipple(receiver, msg, now)) {
         return;
       }
       if (Number.isFinite(msg.x) && Number.isFinite(msg.y)) {

@@ -10,8 +10,8 @@
 
 use crate::analysis::handmark::trace::{Point, RipplePoint, Step, TraceField, TraceState, STEP_MS};
 
-/// 窓へ場を送る間隔（ms）。
-const TRACE_SEND_MS: u64 = 33;
+/// 窓へ場を送る間隔（ms）。刻み（16ms）の 2 つぶん。窓の `TRACE_TICK_MS`（handmarkStageTrace.ts）と同じ。
+const TRACE_SEND_MS: u64 = 2 * STEP_MS;
 /// 動いている間の待ち（ms）。
 const WAIT_ACTIVE_MS: u64 = STEP_MS;
 /// 止まっている間の待ち（ms）。
@@ -43,6 +43,8 @@ pub struct PointerDriver {
     /// 前回の `(open, cursor, click, paused)`。
     key: (bool, bool, bool, bool),
     last_trace_ms: u64,
+    /// 前回の `tick` の時刻。戻った（前より小さい）ときに読みが止まり続けないよう、場を取り直す。
+    last_now_ms: u64,
     /// 最後に出した写しが全部 0 だった。
     sent_zero: bool,
     /// 実効の入れ切りがある（読んでいる）。
@@ -61,17 +63,20 @@ impl PointerDriver {
             field: None,
             key: (false, false, false, false),
             last_trace_ms: 0,
+            last_now_ms: 0,
             sent_zero: true,
             hot: false,
         }
     }
 
-    /// 次の `tick` までの待ちの目安（ms）。実効の入れ切りがある（窓が開いていて・一時停止でなく・
-    /// カーソルかクリックが入っている）間は止まっていても常に 16。250 は読まない間だけ。
+    /// 次の `tick` までの待ちの目安（ms）。`now_ms` は今の時刻（`tick` に渡す時計と同じもの）。
+    /// 実効の入れ切りがある（窓が開いていて・一時停止でなく・カーソルかクリックが入っている）間は
+    /// 止まっていても、次の 16ms の格子の境目までの残り（1〜16）。250 は読まない間だけ。
     /// 止まっている間に延ばすと、次の短いクリックを取りこぼす（補訂 1 の項目 1 は 16ms ごとの読み）。
-    pub fn next_wait_ms(&self) -> u64 {
+    /// 固定の 16 だと、読みと睡眠の費用で刻みを飛ばす呼び出しが出る。格子の境目へ合わせる。
+    pub fn next_wait_ms(&self, now_ms: u64) -> u64 {
         if self.hot {
-            WAIT_ACTIVE_MS
+            (now_ms / WAIT_ACTIVE_MS + 1) * WAIT_ACTIVE_MS - now_ms
         } else {
             WAIT_IDLE_MS
         }
@@ -82,7 +87,8 @@ impl PointerDriver {
         self.field.as_ref().map(TraceField::state)
     }
 
-    /// 1 回の呼び出し。`now_ms` は UTC の ms、`read` は一点を 1 回読む口。
+    /// 1 回の呼び出し。`now_ms` はこのスレッドの単調な ms（起動からの経過）、`read` は一点を 1 回読む口。
+    /// `now_ms` が前回より小さくなったときは、場を 0 に戻して世代を進め、格子を取り直す（読みが止まり続けない）。
     ///
     /// 開いていない・一時停止・カーソルもクリックも切れている間は `read` を呼ばない。
     pub fn tick(
@@ -96,13 +102,16 @@ impl PointerDriver {
         let eff_open = gate.open && !paused;
         let reading = eff_open && (gate.cursor || gate.click);
 
+        let went_back = now_ms < self.last_now_ms;
+        self.last_now_ms = now_ms;
+
         let mut fresh = false;
         if eff_open && self.field.is_none() {
             self.field = Some(TraceField::new(now_ms));
             fresh = true;
         }
         let key = (gate.open, gate.cursor, gate.click, paused);
-        let changed = key != self.key;
+        let changed = key != self.key || (went_back && !fresh);
         self.key = key;
 
         let Some(field) = self.field.as_mut() else {
@@ -112,7 +121,11 @@ impl PointerDriver {
 
         if changed {
             if !fresh {
-                field.reset();
+                if went_back {
+                    field.rebase(now_ms);
+                } else {
+                    field.reset();
+                }
             }
             out.push(PointerOut::Trace(Box::new(field.state())));
             self.last_trace_ms = now_ms;
@@ -122,7 +135,8 @@ impl PointerDriver {
         if reading {
             let target = now_ms / STEP_MS * STEP_MS;
             if target.saturating_sub(field.grid_t()) >= STEP_MS {
-                field.advance_to(target - STEP_MS);
+                // 飛ばした刻み。カーソルが入っていれば速さを保つ（読めなかった刻み）。
+                field.advance_held(target - STEP_MS, gate.cursor);
                 let sample = read();
                 let ripple = field.step(Step {
                     sample,
@@ -206,7 +220,7 @@ mod tests {
                     Some(pt(0.5, 0.5, false))
                 };
                 d.tick(1_600 + k * 16, gate, paused, &mut read);
-                assert!(d.next_wait_ms() == 250);
+                assert!(d.next_wait_ms(1_600 + k * 16) == 250);
             }
         }
         assert!(calls == 0);
@@ -334,12 +348,12 @@ mod tests {
     }
 
     #[test]
-    fn trace_goes_out_every_33ms_while_nonzero_and_stops_after_one_zero() {
+    fn trace_goes_out_every_32ms_while_nonzero_and_stops_after_one_zero() {
         let mut d = PointerDriver::new();
         let out = drive_circle(&mut d, 0, 90, ON);
         let moving = traces(&out).len();
-        // 90 刻み（約 1.4 秒）で 33ms ごと（16ms の刻みでは 3 刻みに 1 回）。
-        assert!((25..=35).contains(&moving), "{moving}");
+        // 90 刻み（約 1.4 秒）で 32ms ごと（16ms の刻みでは 2 刻みに 1 回）。最初の 0 の知らせを含む。
+        assert!((43..=47).contains(&moving), "{moving}");
         // 止まる（同じ一点を返し続ける）。8 秒を過ぎると 0 が 1 回だけ出て、あとは出ない。
         let mut all = Vec::new();
         for k in 90..90 + 800u64 {
@@ -357,20 +371,20 @@ mod tests {
         assert!(zeros == 1, "zeros={zeros}");
         assert!(t.last().is_some_and(|s| s.is_zero()));
         // 止まって場が 0 でも、読んでいる間は 16（短いクリックを取りこぼさない）。
-        assert!(d.next_wait_ms() == 16);
+        assert!(d.next_wait_ms(1_600 + 889 * 16) == 16);
     }
 
     #[test]
     fn wait_is_16_while_reading_even_when_still_and_250_only_when_not_reading() {
         let mut d = PointerDriver::new();
         drive_circle(&mut d, 0, 30, ON);
-        assert!(d.next_wait_ms() == 16);
+        assert!(d.next_wait_ms(1_600 + 29 * 16) == 16);
         // 止まって 8 秒を過ぎ、場が 0 になっても、入っている間は 16。
         let mut now = 1_600 + 30 * 16;
         for _ in 0..1_000 {
             let mut r = || Some(pt(0.5, 0.5, false));
             d.tick(now, ON, false, &mut r);
-            assert!(d.next_wait_ms() == 16, "now={now}");
+            assert!(d.next_wait_ms(now) == 16, "now={now}");
             now += 16;
         }
         // クリックだけ・カーソルだけでも読むので 16。
@@ -383,7 +397,7 @@ mod tests {
         ] {
             let mut r = || Some(pt(0.5, 0.5, false));
             d.tick(now, gate, false, &mut r);
-            assert!(d.next_wait_ms() == 16);
+            assert!(d.next_wait_ms(now) == 16);
             now += 16;
         }
         // 読まない間（一時停止・両方切る・閉じる）は 250。
@@ -401,7 +415,7 @@ mod tests {
         ] {
             let mut r = || Some(pt(0.5, 0.5, false));
             d.tick(now, gate, paused, &mut r);
-            assert!(d.next_wait_ms() == 250);
+            assert!(d.next_wait_ms(now) == 250);
             now += 16;
         }
     }
@@ -463,7 +477,123 @@ mod tests {
         assert!(rip == presses, "ripples={rip} presses={presses}");
         let live = d.trace_state().expect("opened");
         assert!(live.bits() == replay_trace(&bins, seed, t0, t_end).bits());
-        assert!(!live.is_zero() || t_end > 6_000);
+        // 終わりの時点（最後の入力は 6 秒の行で、その後 8 秒は経っていない）で場は 0 でない。
+        assert!(!live.is_zero());
+    }
+
+    /// 時刻 `t`（ms）のカーソルの位置（なめらかな円。呼び出しの時刻で読む）。
+    fn circle_at(t: u64) -> Point {
+        let a = t as f32 / 16.0 * 0.07;
+        pt(0.8 + 0.5 * a.cos(), 0.5 + 0.3 * a.sin(), false)
+    }
+
+    /// 呼び出しの時刻の列に沿って走らせ、場の `bend` の最大値（全刻み・全マス）を返す。
+    fn max_bend_over(times: &[u64]) -> f32 {
+        let mut d = PointerDriver::new();
+        let mut best = 0.0f32;
+        for &now in times {
+            let mut read = || Some(circle_at(now));
+            d.tick(now, ON, false, &mut read);
+            if let Some(st) = d.trace_state() {
+                for c in &st.cells {
+                    best = best.max(c[0].abs());
+                }
+            }
+        }
+        best
+    }
+
+    #[test]
+    fn jittered_call_intervals_do_not_weaken_the_bend() {
+        // 16ms ちょうどの呼び出しと、17・16・33ms を繰り返す（刻みを飛ばす呼び出しが混じる）呼び出しで、
+        // 同じ動きに対する草を倒す量の最大値が大きく落ちない（飛ばした刻みで速さが 0 に戻らない）。
+        let exact: Vec<u64> = (0..400u64).map(|k| 1_600 + k * 16).collect();
+        let mut jittered = Vec::new();
+        let mut t = 1_600u64;
+        let pattern = [17u64, 16, 33];
+        let mut i = 0;
+        while t < 1_600 + 400 * 16 {
+            jittered.push(t);
+            t += pattern[i % 3];
+            i += 1;
+        }
+        let a = max_bend_over(&exact);
+        let b = max_bend_over(&jittered);
+        assert!(a > 0.0);
+        assert!(b >= a * 0.7, "exact={a} jittered={b}");
+        // 17・16 の交互（刻みを飛ばさない・ときどき 2 回呼ぶ）でも同じ。
+        let mut alt = Vec::new();
+        let mut t = 1_600u64;
+        let mut i = 0;
+        while t < 1_600 + 400 * 16 {
+            alt.push(t);
+            t += if i % 2 == 0 { 17 } else { 16 };
+            i += 1;
+        }
+        assert!(max_bend_over(&alt) >= a * 0.7);
+    }
+
+    #[test]
+    fn the_wait_aims_at_the_next_grid_boundary() {
+        let mut d = PointerDriver::new();
+        let mut r = || Some(pt(0.5, 0.5, false));
+        d.tick(1_600, ON, false, &mut r);
+        // 読んでいる間は、次の 16ms の格子の境目までの残り（最低 1・最大 16）。
+        for now in 1_600u64..1_700 {
+            let w = d.next_wait_ms(now);
+            assert!((1..=16).contains(&w));
+            assert!((now + w).is_multiple_of(16), "now={now} w={w}");
+        }
+        assert!(d.next_wait_ms(1_615) == 1);
+        assert!(d.next_wait_ms(1_616) == 16);
+    }
+
+    #[test]
+    fn reading_resumes_when_the_clock_goes_back() {
+        // 時刻が前より小さくなっても（格子が先に進んだままで読みが止まり続けない）、場を取り直して読み続ける。
+        let mut calls = 0u32;
+        let mut d = PointerDriver::new();
+        let mut now = 50_000u64;
+        let mut epoch_before = 0;
+        for _ in 0..60 {
+            let mut read = || {
+                calls += 1;
+                Some(circle_at(now))
+            };
+            d.tick(now, ON, false, &mut read);
+            epoch_before = d.trace_state().map_or(0, |s| s.epoch);
+            now += 16;
+        }
+        let calls_before = calls;
+        // 時計が 40 秒戻る。
+        let mut now = 10_000u64;
+        let mut out_all = Vec::new();
+        for _ in 0..60 {
+            let mut read = || {
+                calls += 1;
+                Some(circle_at(now))
+            };
+            out_all.extend(d.tick(now, ON, false, &mut read));
+            now += 16;
+        }
+        assert!(calls - calls_before >= 58, "reads={}", calls - calls_before);
+        let st = d.trace_state().expect("opened");
+        assert!(
+            !st.is_zero(),
+            "the field rises again after the clock went back"
+        );
+        assert!(
+            st.epoch == epoch_before + 1,
+            "a new epoch tells the window to clear"
+        );
+        // 戻った刻みで 0 の写しが 1 回出る（窓が前の場を消す）。
+        let zeros: Vec<_> = traces(&out_all)
+            .into_iter()
+            .filter(|s| s.is_zero())
+            .collect();
+        assert!(zeros.len() == 1 && zeros[0].epoch == epoch_before + 1);
+        // 押しっぱなしで時計が戻っても、波紋は出ない。
+        assert!(ripples(&out_all) == 0);
     }
 
     #[test]

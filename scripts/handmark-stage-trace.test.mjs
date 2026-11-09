@@ -11,6 +11,7 @@ import {
   GRID_W,
   MOTE_MAX,
   RIPPLE_MS,
+  REBASE_AFTER,
   RIPPLE_SLOTS,
   STALE_MS,
   TRACE_TTL_MS,
@@ -101,19 +102,69 @@ test("世代を進める知らせは、遅れて届いても効く", () => {
   const rc = makeReceiver();
   receive(rc, msg({ tMs: 0 }), 100);
   const v = receive(rc, msg({ epoch: 1, tMs: 16 }), 5000);
-  assert.equal(v.use, false);
+  // 世代が進むと基準を取り直すので、その最初の値は受ける（遅れていても世代を進める知らせは効く）。
+  assert.equal(v.use, true);
   assert.equal(v.reset, true);
   assert.equal(rc.epoch, 1);
 });
 
 test("波紋の種も、遅れすぎたものは捨てる（場と同じ基準）", () => {
   const rc = makeReceiver();
-  assert.equal(receiveRipple(rc, 0, 100), true);
-  assert.equal(receiveRipple(rc, 16, 116 + STALE_MS), true);
-  assert.equal(receiveRipple(rc, 32, 133 + STALE_MS), false);
+  assert.equal(receiveRipple(rc, msg({ tMs: 0 }), 100), true);
+  assert.equal(receiveRipple(rc, msg({ tMs: 16 }), 116 + STALE_MS), true);
+  assert.equal(receiveRipple(rc, msg({ tMs: 32 }), 133 + STALE_MS), false);
   // 場の受け取りと基準を共有する
   receive(rc, msg({ tMs: 48 }), 148);
-  assert.equal(receiveRipple(rc, 64, 164), true);
+  assert.equal(receiveRipple(rc, msg({ tMs: 64 }), 164), true);
+});
+
+test("古い世代の波紋は捨てる（切る前に送られた波紋が、切った後に出ない）", () => {
+  const rc = makeReceiver();
+  receive(rc, msg({ epoch: 3, tMs: 0 }), 100);
+  assert.equal(receiveRipple(rc, msg({ epoch: 2, tMs: 16 }), 116), false);
+  assert.equal(receiveRipple(rc, msg({ epoch: 3, tMs: 32 }), 132), true);
+});
+
+test("時計のずれが一度に 1 秒大きくなっても、5 回で受け取りが戻る", () => {
+  const rc = makeReceiver();
+  assert.equal(receive(rc, msg({ tMs: 0 }), 100).use, true);
+  assert.equal(receive(rc, msg({ tMs: 32 }), 132).use, true);
+  // 窓の時計だけが 1 秒進む（スリープなど）。以後の遅れは 1 秒大きい。
+  let t = 64;
+  const uses = [];
+  for (let i = 0; i < REBASE_AFTER; i++, t += 32) {
+    uses.push(receive(rc, msg({ tMs: t }), t + 100 + 1000).use);
+  }
+  assert.deepEqual(uses, [false, false, false, false, true]);
+  // 取り直した後は受ける
+  assert.equal(receive(rc, msg({ tMs: t }), t + 1100).use, true);
+  // 陽性対照: 捨てる判定が途中で受け取れたら数え直す（4 回捨てて 1 回受けて、また 4 回は戻らない）
+  const rc2 = makeReceiver();
+  receive(rc2, msg({ tMs: 0 }), 100);
+  for (let i = 0; i < REBASE_AFTER - 1; i++) {
+    assert.equal(receive(rc2, msg({ tMs: 32 }), 1132).use, false);
+  }
+  assert.equal(receive(rc2, msg({ tMs: 64 }), 164).use, true);
+  for (let i = 0; i < REBASE_AFTER - 1; i++) {
+    assert.equal(receive(rc2, msg({ tMs: 96 }), 1196).use, false);
+  }
+  // 波紋も同じ規則で戻る
+  const rc3 = makeReceiver();
+  receive(rc3, msg({ tMs: 0 }), 100);
+  const r = [];
+  for (let i = 0; i < REBASE_AFTER; i++) r.push(receiveRipple(rc3, msg({ tMs: 32 + i }), 1132 + i));
+  assert.deepEqual(r, [false, false, false, false, true]);
+});
+
+test("世代が進むと、時計のずれの基準が取り直される", () => {
+  const rc = makeReceiver();
+  receive(rc, msg({ epoch: 0, tMs: 0 }), 100);
+  assert.equal(rc.minLag, 100);
+  // 世代が進んだ時点で窓の時計が 1 秒進んでいても、最初の値から受ける
+  const v = receive(rc, msg({ epoch: 1, tMs: 32 }), 1132);
+  assert.deepEqual(v, { use: true, reset: true });
+  assert.equal(rc.minLag, 1100);
+  assert.equal(receive(rc, msg({ epoch: 1, tMs: 64 }), 1164).use, true);
 });
 
 test("最後に場を受け取ってから 1 秒で、場を 0 にする時になる", () => {

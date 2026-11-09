@@ -2510,7 +2510,7 @@ impl Drop for HandmarkWindowGuard {
 
 /// 手跡のポインタのスレッド。★ 段 1 かつ macOS のときだけ起こす。`HANDMARK_DRIVER` のロックを取らず、
 /// 門の Atomic・一時停止・主画面の大きさだけを読む。読んだ値・座標・場は窓以外へ出さない
-/// (ログ・エラー文にも入れない・ADR-050 D2)。時計は駆動役と同じ UTC の ms。
+/// (ログ・エラー文にも入れない・ADR-050 D2)。時計は起動からの単調な ms（駆動役の壁時計とは別）。
 #[cfg(target_os = "macos")]
 fn spawn_handmark_pointer(app: tauri::AppHandle) {
     use crate::handmark_pointer_thread::{Gate, PointerDriver, PointerOut};
@@ -2518,6 +2518,10 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
         .name("gse-handmark-pointer".to_string())
         .spawn(move || {
             let mut driver = PointerDriver::new();
+            // 時計はこのスレッドの起動からの単調な ms（壁時計は NTP・手動の変更で飛ぶ）。記録しないので
+            // 絶対の時刻に揃える必要は無い。窓は届くまでのずれの最小からの差で遅れを見る。
+            let started = std::time::Instant::now();
+            let mono_ms = move || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
             loop {
                 if is_shutting_down() {
                     return;
@@ -2528,7 +2532,7 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
                     cursor: bits & 2 != 0,
                     click: bits & 4 != 0,
                 };
-                let now = epoch_ms();
+                let now = mono_ms();
                 let (w, h) = crate::handmark_stage::screen_size_pt();
                 let mut read = || {
                     crate::input::handmark_pointer::to_point(
@@ -2544,7 +2548,7 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
                         PointerOut::Ripple(r) => crate::handmark_stage::emit_ripple(&app, &r, now),
                     }
                 }
-                thread::sleep(Duration::from_millis(driver.next_wait_ms()));
+                thread::sleep(Duration::from_millis(driver.next_wait_ms(mono_ms())));
             }
         });
     if spawned.is_err() {

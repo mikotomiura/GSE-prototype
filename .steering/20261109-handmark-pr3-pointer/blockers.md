@@ -54,3 +54,13 @@
 38. `tsc --noEmit`: `tsconfig.json` の `include` は `["src"]` なので `scripts/` は入らない。`src/components/handmarkStageTrace.ts` は tsc を通る（`.mjs` のテストは型検査の対象外）。
 39. **Windows の cfg の目視確認**（手元は macOS で Windows のビルドは走らない）: macOS だけが使う `HANDMARK_POINTER_GATE`・`spawn_handmark_pointer`・`handmark_stage::{emit_trace, emit_ripple, screen_size_pt}`・`input::handmark_pointer_macos` には `#[cfg(target_os = "macos")]`（`handmark_stage.rs` は `imp` の中）。`Effect::PointerGate` の腕は `open`・`cursor`・`click` を全 OS で使う（トレイの状態へ）。トレイの関数・`handmark_set_input_from_tray` は全 OS で使われる。定数 `TRACE_EVENT`・`RIPPLE_EVENT` はモジュール直下（検査が全 OS で使う）。これで未使用の警告は出ないはずだが、Windows の clippy は走らせていない。
 40. 確かめていないこと: 実機で動くか（読み・場の送り・窓の描画・波紋）／トレイの押下が実際に効くか（CheckMenuItem の自動反転と言い直し・差し込み位置・押した後の印）／格子の粗さの見え方／Windows の clippy／CI の node の版／16 ms ごとの `epoch_ms()` と `is_paused()` の費用（軽いはずだが測っていない）。B1+B2 の commit は `tray::set_handmark_inputs` を参照するので、その commit 単独ではビルドできない（B3 の commit と対）。
+
+## レビューの指摘の修正（実装役が決めた細部・メインが decisions に写す）
+
+### コミット 1: 時計と刻み
+
+41. **時計**: ポインタのスレッドの時計は `std::time::Instant`（スレッドの起動）からの単調な ms。payload の `tMs` も同じ。再生 `replay_trace` は `pointer_bin` の絶対時刻のまま。窓は `receive` で世代が進んだとき `minLag` を `Infinity` に戻し、遅れの判定が `REBASE_AFTER`（5）回続けて「捨てる」になったら `minLag` をその遅れに取り直して、その値を受ける（波紋も同じ `judgeLag`・基準も共有）。副作用: 世代が進んだ最初の値は遅れていても受ける（旧テスト「世代を進める知らせは、遅れて届いても効く」の `use: false` を `use: true` に直した・`reset: true` は同じ）。確かめていない: macOS の `Instant` はスリープの間進まない（`mach_absolute_time`）のに対し、WKWebView の `performance.now()` の扱いはスリープ中の挙動を確かめていない（だから取り直しを入れた）。
+42. **時計が戻ったとき（Rust）**: `PointerDriver::tick` は前回の `now_ms` を持ち、小さくなったら `TraceField::rebase(now)`（`reset` ＋ 格子を取り直す＝世代 +1）して 0 の写しを 1 回出す。単調な時計では起きないはずの防御。窓が開いていないときは何もしない。
+43. **刻みの飛ばし**: `TraceField::step` は `cursor_on` が真で `sample` が `None` の刻みで速さを保つ（場へは足さない）。`advance_to` は `advance_held(t, false)`（旧と同じ・速さは 0 へ）。`PointerDriver::tick` は `advance_held(target - 16, gate.cursor)` で間の刻みを埋める。`next_wait_ms(now_ms)` は次の 16ms の格子の境目までの残り（1〜16）。
+44. **80% の件は届かなかった**: 17・16・33ms を繰り返す呼び出しで、飛ばした刻み（4 刻みのうち 1 つ）に場へ足さない規則なので、草を倒す量の最大値は 16ms ちょうどの 0.73 倍（旧い「速さを 0 に戻す」扱いは 0.65 倍）。テストの下限は 0.7 にした（`jittered_call_intervals_do_not_weaken_the_bend`）。8 割にするには、飛ばした刻みで最後の一点と保った速さで足し込む必要があり、指示の「足し込みはしない」と衝突するので入れていない（相談: 入れるなら `step` の `(true, None)` で最後の位置を使う）。
+45. `RipplePoint` に `epoch: u32` を足した（押下の刻みの世代・波紋の payload の `epoch`）（波紋の世代・項目 8）は時計の変更と同じ窓の受け取りの直しなので、コミット 1 に含めた（窓は `epoch < rc.epoch` の波紋を捨てる・node のテスト 1 件）。

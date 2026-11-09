@@ -12,10 +12,10 @@ export const RIPPLE_MS = 1600;
 /** これより遅れて届いた値は描かずに捨てる。 */
 export const STALE_MS = 250;
 /** 最後に場を受け取ってからこれだけ経ったら、場を 0 にする（入力が来ない間にも消える・ADR-050 D4）。
- * Rust は場が 0 でない間 33ms ごとに送るので、1 秒途絶えたら古い。 */
+ * Rust は場が 0 でない間 32ms ごと（2 刻み）に送るので、1 秒途絶えたら古い。 */
 export const TRACE_TTL_MS = 1000;
 /** Rust が場を送る間隔（src-tauri/src/handmark_pointer_thread.rs の TRACE_SEND_MS）。届いた場へこの時間をかけて寄せる。 */
-export const TRACE_TICK_MS = 33;
+export const TRACE_TICK_MS = 32;
 
 /** 格子（src-tauri/src/analysis/handmark/trace.rs と同じ）。 */
 export const GRID_W = 16;
@@ -133,6 +133,7 @@ export interface TraceMessage {
 
 /** Rust から届く波紋の種（RipplePayload）。x・y は正準の箱。 */
 export interface RippleMessage {
+  epoch: number;
   tMs: number;
   x: number;
   y: number;
@@ -192,14 +193,20 @@ export function sampleField(f: Field, x: number, y: number): FieldValue {
   return { bend: at(f.bend), pullX: at(f.pullX), pullY: at(f.pullY) };
 }
 
+/** 遅れの判定が続けて「捨てる」になったら基準（`minLag`）を取り直す回数。送り手（Rust の単調な時計）と
+ * 窓（performance.now）の時計のずれが、スリープなどで一度に大きく変わったときに回復する。 */
+export const REBASE_AFTER = 5;
+
 export interface Receiver {
   epoch: number;
   /** 届くまでのずれ（時計の差を含む）の最小。これより STALE_MS 以上遅れたら捨てる。最初の値が基準。 */
   minLag: number;
+  /** 続けて「遅すぎる」と判定した回数（受け取れたら 0 に戻る）。 */
+  lateRun: number;
 }
 
 export function makeReceiver(): Receiver {
-  return { epoch: -1, minLag: Infinity };
+  return { epoch: -1, minLag: Infinity, lateRun: 0 };
 }
 
 export interface Verdict {
@@ -207,6 +214,24 @@ export interface Verdict {
   use: boolean;
   /** 世代が進んだ（場と波紋を消す）。遅れて届いても効く。 */
   reset: boolean;
+}
+
+/** 遅れで受けるかを決める（場と波紋で共通）。`minLag` を更新する。遅すぎる判定が `REBASE_AFTER` 回続いたら、
+ * その値を新しい基準にして受ける（時計のずれが一度に変わった場合の回復）。 */
+function judgeLag(rc: Receiver, tMs: number, now: number): boolean {
+  const lag = now - tMs;
+  rc.minLag = Math.min(rc.minLag, lag);
+  if (lag - rc.minLag <= STALE_MS) {
+    rc.lateRun = 0;
+    return true;
+  }
+  rc.lateRun += 1;
+  if (rc.lateRun >= REBASE_AFTER) {
+    rc.minLag = lag;
+    rc.lateRun = 0;
+    return true;
+  }
+  return false;
 }
 
 /** 届いた場を受けるかを決める。`now` は受け取った時刻（窓の時計）。 */
@@ -218,17 +243,19 @@ export function receive(rc: Receiver, m: { epoch: number; tMs: number }, now: nu
   let reset = false;
   if (m.epoch > rc.epoch) {
     // 最初の値（rc.epoch が -1）も世代が進んだ扱いになるが、消すものは無い。
+    // 世代が進むときは、時計のずれも取り直す（切る間に窓がスリープしていたかもしれない）。
     reset = true;
     rc.epoch = m.epoch;
+    rc.minLag = Infinity;
+    rc.lateRun = 0;
   }
-  const lag = now - m.tMs;
-  rc.minLag = Math.min(rc.minLag, lag);
-  return { use: lag - rc.minLag <= STALE_MS, reset };
+  return { use: judgeLag(rc, m.tMs, now), reset };
 }
 
-/** 届いた波紋の種を受けるか（世代を持たないので、遅れだけで決める）。 */
-export function receiveRipple(rc: Receiver, tMs: number, now: number): boolean {
-  const lag = now - tMs;
-  rc.minLag = Math.min(rc.minLag, lag);
-  return lag - rc.minLag <= STALE_MS;
+/** 届いた波紋の種を受けるか。今の世代より古いものは捨て、遅れは場と同じ規則で決める。 */
+export function receiveRipple(rc: Receiver, m: { epoch: number; tMs: number }, now: number): boolean {
+  if (m.epoch < rc.epoch) {
+    return false;
+  }
+  return judgeLag(rc, m.tMs, now);
 }

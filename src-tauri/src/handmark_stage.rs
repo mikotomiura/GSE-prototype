@@ -49,7 +49,7 @@ mod imp {
     #[serde(rename_all = "camelCase")]
     struct TracePayload {
         epoch: u32,
-        /// 送った時刻（UTC の ms。窓は遅れて届いた値を捨てるのに使う）。
+        /// 送った時刻（ポインタのスレッドの単調な ms。窓は届くまでのずれの最小との差で、遅れて届いた値を捨てる）。
         t_ms: u64,
         /// `i * GRID_W + col` の順に `bend`・`pull_x`・`pull_y`（各 −127〜127）。
         cells: Vec<i8>,
@@ -59,6 +59,8 @@ mod imp {
     #[derive(Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct RipplePayload {
+        /// 押下が始まった刻みの場の世代（窓は今の世代より古い波紋を捨てる）。
+        epoch: u32,
         t_ms: u64,
         x: f32,
         y: f32,
@@ -240,7 +242,7 @@ mod imp {
         let _ = app.emit_to(LABEL, STATE_EVENT, Some(*state));
     }
 
-    /// 跡の場を手跡の窓だけへ配る（全窓へ流す `emit` は使わない）。`t_ms` は UTC の ms。
+    /// 跡の場を手跡の窓だけへ配る（全窓へ流す `emit` は使わない）。`t_ms` はポインタのスレッドの単調な ms。
     pub fn emit_trace(app: &AppHandle<Wry>, state: &TraceState, t_ms: u64) {
         let _ = app.emit_to(LABEL, TRACE_EVENT, trace_payload(state, t_ms));
     }
@@ -251,6 +253,7 @@ mod imp {
             LABEL,
             RIPPLE_EVENT,
             RipplePayload {
+                epoch: r.epoch,
                 t_ms,
                 x: r.x,
                 y: r.y,
