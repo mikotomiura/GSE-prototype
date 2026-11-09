@@ -2485,7 +2485,18 @@ fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
     crate::handmark_stage::status()
 }
 
-/// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠す。
+/// 駆動役を捨てる(駆動スレッドがパニックで抜けたときに、その後のトレイの押下が古い駆動役で門を
+/// 開け直さないように)。ロックが毒を受けていても取れる。★ 終了の処理中は残す(`handmark_finish_before_end`
+/// が最後の行を書くのに駆動役が要る)。
+#[cfg(any(target_os = "macos", test))]
+fn handmark_clear_driver() {
+    if is_shutting_down() {
+        return;
+    }
+    *handmark_lock() = None;
+}
+
+/// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠し、駆動役を捨てる。
 #[cfg(target_os = "macos")]
 struct HandmarkWindowGuard {
     app: tauri::AppHandle,
@@ -2499,6 +2510,8 @@ impl Drop for HandmarkWindowGuard {
         crate::tray::set_handmark_inputs(None);
         // ポインタのスレッドも読むのをやめる(閉じた門)
         HANDMARK_POINTER_GATE.store(0, std::sync::atomic::Ordering::Release);
+        // 駆動役を捨てる(以後のトレイの押下は `handmark_lock()` が `None` を返して何もしない)
+        handmark_clear_driver();
     }
 }
 
@@ -8368,5 +8381,47 @@ mod s1_driver_wiring_tests {
         let code = squash(&production_code());
         assert!(code
             .contains("Some(r@(SkipReason::DontRemember|SkipReason::Dismissed))=>r,_=>returnErr("));
+    }
+}
+
+#[cfg(test)]
+mod handmark_wiring_tests {
+    use super::*;
+    use crate::handmark_store::testfs::with_table;
+
+    /// 駆動スレッドがロックを持ったままパニックしても（ロックが毒を受けても）、駆動役を捨てられ、
+    /// 以後のトレイの押下の入口（`handmark_lock()` の `as_mut()`）は `None` で何もしない。
+    #[test]
+    fn a_panicked_driver_thread_leaves_no_driver_for_later_presses() {
+        let fs = with_table();
+        let (d, _) =
+            crate::handmark_driver::HandmarkDriver::new(&fs, true, 1_800_000_000_000, 20_411);
+        *handmark_lock() = Some(d);
+        assert!(handmark_lock()
+            .as_mut()
+            .is_some_and(|d| d.input_items().is_some()));
+        // ロックを持ったままパニックするスレッド（毒を作る）。
+        let r = std::thread::spawn(|| {
+            let _g = handmark_lock();
+            panic!("driver thread panicked");
+        })
+        .join();
+        assert!(r.is_err());
+        assert!(
+            HANDMARK_DRIVER.is_poisoned(),
+            "positive control: the lock is poisoned"
+        );
+        handmark_clear_driver();
+        assert!(handmark_lock().is_none(), "the driver is gone");
+        // 押下の入口: 駆動役が無ければ照合にも進まない。
+        let items = handmark_lock().as_ref().and_then(|d| d.input_items());
+        assert_eq!(
+            crate::handmark_driver::decide_tray_input(
+                true,
+                items,
+                crate::analysis::handmark::day::PointerInput::Cursor
+            ),
+            None
+        );
     }
 }

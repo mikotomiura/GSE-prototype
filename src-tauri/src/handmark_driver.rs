@@ -16,7 +16,8 @@ use crate::analysis::handmark::day::PointerInput;
 use crate::analysis::handmark::gate::{CloseReason, Decision, RECHECK_MS};
 use crate::analysis::handmark::state::{Stage, StageState, LIVE_LAG_MS};
 use crate::handmark_store::{
-    scrub_state_file, turn_input_off, turn_input_on, turn_off, turn_on, Evaluation, HandmarkFs,
+    rewrite_or_remove, scrub_state_file, turn_input_off, turn_input_on, turn_off, turn_on,
+    Evaluation, HandmarkFs,
 };
 use crate::logger::HandmarkDayRow;
 
@@ -253,7 +254,10 @@ impl HandmarkDriver {
         let applied = if on {
             turn_input_on(fs, &mut self.ev, input, now).is_ok()
         } else {
+            // 状態ファイルに書けず印を書けたとき（`MarkOnly`）は、その日は手跡全体を出さない側に倒れて
+            // 門が閉じる。窓をここで閉じる（再起動を待たない）。
             turn_input_off(fs, &mut self.ev, input, now);
+            self.reconcile(now, &mut fx);
             true
         };
         if applied {
@@ -436,24 +440,11 @@ impl HandmarkDriver {
             if self.ev.scrub_state(fs, from_ms, to_ms).is_ok() {
                 true
             } else {
-                // 書けない: 切っていたなら印を書けたときだけ状態ファイルを消す。印も書けなければ
-                //   消さず、区間の時刻を落とし off を保つ最小の形で書き直す。それも駄目なら失敗を返す。
-                let off = self.ev.record.as_ref().is_some_and(|r| r.off);
-                let day = self.ev.today;
+                // 書けない: 始末は `scrub_state_file` と共通（`rewrite_or_remove`・入力ごとの切りも保つ）。
+                let snapshot = self.ev.record.clone();
                 self.ev.note_save_failed();
                 self.reconcile(now, &mut fx);
-                if !off || fs.write_mark(day).is_ok() {
-                    fs.remove_state().is_ok()
-                } else {
-                    let mut min = self.ev.record.as_ref().map_or_else(
-                        || crate::analysis::handmark::day::DayRecord::new(day),
-                        |r| r.minimal_keeping_off(),
-                    );
-                    min.off = true;
-                    serde_json::to_vec(&min)
-                        .ok()
-                        .is_some_and(|b| fs.write_state(&b).is_ok())
-                }
+                snapshot.is_some_and(|r| rewrite_or_remove(fs, &r).is_ok())
             }
         } else {
             // 状態ファイルが壊れていて累計が無い: ファイルを直接直す(壊れていれば消す)
@@ -857,12 +848,47 @@ mod tests {
         let fs = with_table();
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         fs.fail_state_write.set(true);
+        // 印も書けない（書けるときは全体を出さない側に倒れる・下の別のテスト）
+        fs.fail_mark_write.set(true);
         let fx = d.set_input(&fs, PointerInput::Click, false, T0 + 1_000);
         assert_eq!(gates(&fx), vec![(true, true, false)], "書けなくても切る");
         // 入れるのは書けなければ切ったまま（出来事も出さない）
         let fx = d.set_input(&fs, PointerInput::Click, true, T0 + 2_000);
         assert!(fx.is_empty());
         assert_eq!(d.input_items(), Some((true, false)));
+    }
+
+    #[test]
+    fn a_failed_input_cut_with_a_mark_closes_the_window_and_stays_closed_after_a_restart() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        fs.fail_state_write.set(true);
+        let fx = d.set_input(&fs, PointerInput::Click, false, T0 + 1_000);
+        assert!(closed(&fx), "全体を出さない側に倒れて窓を閉じる");
+        assert_eq!(gates(&fx), vec![(false, true, false)]);
+        assert_eq!(d.input_items(), None);
+        assert!(fs.marks.borrow().contains(&ON_DAY));
+        // 起動し直してもその日は出ない。
+        fs.fail_state_write.set(false);
+        let (d2, fx2) = HandmarkDriver::new(&fs, true, T0 + 5_000, ON_DAY);
+        assert!(!d2.is_window_open() && !opened(&fx2));
+    }
+
+    #[test]
+    fn a_failed_redact_rewrite_keeps_an_input_cut_through_the_driver() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.set_input(&fs, PointerInput::Cursor, false, T0 + 500);
+        // 区間の削除で、書き直し（全体）だけ失敗する
+        fs.fail_state_writes_left.set(1);
+        let (_, ok) = d.on_redact(&fs, T0, T0 + 10_000, T0 + 20_000);
+        assert!(ok);
+        let (d2, _) = HandmarkDriver::new(&fs, true, T0 + 60_000, ON_DAY);
+        assert_eq!(
+            d2.input_items(),
+            Some((false, true)),
+            "カーソルは切れたまま"
+        );
     }
 
     #[test]
