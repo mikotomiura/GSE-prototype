@@ -635,6 +635,44 @@ fn the_macos_read_touches_only_the_pointer() {
     assert!(nsevent_reads(&planted).iter().any(|r| r == "keyCode"));
 }
 
+/// macOS の読み（`handmark_pointer_macos::read`）と箱への写し（`to_point`）を呼べるのは、`lib.rs`（スレッドの
+/// 配線）・`handmark_pointer_thread.rs`・定義のファイルだけ。他のファイルがポインタを読み始めないことを保つ。
+#[test]
+fn only_lib_and_the_pointer_thread_read_the_pointer() {
+    let files = rs_sources();
+    let names = [
+        "handmark_pointer_macos::",
+        "handmark_pointer::to_point",
+        "to_point(",
+    ];
+    let allowed = [
+        "lib.rs",
+        "handmark_pointer_thread.rs",
+        "input/handmark_pointer.rs",
+        "input/handmark_pointer_macos.rs",
+    ];
+    assert_eq!(
+        rs_files_naming(&names, &allowed, &files),
+        Vec::<String>::new()
+    );
+    // 許したファイルのうち lib.rs は本当に使っている（探し方が空回りしていない）。
+    let lib = files.iter().find(|(n, _)| n == "lib.rs").expect("lib.rs");
+    assert!(names.iter().any(|w| body(&lib.1).contains(w)));
+    // 陽性対照: 他のファイルが書いたら見つかる（実行時に連結して作る）。
+    for w in names {
+        let mut planted = files.clone();
+        planted.push((
+            "planted.rs".to_string(),
+            format!("fn f() {{ let _ = {w}; }}"),
+        ));
+        assert_eq!(
+            rs_files_naming(&names, &allowed, &planted),
+            vec!["planted.rs".to_string()],
+            "対照が赤にならない（{w}）"
+        );
+    }
+}
+
 // ---- 窓の TS（PR 3・ADR-050 D3・D4） ----
 
 /// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。
@@ -903,7 +941,7 @@ fn the_stage_emits_only_to_its_own_window() {
 
 /// 窓の側で配列・表を作ってよい名前（名前を決めた固定数の枠: 草・粒・波紋・場の 3 本の配列）。
 const ALLOWED_LISTS: [&str; 6] = ["blades", "motes", "ripples", "bend", "pullX", "pullY"];
-const LIST_MAKERS: [&str; 13] = [
+const LIST_MAKERS: [&str; 18] = [
     "[]",
     "Array.from",
     "Array(",
@@ -917,16 +955,40 @@ const LIST_MAKERS: [&str; 13] = [
     ".push(",
     ".unshift(",
     ".splice(",
+    // 新しい列を返す書き方（写し・並べ替え・選び出し・生成）。
+    ".map(",
+    ".slice(",
+    ".filter(",
+    "Array.of",
+    "structuredClone",
 ];
 /// 値を持たない配列の書き方で、許す行（React の useEffect の依存の配列が空であること）。
 const ALLOWED_LINES: [&str; 1] = ["}, []);"];
+
+/// `new` の後ろが、大文字で始まり `Array` で終わる語（型付き配列の全部: `Int8Array`・`Uint8Array`・`Float64Array`・
+/// `BigInt64Array` など）。一覧に 1 つずつ足すと漏れるので、形で拾う。
+fn has_typed_array_ctor(line: &str) -> bool {
+    line.match_indices("new ").any(|(i, _)| {
+        let word: String = line[i + 4..]
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        word.starts_with(|c: char| c.is_ascii_uppercase()) && word.ends_with("Array")
+    })
+}
+
+/// 列・表を作る書き方を含む行。
+fn makes_list(line: &str) -> bool {
+    LIST_MAKERS.iter().any(|m| line.contains(m)) || has_typed_array_ctor(line)
+}
 
 /// 配列・表を作る行のうち、許す名前のどれにも当たらない行。
 fn unnamed_lists(src: &str) -> Vec<String> {
     body(src)
         .lines()
         .filter(|l| !ALLOWED_LINES.contains(&l.trim()))
-        .filter(|l| LIST_MAKERS.iter().any(|m| l.contains(m)))
+        .filter(|l| makes_list(l))
         .filter(|l| {
             !ALLOWED_LISTS.iter().any(|a| {
                 [" =", ".push(", ": "]
@@ -954,6 +1016,26 @@ fn the_window_lists_only_named_slots() {
                 unnamed_lists(&planted).len(),
                 1,
                 "列: 対照が赤にならない（{maker}）"
+            );
+        }
+        // 陽性対照: 型付き配列は名前に依らず、形で拾う（一覧に無い型も）。
+        for ctor in [
+            "Int8Array",
+            "Uint8Array",
+            "Uint8ClampedArray",
+            "Int16Array",
+            "Uint16Array",
+            "Int32Array",
+            "Uint32Array",
+            "Float64Array",
+            "BigInt64Array",
+            "BigUint64Array",
+        ] {
+            let planted = format!("const trail = new {ctor}(64);\n{src}");
+            assert_eq!(
+                unnamed_lists(&planted).len(),
+                1,
+                "列: 型付き配列の対照が赤にならない（{ctor}）"
             );
         }
         // 陽性対照 2: 許した名前の枠なら通る（探し方が過剰でない）

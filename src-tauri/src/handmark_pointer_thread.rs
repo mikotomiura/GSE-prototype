@@ -28,6 +28,17 @@ pub struct Gate {
     pub click: bool,
 }
 
+impl Gate {
+    /// 駆動役が書く門の Atomic のビット（0 = 窓が開いている・1 = カーソルが入っている・2 = クリックが入っている）。
+    pub fn from_bits(bits: u8) -> Self {
+        Self {
+            open: bits & 1 != 0,
+            cursor: bits & 2 != 0,
+            click: bits & 4 != 0,
+        }
+    }
+}
+
 /// ポインタの駆動役の出来事。行き先は窓だけ。
 #[derive(Clone, PartialEq)]
 pub enum PointerOut {
@@ -162,6 +173,43 @@ impl PointerDriver {
         }
         self.hot = reading;
         out
+    }
+}
+
+/// ポインタのスレッドの本体。OS・Tauri に触る部分（門の Atomic・一時停止・時計・読み・窓への送り・待ち・終了の
+/// 判定）は閉包で受ける。`lib.rs` はスレッドを立てて閉包を渡すだけにして、ループの本体を `handmark_guard.rs` の
+/// 本文検査（記録・ログ・ファイル・推定の語を持たない）の下に置く。`should_stop` が `true` を返したら戻る。
+///
+/// - `gate_bits`: 駆動役が書く門の値（[`Gate::from_bits`] の並び）。
+/// - `read`: 一点を 1 回読む口（画面の外は `None`）。開いていて入っている間だけ呼ばれる。
+/// - `send_trace` / `send_ripple`: 窓へ送る（`lib.rs` が `handmark_stage` の送りを渡す）（第 2 引数は今の時刻）。
+/// - `sleep_ms`: 待つ。
+#[allow(clippy::too_many_arguments)]
+pub fn run_loop(
+    mut gate_bits: impl FnMut() -> u8,
+    mut paused: impl FnMut() -> bool,
+    mut now_ms: impl FnMut() -> u64,
+    mut read: impl FnMut() -> Option<Point>,
+    mut send_trace: impl FnMut(&TraceState, u64),
+    mut send_ripple: impl FnMut(&RipplePoint, u64),
+    mut sleep_ms: impl FnMut(u64),
+    mut should_stop: impl FnMut() -> bool,
+) {
+    let mut driver = PointerDriver::new();
+    loop {
+        if should_stop() {
+            return;
+        }
+        let gate = Gate::from_bits(gate_bits());
+        let now = now_ms();
+        let out = driver.tick(now, gate, paused(), &mut read);
+        for o in out {
+            match o {
+                PointerOut::Trace(s) => send_trace(&s, now),
+                PointerOut::Ripple(r) => send_ripple(&r, now),
+            }
+        }
+        sleep_ms(driver.next_wait_ms(now_ms()));
     }
 }
 
@@ -441,6 +489,89 @@ mod tests {
         let after = d.trace_state().expect("opened");
         let bend = |s: &TraceState| s.cells.iter().fold(0.0f32, |m, c| m.max(c[0].abs()));
         assert!(bend(&after) <= bend(&before), "no jump on return");
+    }
+
+    /// `run_loop` を偽の時計・門・読みで回す（OS に触らない）。時計は待ちの分だけ進める。
+    #[test]
+    fn run_loop_reads_only_while_open_and_emits_to_the_window_only() {
+        use std::cell::{Cell, RefCell};
+        let clock = Cell::new(1_600u64);
+        let bits = Cell::new(0u8);
+        let paused = Cell::new(false);
+        let reads = Cell::new(0u32);
+        let iterations = Cell::new(0u32);
+        let traces_out = RefCell::new(0u32);
+        let ripples_out = RefCell::new(0u32);
+        let slept = RefCell::new(Vec::new());
+        // 閉じている 5 周 → 開く（カーソル + クリック）120 周 → 一時停止 5 周 → 閉じる。
+        let mut read_at = 0u32;
+        run_loop(
+            || bits.get(),
+            || paused.get(),
+            || clock.get(),
+            || {
+                reads.set(reads.get() + 1);
+                read_at += 1;
+                let a = read_at as f32 * 0.07;
+                Some(pt(
+                    0.8 + 0.5 * a.cos(),
+                    0.5 + 0.3 * a.sin(),
+                    read_at % 40 > 20,
+                ))
+            },
+            |_, _| *traces_out.borrow_mut() += 1,
+            |_, _| *ripples_out.borrow_mut() += 1,
+            |ms| {
+                slept.borrow_mut().push(ms);
+                clock.set(clock.get() + ms);
+            },
+            || {
+                let n = iterations.get();
+                iterations.set(n + 1);
+                match n {
+                    0 => {}
+                    5 => bits.set(0b111),
+                    125 => paused.set(true),
+                    130 => {
+                        paused.set(false);
+                        bits.set(0);
+                    }
+                    _ => {}
+                }
+                if n == 140 {
+                    return true;
+                }
+                false
+            },
+        );
+        assert!(reads.get() > 100, "reads={}", reads.get());
+        assert!(
+            reads.get() < 125,
+            "no read while closed or paused: {}",
+            reads.get()
+        );
+        assert!(*traces_out.borrow() > 10);
+        assert!(*ripples_out.borrow() > 0);
+        // 閉じている間は 250、読んでいる間は 16 以下。
+        let s = slept.borrow();
+        assert!(s[..5].iter().all(|m| *m == 250));
+        assert!(s[10..100].iter().all(|m| (1..=16).contains(m)));
+    }
+
+    #[test]
+    fn gate_bits_decode() {
+        let g = Gate::from_bits(0b101);
+        assert!(g.open && !g.cursor && g.click);
+        let g = Gate::from_bits(0);
+        assert!(!g.open && !g.cursor && !g.click);
+        assert!(
+            Gate::from_bits(0b110)
+                == Gate {
+                    open: false,
+                    cursor: true,
+                    click: true
+                }
+        );
     }
 
     /// ライブの一致: A2 の合成の一点を、偽の読みで同じ刻みの時刻に返して `tick` を回した結果が

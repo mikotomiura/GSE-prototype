@@ -2537,43 +2537,30 @@ impl Drop for HandmarkWindowGuard {
 /// (ログ・エラー文にも入れない・ADR-050 D2)。時計は起動からの単調な ms（駆動役の壁時計とは別）。
 #[cfg(target_os = "macos")]
 fn spawn_handmark_pointer(app: tauri::AppHandle) {
-    use crate::handmark_pointer_thread::{Gate, PointerDriver, PointerOut};
     let spawned = thread::Builder::new()
         .name("gse-handmark-pointer".to_string())
         .spawn(move || {
-            let mut driver = PointerDriver::new();
             // 時計はこのスレッドの起動からの単調な ms（壁時計は NTP・手動の変更で飛ぶ）。記録しないので
             // 絶対の時刻に揃える必要は無い。窓は届くまでのずれの最小からの差で遅れを見る。
             let started = std::time::Instant::now();
-            let mono_ms = move || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
-            loop {
-                if is_shutting_down() {
-                    return;
-                }
-                let bits = HANDMARK_POINTER_GATE.load(std::sync::atomic::Ordering::Acquire);
-                let gate = Gate {
-                    open: bits & 1 != 0,
-                    cursor: bits & 2 != 0,
-                    click: bits & 4 != 0,
-                };
-                let now = mono_ms();
-                let (w, h) = crate::handmark_stage::screen_size_pt();
-                let mut read = || {
+            // ループの本体は `handmark_pointer_thread::run_loop`（本文検査の下）。ここは OS・Tauri に触る口を渡すだけ。
+            crate::handmark_pointer_thread::run_loop(
+                || HANDMARK_POINTER_GATE.load(std::sync::atomic::Ordering::Acquire),
+                crate::recording::is_paused,
+                || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+                || {
+                    let (w, h) = crate::handmark_stage::screen_size_pt();
                     crate::input::handmark_pointer::to_point(
                         crate::input::handmark_pointer_macos::read(),
                         w,
                         h,
                     )
-                };
-                let out = driver.tick(now, gate, crate::recording::is_paused(), &mut read);
-                for o in out {
-                    match o {
-                        PointerOut::Trace(s) => crate::handmark_stage::emit_trace(&app, &s, now),
-                        PointerOut::Ripple(r) => crate::handmark_stage::emit_ripple(&app, &r, now),
-                    }
-                }
-                thread::sleep(Duration::from_millis(driver.next_wait_ms(mono_ms())));
-            }
+                },
+                |s, now| crate::handmark_stage::emit_trace(&app, s, now),
+                |r, now| crate::handmark_stage::emit_ripple(&app, r, now),
+                |ms| thread::sleep(Duration::from_millis(ms)),
+                is_shutting_down,
+            );
         });
     if spawned.is_err() {
         tracing::warn!("handmark: pointer thread could not be started");
