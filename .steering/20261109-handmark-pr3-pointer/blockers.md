@@ -28,3 +28,12 @@
 18. `set_input` は窓を出していないとき何もしない（トレイの項目も出ない）。切った・入れたら行も 1 つ出す（`turn_off` と同じ）。入れるのが書けずに失敗したときは出来事を何も出さない。
 19. `lib.rs` の `run_handmark_effects` は網羅の match なので `Effect::PointerGate { .. } => {}`（受け取って捨てる）を足しただけ。配線は B2。
 20. 駆動役の `on_redact` の最小の形も `minimal_keeping_off` を使う（A5 の 13）。
+
+## A7（検査・実装役が決めた細部）
+
+21. `FILES` は 8 → 12 件（末尾に `trace.rs`・`trace_replay.rs`・`input/handmark_pointer.rs`・`handmark_pointer_thread.rs`）。`FILES[5]` の添字は不変。ポインタの本文の検査は `pointer_files()`（`FILES[8..]`）を見る。**B1・B4 で足すとき**: `FILES` の末尾に `("input/handmark_pointer_macos.rs", include_str!(...))` を足し、配列の長さを 13 に、`pointer_files()` は `FILES[8..]` のままで新しい分も含む（`assert_eq!(files.len(), 4)` を 5 に直す）。macOS の読みには、試作の「境界」の検査（`modifierFlags`・`keyCode`・`CGEvent`・`addGlobalMonitor`・`unsafe` が無いこと・`mouseLocation`/`pressedMouseButtons` が在ること）を写して足す。窓の TS（`HandmarkStage.tsx`・`handmarkStageTrace.ts`）は `include_str!("../../src/components/...")` の別の一覧（試作の `WINDOW`）で、`invoke`・`localStorage`・`fetch`・`console`・配列を作る行の名前の一覧（試作の `d4_lists_only_named_slots`）を写す。TS の検査は B4 で作る。
+22. 禁じる語の一覧は検査ファイル（走査の対象外）に書き、陽性対照は「実際の本文の先頭に語を実行時に足した本文」で赤になることを確かめる（試作と同じ作法）。`File` は部分一致だが、現在の 4 ファイルの本文には当たらない（当たったらその語を単位で見るよう直す）。追加で禁じた語: `log_tx`・`info!(`・`warn!(`・`debug!(`・`error!(`・`trace!(`・`println`・`eprintln`・`dbg!`。
+23. 型の層は試作の `Probe`（固有の定数と trait の既定の定数の特殊化）を写し、`assert_not_printable!` マクロで 7 型 × 3 trait を `const _: () = assert!` にした（実装すればテストのビルドが止まる）。陽性対照 `Probe::<f64>`・`Probe::<String>` が真。記録の側への逆向きは型の名前を `std::any::type_name` から実行時に得る（改名に追従）。
+24. 列の検査は構造体の定義（`struct Name {` から対応する `}`）だけを見る（関数の中の `Vec` は対象外。`TraceState::bits` が `Vec` を返すのは定義でないので許す）。識別子の単位で比べる（`Vec` が `VecDeque` に当たらないように）。`PointerReader` は今は存在しないので、あれば検査する形にした。
+25. 振る舞いの検査は、駆動役を 600 秒ぶん（16ms ごと）回し、`PointerGate` の値を `PointerDriver` の `Gate` へ流して、合成の一点（`trace_replay::synth_points`）を読みとして通す。カーソル・クリックの入れ切り・全体のやめる・描くを途中に入れ、`Trace`・`Ripple` が出ていること（空回りでない）と、記録へ向かうのが `Row` だけであることを見る。`PointerOut` の網羅の match（`pointer_out_goes_to_the_log`）は腕を足すとコンパイルが止まる。
+26. 自分で変異を 1 つ入れて確かめた: `trace.rs` の末尾に `std::fs::read` を足すとソースの検査が赤になり、戻すと緑（メインの変異の確認は別に行う）。

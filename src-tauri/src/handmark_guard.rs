@@ -13,7 +13,7 @@ use crate::handmark_store::Evaluation;
 use crate::logger::LogEntry;
 
 /// 新しく足したファイルの本文（このファイル自身は含めない）。
-const FILES: [(&str, &str); 8] = [
+const FILES: [(&str, &str); 12] = [
     (
         "analysis/handmark/mod.rs",
         include_str!("analysis/handmark/mod.rs"),
@@ -37,7 +37,31 @@ const FILES: [(&str, &str); 8] = [
     ("handmark_store.rs", include_str!("handmark_store.rs")),
     ("handmark_driver.rs", include_str!("handmark_driver.rs")),
     ("handmark_stage.rs", include_str!("handmark_stage.rs")),
+    // ★ 添字 0..=7 は上の検査（`FILES[5]`）が使うので、足すときは必ず末尾に足す。
+    // ポインタ（PR 3・ADR-050 D3）。macOS の読み `input/handmark_pointer_macos.rs`（B1）と窓の TS（B4）は
+    // 作るときに末尾へ足し、`POINTER_FILES` の添字の範囲も広げる。
+    (
+        "analysis/handmark/trace.rs",
+        include_str!("analysis/handmark/trace.rs"),
+    ),
+    (
+        "analysis/handmark/trace_replay.rs",
+        include_str!("analysis/handmark/trace_replay.rs"),
+    ),
+    (
+        "input/handmark_pointer.rs",
+        include_str!("input/handmark_pointer.rs"),
+    ),
+    (
+        "handmark_pointer_thread.rs",
+        include_str!("handmark_pointer_thread.rs"),
+    ),
 ];
+
+/// `FILES` のうちポインタの本文のファイル（末尾の 4 つ）。
+fn pointer_files() -> &'static [(&'static str, &'static str)] {
+    &FILES[8..]
+}
 const BIN: &str = include_str!("bin/gse-handmark-table.rs");
 
 /// `LogEntry::` の後ろの名前が `HandmarkDay` 以外の出現を返す。
@@ -229,4 +253,527 @@ fn reasons_and_assigned_values_agree_across_enum_logger_and_schema() {
     logger.sort();
     assert_eq!(assigned, logger);
     assert_eq!(assigned, schema_enum("HandmarkAssignedDto"));
+}
+
+// ====================================================================================
+// ポインタ（手跡の PR 3・ADR-050 D3 の 3 層）
+//
+// 試作 `handmark_stage_guard.rs` の考え方: 型で縛り・ソースの語で縛り・振る舞いで縛る。語の検査には
+// 陽性対照（実際の本文に禁じる語を実行時に足すと赤になる）を付ける。この検査ファイル自身は走査の
+// 対象でないので、禁じる語を検査の一覧に書いてよい。文字列の検査は別名の関数を経由した漏れを見つけられない。
+// ====================================================================================
+
+use crate::analysis::handmark::trace::{Point, RipplePoint, Step, TraceField, TraceState};
+use crate::handmark_pointer_thread::{Gate, PointerDriver, PointerOut};
+use crate::input::handmark_pointer::PointerSample;
+use std::marker::PhantomData;
+
+/// 識別子の字か。
+fn ident(c: Option<&u8>) -> bool {
+    c.is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
+}
+
+/// `i` からコメント・文字列・文字・raw 文字列が始まるなら、その後ろの位置を返す（閉じていなければ末尾）。
+fn skip_lexeme(b: &[u8], i: usize) -> Option<usize> {
+    let at = |k: usize| b.get(k).copied();
+    match b[i] {
+        b'/' if at(i + 1) == Some(b'/') => Some(
+            b[i..]
+                .iter()
+                .position(|c| *c == b'\n')
+                .map_or(b.len(), |k| i + k),
+        ),
+        b'/' if at(i + 1) == Some(b'*') => {
+            let (mut depth, mut j) = (1usize, i + 2);
+            while j < b.len() && depth > 0 {
+                if b[j] == b'/' && at(j + 1) == Some(b'*') {
+                    depth += 1;
+                    j += 2;
+                } else if b[j] == b'*' && at(j + 1) == Some(b'/') {
+                    depth -= 1;
+                    j += 2;
+                } else {
+                    j += 1;
+                }
+            }
+            Some(j)
+        }
+        b'"' => {
+            let mut j = i + 1;
+            while j < b.len() {
+                match b[j] {
+                    b'\\' => j += 2,
+                    b'"' => return Some(j + 1),
+                    _ => j += 1,
+                }
+            }
+            Some(b.len())
+        }
+        b'r' if !ident(i.checked_sub(1).and_then(|k| b.get(k)))
+            || (i >= 1 && b[i - 1] == b'b' && !ident(i.checked_sub(2).and_then(|k| b.get(k)))) =>
+        {
+            let hashes = b[i + 1..].iter().take_while(|c| **c == b'#').count();
+            if at(i + 1 + hashes) != Some(b'"') {
+                return None;
+            }
+            let mut j = i + 2 + hashes;
+            while j < b.len() {
+                if b[j] == b'"'
+                    && b[j + 1..]
+                        .iter()
+                        .take(hashes)
+                        .filter(|c| **c == b'#')
+                        .count()
+                        == hashes
+                {
+                    return Some(j + 1 + hashes);
+                }
+                j += 1;
+            }
+            Some(b.len())
+        }
+        b'\'' if at(i + 1) == Some(b'\\') => Some(
+            b[i + 2..]
+                .iter()
+                .position(|c| *c == b'\'')
+                .map_or(b.len(), |k| i + 3 + k),
+        ),
+        // 1 バイトの文字（`'{'` など）。それ以外の `'` は寿命の印か多バイトの字で、括弧にならない。
+        b'\'' if at(i + 2) == Some(b'\'') => Some(i + 3),
+        _ => None,
+    }
+}
+
+/// `j` から始まる項目の終わり（`;` か、対応する `}` の後ろ）。閉じていなければ `None`。
+fn item_end(b: &[u8], mut j: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    while j < b.len() {
+        if let Some(n) = skip_lexeme(b, j) {
+            j = n;
+            continue;
+        }
+        match b[j] {
+            b';' if depth == 0 => return Some(j + 1),
+            b'{' | b'(' | b'[' => depth += 1,
+            b'}' | b')' | b']' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 && b[j] == b'}' {
+                    return Some(j + 1);
+                }
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    None
+}
+
+/// `#[cfg(test)]` の付いた項目だけを除く（後ろの本番のコードは残す）。コメント・文字列・文字の中の
+/// 属性や括弧は数えない。閉じていない項目は外さない（外しすぎない）。
+fn strip_test_items(src: &str) -> String {
+    const ATTR: &str = "#[cfg(test)]";
+    let b = src.as_bytes();
+    let mut out = String::with_capacity(src.len());
+    let (mut i, mut from) = (0usize, 0usize);
+    while i < b.len() {
+        if let Some(n) = skip_lexeme(b, i) {
+            i = n;
+            continue;
+        }
+        if b[i..].starts_with(ATTR.as_bytes()) {
+            if let Some(e) = item_end(b, i + ATTR.len()) {
+                out.push_str(&src[from..i]);
+                i = e;
+                from = e;
+                continue;
+            }
+            i += ATTR.len();
+            continue;
+        }
+        i += 1;
+    }
+    out.push_str(&src[from..]);
+    out
+}
+
+/// テストの項目と、行の頭からのコメントを除いた本文。
+fn body(src: &str) -> String {
+    strip_test_items(src)
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn hits(src: &str, needles: &[&str]) -> Vec<String> {
+    let b = body(src);
+    needles
+        .iter()
+        .filter(|n| b.contains(**n))
+        .map(|n| n.to_string())
+        .collect()
+}
+
+/// どのファイルも語を含まないこと。陽性対照: 各ファイルの先頭に語を 1 つ足した本文（実行時に連結）では見つかる。
+fn assert_clean(row: &str, files: &[(&str, &str)], needles: &[&str]) {
+    for (name, src) in files {
+        let found = hits(src, needles);
+        assert!(found.is_empty(), "{row}: {name} が {found:?} を含む");
+        for n in needles {
+            let planted = format!("{n}\n{src}");
+            assert_eq!(
+                hits(&planted, &[n]),
+                vec![n.to_string()],
+                "{row}: 陽性対照が赤にならない（{name} に {n}）"
+            );
+        }
+    }
+}
+
+fn short_name(full: &str) -> &str {
+    full.rsplit("::").next().unwrap_or(full)
+}
+
+/// 記録の側が知ってはならないポインタの型の名前（型から実行時に得る・改名すれば検査が追従する）。
+fn pointer_type_names() -> [String; 5] {
+    [
+        short_name(std::any::type_name::<PointerSample>()).to_string(),
+        short_name(std::any::type_name::<TraceState>()).to_string(),
+        short_name(std::any::type_name::<TraceField>()).to_string(),
+        short_name(std::any::type_name::<RipplePoint>()).to_string(),
+        short_name(std::any::type_name::<PointerOut>()).to_string(),
+    ]
+}
+
+// ---- 型の層 ----
+
+/// 型が trait を実装しているかを値で得る（実装していれば固有の定数、していなければ trait の定数に解決される）。
+struct Probe<T>(PhantomData<T>);
+trait Fallback {
+    const DEBUG: bool = false;
+    const DISPLAY: bool = false;
+    const SERIALIZE: bool = false;
+}
+impl<T> Fallback for Probe<T> {}
+impl<T: std::fmt::Debug> Probe<T> {
+    const DEBUG: bool = true;
+}
+impl<T: std::fmt::Display> Probe<T> {
+    const DISPLAY: bool = true;
+}
+impl<T: serde::Serialize> Probe<T> {
+    const SERIALIZE: bool = true;
+}
+
+/// 型が `Debug`・`Display`・`Serialize` を実装すると、テストのビルドが止まる。
+macro_rules! assert_not_printable {
+    ($($t:ty),+ $(,)?) => {$(
+        const _: () = assert!(!Probe::<$t>::DEBUG);
+        const _: () = assert!(!Probe::<$t>::DISPLAY);
+        const _: () = assert!(!Probe::<$t>::SERIALIZE);
+    )+};
+}
+assert_not_printable!(
+    PointerSample,
+    Point,
+    Step,
+    TraceState,
+    TraceField,
+    RipplePoint,
+    PointerOut,
+);
+// 陽性対照: 実装している型では真になる（調べ方が空回りしていない）。
+const _: () = assert!(Probe::<f64>::DEBUG && Probe::<f64>::DISPLAY && Probe::<f64>::SERIALIZE);
+const _: () =
+    assert!(Probe::<String>::DEBUG && Probe::<String>::DISPLAY && Probe::<String>::SERIALIZE);
+
+// ---- ソースの層 ----
+
+#[test]
+fn pointer_files_do_not_touch_the_recorders_files_network_or_the_estimator() {
+    let files = pointer_files();
+    assert_eq!(files.len(), 4);
+    // 記録・ログ・ファイル・ネットワーク・推定のどれも呼ばない。
+    assert_clean(
+        "ポインタの本文",
+        files,
+        &[
+            "LogEntry",
+            "log_tx",
+            "tracing",
+            "info!(",
+            "warn!(",
+            "debug!(",
+            "error!(",
+            "trace!(",
+            "println",
+            "eprintln",
+            "dbg!",
+            "std::fs",
+            "File",
+            "std::net",
+            "reqwest",
+            "TcpStream",
+            "crate::logger",
+            "crate::analysis::engine",
+            "features",
+            "intervention",
+            "invitation",
+            "p_stuck",
+        ],
+    );
+}
+
+/// 逆向き: 記録の側（行・schema・提出・パッケージ）がポインタの値の型を知らない。
+#[test]
+fn the_record_side_does_not_know_the_pointer_types() {
+    let record_side = [
+        ("logger.rs", include_str!("logger.rs")),
+        ("schema_dto.rs", include_str!("schema_dto.rs")),
+        ("submission.rs", include_str!("submission.rs")),
+        ("packaging.rs", include_str!("packaging.rs")),
+    ];
+    let names = pointer_type_names();
+    let needles: Vec<&str> = names.iter().map(String::as_str).collect();
+    assert_eq!(needles.len(), 5);
+    assert_clean("提出物", &record_side, &needles);
+}
+
+// ---- 列（D4） ----
+
+/// `struct name { ... }` の定義の本文（波括弧の対応で切る）。タプル構造体・無い名前は `None`。
+fn struct_def(src: &str, name: &str) -> Option<String> {
+    let b = body(src);
+    let head = format!("struct {name} {{");
+    let start = b.find(&head)? + head.len() - 1;
+    let end = item_end(b.as_bytes(), start)?;
+    Some(b[start..end].to_string())
+}
+
+const COLUMN_TYPES: [&str; 4] = ["Vec", "VecDeque", "HashMap", "BTreeMap"];
+
+fn column_hits(def: &str) -> Vec<&'static str> {
+    // 識別子の単位で見る（`Vec` が `VecDeque` に当たらないように）。
+    let words: Vec<&str> = def
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .collect();
+    COLUMN_TYPES
+        .iter()
+        .copied()
+        .filter(|t| words.contains(t))
+        .collect()
+}
+
+/// 場・駆動役・（あれば）読みの構造体は、固定長の値だけを持ち、列を持たない。
+#[test]
+fn the_pointer_structs_hold_no_columns() {
+    let owners: [(&str, &str, &str); 2] = [
+        (
+            "TraceField",
+            "analysis/handmark/trace.rs",
+            include_str!("analysis/handmark/trace.rs"),
+        ),
+        (
+            "PointerDriver",
+            "handmark_pointer_thread.rs",
+            include_str!("handmark_pointer_thread.rs"),
+        ),
+    ];
+    for (name, file, src) in owners {
+        let def = struct_def(src, name).unwrap_or_else(|| panic!("{file} に struct {name} が無い"));
+        assert!(
+            def.contains("cells") || def.contains("field"),
+            "{name}: 定義を取り違えた"
+        );
+        assert!(
+            column_hits(&def).is_empty(),
+            "{name} が列を持つ: {:?}",
+            column_hits(&def)
+        );
+        // 陽性対照: 定義に列の欄を実行時に足すと見つかる。
+        for t in COLUMN_TYPES {
+            let planted = src.replacen(
+                &format!("struct {name} {{"),
+                &format!("struct {name} {{\n    trail: {t}<u8>,"),
+                1,
+            );
+            let def = struct_def(&planted, name).expect("planted def");
+            assert_eq!(
+                column_hits(&def),
+                vec![t],
+                "{name}: 対照が赤にならない（{t}）"
+            );
+        }
+    }
+    // 読みの構造体（`PointerReader`）は、作ったときに列を持たないことを縛る（今は無い）。
+    for (file, src) in pointer_files() {
+        if let Some(def) = struct_def(src, "PointerReader") {
+            assert!(
+                column_hits(&def).is_empty(),
+                "{file}: PointerReader が列を持つ"
+            );
+        }
+    }
+}
+
+// ---- 振る舞いの層 ----
+
+/// 記録へ向かう腕を持たないことを、網羅の match で縛る（`PointerOut` に腕を足すとここで必ず止まる）。
+fn pointer_out_goes_to_the_log(o: &PointerOut) -> bool {
+    match o {
+        PointerOut::Trace(_) => false,
+        PointerOut::Ripple(_) => false,
+    }
+}
+
+/// 1 日分の打鍵と、ポインタの入れ切りを駆動役に通し、同じ時間に `PointerDriver` にも合成の一点を通す。
+/// 記録へ向かう出来事は `HandmarkDay` の行だけ（駆動役の出口と `PointerOut` の両方）。
+#[test]
+fn a_day_of_typing_and_pointer_toggles_produces_only_handmark_day_rows() {
+    use crate::analysis::handmark::day::PointerInput;
+    use crate::analysis::handmark::trace_replay::synth_points;
+    use crate::analysis::pointer_bin::PointerBin;
+    use crate::handmark_driver::{Destination, Effect, HandmarkDriver};
+
+    let fs = with_table();
+    let day = 20_411;
+    let t0 = 1_800_000_000_000u64;
+    let bins: Vec<PointerBin> = (1..=900u64)
+        .map(|k| PointerBin {
+            timestamp: t0 + k * 1_000,
+            moved: (k % 7) as u8 + 1,
+            buttons: (k % 4) as u8,
+            wheel: 0,
+        })
+        .collect();
+    let mut pts = synth_points(&bins, 9, t0, t0 + 900_000).into_iter();
+
+    let (mut d, mut fx_all) = HandmarkDriver::new(&fs, true, t0, day);
+    let mut gate = Gate {
+        open: false,
+        cursor: true,
+        click: true,
+    };
+    let absorb = |fx: &[Effect], gate: &mut Gate| {
+        for e in fx {
+            if let Effect::PointerGate {
+                open,
+                cursor,
+                click,
+            } = e
+            {
+                *gate = Gate {
+                    open: *open,
+                    cursor: *cursor,
+                    click: *click,
+                };
+            }
+        }
+    };
+    absorb(&fx_all, &mut gate);
+    let mut p = PointerDriver::new();
+    let (mut traces, mut ripples) = (0usize, 0usize);
+    let (mut saw_cursor_off, mut saw_click_off, mut saw_closed_after_open) = (false, false, false);
+    let mut was_open = false;
+    let mut now = t0;
+    let mut i = 0u64;
+    while now < t0 + 600_000 {
+        now += 16;
+        i += 1;
+        let mut read = || pts.next();
+        for o in p.tick(now, gate, false, &mut read) {
+            assert!(!pointer_out_goes_to_the_log(&o));
+            match o {
+                PointerOut::Trace(_) => traces += 1,
+                PointerOut::Ripple(_) => ripples += 1,
+            }
+        }
+        if i.is_multiple_of(16) {
+            d.on_press(now - 40);
+            let fx = d.tick(&fs, now, day);
+            absorb(&fx, &mut gate);
+            fx_all.extend(fx);
+        }
+        let fx = match i {
+            6_000 => d.set_input(&fs, PointerInput::Cursor, false, now),
+            9_000 => d.set_input(&fs, PointerInput::Cursor, true, now),
+            12_000 => d.set_input(&fs, PointerInput::Click, false, now),
+            15_000 => d.set_input(&fs, PointerInput::Click, true, now),
+            20_000 => d.turn_off(&fs, now),
+            22_000 => d.turn_on(&fs, now),
+            _ => Vec::new(),
+        };
+        absorb(&fx, &mut gate);
+        fx_all.extend(fx);
+        saw_cursor_off |= gate.open && !gate.cursor;
+        saw_click_off |= gate.open && !gate.click;
+        saw_closed_after_open |= was_open && !gate.open;
+        was_open |= gate.open;
+    }
+    fx_all.extend(d.on_quit(&fs, now));
+    assert!(
+        traces > 50 && ripples > 0,
+        "合成の一点が通っていない（検査が空回り）: {traces} {ripples}"
+    );
+    assert!(saw_cursor_off && saw_click_off && saw_closed_after_open);
+    let mut rows = 0;
+    let mut gates = 0;
+    for e in &fx_all {
+        if matches!(e, Effect::PointerGate { .. }) {
+            gates += 1;
+            assert_eq!(e.destination(), Destination::Window);
+        }
+        if e.destination() == Destination::Log {
+            let Effect::Row(r) = e else {
+                panic!("記録へ向かうのが Row 以外: {e:?}");
+            };
+            let entry = LogEntry::HandmarkDay(r.clone());
+            assert_eq!(entry.line_type(), Some("handmark_day"));
+            rows += 1;
+        }
+    }
+    assert!(rows >= 6 && gates >= 6, "rows={rows} gates={gates}");
+}
+
+/// 行に入る入れ切りの要素は時刻・入力の種類・入れたかの 3 つだけで、入力の種類は固定の 2 語。
+#[test]
+fn input_toggles_in_the_row_carry_only_time_kind_and_side() {
+    use crate::analysis::handmark::day::PointerInput;
+    use crate::handmark_store::{turn_input_off, turn_input_on};
+    let fs = with_table();
+    let mut ev = Evaluation::run(&fs, true, 20_411, None);
+    turn_input_off(&fs, &mut ev, PointerInput::Cursor, 1_000);
+    turn_input_off(&fs, &mut ev, PointerInput::Click, 2_000);
+    assert!(turn_input_on(&fs, &mut ev, PointerInput::Cursor, 3_000).is_ok());
+    let text = crate::logger::format_handmark_day_line_for_test(&ev.row(5).unwrap());
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let arr = v["input_toggles"].as_array().expect("input_toggles");
+    assert_eq!(arr.len(), 3);
+    for e in arr {
+        let mut keys: Vec<&str> = e.as_object().unwrap().keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, vec!["input", "on", "t"]);
+        assert!(matches!(e["input"].as_str(), Some("cursor" | "click")));
+    }
+}
+
+/// 入力の種類の値の 3 つの真実源（Rust の列挙・logger が許す値・スキーマの enum）が一致する。
+#[test]
+fn pointer_input_values_agree_across_enum_logger_and_schema() {
+    use crate::analysis::handmark::day::PointerInput;
+    let mut from_enum: Vec<String> = [PointerInput::Cursor, PointerInput::Click]
+        .iter()
+        .map(|i| i.as_str().to_string())
+        .collect();
+    from_enum.sort();
+    assert_eq!(from_enum, schema_enum("HandmarkPointerInputDto"));
+    // logger は固定の 2 語だけを書く（それ以外の語の要素は落とす）。
+    let mut r = Evaluation::run(&with_table(), true, 20_411, None)
+        .row(1)
+        .unwrap();
+    assert_eq!(from_enum, vec!["click".to_string(), "cursor".to_string()]);
+    r.input_toggles = vec![(1, "cursor", true), (2, "click", true), (3, "wheel", true)];
+    let text = crate::logger::format_handmark_day_line_for_test(&r);
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["input_toggles"].as_array().map(Vec::len), Some(2));
 }
