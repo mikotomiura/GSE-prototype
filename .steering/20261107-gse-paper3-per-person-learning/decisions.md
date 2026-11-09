@@ -74,3 +74,8 @@
 - 理由: main の末尾は [V387] で、[V388]〜[V412] は `docs/gse-daily-item-scale-literature`・`docs/gse-stage1-prereg-revision` の枝が、[V413]〜[V495] は `docs/public-data-findings-paper`・`docs/gse-paper2-stall-shape` の枝が別の文献に使っていた（2026-11-09 に origin の全枝の references.md を照合）。どの番号もまだ main に無く、この枝が最も新しいので、この枝が退く。citation-ssot の「振り直さない」は main に入った番号の安定のための規則で、まだどこにも入っていない枝どうしのぶつかりは、後から来た側が退くほかに直せない。
 - 留意 1: [V534]（Garcés-Manzanera 2026, doi:10.1016/j.rmal.2026.100381）は、論文 2 の枝に [V448] と [V488] として既にある（論文 2 の枝の中でも 2 重）。この枝と論文 2 の枝の後に入る方が、マージのときに後の番号を tombstone（→ 先の番号）にする。
 - 留意 2: 他の枝どうし（daily-item / stage1-prereg と public-data / paper2）は番号の範囲が重ならない。次に番号を足す枝は、fetch してから origin の全枝の最大（この判断の後で [V534]）の次から採る。同時に採る枝や push していない番号は見えないので、マージの前にも同じ照合をする。
+
+## 判断 16（2026-11-09）attack-me round 2 の時期と次の引き継ぎ
+- 決定: attack-me round 2 は、構造の足りなさの試験の結果で C2 の Strength の最後の一文（"was not tested"）を直した後に 1 回だけ回す。手順は `.steering/_handoff/next-session-gse-paper3-after-structure-deficit.md` に書いた。
+- 理由: 研究者が選んだ（推奨どおり・AskUserQuestion）。いま回すと、結果が戻った後に C2 を直して、もう 1 回回すことになる。
+- 留意: 構造の試験の条件の「読まないこと」は「結果は論文 3 に入れない」のままで、判断 11 の改めはあちらの記録に無い（2026-11-09 に conditions.md で確かめた）。持ち込む前に、あちらの notes に記録があるかを見る（引き継ぎ §2）。
