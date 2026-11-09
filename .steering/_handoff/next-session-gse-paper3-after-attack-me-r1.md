@@ -20,17 +20,17 @@
 ## 1 ここまでに済んだこと
 
 - paper-write Step 0〜5 の計画: 投稿先 UMUAI（購読モデル・APC なし）・英語・MacTeX・本文 7,000 語・図表 4（判断 3〜4・`paper-write/venue-fit.md`・`length-log.md`）。外枠は `papers/per-person-learning/manuscript/outline.md`。
-- 文献のラウンド 1 回（[V386]〜[V400]・`docs/literature/20261107-per-person-gain-comparison-baselines.md`）。
+- 文献のラウンド 1 回（[V386]〜[V509]・`docs/literature/20261107-per-person-gain-comparison-baselines.md`）。
 - 記号化の書き直し（`papers/per-person-learning/kit/symbols/`・作業記録 `.steering/20261107-gse-paper3-symbol-reimpl/`）: 元の replay と、合成 300 本・CoAuthor 1,157 セッション・CS1 2021 の 177 課題で記号と x・y の bit まで一致。/cross-review 2 巡。
 - attack-me outline round 1: major revision（R1〜R3・Codex が major、編集者は「直してから回す」）。
-- 文献の調べ 1 ラウンド（判断 12・判断 14・2026-11-07）: `docs/literature/20261107-per-person-shrinkage-prior-art.md`・[V401]〜[V424]・コミット 515712eb。τ の MAP は話者適応の MAP の離散 HMM 版で、多水準 HMM の特殊な場合ではない。「他人で選ぶ・同じ人の後の時点で測る」は入力の言語モデルの個人化の流儀で C3 の新規性に数えない。HMM と 1 次のマルコフの同じデータの中の比べは [V408] がある。外枠への持ち込みは判断 14（外枠はまだ直していない）。
+- 文献の調べ 1 ラウンド（判断 12・判断 14・2026-11-07）: `docs/literature/20261107-per-person-shrinkage-prior-art.md`・[V510]〜[V533]・コミット 515712eb。τ の MAP は話者適応の MAP の離散 HMM 版で、多水準 HMM の特殊な場合ではない。「他人で選ぶ・同じ人の後の時点で測る」は入力の言語モデルの個人化の流儀で C3 の新規性に数えない。HMM と 1 次のマルコフの同じデータの中の比べは [V517] がある。外枠への持ち込みは判断 14（外枠はまだ直していない）。
 
 ## 2 文献の調べ（判断 12）で探すこと
 
 - 多水準・混合 HMM（個人ごとの遷移・放出を集団分布へ縮める）。少なくとも Aarts & Haslbeck 2025（PsyArXiv・doi:10.31234/osf.io/y2u5s_v2・前のラウンドで本文未取得）。論文 3 の「τ で共通へ縮める MAP」がその特殊な場合に当たるかを確かめる。
 - 階層モデル・経験ベイズの部分的なプール（縮小の強さを他人で選ぶこと、分散成分が 0〔完全なプール〕に張り付く問題・Chung ほか 2013 Psychometrika・本文未取得）。
 - キーボードの言語モデルの個人化（全体のモデルと個人のモデルの補間・微調整を予測の尤度で比べる系統）。R2 が挙げたが一次は未確認。
-- 前のラウンドの「やり残し」: Pardos & Heffernan 2010・Yudelson 2016 の本文、[V392] Ferrari の Chrome での照合、[V398] Stoye の雑誌版。
+- 前のラウンドの「やり残し」: Pardos & Heffernan 2010・Yudelson 2016 の本文、[V501] Ferrari の Chrome での照合、[V507] Stoye の雑誌版。
 - 既にある文献は入れ直さず番号だけ挙げる（memory「文献のラウンドで既存の文献を入れ直さない」）。Saeb 2017 は [V98] で登録済み（外枠に引く）。
 
 ## 3 新しい小さな試験（判断 11）
