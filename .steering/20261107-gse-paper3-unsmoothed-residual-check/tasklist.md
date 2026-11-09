@@ -37,9 +37,9 @@
 - [x] HP Z2 の引き継ぎを書く（研究者が回す）
 - [x] P-REPRO が通る（葉 5,751・外れ 0）
 - [x] notes.md（読みの形のとおり・集計値だけ・判断 12・13）
-- [ ] 論文 3 の外枠を直す（C1・C2 の Strength・限界・補足の表・4.2 の 1 文）
-- [ ] code-reviewer と /cross-review（notes と外枠の diff・集計値だけ）
+- [x] 論文 3 の外枠を直す（C1・C2 の Strength・限界・補足の表・4.2 の 1 文）
+- [x] code-reviewer と /cross-review（notes と外枠の diff・集計値だけ）
 
 ## 完了処理
-- [ ] design.md・decisions.md の最終化
+- [x] design.md・decisions.md の最終化
 - [ ] git commit（push と PR は研究者が確かめてから）
