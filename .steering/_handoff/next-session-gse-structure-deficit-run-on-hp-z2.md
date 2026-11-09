@@ -65,4 +65,17 @@ JOBS=16 bash run.sh 2>&1 | tee "$DATA_DIR/structure_deficit_run.log"; echo "exit
 
 ## 7 HP Z2 での実行の記録（職場の PC のセッションが追記）
 
-（未記入）
+記入: 2026-11-10（HP Z2 のセッション）。
+
+- 機械と版: HP Z2・Python 3.11.9・numpy 2.4.4・git-bash・`JOBS=16`。コードは `48137cbe`（`provenance.json` の `git_dirty_paths` は空）。`run_id` は `20261109T122107-1576`（`summary.json` と `provenance.json` で同じ）。終了コード 0。
+- 準備: 枝の取り出しの前に、追跡されていない `experiments/20261106-tau-mode-candidate/tables.md`（枝のコミット済みの版と中身が違う）が取り出しを妨げたので、消さずに repo の外 `~/gse-untracked-backup/20261106-tau-mode-candidate/tables.md.local` に移した。AC のスリープ・休止は 0、C: の空きは 230 GB。
+- 各段の時刻（2026-11-09 開始。結果のファイルと書き手ごとの値の pkl の更新時刻から）:
+  - 開始 12:21:07 → manifest の照合・門の selftest・P-SAME（CoAuthor・CS1）12:21
+  - selftest（合成・19 対照）すべて緑 〜12:37 → 変異 16 個すべてが名指しの対照を赤にした 12:52 → P-Q 12:52
+  - q5_o: CoAuthor 13:19・CS1 14:58 → P-REPRO 14:58
+  - q5_p: 15:33・17:08 / q3_o: 17:44・19:10 / q3_p: 19:42・21:26 / q7_o: 21:50・23:02 / q7_p: 23:31・2026-11-10 01:01
+  - provenance と終了 2026-11-10 01:01:39（全体で約 12 時間 40 分）
+- P-Q（`q_gate.json`）: coauthor `rows` 588227・`mismatched` 0、cs1 `rows` 2794277・`mismatched` 0。
+- P-REPRO（`repro_check.json`・`tolerance_rel` 1e-09）: tau `cells` 6741・`mismatched` 0・`max_rel_diff` 0.0・`mismatched_sections` []、mli `cells` 1363・`mismatched` 0・`max_rel_diff` 0.0・`mismatched_sections` []。
+- 止まった段・赤: なし。
+- 結果は `51ab4d46` で push 済み（`results/` の下だけ。`results/mutations/` を含む）。書き手ごとの値の pkl 12 個は `~/gse-public-data/landscape/` にあり、開いていない・repo に入れていない。`summary.json` は `run_id` と `groups` の 6 組の名前の確かめまでで、値は読んでいない。
