@@ -2429,14 +2429,18 @@ pub(crate) fn handmark_set_input_from_tray(
     app: &tauri::AppHandle,
     input: crate::analysis::handmark::day::PointerInput,
     shown_checked: bool,
-) {
+) -> bool {
     if is_shutting_down() {
-        return;
+        return false;
     }
-    let Some(fs) = HANDMARK_FS.get() else { return };
+    let Some(fs) = HANDMARK_FS.get() else {
+        return false;
+    };
     let log_tx = handmark_log_tx(app);
     let mut g = handmark_lock();
-    let Some(d) = g.as_mut() else { return };
+    let Some(d) = g.as_mut() else {
+        return false;
+    };
     let items = d.input_items();
     let Some(on) = crate::handmark_driver::decide_tray_input(shown_checked, items, input) else {
         // 押下を捨てたときだけ理由を残す(2026-11-09 の画面の確かめで、効いたように見えて記録に
@@ -2449,10 +2453,11 @@ pub(crate) fn handmark_set_input_from_tray(
                 "window is not open"
             }
         );
-        return;
+        return false;
     };
     let fx = d.set_input(fs, input, on, epoch_ms());
     run_handmark_effects(app, &log_tx, fx);
+    true
 }
 
 /// 区間の削除: 手跡の状態ファイルと走行中の累計から、区間に入る時刻を消す(`redact_dir` の前に呼ぶ)。

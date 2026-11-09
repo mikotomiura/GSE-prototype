@@ -305,6 +305,32 @@ fn handmark_input_request(
     Some((input, checked))
 }
 
+/// 押下の後に書く「出している印」。出ている項目で、駆動役の望む状態があるときだけ、それへ進める
+/// （メニューの項目は押すと自分で印が反転するので、表示とも合う）。出ていない項目は書かない。
+fn shown_after_press(want: Option<bool>, shown: Option<bool>) -> Option<bool> {
+    match (want, shown) {
+        (Some(w), Some(_)) => Some(w),
+        (_, s) => s,
+    }
+}
+
+/// 計画の実行に失敗したとき、次の周回で印の言い直しをやり直すか。印の合わせだけが対象
+/// （出し入れの失敗は、出している状態が変わらないので次の周回の計画がまた同じになる）。
+fn handmark_input_retry(plan: InputPlan, ok: bool) -> bool {
+    matches!(plan, InputPlan::SetChecked(_)) && !ok
+}
+
+/// 押下が駆動役まで通って入れ切りが変わった直後に、メニューに出している印の記録（`HANDMARK_INPUT_SHOWN`）を
+/// 新しい状態へ書く。
+fn handmark_input_after_press(which: usize) {
+    let want = input_from_code(HANDMARK_INPUT_WANT[which].load(Ordering::Acquire));
+    let shown = input_from_code(HANDMARK_INPUT_SHOWN[which].load(Ordering::Acquire));
+    HANDMARK_INPUT_SHOWN[which].store(
+        input_code(shown_after_press(want, shown)),
+        Ordering::Release,
+    );
+}
+
 /// 入力の項目が押された。`which` は添字。押された時点で出ていた印を駆動役へ渡す（照合は
 /// `handmark_driver::decide_tray_input`）。
 fn handmark_input_pressed(app: &AppHandle, which: usize) {
@@ -314,7 +340,11 @@ fn handmark_input_pressed(app: &AppHandle, which: usize) {
         tracing::warn!("handmark: input press ignored (menu mark unknown)");
     }
     if let Some((input, checked)) = req {
-        crate::handmark_set_input_from_tray(app, input, checked);
+        // 駆動役まで通って入れ切りが変わったら、表示の印の記録を新しい状態へ進める（更新スレッドは 1 秒ごと
+        // にしか書かないので、1 秒以内の次の押下が「表示が古い」で捨てられないように）。
+        if crate::handmark_set_input_from_tray(app, input, checked) {
+            handmark_input_after_press(which);
+        }
     }
 }
 
@@ -332,20 +362,29 @@ fn handmark_input_reconcile(
     } else {
         &[MENU_HANDMARK]
     };
-    let after = handmark_input_step(want, shown, force, |plan| match plan {
-        InputPlan::Nothing => true,
-        InputPlan::Remove => menu.remove(item).is_ok(),
-        InputPlan::SetChecked(c) => item.set_checked(c).is_ok(),
-        InputPlan::Insert(c) => {
-            let ids: Vec<String> = menu
-                .items()
-                .map(|v| v.iter().map(|k| k.id().as_ref().to_string()).collect())
-                .unwrap_or_default();
-            let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
-            let position = handmark_input_index(&refs, before);
-            item.set_checked(c).is_ok() && menu.insert(item, position).is_ok()
-        }
+    let mut retry = false;
+    let after = handmark_input_step(want, shown, force, |plan| {
+        let ok = match plan {
+            InputPlan::Nothing => true,
+            InputPlan::Remove => menu.remove(item).is_ok(),
+            InputPlan::SetChecked(c) => item.set_checked(c).is_ok(),
+            InputPlan::Insert(c) => {
+                let ids: Vec<String> = menu
+                    .items()
+                    .map(|v| v.iter().map(|k| k.id().as_ref().to_string()).collect())
+                    .unwrap_or_default();
+                let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+                let position = handmark_input_index(&refs, before);
+                item.set_checked(c).is_ok() && menu.insert(item, position).is_ok()
+            }
+        };
+        retry |= handmark_input_retry(plan, ok);
+        ok
     });
+    if retry {
+        // 印の言い直しに失敗した: 合図は呼び出し側が消費済みなので、立て直して次の周回でやり直す。
+        HANDMARK_INPUT_RESYNC.store(true, Ordering::Release);
+    }
     HANDMARK_INPUT_SHOWN[which].store(input_code(after), Ordering::Release);
     after
 }
@@ -964,6 +1003,68 @@ mod tests {
         assert!(handmark_input_request(INPUT_CURSOR).is_none());
         HANDMARK_INPUT_RESYNC.store(false, Ordering::Release);
         set_handmark_inputs(None);
+    }
+
+    /// 1 秒以内の 2 回目の押下も駆動役に届く（更新スレッドは 1 秒ごとにしか表示の印を書かないので、押下の側が
+    /// 書かないと 2 回目が「表示が古い」で捨てられる・2026-11-09 の画面の確かめ）。
+    #[test]
+    fn two_presses_within_one_second_both_reach_the_driver() {
+        use crate::handmark_driver::{decide_tray_input, HandmarkDriver};
+        use crate::handmark_store::testfs::with_table;
+        let _lock = INPUT_ATOMICS.lock().unwrap_or_else(|p| p.into_inner());
+        const T0: u64 = 1_800_000_000_000;
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, 20_411);
+        apply_gate(&fx);
+        reconcile_without_menu(false);
+        let mut changes = 0;
+        // 更新スレッドを挟まずに、カーソルを 3 回続けて押す（切る → 入れる → 切る）。
+        for (k, expect_on) in [(1u64, false), (2, true), (3, false)] {
+            let (input, checked) = handmark_input_request(INPUT_CURSOR).expect("shown");
+            let on = decide_tray_input(checked, d.input_items(), input);
+            assert_eq!(on, Some(expect_on), "press {k} must reach set_input");
+            let fx = d.set_input(&fs, input, expect_on, T0 + k * 100);
+            assert_eq!(apply_gate(&fx), 1);
+            handmark_input_after_press(INPUT_CURSOR);
+            changes += 1;
+        }
+        assert_eq!(changes, 3);
+        assert_eq!(d.input_items(), Some((false, true)));
+        let shown = |i: usize| input_from_code(HANDMARK_INPUT_SHOWN[i].load(Ordering::Acquire));
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(false), Some(true))
+        );
+        HANDMARK_INPUT_RESYNC.store(false, Ordering::Release);
+        set_handmark_inputs(None);
+        reconcile_without_menu(false);
+    }
+
+    /// 押下の後の「出している印」: 出ていて・望む状態がある項目だけを望む状態へ。出ていない項目は書かない。
+    #[test]
+    fn shown_after_press_follows_want_only_for_a_shown_item() {
+        assert_eq!(shown_after_press(Some(true), Some(false)), Some(true));
+        assert_eq!(shown_after_press(Some(false), None), None);
+        // 望む状態が無い（窓が閉じた）ときは触らない（項目の取り外しは更新スレッドの仕事）。
+        assert_eq!(shown_after_press(None, Some(true)), Some(true));
+        assert_eq!(shown_after_press(None, None), None);
+    }
+
+    /// 印の言い直しが失敗したら、次の周回でやり直す（消費した合図を立て直す）。
+    #[test]
+    fn a_failed_set_checked_asks_for_a_retry() {
+        let mut retry = false;
+        let after = handmark_input_step(Some(false), Some(false), true, |p| {
+            assert_eq!(p, InputPlan::SetChecked(false));
+            false
+        });
+        assert_eq!(after, Some(false));
+        assert!(handmark_input_retry(InputPlan::SetChecked(false), false));
+        assert!(!handmark_input_retry(InputPlan::SetChecked(false), true));
+        assert!(!handmark_input_retry(InputPlan::Insert(true), false));
+        assert!(!handmark_input_retry(InputPlan::Nothing, false));
+        retry |= handmark_input_retry(InputPlan::Remove, false);
+        assert!(!retry);
     }
 
     /// 駆動役が知らせた状態が、項目ごとの「あるべき状態」になる(出さない日は両方 None)。
