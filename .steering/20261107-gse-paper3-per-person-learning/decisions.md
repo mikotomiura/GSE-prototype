@@ -96,3 +96,16 @@
 - 対応: (1) 中心を「評価の手順と、それを当てた実例」の C1 1 つにし、旧 C1 を実例、旧 C3 を手順として統合。旧 C2 は Supporting evidence に下げた（判断 10）。(2) take-home を数値なしの 2 文（主張と、適応する系の設計者への含意）に。(3) "exactly zero" → 「共通のモデルそのもの（τ = ∞）が全員で選ばれ、差は定義上 0」。"pooled limit" → "the shared model itself (tau = infinity)"。格子の目的を「端の選択を読めるように」の 1 つに。(4) 比べの相手を 1 か所で定義（共通は対象の書き手を除く・r1 は各 +0.5・系列のモデルに本人の切片は無い）。構造だけ・縮小だけの比べを主表の行に。縮小だけ: ar1（τ 他人）− r1 = +0.034（ar3 は +0.042・CoAuthor P15 k = 5・ml-improve notes）。(5) 実例は CoAuthor に限り、CS1 の hmm3 は一貫して勝たない（−0.035〜+0.028）と書いた。(6) "established" → "consistently observed … (exploratory)"。3.4 に逐次の設計。n・IQR・良い側の割合（15/17・17/17）。(7) 済み（判断 12〜13 の残差の試験）。(8) 判断 14 のとおり位置づけ（話者適応の MAP・多水準 HMM と別・キーボードの言語モデルの個人化の流儀・Shirley 2010・境界の分散の推定との違い・Saeb 2017・Singer の両側・Liu & Meng の代価）。検索の記録は S1。(9) 序論に適応する系への含意の 1 段落。(10) 4.4 と代理ラベルの段落を補足へ（S9・S10）、格子の延長は 4.3 に 1 段落。(11) 但し書きを 6 の 1 か所に集め、見出しを宣言文に。(12) 要旨・キーワード・Statements and declarations（データ・コード〔判断 13〕・照合の件数・倫理）を外枠に。(13) 約 1e-3 を「再現の照らしの数値の許容の内」に、"up to +0.19" を値・IQR・人数に。(14) パネルの呼び方（15-session・30-session・five-assignment）・Status・open items・3.2 の "timing" → 合成の打鍵の特徴・CS1 の単位（課題）・検定を使わない理由を 3.4 に 1 文・hmm10 は S5。kit の README の friction・fluency を「合成の値 x・y（状態として読まない）」に直した。`symbolizer.py` の docstring にも同じ語があるが、残差の試験の来歴（provenance の files_sha256）がこのファイルのハッシュを固定しているので、今は直さない（公開の前に、来歴の扱いを決めてから直す）。
 - 本文の予算: 節の合計 7,000 語のまま（要旨と宣言は予算の外）。4.4 を外し、4.1・4.2・4.3・5 に配り直した。
 - 採らなかったもの: なし。round 1 の C2 の「Strength」の長い段（平滑の無い記号の数値）は、S13 と限界に移し、実例の Strength には CoAuthor の hmm3 の値だけを残した。
+
+## 判断 20（2026-11-10）判断 19 の書き直しへのレビューの対応
+- レビュー: code-reviewer（HIGH 4・MEDIUM 5・LOW 8）と /cross-review（Claude と Codex・HIGH 1・MEDIUM 5・LOW 3・Codex 約 29,620 tokens を記帳）。指摘は一次（tau-extend の notes と tables・tau-mode の notes・ml-improve の conditions と notes・references.md）で確かめてから直した。
+- 直した所:
+  - 「再現の照らしの数値の許容の内」を消した（両方の HIGH）。P-REPRO の許容は相対 1e-9 で、約 1e-3 以下の差の大きさの根拠にならない。2 段（他人）の差は 16〜17 / 17 人で正なので、「小さいが符号はそろう」と書き、中央値で比べると最頻値と共通の違い（b）が本人の記録の寄与（a・負）より大きいこと（tau-mode notes 結果 2）を本文に上げた。take-home の「no longer visible」を「a few ten-thousandths of a nat per symbol」に、4.3 の見出しも同じに直した。
+  - 縮小だけの行を、手順の格子（10^6 と ∞）の値に揃えた: ar1（τ 他人）− r1 = +0.043、ar3 − r1 = +0.059（tau-extend tables・17 / 17）。ml-improve の +0.034・+0.042 は格子が 10^4 までの値だった。
+  - 共通の定義を一次に合わせた: 「w を除く書き手の、評価に使う単位を除いた全単位・評価の単位を持たない書き手は全単位」（ml-improve conditions）。パネルの中だけではない。
+  - 評価の単位をデータごとに（CoAuthor は後ろの 5 セッション・CS1 は最後の 1 課題）。
+  - CS1 の hmm3 を手順の格子の値に（0〜+0.028・良い側 61% 以下）。take-home の 1 文目を「can gain a lot」に弱め、2 文目を「sequence models of keystroke behaviour」に限り「we suggest」にした。Strength を「CoAuthor で観察・CS1 は手順の下では本人の差が定義上 0」に。
+  - 30-session panel の手順の値（k = 30 で +0.001・6 / 9）を挙げ、ar1 の +0.003・+0.005 は「構造を固定した参考の値」と区別した。
+  - Saeb 2017 を「分割が精度を膨らませる」の根拠として Little et al. 2017 と対で引いた（references.md の [V99] の注）。
+  - 構造・縮小の比べを "isolate" から "separate" に、τ はそれぞれ他人で選ぶと明記。ラベル（hmm3・hmm10・ar1〜ar3）と τ の格子、all-writer panel の置き場（S4）を Status に定義。hmm10 の 1 行を 4.2 に戻した（格子 10^4 までの値と印をつけた）。主表に中央値の bootstrap の区間。Morris & Lysy・Chung の文に向き（τ = ∞ は人の間の分散 0）。内部の手続きの語（paper-write・pre-review）を外した。open items の全文の未読を消した（Aarts・Yudelson・Chung は照合済み）。補足の番号は投稿の前に初出の順に振り直すと open items に書いた。
+- 採らなかったもの: Singer の topical の逐語をカードと [V509] の注に足す（LOW）は、文献のカードの直しで別に行う。Codex の「除外の数と感度」は S4 に既にある設計（除外の規則と人数）で足りるとした。
