@@ -1010,3 +1010,48 @@ fn pointer_input_values_agree_across_enum_logger_and_schema() {
     let v: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(v["input_toggles"].as_array().map(Vec::len), Some(2));
 }
+
+/// 窓の TS が `export const NAME = <数>;` で持つ値を読む（無ければ None）。
+fn ts_const(src: &str, name: &str) -> Option<f64> {
+    let head = format!("export const {name} = ");
+    let line = src.lines().find(|l| l.trim_start().starts_with(&head))?;
+    let rest = line.trim_start().strip_prefix(&head)?;
+    rest.trim_end().trim_end_matches(';').trim().parse().ok()
+}
+
+/// Rust の場の定数と、窓の TS に手で写した値の食い違い（名前の一覧）。
+fn trace_const_mismatches(ts: &str) -> Vec<&'static str> {
+    use crate::analysis::handmark::trace::{BEND_MAX, BOX_W, GRID_H, GRID_W, MOTE_MAX};
+    let want: [(&'static str, f64); 5] = [
+        ("GRID_W", GRID_W as f64),
+        ("GRID_H", GRID_H as f64),
+        ("BOX_W", f64::from(BOX_W)),
+        ("BEND_MAX", f64::from(BEND_MAX)),
+        ("MOTE_MAX", f64::from(MOTE_MAX)),
+    ];
+    want.iter()
+        .filter(|(n, v)| ts_const(ts, n).is_none_or(|t| (t - v).abs() > 1e-6))
+        .map(|(n, _)| *n)
+        .collect()
+}
+
+#[test]
+fn the_window_copies_the_field_constants_exactly() {
+    let ts = WINDOW[1].1;
+    assert!(
+        trace_const_mismatches(ts).is_empty(),
+        "{:?}",
+        trace_const_mismatches(ts)
+    );
+    // 陽性対照: 片方だけ値を変えると食い違いが出る。
+    let changed = ts.replacen(
+        "export const BEND_MAX = 0.9;",
+        "export const BEND_MAX = 0.8;",
+        1,
+    );
+    assert_ne!(changed, ts, "対照の置き換えが当たっていない");
+    assert_eq!(trace_const_mismatches(&changed), vec!["BEND_MAX"]);
+    // 陽性対照: 消すと食い違いが出る。
+    let gone = ts.replacen("export const GRID_W = 16;", "", 1);
+    assert_eq!(trace_const_mismatches(&gone), vec!["GRID_W"]);
+}
