@@ -31,5 +31,5 @@
 ## 結果の後
 - [x] notes.md（読みの形 A・B・C）・report.py の表（CoAuthor の主のセルは形 B・CS1 C5 k = 5 は形 C）
 - [x] code-reviewer ＋ /cross-review（Codex）（HIGH なし・判断 13 で直した）
-- [ ] 2 系統目のレビューの残り 4 件を直し（判断 14）、code-reviewer ＋ /cross-review（Codex）の 2 巡目を通す
+- [x] 2 系統目のレビューの残り 4 件を直し（判断 14）、code-reviewer ＋ /cross-review（Codex）の 2 巡目を通す（判断 15 で直した）
 - [ ] push・PR は研究者が確かめてから
