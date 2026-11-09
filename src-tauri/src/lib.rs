@@ -2324,6 +2324,11 @@ static HANDMARK_FS: std::sync::OnceLock<crate::handmark_store::DiskFs> = std::sy
 static HANDMARK_PRESS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
     std::sync::OnceLock::new();
 
+/// ポインタのスレッドへの門(駆動役が `Effect::PointerGate` で書く)。ビット 0 = 窓が開いている・
+/// 1 = カーソルが入っている・2 = クリックが入っている。0 = 閉じている。
+#[cfg(target_os = "macos")]
+static HANDMARK_POINTER_GATE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
 /// 手跡の駆動役へ打鍵の時刻を送る(口が無ければ何もしない・満杯なら捨てる)。
 fn handmark_send_press(t_ms: u64) {
     if let Some(tx) = HANDMARK_PRESS_TX.get() {
@@ -2361,8 +2366,19 @@ fn run_handmark_effects(
             #[cfg(not(target_os = "macos"))]
             Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
-            // ポインタのスレッドへの入れ切り。配線は B2（今は受け取って捨てる）。
-            Effect::PointerGate { .. } => {}
+            // ポインタのスレッドへの入れ切り(Atomic に書くだけ)と、トレイの「カーソル」「クリック」の項目の状態。
+            Effect::PointerGate {
+                open,
+                cursor,
+                click,
+            } => {
+                #[cfg(target_os = "macos")]
+                HANDMARK_POINTER_GATE.store(
+                    u8::from(open) | (u8::from(cursor) << 1) | (u8::from(click) << 2),
+                    std::sync::atomic::Ordering::Release,
+                );
+                crate::tray::set_handmark_inputs(open.then_some((cursor, click)));
+            }
         }
     }
 }
@@ -2400,6 +2416,38 @@ pub(crate) fn handmark_toggle_from_tray(
         TrayItem::Restore => d.turn_on(fs, now),
         TrayItem::Hidden => return,
     };
+    run_handmark_effects(app, &log_tx, fx);
+}
+
+/// トレイの「カーソル」「クリック」。`on` は入れる側。選んだことは(日の行の入れ切りの時刻以外は)記録しない。
+///
+/// `on` は押された項目の、メニューに出ていた状態の反対(出ていた印が入っていれば切る)。駆動役の今の状態が
+/// それと違う(表示が古い)ときは何もしない。窓を出していないとき・終了中も何もしない。
+/// ロックの順は `handmark_toggle_from_tray` と同じ(`HANDMARK_DRIVER` を持つ間 `LogState` を取らない)。
+pub(crate) fn handmark_set_input_from_tray(
+    app: &tauri::AppHandle,
+    input: crate::analysis::handmark::day::PointerInput,
+    on: bool,
+) {
+    use crate::analysis::handmark::day::PointerInput;
+    if is_shutting_down() {
+        return;
+    }
+    let Some(fs) = HANDMARK_FS.get() else { return };
+    let log_tx = handmark_log_tx(app);
+    let mut g = handmark_lock();
+    let Some(d) = g.as_mut() else { return };
+    let Some((cursor_on, click_on)) = d.input_items() else {
+        return;
+    };
+    let now_on = match input {
+        PointerInput::Cursor => cursor_on,
+        PointerInput::Click => click_on,
+    };
+    if now_on == on {
+        return;
+    }
+    let fx = d.set_input(fs, input, on, epoch_ms());
     run_handmark_effects(app, &log_tx, fx);
 }
 
@@ -2454,6 +2502,53 @@ impl Drop for HandmarkWindowGuard {
     fn drop(&mut self) {
         crate::handmark_stage::close(&self.app);
         crate::tray::set_handmark_item(crate::handmark_driver::TrayItem::Hidden);
+        crate::tray::set_handmark_inputs(None);
+        // ポインタのスレッドも読むのをやめる(閉じた門)
+        HANDMARK_POINTER_GATE.store(0, std::sync::atomic::Ordering::Release);
+    }
+}
+
+/// 手跡のポインタのスレッド。★ 段 1 かつ macOS のときだけ起こす。`HANDMARK_DRIVER` のロックを取らず、
+/// 門の Atomic・一時停止・主画面の大きさだけを読む。読んだ値・座標・場は窓以外へ出さない
+/// (ログ・エラー文にも入れない・ADR-050 D2)。時計は駆動役と同じ UTC の ms。
+#[cfg(target_os = "macos")]
+fn spawn_handmark_pointer(app: tauri::AppHandle) {
+    use crate::handmark_pointer_thread::{Gate, PointerDriver, PointerOut};
+    let spawned = thread::Builder::new()
+        .name("gse-handmark-pointer".to_string())
+        .spawn(move || {
+            let mut driver = PointerDriver::new();
+            loop {
+                if is_shutting_down() {
+                    return;
+                }
+                let bits = HANDMARK_POINTER_GATE.load(std::sync::atomic::Ordering::Acquire);
+                let gate = Gate {
+                    open: bits & 1 != 0,
+                    cursor: bits & 2 != 0,
+                    click: bits & 4 != 0,
+                };
+                let now = epoch_ms();
+                let (w, h) = crate::handmark_stage::screen_size_pt();
+                let mut read = || {
+                    crate::input::handmark_pointer::to_point(
+                        crate::input::handmark_pointer_macos::read(),
+                        w,
+                        h,
+                    )
+                };
+                let out = driver.tick(now, gate, crate::recording::is_paused(), &mut read);
+                for o in out {
+                    match o {
+                        PointerOut::Trace(s) => crate::handmark_stage::emit_trace(&app, &s, now),
+                        PointerOut::Ripple(r) => crate::handmark_stage::emit_ripple(&app, &r, now),
+                    }
+                }
+                thread::sleep(Duration::from_millis(driver.next_wait_ms()));
+            }
+        });
+    if spawned.is_err() {
+        tracing::warn!("handmark: pointer thread could not be started");
     }
 }
 
@@ -7020,6 +7115,7 @@ pub fn run() {
                     let (hm_tx, hm_rx) = crossbeam_channel::bounded::<u64>(4096);
                     let _ = HANDMARK_PRESS_TX.set(hm_tx);
                     spawn_handmark_driver(app.handle().clone(), log_tx_handmark, hm_rx);
+                    spawn_handmark_pointer(app.handle().clone());
                 }
                 #[cfg(not(target_os = "macos"))]
                 let _ = log_tx_handmark;

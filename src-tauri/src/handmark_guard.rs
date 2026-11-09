@@ -13,7 +13,7 @@ use crate::handmark_store::Evaluation;
 use crate::logger::LogEntry;
 
 /// 新しく足したファイルの本文（このファイル自身は含めない）。
-const FILES: [(&str, &str); 12] = [
+const FILES: [(&str, &str); 13] = [
     (
         "analysis/handmark/mod.rs",
         include_str!("analysis/handmark/mod.rs"),
@@ -38,8 +38,8 @@ const FILES: [(&str, &str); 12] = [
     ("handmark_driver.rs", include_str!("handmark_driver.rs")),
     ("handmark_stage.rs", include_str!("handmark_stage.rs")),
     // ★ 添字 0..=7 は上の検査（`FILES[5]`）が使うので、足すときは必ず末尾に足す。
-    // ポインタ（PR 3・ADR-050 D3）。macOS の読み `input/handmark_pointer_macos.rs`（B1）と窓の TS（B4）は
-    // 作るときに末尾へ足し、`POINTER_FILES` の添字の範囲も広げる。
+    // ポインタ（PR 3・ADR-050 D3）。macOS の読み `input/handmark_pointer_macos.rs` は末尾（`pointer_files` の
+    // 範囲に入る）。窓の TS は別の一覧（`WINDOW`）。
     (
         "analysis/handmark/trace.rs",
         include_str!("analysis/handmark/trace.rs"),
@@ -56,9 +56,13 @@ const FILES: [(&str, &str); 12] = [
         "handmark_pointer_thread.rs",
         include_str!("handmark_pointer_thread.rs"),
     ),
+    (
+        "input/handmark_pointer_macos.rs",
+        include_str!("input/handmark_pointer_macos.rs"),
+    ),
 ];
 
-/// `FILES` のうちポインタの本文のファイル（末尾の 4 つ）。
+/// `FILES` のうちポインタの本文のファイル（末尾の 5 つ）。
 fn pointer_files() -> &'static [(&'static str, &'static str)] {
     &FILES[8..]
 }
@@ -492,7 +496,7 @@ const _: () =
 #[test]
 fn pointer_files_do_not_touch_the_recorders_files_network_or_the_estimator() {
     let files = pointer_files();
-    assert_eq!(files.len(), 4);
+    assert_eq!(files.len(), 5);
     // 記録・ログ・ファイル・ネットワーク・推定のどれも呼ばない。
     assert_clean(
         "ポインタの本文",
@@ -537,6 +541,58 @@ fn the_record_side_does_not_know_the_pointer_types() {
     let needles: Vec<&str> = names.iter().map(String::as_str).collect();
     assert_eq!(needles.len(), 5);
     assert_clean("提出物", &record_side, &needles);
+}
+
+// ---- macOS の読みの境界 ----
+
+/// `NSEvent::` の後ろの名前の一覧（本文のみ）。
+fn nsevent_reads(src: &str) -> Vec<String> {
+    let b = body(src);
+    let needle = format!("{}{}", "NSEvent", "::");
+    b.match_indices(&needle)
+        .map(|(i, _)| {
+            b[i + needle.len()..]
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect()
+        })
+        .collect()
+}
+
+/// macOS の読みは、いまの位置と押しているボタンだけを読む。キーボードの状態・フック・監視を持たない。
+#[test]
+fn the_macos_read_touches_only_the_pointer() {
+    let mac = FILES[12];
+    assert_eq!(mac.0, "input/handmark_pointer_macos.rs");
+    assert_clean(
+        "macOS の読み",
+        &[mac],
+        &[
+            "modifierFlags",
+            "keyCode",
+            "keyState",
+            "CGEventSource",
+            "CGEvent",
+            "addGlobalMonitor",
+            "addLocalMonitor",
+            "unsafe",
+        ],
+    );
+    let reads = nsevent_reads(mac.1);
+    assert!(
+        reads.iter().any(|r| r == "mouseLocation")
+            && reads.iter().any(|r| r == "pressedMouseButtons"),
+        "読みが無い（検査が空回り）: {reads:?}"
+    );
+    for r in &reads {
+        assert!(
+            r == "mouseLocation" || r == "pressedMouseButtons",
+            "NSEvent の読みが 2 つ以外: {r}"
+        );
+    }
+    // 陽性対照: 本文の先頭に別の NSEvent の読みを実行時に足すと見つかる
+    let planted = format!("let _ = {}{}{}();\n{}", "NSEvent", "::", "keyCode", mac.1);
+    assert!(nsevent_reads(&planted).iter().any(|r| r == "keyCode"));
 }
 
 // ---- 列（D4） ----

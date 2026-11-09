@@ -40,7 +40,7 @@ const PULL_RATE: f32 = 0.192_482_24;
 /// 倒しの半径（箱の単位）。
 const CURSOR_R: f32 = 0.16;
 const CURSOR_PUSH: f32 = 6.0;
-const BEND_MAX: f32 = 0.9;
+pub const BEND_MAX: f32 = 0.9;
 /// この速さ（箱/秒）を超えると倒しは頭打ち（`BOX_W × 0.4`）。
 const CURSOR_FULL: f32 = 0.64;
 /// 平滑した速さがこれ未満なら止まっているとみなす（箱/秒）。
@@ -48,7 +48,7 @@ const CURSOR_STILL: f32 = 0.01;
 /// 寄せの半径。
 const MOTE_R: f32 = 0.18;
 const MOTE_PULL: f32 = 0.0006;
-const MOTE_MAX: f32 = 0.08;
+pub const MOTE_MAX: f32 = 0.08;
 /// 刻みの秒（0.016）。
 const DT_S: f32 = 0.016;
 /// 最後の入力からこの刻み数（8000ms）で、場と速さを正確に 0 にする。
