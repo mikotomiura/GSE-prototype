@@ -27,6 +27,7 @@ import {
   receive,
   receiveRipple,
   rippleAge,
+  rippleStart,
   sampleField,
   sweepRipples,
   traceExpired,
@@ -293,4 +294,22 @@ test("場の寄せ: 0 → 1 の間を線形に進み、範囲の外は丸める"
   near(out.bend[10], 0.8);
   lerpField(a, b, -1, out);
   near(out.bend[10], 0);
+});
+
+test("波紋は押された時刻から広げる: 届くまでの遅れが違っても、押してからの経過がそろう", () => {
+  const rc = makeReceiver();
+  const m = (tMs) => ({ epoch: 0, tMs, x: 0.5, y: 0.5 });
+  // 最初の値が基準（ずれの最小 = 100）。遅れ 0 なので始まりは受け取った時刻。
+  assert.equal(receiveRipple(rc, m(0), 100), true);
+  assert.equal(rippleStart(rc, 0, 100), 100);
+  // 押した 1000 の波紋が 40ms 遅れて 1140 に届いた → 始まりは 1100（押した時刻を窓の時計に直したもの）。
+  assert.equal(receiveRipple(rc, m(1000), 1140), true);
+  assert.equal(rippleStart(rc, 1000, 1140), 1100);
+  // 同じく遅れ 0 で届いた波紋 → 始まりは 2100。押してからの経過は、どちらも受け取りの時点で揃う。
+  assert.equal(receiveRipple(rc, m(2000), 2100), true);
+  assert.equal(rippleStart(rc, 2000, 2100), 2100);
+  // 遅れは STALE_MS で頭打ち（基準を取り直した直後など、大きなずれを過去へ持ち込まない）。
+  assert.equal(rippleStart(rc, 3000, 3100 + STALE_MS + 500), 3100 + 500);
+  // 基準が無い（数でない）ときは受け取った時刻。
+  assert.equal(rippleStart(makeReceiver(), 0, 77), 77);
 });

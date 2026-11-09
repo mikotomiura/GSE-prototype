@@ -26,6 +26,7 @@ import {
   receive,
   receiveRipple,
   rippleAge,
+  rippleStart,
   sampleField,
   sweepRipples,
   traceExpired,
@@ -427,7 +428,8 @@ export default function HandmarkStage() {
         return;
       }
       if (Number.isFinite(msg.x) && Number.isFinite(msg.y)) {
-        addRipple(rippleSlots, msg.x, msg.y, now);
+        // 始まりは押された時刻(届くまでの遅れの違いで出始めがばらつかないように)
+        addRipple(rippleSlots, msg.x, msg.y, rippleStart(receiver, msg.tMs, now));
         if (active) kick();
       }
     };

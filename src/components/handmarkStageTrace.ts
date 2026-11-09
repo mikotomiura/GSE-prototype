@@ -259,3 +259,15 @@ export function receiveRipple(rc: Receiver, m: { epoch: number; tMs: number }, n
   }
   return judgeLag(rc, m.tMs, now);
 }
+
+/** 受けた波紋の始まりの時刻（窓の時計）。押された時刻を、時計のずれの最小（`minLag`）で窓の時計に直す。
+ * 届くまでの遅れ（読みの間隔・窓の描画の混み）が波紋ごとに違っても、押してからの見え方がそろう
+ * （2026-11-09 の画面の確かめで、出始めの速さがばらつくと見えた）。遅れは 0〜`STALE_MS` に収める。
+ * `receiveRipple` が受けた後に呼ぶ。 */
+export function rippleStart(rc: Receiver, tMs: number, now: number): number {
+  const late = now - tMs - rc.minLag;
+  if (!Number.isFinite(late)) {
+    return now;
+  }
+  return now - Math.min(STALE_MS, Math.max(0, late));
+}
