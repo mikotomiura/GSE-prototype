@@ -32,4 +32,4 @@
 - [x] notes.md（読みの形 A・B・C）・report.py の表（CoAuthor の主のセルは形 B・CS1 C5 k = 5 は形 C）
 - [x] code-reviewer ＋ /cross-review（Codex）（HIGH なし・判断 13 で直した）
 - [x] 2 系統目のレビューの残り 4 件を直し（判断 14）、code-reviewer ＋ /cross-review（Codex）の 2 巡目を通す（判断 15 で直した）
-- [ ] push・PR は研究者が確かめてから
+- [ ] push・PR は研究者が確かめてから（2026-11-10 研究者の選択: 下の 3 本 tau-mode-candidate → timeseries-tau-extend → coauthor-ml-improve を先に 1 本ずつ PR・マージし、その後にこの枝）
