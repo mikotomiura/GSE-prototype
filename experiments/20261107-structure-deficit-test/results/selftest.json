@@ -1,0 +1,307 @@
+{
+ "run_id": "20261109T122107-1576",
+ "mutate": [],
+ "P-XI": {
+  "passed": true,
+  "worst_rel": {
+   "10": 2.314626612988722e-15,
+   "26": 2.776267199306214e-15,
+   "50": 2.9154699906011262e-15
+  }
+ },
+ "P-BATCH": {
+  "passed": true,
+  "worst_rel": 5.297644072374411e-15
+ },
+ "P-EM3": {
+  "passed": true,
+  "sum_dev_at_dev": {
+   "10": [
+    4.440892098500626e-16,
+    1.1102230246251565e-16
+   ],
+   "26": [
+    4.440892098500626e-16,
+    4.163336342344337e-17
+   ],
+   "50": [
+    6.661338147750939e-16,
+    2.7755575615628914e-17
+   ]
+  }
+ },
+ "P-AR1": {
+  "passed": true,
+  "worst": {
+   "10": 0.0,
+   "26": 0.0,
+   "50": 0.0
+  }
+ },
+ "P-PRIOR": {
+  "passed": true,
+  "max_abs_diff_AB": 0.00010463402369106922,
+  "tau0_equals_base": true,
+  "sbar_sums": [
+   0.9999999999999916,
+   1.0000000000000007
+  ]
+ },
+ "P-OTH": {
+  "passed": true
+ },
+ "P-Q": {
+  "passed": true,
+  "bins_equal_rust": true,
+  "q5_equals_obs": true,
+  "penalty": true,
+  "q3_q7_ref": true,
+  "gate_clean": [
+   3000,
+   0
+  ],
+  "gate_one_off": [
+   3000,
+   1
+  ]
+ },
+ "P-SHUF": {
+  "passed": true,
+  "order_o_unchanged": true,
+  "per_seq_multiset": true,
+  "changed": 48,
+  "seqs": 48,
+  "same_perm_3_cols": true,
+  "pflag_moves": true,
+  "eval_seqs_changed": 12
+ },
+ "P-QW": {
+  "passed": true,
+  "error": null
+ },
+ "P-D": {
+  "passed": true,
+  "max_abs_dev": 0.0
+ },
+ "P-S": {
+  "passed": true
+ },
+ "P-CH": {
+  "passed": true,
+  "median": 0.0003063729434973515,
+  "runs": 10
+ },
+ "P-TAU": {
+  "passed": true,
+  "to_prior_mode": {
+   "1000": 0.13679220852003035,
+   "10000": 0.04945266703041415,
+   "30000": 0.020711756833440842,
+   "100000": 0.006796571836205467,
+   "300000": 0.0023296036716783375,
+   "1000000": 0.0007059750091744088
+  },
+  "to_pool": {
+   "1000": 0.13164819594696306,
+   "10000": 0.0452548294287026,
+   "30000": 0.016859468498466923,
+   "100000": 0.00676496081834016,
+   "300000": 0.005666535567306397,
+   "1000000": 0.00600616165126272
+  }
+ },
+ "P-SAME": {
+  "passed": true,
+  "cells": 432,
+  "differing": 0
+ },
+ "P-LEAK": {
+  "passed": true,
+  "worst": -0.00656403066549327
+ },
+ "P-OTHER": {
+  "passed": true,
+  "max_abs_dev": 0.0,
+  "v_model_dev": 0.0,
+  "cells": 26,
+  "p30_cells": 2
+ },
+ "P-COMP": {
+  "passed": true,
+  "part1": "vanish",
+  "part2": "own",
+  "values": {
+   "G_o": 0.03688550037564742,
+   "G_p": 0.008986659010791431,
+   "G0_o": 0.037801597802607834,
+   "D_o": 0.5977599213884921,
+   "D_p": -0.0635892261516311,
+   "S0_o": -0.042811407735981355
+  }
+ },
+ "P-PERS": {
+  "passed": true,
+  "part1": "split",
+  "part2": "own",
+  "values": {
+   "G_o": 0.967043613381366,
+   "G_p": 0.9639902812045649,
+   "G0_o": 0.9634276242878115,
+   "D_o": 0.9190644054495651,
+   "D_p": 0.9359560538570961,
+   "S0_o": -0.74263810513715
+  }
+ },
+ "P-EM2": {
+  "passed": true,
+  "decreases": 0
+ },
+ "seconds": 893.5497035980225,
+ "all_passed": true,
+ "mutations": {
+  "m1": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-LEAK": false
+   },
+   "hit": true
+  },
+  "m2": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-AR1": false
+   },
+   "hit": true
+  },
+  "m3": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PRIOR": false
+   },
+   "hit": true
+  },
+  "m6": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-S": false
+   },
+   "hit": true
+  },
+  "m7": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-S": false
+   },
+   "hit": true
+  },
+  "m8": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-OTH": false
+   },
+   "hit": true
+  },
+  "m15": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-TAU": false
+   },
+   "hit": true
+  },
+  "m31": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-Q": false
+   },
+   "hit": true
+  },
+  "m32": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-Q": false
+   },
+   "hit": true
+  },
+  "m33": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-SHUF": false
+   },
+   "hit": true
+  },
+  "m34": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-SHUF": false
+   },
+   "hit": true
+  },
+  "m35": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-QW": false
+   },
+   "hit": true
+  },
+  "m36": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-D": false
+   },
+   "hit": true
+  },
+  "m37": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-OTHER": false
+   },
+   "hit": true
+  },
+  "m38": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-OTHER": false
+   },
+   "hit": true
+  },
+  "m39": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-SAME": false
+   },
+   "hit": true
+  }
+ }
+}

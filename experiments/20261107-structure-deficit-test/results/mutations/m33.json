@@ -1,0 +1,18 @@
+{
+ "run_id": "20261109T122107-1576",
+ "mutate": [
+  "m33"
+ ],
+ "P-SHUF": {
+  "passed": false,
+  "order_o_unchanged": true,
+  "per_seq_multiset": false,
+  "changed": 0,
+  "seqs": 0,
+  "same_perm_3_cols": true,
+  "pflag_moves": true,
+  "eval_seqs_changed": 0
+ },
+ "seconds": 0.019015789031982422,
+ "all_passed": false
+}
