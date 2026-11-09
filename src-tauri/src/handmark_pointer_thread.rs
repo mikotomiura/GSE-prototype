@@ -16,8 +16,6 @@ const TRACE_SEND_MS: u64 = 33;
 const WAIT_ACTIVE_MS: u64 = STEP_MS;
 /// 止まっている間の待ち（ms）。
 const WAIT_IDLE_MS: u64 = 250;
-/// 入れ切り・開閉が変わった後、止まって見えても短い待ちで読む時間（ms）。
-const WARM_MS: u64 = 1_000;
 
 /// 駆動役（打鍵側）が決める入れ切り。
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -47,7 +45,7 @@ pub struct PointerDriver {
     last_trace_ms: u64,
     /// 最後に出した写しが全部 0 だった。
     sent_zero: bool,
-    warm_until_ms: u64,
+    /// 実効の入れ切りがある（読んでいる）。
     hot: bool,
 }
 
@@ -64,13 +62,13 @@ impl PointerDriver {
             key: (false, false, false, false),
             last_trace_ms: 0,
             sent_zero: true,
-            warm_until_ms: 0,
             hot: false,
         }
     }
 
-    /// 次の `tick` までの待ちの目安（ms）。動いている間 16・止まっている間 250。
-    /// 延ばしても場は 0 のままなので結果は変わらない。
+    /// 次の `tick` までの待ちの目安（ms）。実効の入れ切りがある（窓が開いていて・一時停止でなく・
+    /// カーソルかクリックが入っている）間は止まっていても常に 16。250 は読まない間だけ。
+    /// 止まっている間に延ばすと、次の短いクリックを取りこぼす（補訂 1 の項目 1 は 16ms ごとの読み）。
     pub fn next_wait_ms(&self) -> u64 {
         if self.hot {
             WAIT_ACTIVE_MS
@@ -119,7 +117,6 @@ impl PointerDriver {
             out.push(PointerOut::Trace(Box::new(field.state())));
             self.last_trace_ms = now_ms;
             self.sent_zero = true;
-            self.warm_until_ms = now_ms.saturating_add(WARM_MS);
         }
 
         if reading {
@@ -146,7 +143,7 @@ impl PointerDriver {
                 }
             }
         }
-        self.hot = reading && (field.is_active() || now_ms < self.warm_until_ms);
+        self.hot = reading;
         out
     }
 }
@@ -359,14 +356,54 @@ mod tests {
         let zeros = t.iter().filter(|s| s.is_zero()).count();
         assert!(zeros == 1, "zeros={zeros}");
         assert!(t.last().is_some_and(|s| s.is_zero()));
-        assert!(d.next_wait_ms() == 250);
+        // 止まって場が 0 でも、読んでいる間は 16（短いクリックを取りこぼさない）。
+        assert!(d.next_wait_ms() == 16);
     }
 
     #[test]
-    fn wait_is_short_while_moving() {
+    fn wait_is_16_while_reading_even_when_still_and_250_only_when_not_reading() {
         let mut d = PointerDriver::new();
         drive_circle(&mut d, 0, 30, ON);
         assert!(d.next_wait_ms() == 16);
+        // 止まって 8 秒を過ぎ、場が 0 になっても、入っている間は 16。
+        let mut now = 1_600 + 30 * 16;
+        for _ in 0..1_000 {
+            let mut r = || Some(pt(0.5, 0.5, false));
+            d.tick(now, ON, false, &mut r);
+            assert!(d.next_wait_ms() == 16, "now={now}");
+            now += 16;
+        }
+        // クリックだけ・カーソルだけでも読むので 16。
+        for gate in [
+            Gate {
+                cursor: false,
+                ..ON
+            },
+            Gate { click: false, ..ON },
+        ] {
+            let mut r = || Some(pt(0.5, 0.5, false));
+            d.tick(now, gate, false, &mut r);
+            assert!(d.next_wait_ms() == 16);
+            now += 16;
+        }
+        // 読まない間（一時停止・両方切る・閉じる）は 250。
+        for (gate, paused) in [
+            (ON, true),
+            (
+                Gate {
+                    cursor: false,
+                    click: false,
+                    ..ON
+                },
+                false,
+            ),
+            (Gate { open: false, ..ON }, false),
+        ] {
+            let mut r = || Some(pt(0.5, 0.5, false));
+            d.tick(now, gate, paused, &mut r);
+            assert!(d.next_wait_ms() == 250);
+            now += 16;
+        }
     }
 
     /// ライブの一致: A2 の合成の一点を、偽の読みで同じ刻みの時刻に返して `tick` を回した結果が
