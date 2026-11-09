@@ -48,3 +48,8 @@
 - [x] /finish-task（/cross-review を含む）
 - [ ] gse-dataset の同期の PR
 - [ ] push・PR は研究者に確かめてから
+
+## 後期の日に見ること（研究者の版で）
+- [ ] applog に `handmark: input press ignored` の行が出ていないか
+- [ ] トレイの「カーソル」「クリック」を押した種類と、`handmark_day.input_toggles` の種類が合うか（判断 14）
+- [ ] 波紋の出始めがそろって見えるか（判断 14 の直しの後）
