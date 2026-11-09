@@ -64,4 +64,12 @@ JOBS=16 bash run.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/unsmoothed_residu
 
 ## 7 HP Z2 での実行の記録（職場の PC のセッションが追記）
 
-（まだ無い）
+### 1 回目（2026-11-09）—— 足す陽性対照で門が赤・止まった
+
+- 場所: 別の worktree `C:/Users/SDS02/GSE-prototype-paper3`（同じ時刻に元の作業ツリーで構造の足りなさの試験が走っていたため）。先端 `a599378c`。
+- 版: Python 3.11.9・numpy 2.4.4。JOBS=16（32 論理コア・構造の足りなさの試験と並走）。
+- 準備: 3 ファイルの SHA-256 は manifest と一致（`d9526ea7…`・`d4edd002…`・manifest `370c1d59…`）。
+- 段の時刻: 開始 12:55:06 → P-PIN・manifest 2 つ 緑 → [12:55:09] 門の単体と P-D1 緑 → [12:55:21] 引き継ぐ陽性対照 緑 → [13:04:49] 足す陽性対照と変異 → 赤で終了（run.sh の終了コード 1）。
+- 赤の内容: `scripts/selftest.py` の `p_npz`（P-NPZ）が値ではなく後片付けで例外。`np.load(p)` で開いた npz を閉じないまま `tempfile.TemporaryDirectory()` を抜けるため、Windows で `p.npz` が消せず `PermissionError: [WinError 32]`（別のプロセスが使用中）。Mac では起きない Windows だけの事象と見られる。直していない。
+- 本計算（n・o・u）・変異 11 個・配管の合成の通し・P-REPRO には進んでいない。`results/` に残った門のファイル（pin_check・manifest の照合 2 つ・check_same 2 つ・selftest_inherited）はコミットしていない。
+- 次: Mac で直す（例: `with np.load(p) as z:`）かは研究者が決める。直すと selftest.py の SHA-256（P-PIN）も変わる。
