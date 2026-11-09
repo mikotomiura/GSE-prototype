@@ -36,7 +36,7 @@
 ## テスト・確かめ
 - [x] fmt・clippy（`-D warnings`）・`cargo test --workspace`・`emit_schema` の一致・`tsc --noEmit`・`node --test` を自分で走らせ直す
 - [x] 変異で赤を見る（読みの後に `tracing` を足す・`PointerSample` に `Debug`・世代が進んでも場を消さない・一時停止を見ない・区間の削除で `input_toggles` を消さない・格子の進め方を描画の回数に依らせる）
-- [ ] gse-replay の snapshot（HMM は変えないので一致を見るだけ）
+- [x] gse-replay の snapshot（HMM は変えないので一致を見るだけ）
 - [x] 区切りの点検: code-reviewer ＋ security-checker
 - [x] 画面の確かめ（研究者と・格子の粗さを判定）
 
@@ -45,6 +45,6 @@
 - [x] glossary（新しい語があれば）
 
 ## 完了処理
-- [ ] /finish-task（/cross-review を含む）
+- [x] /finish-task（/cross-review を含む）
 - [ ] gse-dataset の同期の PR
 - [ ] push・PR は研究者に確かめてから
