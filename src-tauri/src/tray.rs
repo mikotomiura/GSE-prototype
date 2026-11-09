@@ -283,19 +283,34 @@ pub fn set_handmark_inputs(v: Option<(bool, bool)>) {
     HANDMARK_INPUT_WANT[INPUT_CLICK].store(input_code(v.map(|x| x.1)), Ordering::Release);
 }
 
-/// 入力の項目が押された。`which` は添字。押された時点で出ていた印の反対を駆動役へ渡す。
-fn handmark_input_pressed(app: &AppHandle, which: usize) {
+/// 駆動役の `Effect::PointerGate { open, cursor, click }` を項目の状態へ写す（窓を出していなければ出さない）。
+pub fn set_handmark_inputs_from_gate(open: bool, cursor: bool, click: bool) {
+    set_handmark_inputs(open.then_some((cursor, click)));
+}
+
+/// 押された項目（添字 `which`）の、駆動役へ渡す値。メニューに出ていた印を返し（出ていなければ `None`）、
+/// 印の言い直しを頼む（メニューの項目は押すと自分で印が反転するので、駆動役の結果に合わせ直させる）。
+fn handmark_input_request(
+    which: usize,
+) -> Option<(crate::analysis::handmark::day::PointerInput, bool)> {
     use crate::analysis::handmark::day::PointerInput;
     let shown = input_from_code(HANDMARK_INPUT_SHOWN[which].load(Ordering::Acquire));
-    // メニューの印は押すと自分で反転するので、駆動役の結果に合わせ直させる
     HANDMARK_INPUT_RESYNC.store(true, Ordering::Release);
-    let Some(checked) = shown else { return };
+    let checked = shown?;
     let input = if which == INPUT_CURSOR {
         PointerInput::Cursor
     } else {
         PointerInput::Click
     };
-    crate::handmark_set_input_from_tray(app, input, !checked);
+    Some((input, checked))
+}
+
+/// 入力の項目が押された。`which` は添字。押された時点で出ていた印を駆動役へ渡す（照合は
+/// `handmark_driver::decide_tray_input`）。
+fn handmark_input_pressed(app: &AppHandle, which: usize) {
+    if let Some((input, checked)) = handmark_input_request(which) {
+        crate::handmark_set_input_from_tray(app, input, checked);
+    }
 }
 
 /// 入力の項目 1 つをメニューに反映する(更新スレッドから)。結果の状態を返す。
@@ -839,9 +854,117 @@ mod tests {
         assert_eq!(handmark_input_index(&[], &[MENU_HANDMARK]), 0);
     }
 
+    /// 入力の項目の Atomic（`HANDMARK_INPUT_*`）は全体で 1 組なので、触るテストは直列にする。
+    static INPUT_ATOMICS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// 駆動役の出来事のうち `PointerGate` を、実際の経路（`set_handmark_inputs_from_gate`）で項目の「あるべき状態」へ。
+    fn apply_gate(fx: &[crate::handmark_driver::Effect]) -> usize {
+        let mut n = 0;
+        for e in fx {
+            if let crate::handmark_driver::Effect::PointerGate {
+                open,
+                cursor,
+                click,
+            } = e
+            {
+                set_handmark_inputs_from_gate(*open, *cursor, *click);
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// 更新スレッドが 1 秒ごとにする「あるべき状態に合わせ、実際に出している状態を書く」を、メニューなしで写す。
+    fn reconcile_without_menu(force: bool) {
+        for i in [INPUT_CURSOR, INPUT_CLICK] {
+            let want = input_from_code(HANDMARK_INPUT_WANT[i].load(Ordering::Acquire));
+            let shown = input_from_code(HANDMARK_INPUT_SHOWN[i].load(Ordering::Acquire));
+            let after = handmark_input_step(want, shown, force, |_| true);
+            HANDMARK_INPUT_SHOWN[i].store(input_code(after), Ordering::Release);
+        }
+    }
+
+    /// 押下 → 照合 → `set_input` → `PointerGate` → `set_handmark_inputs_from_gate` → 印の Atomic まで 1 本で通す
+    /// （PR 1 判断 10: 純関数だけのテストで、押しても効かない不具合を出した）。
+    #[test]
+    fn a_tray_press_reaches_the_marks_through_the_driver() {
+        use crate::analysis::handmark::day::PointerInput;
+        use crate::handmark_driver::{decide_tray_input, HandmarkDriver};
+        use crate::handmark_store::testfs::with_table;
+        let _lock = INPUT_ATOMICS.lock().unwrap_or_else(|p| p.into_inner());
+        const T0: u64 = 1_800_000_000_000;
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, 20_411);
+        assert_eq!(apply_gate(&fx), 1);
+        reconcile_without_menu(false);
+        let want = |i: usize| input_from_code(HANDMARK_INPUT_WANT[i].load(Ordering::Acquire));
+        let shown = |i: usize| input_from_code(HANDMARK_INPUT_SHOWN[i].load(Ordering::Acquire));
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(true), Some(true))
+        );
+
+        // 押す（カーソル）: 印は入っている → 切る。
+        let (input, checked) = handmark_input_request(INPUT_CURSOR).expect("shown");
+        assert!(input == PointerInput::Cursor && checked);
+        let on = decide_tray_input(checked, d.input_items(), input).expect("fresh");
+        assert!(!on);
+        let fx = d.set_input(&fs, input, on, T0 + 1_000);
+        assert_eq!(apply_gate(&fx), 1);
+        assert_eq!(d.input_items(), Some((false, true)));
+        assert_eq!(
+            (want(INPUT_CURSOR), want(INPUT_CLICK)),
+            (Some(false), Some(true))
+        );
+        // 押した直後は印の言い直しが頼まれている（メニューの自動反転を戻す）
+        assert!(HANDMARK_INPUT_RESYNC.swap(false, Ordering::AcqRel));
+        reconcile_without_menu(true);
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(false), Some(true))
+        );
+
+        // 古い表示で押す（まだ入っている印のつもり）→ 何も起きない。
+        assert_eq!(
+            decide_tray_input(true, d.input_items(), PointerInput::Cursor),
+            None
+        );
+
+        // 押す（クリック）→ 切る・もう一度カーソルを押す → 入れる。
+        let (input, checked) = handmark_input_request(INPUT_CLICK).expect("shown");
+        let on = decide_tray_input(checked, d.input_items(), input).expect("fresh");
+        apply_gate(&d.set_input(&fs, input, on, T0 + 2_000));
+        reconcile_without_menu(true);
+        let (input, checked) = handmark_input_request(INPUT_CURSOR).expect("shown");
+        assert!(!checked);
+        let on = decide_tray_input(checked, d.input_items(), input).expect("fresh");
+        assert!(on);
+        apply_gate(&d.set_input(&fs, input, on, T0 + 3_000));
+        reconcile_without_menu(true);
+        // 印の Atomic が、駆動役の状態と一致する。
+        let (c, k) = d.input_items().expect("open");
+        assert_eq!((c, k), (true, false));
+        assert_eq!((want(INPUT_CURSOR), want(INPUT_CLICK)), (Some(c), Some(k)));
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(c), Some(k))
+        );
+        HANDMARK_INPUT_RESYNC.store(false, Ordering::Release);
+        // 窓を閉じる（全体のやめる）→ 項目が消える。
+        let fx = d.turn_off(&fs, T0 + 4_000);
+        apply_gate(&fx);
+        reconcile_without_menu(false);
+        assert_eq!((shown(INPUT_CURSOR), shown(INPUT_CLICK)), (None, None));
+        // 出ていない項目の押下は何も渡さない（言い直しだけ頼む）。
+        assert!(handmark_input_request(INPUT_CURSOR).is_none());
+        HANDMARK_INPUT_RESYNC.store(false, Ordering::Release);
+        set_handmark_inputs(None);
+    }
+
     /// 駆動役が知らせた状態が、項目ごとの「あるべき状態」になる(出さない日は両方 None)。
     #[test]
     fn set_handmark_inputs_writes_both_wants() {
+        let _lock = INPUT_ATOMICS.lock().unwrap_or_else(|p| p.into_inner());
         let read = |i: usize| input_from_code(HANDMARK_INPUT_WANT[i].load(Ordering::Acquire));
         set_handmark_inputs(Some((false, true)));
         assert_eq!(

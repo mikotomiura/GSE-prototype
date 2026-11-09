@@ -104,6 +104,24 @@ impl Effect {
     }
 }
 
+/// トレイの「カーソル」「クリック」の押下の照合（AppHandle を要らない純関数）。
+///
+/// `shown_checked` は押された項目の、メニューに出ていた印（入っていれば true）。`driver_items` は駆動役の
+/// 今の状態（`input_items()`）。窓を出していない（`None`）・表示が古い（駆動役の今の状態が出ていた印と違う）
+/// ときは `None`（何もしない）。そうでなければ `Some(on)`（`on` は入れる側 = 出ていた印の反対）。
+pub fn decide_tray_input(
+    shown_checked: bool,
+    driver_items: Option<(bool, bool)>,
+    input: PointerInput,
+) -> Option<bool> {
+    let (cursor_on, click_on) = driver_items?;
+    let now_on = match input {
+        PointerInput::Cursor => cursor_on,
+        PointerInput::Click => click_on,
+    };
+    (now_on == shown_checked).then_some(!shown_checked)
+}
+
 /// 今日の評価から、トレイの項目を決める（出す日でない日に止める・戻すは意味を持たない）。
 pub fn tray_item(ev: &Evaluation) -> TrayItem {
     match ev.decision {
@@ -485,6 +503,25 @@ mod tests {
             Effect::Row(r) => Some(r.reason),
             _ => None,
         })
+    }
+
+    #[test]
+    fn decide_tray_input_matches_the_shown_mark_with_the_drivers_state() {
+        use PointerInput::{Click, Cursor};
+        // 窓を出していない → 何もしない。
+        assert_eq!(decide_tray_input(true, None, Cursor), None);
+        // 出ていた印が駆動役の状態と同じなら、反対を入れる側として返す。
+        assert_eq!(
+            decide_tray_input(true, Some((true, false)), Cursor),
+            Some(false)
+        );
+        assert_eq!(
+            decide_tray_input(false, Some((true, false)), Click),
+            Some(true)
+        );
+        // 違う（表示が古い）→ 何もしない。
+        assert_eq!(decide_tray_input(false, Some((true, false)), Cursor), None);
+        assert_eq!(decide_tray_input(true, Some((true, false)), Click), None);
     }
 
     #[test]

@@ -2377,7 +2377,7 @@ fn run_handmark_effects(
                     u8::from(open) | (u8::from(cursor) << 1) | (u8::from(click) << 2),
                     std::sync::atomic::Ordering::Release,
                 );
-                crate::tray::set_handmark_inputs(open.then_some((cursor, click)));
+                crate::tray::set_handmark_inputs_from_gate(open, cursor, click);
             }
         }
     }
@@ -2419,17 +2419,17 @@ pub(crate) fn handmark_toggle_from_tray(
     run_handmark_effects(app, &log_tx, fx);
 }
 
-/// トレイの「カーソル」「クリック」。`on` は入れる側。選んだことは(日の行の入れ切りの時刻以外は)記録しない。
+/// トレイの「カーソル」「クリック」。`shown_checked` は押された項目の、メニューに出ていた印(入っていれば true)。
+/// 選んだことは(日の行の入れ切りの時刻以外は)記録しない。
 ///
-/// `on` は押された項目の、メニューに出ていた状態の反対(出ていた印が入っていれば切る)。駆動役の今の状態が
-/// それと違う(表示が古い)ときは何もしない。窓を出していないとき・終了中も何もしない。
+/// 照合は純関数 `handmark_driver::decide_tray_input`: 駆動役の今の状態が出ていた印と違う(表示が古い)ときは
+/// 何もしない。窓を出していないとき・終了中も何もしない。
 /// ロックの順は `handmark_toggle_from_tray` と同じ(`HANDMARK_DRIVER` を持つ間 `LogState` を取らない)。
 pub(crate) fn handmark_set_input_from_tray(
     app: &tauri::AppHandle,
     input: crate::analysis::handmark::day::PointerInput,
-    on: bool,
+    shown_checked: bool,
 ) {
-    use crate::analysis::handmark::day::PointerInput;
     if is_shutting_down() {
         return;
     }
@@ -2437,16 +2437,10 @@ pub(crate) fn handmark_set_input_from_tray(
     let log_tx = handmark_log_tx(app);
     let mut g = handmark_lock();
     let Some(d) = g.as_mut() else { return };
-    let Some((cursor_on, click_on)) = d.input_items() else {
+    let Some(on) = crate::handmark_driver::decide_tray_input(shown_checked, d.input_items(), input)
+    else {
         return;
     };
-    let now_on = match input {
-        PointerInput::Cursor => cursor_on,
-        PointerInput::Click => click_on,
-    };
-    if now_on == on {
-        return;
-    }
     let fx = d.set_input(fs, input, on, epoch_ms());
     run_handmark_effects(app, &log_tx, fx);
 }
