@@ -137,11 +137,14 @@ impl PointerDriver {
             if target.saturating_sub(field.grid_t()) >= STEP_MS {
                 // 飛ばした刻み。カーソルが入っていれば速さを保つ（読めなかった刻み）。
                 field.advance_held(target - STEP_MS, gate.cursor);
+                // 読んで画面の外だった（`None`）刻みは `lost`。読まなかった刻み（上の `advance_held`）とは別。
                 let sample = read();
+                let lost = sample.is_none();
                 let ripple = field.step(Step {
                     sample,
                     cursor_on: gate.cursor,
                     click_on: gate.click,
+                    lost,
                 });
                 if let Some(r) = ripple {
                     out.push(PointerOut::Ripple(r));
@@ -418,6 +421,26 @@ mod tests {
             assert!(d.next_wait_ms(now) == 250);
             now += 16;
         }
+    }
+
+    #[test]
+    fn a_return_from_off_screen_through_tick_does_not_jump_the_field() {
+        // 画面の外（read が None）を数刻み挟んで、遠くへ戻る。戻った刻みで場が大きく増えない。
+        let mut d = PointerDriver::new();
+        let out = drive_circle(&mut d, 0, 60, ON);
+        assert!(!traces(&out).is_empty());
+        let mut now = 1_600 + 60 * 16;
+        for _ in 0..4 {
+            let mut r = || None;
+            d.tick(now, ON, false, &mut r);
+            now += 16;
+        }
+        let before = d.trace_state().expect("opened");
+        let mut r = || Some(pt(0.05, 0.95, false));
+        d.tick(now, ON, false, &mut r);
+        let after = d.trace_state().expect("opened");
+        let bend = |s: &TraceState| s.cells.iter().fold(0.0f32, |m, c| m.max(c[0].abs()));
+        assert!(bend(&after) <= bend(&before), "no jump on return");
     }
 
     /// ライブの一致: A2 の合成の一点を、偽の読みで同じ刻みの時刻に返して `tick` を回した結果が

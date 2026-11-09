@@ -71,6 +71,10 @@ pub struct Step {
     pub cursor_on: bool,
     /// クリックの入力が入っているか。
     pub click_on: bool,
+    /// 読んだが、画面の外だった（副画面など・`to_point` が `None`）。`true` の刻みは最後の一点を捨て、
+    /// 速さを 0 にし、前の押下を「押されている」とみなす（戻ったとき古い速さが効かず、押したまま戻って
+    /// 波紋も出ない）。読まなかった刻み（呼び出しの遅れ）は `false` のまま `sample: None`（速さを保つ）。
+    pub lost: bool,
 }
 
 /// 押下が始まった刻みの正準の位置（波紋の種）。
@@ -190,6 +194,7 @@ impl TraceField {
             sample: None,
             cursor_on,
             click_on: false,
+            lost: false,
         };
         while self.grid_t.saturating_add(STEP_MS) <= t {
             if self.is_idle() {
@@ -210,6 +215,14 @@ impl TraceField {
             c[0] *= DECAY_BEND;
             c[1] *= DECAY_PULL;
             c[2] *= DECAY_PULL;
+        }
+
+        // 1b. 読んだが画面の外だった: 最後の一点・速さ・前の押下を捨てる（戻った最初の一点を古い値で扱わない）
+        if input.lost {
+            self.last = None;
+            self.vx = 0.0;
+            self.vy = 0.0;
+            self.prev_down = true;
         }
 
         // 2. 速さ
@@ -345,6 +358,7 @@ mod tests {
             sample: Some(p),
             cursor_on: true,
             click_on: true,
+            lost: false,
         }
     }
 
@@ -400,6 +414,7 @@ mod tests {
                 sample: None,
                 cursor_on: true,
                 click_on: true,
+                lost: false,
             });
         }
         assert!(a.grid_t() == b.grid_t() && a.grid_t() == c.grid_t());
@@ -453,6 +468,7 @@ mod tests {
                 sample: Some(p),
                 cursor_on: false,
                 click_on: true,
+                lost: false,
             });
         }
         assert!(f.state().is_zero());
@@ -470,11 +486,13 @@ mod tests {
             sample: Some(pt(0.4, 0.5)),
             cursor_on: true,
             click_on: false,
+            lost: false,
         });
         let r = f.step(Step {
             sample: Some(down(0.4)),
             cursor_on: true,
             click_on: false,
+            lost: false,
         });
         assert!(r.is_none());
         // 押しっぱなしのまま入れても出ない。
@@ -552,6 +570,7 @@ mod tests {
             sample: None,
             cursor_on: true,
             click_on: true,
+            lost: false,
         };
         f.step(miss);
         assert!((f.vx, f.vy) == (vx, vy), "the speed is kept");
@@ -564,8 +583,79 @@ mod tests {
             sample: None,
             cursor_on: false,
             click_on: true,
+            lost: false,
         });
         assert!(f.vx == 0.0 && f.vy == 0.0);
+    }
+
+    fn lost_step() -> Step {
+        Step {
+            sample: None,
+            cursor_on: true,
+            click_on: true,
+            lost: true,
+        }
+    }
+
+    fn max_abs_bend(f: &TraceField) -> f32 {
+        f.cells.iter().fold(0.0f32, |m, c| m.max(c[0].abs()))
+    }
+
+    #[test]
+    fn a_return_from_off_screen_does_not_use_the_old_speed() {
+        // 動く → 画面の外（読んだが None）→ 遠くへ戻る。戻った最初の一点に古い速さが効かず、場が跳ねない。
+        let far = pt(0.2, 0.9);
+        let mut lost = run(&circle(30));
+        assert!(lost.vx != 0.0 || lost.vy != 0.0);
+        for _ in 0..3 {
+            lost.step(lost_step());
+        }
+        assert!(lost.last.is_none() && lost.vx == 0.0 && lost.vy == 0.0);
+        let before = max_abs_bend(&lost);
+        lost.step(on(far));
+        assert!(
+            lost.vx == 0.0 && lost.vy == 0.0,
+            "no speed from a stale point"
+        );
+        assert!(max_abs_bend(&lost) <= before, "the field does not jump");
+
+        // 陰性の対照: 読まなかった刻み（lost でない・呼び出しの遅れ）では、最後の一点が残るので同じ戻りで跳ねる。
+        let mut held = run(&circle(30));
+        for _ in 0..3 {
+            held.step(Step {
+                lost: false,
+                ..lost_step()
+            });
+        }
+        held.step(on(far));
+        assert!(
+            held.vx != 0.0 || held.vy != 0.0,
+            "the control sees the stale point"
+        );
+    }
+
+    #[test]
+    fn a_press_held_across_an_off_screen_stretch_gives_no_ripple_but_release_and_press_does() {
+        let down = |x| Point {
+            x,
+            y: 0.5,
+            left_down: true,
+        };
+        let mut f = TraceField::new(0);
+        f.step(on(pt(0.4, 0.5)));
+        // 押したまま画面の外へ出て、押したまま戻る: 波紋は出ない。
+        assert!(f.step(on(down(0.4))).is_some());
+        f.step(lost_step());
+        f.step(lost_step());
+        assert!(f.step(on(down(0.9))).is_none());
+        assert!(f.step(on(down(0.9))).is_none());
+        // 離して画面の外へ出て、戻って押す: 波紋が出る。
+        f.step(on(pt(0.9, 0.5)));
+        f.step(lost_step());
+        // 離している間に外へ出たので、戻った最初の一点までは「押されている」とみなす（その一点が離している）。
+        assert!(f.step(on(pt(0.5, 0.5))).is_none());
+        let r = f.step(on(down(0.5)));
+        assert!(r.is_some_and(|r| r.x == 0.5));
     }
 
     #[test]

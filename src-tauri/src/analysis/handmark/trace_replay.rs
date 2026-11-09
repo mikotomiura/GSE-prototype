@@ -221,6 +221,7 @@ pub fn replay_trace(bins: &[PointerBin], seed: u64, t0: u64, t: u64) -> TraceSta
             sample: Some(p),
             cursor_on: true,
             click_on: true,
+            lost: false,
         });
     }
     field.state()
@@ -284,6 +285,7 @@ mod tests {
                 sample: Some(p),
                 cursor_on: true,
                 click_on: true,
+                lost: false,
             });
         }
         assert!(f.state().bits() == replay_trace(&b, 3, 1_000, 9_000).bits());

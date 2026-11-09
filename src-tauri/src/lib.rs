@@ -2520,13 +2520,15 @@ struct HandmarkWindowGuard {
 #[cfg(target_os = "macos")]
 impl Drop for HandmarkWindowGuard {
     fn drop(&mut self) {
+        // ★ 駆動役を捨てるのが最初(以後のトレイの押下は `handmark_lock()` が `None` を返して何もしない)。
+        // 後にすると、閉じた後の隙間のトレイの押下が古い駆動役から `PointerGate { open: true }` を出して門と
+        // トレイの項目を開け直し、駆動役が居ないので誰も閉じない。
+        handmark_clear_driver();
         crate::handmark_stage::close(&self.app);
         crate::tray::set_handmark_item(crate::handmark_driver::TrayItem::Hidden);
         crate::tray::set_handmark_inputs(None);
         // ポインタのスレッドも読むのをやめる(閉じた門)
         HANDMARK_POINTER_GATE.store(0, std::sync::atomic::Ordering::Release);
-        // 駆動役を捨てる(以後のトレイの押下は `handmark_lock()` が `None` を返して何もしない)
-        handmark_clear_driver();
     }
 }
 
