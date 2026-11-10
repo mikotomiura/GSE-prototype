@@ -5,6 +5,8 @@
 出力: <out_dir>/calibration.json・replicates/<番号>.json（合成の書き手ごとの値・実データではない）・plan.json（時間の規則）。
 複製の値はこのスクリプトでは要約も表示もしない（D6: 時間だけを見て削りを決める）。
 """
+import glob
+import hashlib
 import json
 import os
 import sys
@@ -18,6 +20,18 @@ import synth as SY  # noqa: E402
 from pinned import DT, H, ml  # noqa: E402
 
 DOSE = [1e-3, 3e-3, 1e-2, 3e-2]
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def code_hash():
+    """scripts/*.py と読み込む tau-extend のコードを合わせた SHA-256（再開のときに古い結果を照らす・レビュー MEDIUM 3）。"""
+    import pinned
+    h = hashlib.sha256()
+    for p in sorted(glob.glob(os.path.join(HERE, "*.py"))):
+        h.update(os.path.basename(p).encode() + open(p, "rb").read())
+    for f, v in sorted(pinned.hashes().items()):
+        h.update((f + v).encode())
+    return h.hexdigest()
 
 
 def plan():
@@ -97,6 +111,7 @@ def run_rep(r, cal, m0s, seed, jobs, mut=(), smut=()):
     """1 複製。返り値: 書き手ごとの値（パネルだけ）と時間。"""
     t0 = time.time()
     sh = SY.SHAPES[r["shape"]]
+    assert sh["H"] == ml.DATASETS[sh["ds"]]["H"]  # fit_pool_excl は ml.DATASETS の H を使う（レビュー LOW 5）
     lam = cal[r["K"]][str(r["g"])]["lam"] if r["g"] > 0 else 0.0
     writers, models, lams, P = SY.build(r["shape"], r["K"], r["seed"], SY.lam_rule(r["strand"], lam), m0s[r["K"]], seed)
     ds, H_ = sh["ds"], sh["H"]
@@ -121,15 +136,18 @@ def run_rep(r, cal, m0s, seed, jobs, mut=(), smut=()):
                 seconds=dict(pools=t1 - t0, writers=time.time() - t1, total=time.time() - t0))
 
 
-def calibrate_all(seed, path):
+def calibrate_all(seed, path, ch):
     if os.path.exists(path):
-        return {int(k): v for k, v in json.load(open(path)).items()}
+        d = json.load(open(path))
+        if d.get("seed") != seed or d.get("code_hash") != ch:
+            sys.exit("calibration.json の seed かコードのハッシュが今回と違う（消してからやり直す）")
+        return {int(k): v for k, v in d["cal"].items()}
     m0s = {K: SY.make_m0(K, seed) for K in (3, 5)}
     cal = {3: {}, 5: {}}
     for g in DOSE:
         cal[3][str(g)] = SY.calibrate(m0s[3], g, seed)
     cal[5][str(1e-2)] = SY.calibrate(m0s[5], 1e-2, seed)
-    json.dump(cal, open(path, "w"), indent=1)
+    json.dump(dict(seed=seed, code_hash=ch, cal=cal), open(path, "w"), indent=1)
     return cal
 
 
@@ -143,20 +161,26 @@ def main():
     seed, out, jobs = int(argv[0]), argv[1], int(argv[2])
     os.makedirs(os.path.join(out, "replicates"), exist_ok=True)
     t0 = time.time()
-    cal = calibrate_all(seed, os.path.join(out, "calibration.json"))
+    ch = code_hash()
+    cal = calibrate_all(seed, os.path.join(out, "calibration.json"), ch)
     bad = [(K, g) for K in cal for g, c in cal[K].items() if not c["ok"]]
     if bad:
         sys.exit("較正が目標の ±10% に入らない（止めて逸脱として書く）: %r" % bad)
     m0s = {K: SY.make_m0(K, seed) for K in (3, 5)}
     rows = plan()
-    P = dict(run_id=run_id, calibration_seconds=time.time() - t0, budget_hours=budget, rows=len(rows))
+    P = dict(run_id=run_id, seed=seed, code_hash=ch, calibration_seconds=time.time() - t0, budget_hours=budget,
+             rows=len(rows), reused=[])
 
     def do(r):
         p = os.path.join(out, "replicates", "%02d.json" % r["no"])
         if os.path.exists(p):
-            return json.load(open(p))["seconds"]["total"]
+            old = json.load(open(p))
+            if old.get("seed") != seed or old.get("code_hash") != ch or old["rep"] != r:
+                sys.exit("複製 %02d の seed・コードのハッシュ・行が今回と違う（消してからやり直す）" % r["no"])
+            P["reused"].append(r["no"])
+            return old["seconds"]["total"]
         R = run_rep(r, cal, m0s, seed, jobs)
-        R["run_id"] = run_id
+        R.update(run_id=run_id, seed=seed, code_hash=ch)
         json.dump(R, open(p, "w"))
         print("複製 %02d（%s・%s）%.0f 秒" % (r["no"], r["strand"], r["shape"], R["seconds"]["total"]), flush=True)
         return R["seconds"]["total"]
@@ -178,6 +202,8 @@ def main():
              per_rep_seconds=dict(coauthor=tco, cs1=tcs))
     json.dump(P, open(os.path.join(out, "plan.json"), "w"), indent=1)
     print("見積もり %.1f 時間（削り %d 段）" % (P["estimate_hours"], applied), flush=True)
+    if P["estimate_hours"] > budget:  # 削りを全部当てても超える: 止めて研究者に聞く（D6・レビュー MEDIUM 2）
+        sys.exit("削りを全部当てても見積もりが %.1f 時間（予算 %.0f）。止めて研究者に聞く" % (P["estimate_hours"], budget))
     for r in rows:
         if r["no"] in keep:
             do(r)

@@ -24,7 +24,12 @@ def main():
         i = argv.index("--run-id"); run_id = argv[i + 1]; argv = argv[:i] + argv[i + 2:]
     out = argv[0]
     reps = [json.load(open(p)) for p in sorted(glob.glob(os.path.join(out, "replicates", "*.json")))]
+    hs = {(R.get("seed"), R.get("code_hash")) for R in reps}
+    if len(hs) != 1 or None in next(iter(hs)):
+        sys.exit("複製の seed かコードのハッシュが揃っていない: %r" % hs)
     S = AN.summarize(reps)
+    S["code_hash"] = next(iter(hs))[1]
+    S["run_ids"] = sorted({R.get("run_id") for R in reps if R.get("run_id")})
     S["run_id"] = run_id
     S["calibration"] = json.load(open(os.path.join(out, "calibration.json")))
     S["plan"] = json.load(open(os.path.join(out, "plan.json")))

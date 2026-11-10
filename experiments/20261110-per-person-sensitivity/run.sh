@@ -16,10 +16,9 @@ mkdir -p "$OUT"
 "$PY" -I -X utf8 "$SC/sens_selftest.py" "$SEED" "$OUT/selftest.json" --run-id "$RUN_ID" --jobs "$JOBS"
 OUT="$OUT" RUN_ID="$RUN_ID" PYTHON="$PY" bash "$EXP_DIR/mutate.sh"
 "$PY" -I -X utf8 "$SC/sens_check_mutations.py" "$OUT/mutations" "$OUT/selftest.json" "$RUN_ID"
-"$PY" -I -X utf8 "$SC/run_synth.py" "$SEED" "$OUT" "$JOBS" --run-id "$RUN_ID"
-"$PY" -I -X utf8 "$SC/sens_report.py" "$OUT" --run-id "$RUN_ID"
+prov() {
 "$PY" -I -X utf8 - "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$(cd "$REPO_ROOT" && git status --porcelain -- experiments/20261110-per-person-sensitivity experiments/20261104-timeseries-tau-extend/scripts)" \
-  "$EXP_DIR" "$RUN_ID" "$JOBS" "$OUT/provenance.json" <<'PY'
+  "$EXP_DIR" "$RUN_ID" "$JOBS" "$OUT/$1" <<'PY'
 import glob, hashlib, json, os, platform, sys
 import numpy
 head, dirty, exp, run_id, jobs, out = sys.argv[1:7]
@@ -32,6 +31,15 @@ P = dict(run_id=run_id, git_head=head, uncommitted=dirty.splitlines(), jobs=int(
          run_sh=h(os.path.join(exp, "run.sh")), mutate_sh=h(os.path.join(exp, "mutate.sh")),
          conditions=h(os.path.join(exp, "conditions.md")), seed_file=h(os.path.join(exp, "SEED")),
          pinned=pinned.hashes())
+d = os.path.dirname(out)
+for f in ("plan.json", "calibration.json"):  # 各複製の時間・較正の λ（V2・レビュー LOW 12）
+    if os.path.exists(os.path.join(d, f)):
+        P[f] = dict(sha256=h(os.path.join(d, f)), content=json.load(open(os.path.join(d, f))))
 json.dump(P, open(out, "w"), indent=1)
 PY
+}
+prov provenance.pre.json  # 本計算の前に一度（途中で落ちても来歴が残る・レビュー LOW 12）
+"$PY" -I -X utf8 "$SC/run_synth.py" "$SEED" "$OUT" "$JOBS" --run-id "$RUN_ID"
+"$PY" -I -X utf8 "$SC/sens_report.py" "$OUT" --run-id "$RUN_ID"
+prov provenance.json
 echo "終わり: $RUN_ID"

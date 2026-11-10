@@ -9,7 +9,8 @@ mkdir -p "$OUT"
 PY="${PYTHON:-python3}"
 run() {
   local m="$1" ctl="$2"
-  "$PY" -I -X utf8 "$SC/sens_selftest.py" "$SEED" "$OUT/$m.json" --mutate "$m" --only "$ctl" --run-id "$RUN_ID" > "$OUT/$m.log" 2>&1
+  # 全対照を回す（V1「それ以外の対照の結果を出す」・レビュー LOW 11）。$ctl は名指しの対照（check で見る）
+  "$PY" -I -X utf8 "$SC/sens_selftest.py" "$SEED" "$OUT/$m.json" --mutate "$m" --run-id "$RUN_ID" > "$OUT/$m.log" 2>&1
   echo $? > "$OUT/$m.exit"
 }
 run v1 P-DIFF
@@ -17,3 +18,4 @@ run v2 P-PLANT0
 run v3 P-JOINTW
 run v4 P-GROUP
 run v5 P-SPLIT
+run v6 P-MEAN

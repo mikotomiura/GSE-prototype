@@ -19,7 +19,7 @@ import synth as SY  # noqa: E402
 from pinned import DT, H, ml  # noqa: E402
 
 NAMES = ["P-HASH", "P-PLANT0", "P-MEAN", "P-DIFF", "P-CAL", "P-GROUP", "P-SPLIT", "P-NULLSAME", "P-JOINTW", "P-RECOVER"]
-MUT_MAP = {"v3": ("ml", "m12"), "v5": ("ml", "m6")}
+MUT_MAP = {"v3": ("ml", "m12"), "v5": ("ml", "m6")}  # v1・v2・v4・v6 は synth.MUT
 
 
 def p_hash(seed, jobs):
@@ -42,27 +42,27 @@ def p_plant0(seed, jobs):
 
 
 def p_mean(seed, jobs):
+    """本番の draw_D を 20,000 回呼び、書き手の D の平均が C0 に合うか（レビュー MEDIUM 1 の直し）。"""
     m0 = SY.make_m0(3, seed)
     rng = np.random.default_rng([seed, 3])
-    K = len(m0["pi"])
-    mx = 0.0
-    for k in range(K):
-        for j in range(SY.NSYM):
-            d = rng.dirichlet(SY.D_CONC * m0["C"][k, j], size=20000).mean(0)
-            mx = max(mx, float(np.abs(d - m0["C"][k, j]).max()))
+    acc = np.zeros_like(m0["C"])
+    n = 20000
+    for _ in range(n):
+        acc += SY.draw_D(m0, rng)
+    mx = float(np.abs(acc / n - m0["C"]).max())
     return dict(passed=mx < 0.01, max_abs=mx)
 
 
 _BUILT = {}
 
 
-def built(kind, seed):
-    if kind not in _BUILT:
+def built(kind, seed, shape="coauthor"):
+    if (kind, shape) not in _BUILT:
         m0 = SY.make_m0(3, seed)
         lam = {"dose": 0.3, "dist": 0.3, "null": 0.0}[kind]
         strand = "dist" if kind == "dist" else "dose"
-        _BUILT[kind] = (SY.build("coauthor", 3, 0, SY.lam_rule(strand, lam), m0, seed), m0)
-    return _BUILT[kind]
+        _BUILT[(kind, shape)] = (SY.build(shape, 3, 0, SY.lam_rule(strand, lam), m0, seed), m0)
+    return _BUILT[(kind, shape)]
 
 
 def p_diff(seed, jobs):
@@ -85,17 +85,23 @@ def p_group(seed, jobs):
 
 
 def p_split(seed, jobs):
-    (writers, models, lams, P), m0 = built("null", seed)
-    H_ = SY.SHAPES["coauthor"]["H"]
+    """CoAuthor と CS1 の両方の形で（CS1 は共通だけの書き手の最後の課題が共通から外れる経路を含む・レビュー LOW 8）。"""
     ok = True
-    for w in range(P):
-        n = len(writers[w])
-        for k in SY.SHAPES["coauthor"]["ks"]:
-            tr, te = DT.split(n, k, H_)
-            ok = ok and not (set(tr) & set(te)) and max(tr) < min(te)
-        ev_ids = {id(writers[w][i]) for i in DT.split(n, 1, H_)[1]}
-        for v in range(len(writers)):
-            ok = ok and not (ev_ids & {id(u) for u in ml.pool_units(writers, H_, exclude=v)})
+    for shape in ("coauthor", "cs1"):
+        (writers, models, lams, P), m0 = built("null", seed, shape)
+        H_ = SY.SHAPES[shape]["H"]
+        for w in range(P):
+            n = len(writers[w])
+            for k in SY.SHAPES[shape]["ks"]:
+                tr, te = DT.split(n, k, H_)
+                ok = ok and not (set(tr) & set(te)) and max(tr) < min(te)
+            ev_ids = {id(writers[w][i]) for i in DT.split(n, 1, H_)[1]}
+            for v in range(len(writers)):
+                ok = ok and not (ev_ids & {id(u) for u in ml.pool_units(writers, H_, exclude=v)})
+        if shape == "cs1":
+            pool_ids = {id(u) for u in ml.pool_units(writers, H_)}
+            for i in range(P, len(writers)):
+                ok = ok and id(writers[i][-1]) not in pool_ids and all(id(u) in pool_ids for u in writers[i][:-1])
     return dict(passed=bool(ok))
 
 

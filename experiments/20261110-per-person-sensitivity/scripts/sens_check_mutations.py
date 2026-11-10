@@ -8,7 +8,7 @@ import json
 import os
 import sys
 
-NAMED = {"v1": ["P-DIFF"], "v2": ["P-PLANT0"], "v3": ["P-JOINTW"], "v4": ["P-GROUP"], "v5": ["P-SPLIT"]}
+NAMED = {"v1": ["P-DIFF"], "v2": ["P-PLANT0"], "v3": ["P-JOINTW"], "v4": ["P-GROUP"], "v5": ["P-SPLIT"], "v6": ["P-MEAN"]}
 
 
 def check(d, m, ctls, run_id):

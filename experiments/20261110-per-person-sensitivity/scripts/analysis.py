@@ -67,7 +67,8 @@ def cell(R, k):
     pl = R["planted"]
     if any(pl) and not all(pl):
         C["planted"] = dict(main=stats([d[w] for w in ws if pl[w]]), n=sum(pl),
-                            moved=sum(1 for w in ws if pl[w] and pick[w][1] not in (ml.INF, str(ml.TAUS_FIT[-1]))),
+                            moved=sum(1 for w in ws if pl[w] and pick[w][1] not in (ml.INF, str(ml.TAUS_FIT[-1]), "0")),
+                            region=region(pick[w][1] for w in ws if pl[w]),
                             chosen_tau=counts(pick[w][1] for w in ws if pl[w]))
         C["unplanted"] = dict(main=stats([d[w] for w in ws if not pl[w]]), n=len(ws) - sum(pl))
     C["values"] = dict(main=d, g=g)  # 合成の書き手ごとの値（実データではない）
@@ -121,7 +122,8 @@ def readings(cells):
                     floor = g
                     break
             means = [lv[str(g)]["mean_median"] for g in levels if str(g) in lv]
-            out["dose"][key] = dict(U=u, null_medians=[c["main"]["median"] for c in null], levels=lv, floor=floor,
+            out["dose"][key] = dict(levels_run=[str(g) for g in levels if str(g) in lv],
+                                    levels_not_run=[str(g) for g in levels if str(g) not in lv], U=u, null_medians=[c["main"]["median"] for c in null], levels=lv, floor=floor,
                                     rises=all(b >= a for a, b in zip(means, means[1:])),
                                     U_vs_real="same order (>= 1e-4)" if u >= 1e-4 else "below 1e-4")
     for k in MAIN["coauthor"]:

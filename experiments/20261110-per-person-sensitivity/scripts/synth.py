@@ -26,7 +26,7 @@ SHAPES = {
     "cs1": dict(i=1, ds="cs1", H=1, P=23, Pu=6, O=8, Ou=3, nseq=2, L=(5000, 8000), ks=[1, 5]),
 }
 CAL_WRITERS, CAL_LEN, CAL_ITERS, CAL_TOL = 40, 20000, 40, 0.10
-MUT = set()  # v1: D_w を全員で 1 つ・v2: g を w を除く共通の当てはめで測る・v4: 分布の筋の印を 1 つずらす
+MUT = set()  # v1: D_w を全員で 1 つ・v2: g を w を除く共通の当てはめで測る・v4: 分布の筋の印を 1 つずらす・v6: D_w の濃度を一様にする
 
 
 # ---------------------------------------------------------------- 真の母数
@@ -50,7 +50,8 @@ def draw_D(m0, rng):
     D = np.empty_like(m0["C"])
     for k in range(K):
         for j in range(NSYM):
-            D[k, j] = rng.dirichlet(D_CONC * m0["C"][k, j])
+            alpha = np.full(NSYM, D_CONC / NSYM) if "v6" in MUT else D_CONC * m0["C"][k, j]
+            D[k, j] = rng.dirichlet(alpha)
     return D
 
 
