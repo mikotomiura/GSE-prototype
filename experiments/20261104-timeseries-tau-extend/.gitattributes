@@ -1,0 +1,5 @@
+# Windows（git-bash）で取り出しても bash と SEED の改行が CRLF に化けないように（判断 13）
+*.sh text eol=lf
+SEED text eol=lf
+*.py text eol=lf
+*.md text eol=lf
