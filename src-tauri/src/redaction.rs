@@ -156,7 +156,18 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
     // ⚠️★★★ **`meta` / `session_meta` 行は消さない**（上記 R-12 / ADR-031 D6 決定 3）。
     //   ★ 行種で弾くので、将来これらに時刻フィールドが増えても**自動的に守られる**。
     let line_type = obj.get("type").and_then(serde_json::Value::as_str);
-    if matches!(line_type, Some("meta") | Some("session_meta")) {
+    //   ★ `invitation_condition`（招待の契機の種類と値・推定器の版）も同じ側（セッションの条件の行）。
+    //   消すとそのファイルの招待の条件が読めなくなる（ADR-040 D4・2026-11-01 研究者の決定）。
+    //   ★ `probe_frame`（段 1 の問いの枠: seed・起点・調停器の定数）も同じ側。中身は系の設定だけで、
+    //   行動も申告も含まない。削除した区間の候補の行（`probe_assignment`・`probe_suppressed`）は消える
+    //   （`.steering/20261105-gse-m5-probe-wiring-plan/decisions.md` 判断 8）。
+    //   ★ `handmark_day`（手跡のその日の累計の写し）は `t` で消える（判断 4: 区間の中の写しが残ると
+    //   その時間帯にアプリが動いていたことと `shown_ms` の差が読める）。区間の外の行に残る `toggles` /
+    //   `stage_starts` のうち区間に入る要素は [`scrub_handmark_day`] が消す。
+    if matches!(
+        line_type,
+        Some("meta") | Some("session_meta") | Some("invitation_condition") | Some("probe_frame")
+    ) {
         return None;
     }
     // ★ 既定は `"t"`。⚠️ 別名を書く行種だけを**明示列挙**する（ADR-031 D6）。
@@ -189,8 +200,10 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
 /// |---|---|
 /// | `activity_label` | `recall_window_start_ms` 〜 `recall_window_end_ms` ∪ `t` |
 /// | `realtime_label` | `analysis_window_start_ms` 〜 `analysis_window_end_ms` ∪ `ts` |
+/// | `day_question` | `shown_ts` 〜 `t`（表示から閉じるまで） |
+/// | `probe_suppressed` | `candidate_ts` 〜 `t`（候補の時刻から判定まで） |
 /// | それ以外 | 点（[`line_timestamp`]） |
-/// | `meta` / `session_meta` | **`None`（常に残す）** |
+/// | `meta` / `session_meta` / `invitation_condition` / `probe_frame` | **`None`（常に残す）** |
 ///
 /// ⚠️★★★ **区間は「答えた時刻」も含める**（和集合）。★ 回答そのものの時刻を消す
 /// 要求（「さっきの 5 分を消して」）でも落ちるようにするためである。
@@ -208,6 +221,11 @@ pub fn line_interval(line: &str) -> Option<(u64, u64)> {
         Some("realtime_label") => {
             num("analysis_window_start_ms").zip(num("analysis_window_end_ms"))
         }
+        // ★ 段 1（2026-11-06・本タスクの判断 8）: 行が持つ 2 つ目の時刻も区間に入れる。
+        //   点（`t`）だけで消すと、削除した区間の中の時刻が別の欄に残りうる（消す側に倒す）。
+        // ⚠️ 2 つ目の時刻が 0（欠けた値）なら点に倒す（epoch からの全区間にしない・security-checker LOW）。
+        Some("day_question") => num("shown_ts").filter(|&v| v > 0).zip(Some(point)),
+        Some("probe_suppressed") => num("candidate_ts").filter(|&v| v > 0).zip(Some(point)),
         _ => None,
     };
     Some(match window {
@@ -247,6 +265,61 @@ pub fn retain_outside_range<'a>(
     (kept, removed)
 }
 
+/// `handmark_day` の行から、区間 `[from_ms, to_ms]`（両端を含む）に入る `toggles`・`input_toggles`・`stage_starts` の要素を消す。
+///
+/// `t` が区間に入る行は [`retain_outside_range`] が行ごと落とす。ここで扱うのは区間の外に残る行で、
+/// 割付・SHA-256・種・出せなかった理由は残す。消すものが無い・`handmark_day` でない・
+/// 区間が逆のときは `None`（行に触らない）。`shown_ms` は時刻ではなく量なので変えない。
+pub fn scrub_handmark_day(line: &str, from_ms: u64, to_ms: u64) -> Option<String> {
+    if from_ms > to_ms {
+        return None;
+    }
+    let mut v: serde_json::Value = serde_json::from_str(line).ok()?;
+    let obj = v.as_object_mut()?;
+    if obj.get("type").and_then(serde_json::Value::as_str) != Some("handmark_day") {
+        return None;
+    }
+    let inside = |t: u64| from_ms <= t && t <= to_ms;
+    let mut changed = false;
+    if let Some(arr) = obj
+        .get_mut("toggles")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        let before = arr.len();
+        arr.retain(|e| {
+            !e.get("t")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(inside)
+        });
+        changed |= arr.len() != before;
+    }
+    if let Some(arr) = obj
+        .get_mut("input_toggles")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        let before = arr.len();
+        arr.retain(|e| {
+            !e.get("t")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(inside)
+        });
+        changed |= arr.len() != before;
+    }
+    if let Some(arr) = obj
+        .get_mut("stage_starts")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        let before = arr.len();
+        arr.retain(|e| !e.as_u64().is_some_and(inside));
+        changed |= arr.len() != before;
+    }
+    if changed {
+        serde_json::to_string(&v).ok()
+    } else {
+        None
+    }
+}
+
 /// 1 ファイルから区間内の行を落とす。★ 落ちた行数を返す。
 ///
 /// ⚠️ **書き換えは一時ファイル → `rename`** で行う。★ 途中で電源が落ちても原本が残る。
@@ -271,11 +344,25 @@ pub fn retain_outside_range<'a>(
 ///
 /// ⚠️ **プライバシー機能そのものがプライバシーを緩めていた。**
 /// ★ 同意文書 §7（削除の申し出）に応じる経路が、応じるたびに保護を落としていたことになる。
+///
+/// 戻り値は、落とした行と、区間の中の時刻を消して書き換えた `handmark_day` の行の数の和。
 pub fn redact_file(path: &Path, from_ms: u64, to_ms: u64) -> Result<usize> {
     let content = fs::read_to_string(path)
         .map_err(|e| format!("failed to read session log {}: {e}", path.display()))?;
     let (kept, removed) = retain_outside_range(content.lines(), from_ms, to_ms);
-    if removed == 0 {
+    // ★ `handmark_day` の行は残し、削除区間に入る要素だけを消す。
+    let mut scrubbed = 0usize;
+    let kept: Vec<std::borrow::Cow<str>> = kept
+        .into_iter()
+        .map(|l| match scrub_handmark_day(l, from_ms, to_ms) {
+            Some(new) => {
+                scrubbed += 1;
+                std::borrow::Cow::Owned(new)
+            }
+            None => std::borrow::Cow::Borrowed(l),
+        })
+        .collect();
+    if removed == 0 && scrubbed == 0 {
         return Ok(0);
     }
 
@@ -335,7 +422,8 @@ pub fn redact_file(path: &Path, from_ms: u64, to_ms: u64) -> Result<usize> {
         let _ = fs::remove_file(&tmp);
         format!("failed to replace session log {}: {e}", path.display())
     })?;
-    Ok(removed)
+    // ★ 時刻だけを消した `handmark_day` の行も 1 件と数える（画面が「0 件」と言わないため・判断 3）。
+    Ok(removed + scrubbed)
 }
 
 /// ⚠️★★★ **既に世界読み取り可になったファイルを締め直す**（自己修復・2026-08-31）。
@@ -607,7 +695,10 @@ mod tests {
             let line_type = &rest[..q];
 
             // ★ `meta` / `session_meta` は**常に残す**側である (D6 決定 3)。
-            if matches!(line_type, "meta" | "session_meta") {
+            if matches!(
+                line_type,
+                "meta" | "session_meta" | "invitation_condition" | "probe_frame"
+            ) {
                 continue;
             }
 
@@ -656,7 +747,12 @@ mod tests {
         let expected: std::collections::BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
             .iter()
             .copied()
-            .filter(|t| !matches!(*t, "meta" | "session_meta"))
+            .filter(|t| {
+                !matches!(
+                    *t,
+                    "meta" | "session_meta" | "invitation_condition" | "probe_frame"
+                )
+            })
             .collect();
         assert_eq!(
             checked, expected,
@@ -776,6 +872,170 @@ mod tests {
             line_timestamp(r#"{"type":"meta","session_start":500,"hmm_version":"0.5.0"}"#),
             None
         );
+    }
+
+    /// `invitation_condition` も `session_meta` と同じく区間削除で消さない（ADR-040 D4）。
+    /// 時刻キーが `t` でも行種で弾く（`session_meta_is_never_redacted_like_meta` と対）。
+    #[test]
+    fn invitation_condition_is_never_redacted() {
+        let line = r#"{"type":"invitation_condition","t":1000,"condition":"estimator","p_stuck":0.6,"hold_ms":30000,"hmm_version":"0.5.0"}"#;
+        assert_eq!(line_timestamp(line), None);
+        // 対照: 同じ時刻の招待の提示は時刻を持つ（消える側）
+        assert_eq!(
+            line_timestamp(r#"{"type":"invitation_present","t":1000}"#),
+            Some(1000)
+        );
+        let (kept, removed) = retain_outside_range([line], 500, 5000);
+        assert_eq!(removed, 0);
+        assert_eq!(kept.len(), 1);
+    }
+
+    /// `probe_frame` は区間の削除で消さない（系の設定だけ・計画の判断 8）。対照の候補の行は消える。
+    #[test]
+    fn probe_frame_survives_redaction() {
+        let frame = r#"{"type":"probe_frame","t":1000,"frame_seed":42,"anchor_ms":900,"arbiter_version":"s1-arbiter-1"}"#;
+        assert_eq!(line_timestamp(frame), None);
+        let assignment = r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random"}"#;
+        let (kept, removed) = retain_outside_range([frame, assignment], 500, 5000);
+        assert_eq!(removed, 1);
+        assert_eq!(kept, vec![frame]);
+    }
+
+    fn handmark_row() -> &'static str {
+        r#"{"type":"handmark_day","t":9000,"day":20411,"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":600000,"visible_ms":null,"toggles":[{"t":1000,"on":false},{"t":3000,"on":true},{"t":8000,"on":false}],"stage_starts":[500,2500,7000],"overflow":false,"table_sha256":null,"draw_seed":"0123456789abcdef","reason":"off_today"}"#
+    }
+
+    /// `t` が区間に入る `handmark_day` の行は行ごと消える。区間の外なら残り、要素だけが消える。
+    #[test]
+    fn handmark_day_row_is_dropped_when_t_is_inside_and_scrubbed_otherwise() {
+        let row = handmark_row(); // t = 9000
+        assert_eq!(line_timestamp(row), Some(9_000));
+        let (kept, removed) = retain_outside_range([row], 9_000, 9_000);
+        assert_eq!((kept.len(), removed), (0, 1));
+        let (kept, removed) = retain_outside_range([row], 0, u64::MAX);
+        assert_eq!((kept.len(), removed), (0, 1));
+        let (kept, removed) = retain_outside_range([row], 2_000, 5_000);
+        assert_eq!((kept.len(), removed), (1, 0));
+        let out = scrub_handmark_day(row, 2_000, 5_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            v["toggles"],
+            serde_json::json!([{"t":1000,"on":false},{"t":8000,"on":false}])
+        );
+        assert_eq!(v["stage_starts"], serde_json::json!([500, 7000]));
+        // 日の属性・量は変わらない
+        for k in [
+            "day",
+            "assigned",
+            "shown_ms",
+            "draw_seed",
+            "reason",
+            "t",
+            "late_start_day",
+        ] {
+            let orig: serde_json::Value = serde_json::from_str(row).unwrap();
+            assert_eq!(v[k], orig[k], "{k}");
+        }
+        // 両端を含む
+        let out = scrub_handmark_day(row, 1_000, 1_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["toggles"].as_array().unwrap().len(), 2);
+        // 全部を覆えば空の配列で行は残る
+        let out = scrub_handmark_day(row, 0, 10_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["toggles"], serde_json::json!([]));
+        assert_eq!(v["stage_starts"], serde_json::json!([]));
+        // 区間の外・逆の区間・別の行種は触らない
+        assert_eq!(scrub_handmark_day(row, 20_000, 30_000), None);
+        assert_eq!(scrub_handmark_day(row, 5_000, 2_000), None);
+        let key = r#"{"type":"key","t":3000,"category":"alphabetic","press":true}"#;
+        assert_eq!(scrub_handmark_day(key, 0, 10_000), None);
+    }
+
+    /// `input_toggles`（入力ごとの入れ切り）も区間に入る要素だけが消え、それしか消えないときも 1 件と数える。
+    #[test]
+    fn handmark_day_input_toggles_are_scrubbed_like_toggles() {
+        let row = r#"{"type":"handmark_day","t":9000,"day":20411,"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":600000,"visible_ms":null,"toggles":[],"input_toggles":[{"t":1000,"input":"cursor","on":false},{"t":3000,"input":"click","on":false},{"t":8000,"input":"cursor","on":true}],"stage_starts":[],"overflow":false,"table_sha256":null,"draw_seed":"0123456789abcdef","reason":null}"#;
+        let out = scrub_handmark_day(row, 2_000, 5_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            v["input_toggles"],
+            serde_json::json!([{"t":1000,"input":"cursor","on":false},{"t":8000,"input":"cursor","on":true}])
+        );
+        // 両端を含む・全部覆えば空で行は残る・外は触らない
+        let out = scrub_handmark_day(row, 3_000, 3_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["input_toggles"].as_array().unwrap().len(), 2);
+        let out = scrub_handmark_day(row, 0, 10_000).expect("changed");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["input_toggles"], serde_json::json!([]));
+        assert_eq!(scrub_handmark_day(row, 20_000, 30_000), None);
+        // 古い行（`input_toggles` が無い）はそのまま扱える
+        assert_eq!(scrub_handmark_day(handmark_row(), 20_000, 30_000), None);
+        // 数え方: `input_toggles` だけが消える行も 1 件
+        let (kept, removed) = retain_outside_range([row], 2_000, 5_000);
+        assert_eq!((kept.len(), removed), (1, 0), "retain は行を落とさない側");
+        let d = tmp_dir("handmark-input-scrub");
+        let path = d.join("gse_20261109_000000.ndjson");
+        std::fs::write(&path, format!("{row}\n")).unwrap();
+        assert_eq!(redact_file(&path, 2_000, 5_000).unwrap(), 1);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains(r#""t":3000"#) && text.contains(r#""t":1000"#));
+        assert_eq!(redact_file(&path, 200_000, 300_000).unwrap(), 0);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ファイルを通しても、行は残って要素だけが消える（消すものが他に無くてもファイルを書き換える）。
+    #[test]
+    fn redact_file_scrubs_handmark_day_without_dropping_the_row() {
+        let d = tmp_dir("handmark-scrub");
+        let path = d.join("gse_20261108_000000.ndjson");
+        let key = r#"{"type":"key","t":99000,"category":"alphabetic","press":true}"#;
+        std::fs::write(&path, format!("{}\n{key}\n", handmark_row())).unwrap();
+        let removed = redact_file(&path, 2_000, 5_000).unwrap();
+        assert_eq!(
+            removed, 1,
+            "落ちた行は無いが、書き換えた行を 1 件と数える（画面に 0 件と出さない）"
+        );
+        let text = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert!(
+            lines[0].contains(r#""stage_starts":[500,7000]"#),
+            "{}",
+            lines[0]
+        );
+        assert_eq!(lines[1], key);
+        // 当たらない区間なら触らない
+        let before = std::fs::read(&path).unwrap();
+        assert_eq!(redact_file(&path, 200_000, 300_000).unwrap(), 0);
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        // t（9000）が区間に入れば行ごと消える
+        assert_eq!(redact_file(&path, 8_000, 10_000).unwrap(), 1);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.lines().collect::<Vec<_>>(), vec![key]);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// 段 1 の申告と候補の行は `"t"` で消える。2 つ目の時刻（表示・候補）が区間に入っても消える。
+    #[test]
+    fn new_s1_rows_are_deleted_by_t() {
+        let dq = r#"{"type":"day_question","t":3000,"shown_ts":2000,"in_eod_window":true,"target_day":20000,"trigger":"evening_idle","delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","motivation":4,"latency_ms":10,"duration_ms":10}"#;
+        let sup = r#"{"type":"probe_suppressed","t":3000,"candidate_ts":2999,"stratum":"random","reason":"away"}"#;
+        assert_eq!(line_timestamp(dq), Some(3000));
+        assert_eq!(line_timestamp(sup), Some(3000));
+        // 閉じた時刻を含む削除
+        let (_, removed) = retain_outside_range([dq, sup], 2500, 3500);
+        assert_eq!(removed, 2);
+        // 表示した時刻だけを含む削除でも、日の問いは消える
+        let (kept, removed) = retain_outside_range([dq, sup], 1500, 2500);
+        assert_eq!(removed, 1);
+        assert_eq!(kept, vec![sup]);
+        assert_eq!(line_interval(dq), Some((2000, 3000)));
+        assert_eq!(line_interval(sup), Some((2999, 3000)));
+        // 2 つ目の時刻が 0 なら点に倒す（epoch から消さない）
+        let zero = r#"{"type":"probe_suppressed","t":3000,"candidate_ts":0,"stratum":"random","reason":"away"}"#;
+        assert_eq!(line_interval(zero), Some((3000, 3000)));
     }
 
     /// ★ 通しの回帰: **自己申告行が実際に落ちて、`session_meta` と `meta` は残る**。

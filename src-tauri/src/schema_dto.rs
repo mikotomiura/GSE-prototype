@@ -94,6 +94,14 @@ pub enum LogEntryDto {
         #[serde(skip_serializing_if = "Option::is_none")]
         #[schemars(regex(pattern = r"^[0-9a-f]{16}$"))]
         o1_install_id: Option<String>,
+        /// 段 1（ADR-043・C4 のプローブと日の終わりの問い）モードの引き金 (`"marker"` | `"env"`)。**start 形状のみ**。
+        ///
+        /// 段 1 は O1 の上に載せた層なので、段 1 のときは `o1_mode` も出る。O1 の記録と分けるのはこの
+        /// フィールドである。EH3 と同時には出ない（両方の印があれば両方を落とす）。
+        /// 段 1 の実施時にしか出ない（印の無い O1 の NDJSON は従来と byte 単位で同一）。
+        /// `Option` である（旧ログには無い・ADR-005）。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        s1_mode: Option<String>,
         /// EH3（肖像と招待の参加者内比較）モードの引き金 (`"marker"` | `"env"`)。**start 形状のみ**。
         ///
         /// EH3 は O1 の収集の器に載せた層なので、EH3 のときは `o1_mode` も出る。O1 の記録と分けるのはこの
@@ -415,6 +423,9 @@ pub enum LogEntryDto {
         /// ADR-031 D4 の「3 値を常に書く / キーの不在 = 古いビルド」は writer 側で保たれる。
         #[serde(skip_serializing_if = "Option::is_none")]
         stratum: Option<ProbeStratumDto>,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
     },
     /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
     ///
@@ -436,6 +447,9 @@ pub enum LogEntryDto {
         analysis_window_start_ms: u64,
         analysis_window_end_ms: u64,
         ts: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
     },
     /// v0.3 較正スモーク: 尺度理解テスト回答 (ビネット)。常に回答あり (q1/q2 は 1..=5)。
     /// `expected_quadrant` は教示の正解ラベル (`UserLabelKindDto` とは別物で `idle` を含む)。
@@ -480,6 +494,9 @@ pub enum LogEntryDto {
         /// この回答が指している区間の終了 (ms)。[`Self::ActivityLabel::recall_window_start_ms`] 参照。
         recall_window_end_ms: u64,
         t: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
     },
     /// EH3 のその日の条件（`meta.eh3_mode` があるときだけ出る）。
     ///
@@ -506,6 +523,238 @@ pub enum LogEntryDto {
     ///
     /// 時刻キーは `t`。
     InvitationPresent { t: u64 },
+    /// 通常のモードで招待を許すセッションの条件（契機の種類と値・推定器の版）。
+    ///
+    /// `session_meta` とは別の行。招待を許すセッションの開始時（条件が決まった時点）に 1 行出す。EH3 は出さない
+    /// （EH3 の条件は `eh3_day`）。`condition` ごとに持つ欄が決まっている: `estimator` は `p_stuck`・`hold_ms`、
+    /// `rising` は `delta`・`window_ms`、`random` は `per_active_hour`・`seed`・`seed_effective`、`none` は持たない。
+    /// 1 つのファイルに複数行ありうる（セッションの宣言が再び呼ばれたとき。後の行がその時点からの条件）。
+    /// 立ったが出さなかった契機は記録しない。提示は `invitation_present` で読む。
+    ///
+    /// 時刻キーは `t`。
+    InvitationCondition {
+        t: u64,
+        condition: InvitationConditionDto,
+        hmm_version: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        p_stuck: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        hold_ms: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        delta: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        window_ms: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        per_active_hour: Option<f64>,
+        /// 設定の seed(2^53 - 1 以下)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seed: Option<u64>,
+        /// セッションの開始時刻(`session_start` 行の `t`)と設定の seed から導いた実効 seed(u64 を 10 進の文字列で)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seed_effective: Option<String>,
+    },
+    /// 段 1 の問いの枠（seed・起点・調停器の版と定数）。`meta.s1_mode` があるときだけ出る。
+    ///
+    /// 記録のファイルを開いたとき（と、同意の印ができたとき）に 1 行出す。無作為の候補の時刻の列は
+    /// `frame_seed` と `anchor_ms` だけで決まり、記録から再現できる。系の設定だけで、行動も申告も持たない。
+    /// ★ 区間指定削除で消さない（`meta`・`invitation_condition` と同じ側）。数値は探索用の仮の定数。
+    ///
+    /// 時刻キーは `t`。
+    ProbeFrame {
+        t: u64,
+        /// 2^53 − 1 以下。
+        frame_seed: u64,
+        anchor_ms: u64,
+        arbiter_version: String,
+        lambda_per_ms: f64,
+        gap_min_ms: u64,
+        cap_window_ms: u64,
+        cap_count: u64,
+        max_gap_ms: u64,
+        away_idle_ms: u64,
+        warmup_ms: u64,
+        strata_enabled: bool,
+        strat_low_op_min_gap_ms: u64,
+        strat_resume_min_gap_ms: u64,
+        strat_guard_after_any_ms: u64,
+        strat_cap_count: u64,
+        strat_cap_window_ms: u64,
+        strat_yield_before_random_ms: u64,
+        no_ask_enabled: bool,
+        no_ask_block_ms: u64,
+        no_ask_fraction: f64,
+        eod_window_start_min: u32,
+        eod_window_end_min: u32,
+        eod_idle_ms: u64,
+        eod_yield_before_random_ms: u64,
+    },
+    /// 段 1 の問いの候補を出さなかった記録。`meta.s1_mode` があるときだけ出る。
+    ///
+    /// `t` は判定した時刻、`candidate_ts` は候補の時刻（無作為は枠の候補・層化は引き金の押下）。
+    /// 区間指定削除では `candidate_ts` 〜 `t` の区間で消える。
+    ProbeSuppressed {
+        t: u64,
+        candidate_ts: u64,
+        stratum: ProbeStratumDto,
+        reason: ProbeSuppressReasonDto,
+    },
+    /// 段 1 の日の終わりの問い（ADR-048 D3）。`meta.s1_mode` があるときだけ出る。カードが閉じた時刻に 1 行。
+    ///
+    /// `target_day` は現地の日の番号（4:00 区切り・1970-01-01 からの日数）。時差は書かない
+    /// （現地の分も書かない。UTC の時刻と並べると時差が分の精度で出るため）。
+    /// `motivation` は 1..5 の 1 項目（答えていなければ `null`）。自由記述・理由を持たない。
+    /// 区間指定削除では `shown_ts` 〜 `t` の区間で消える。
+    DayQuestion {
+        t: u64,
+        shown_ts: u64,
+        /// 問いを出したとき現地の時刻が時間帯の中だったか（現地の分そのものは書かない・時差が出るため）。
+        in_eod_window: bool,
+        target_day: i64,
+        trigger: DayQuestionTriggerDto,
+        delayed: bool,
+        answered: bool,
+        closed_by: DayQuestionClosedByDto,
+        items_version: String,
+        motivation: Option<u8>,
+        latency_ms: Option<u64>,
+        duration_ms: Option<u64>,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。本物の行には無く、確かめの行だけ `true`。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        debug: Option<bool>,
+    },
+    /// 段 1 の後期の手跡の、その日の累計の写し（ADR-051 D4）。`meta.s1_mode` があるときだけ出る。
+    ///
+    /// 書く時点は起動（門の判定の後）・日付の変わり目・終了・5 分ごと。**机上では日ごとに最後の行を採る**
+    /// （`shown_ms` は再起動をまたいで累計なので、同じ日の行を足し合わせない）。
+    /// `day` は現地の日の番号（4:00 区切り）。現地の分は書かない。
+    /// 区間指定削除では行を残し、削除区間に入る `toggles` と `stage_starts` の要素だけを消す
+    /// （割付・SHA-256・種・出せなかった理由は日の属性で、消すと ITT の分母が欠ける）。
+    /// 打鍵の時刻・キー・風の値（速さ・不規則さ・位相）を持つ欄は無い。
+    HandmarkDay {
+        t: u64,
+        day: i64,
+        assigned: HandmarkAssignedDto,
+        late_start_day: Option<i64>,
+        first_shown_day: Option<i64>,
+        /// その日に出ていた時間（ms）。
+        shown_ms: u64,
+        /// 見えていた時間。1a・1b では常に `null`（計り方は帯と一緒に後で決まる）。
+        visible_ms: Option<u64>,
+        /// 切った（`on: false`）／戻した（`on: true`）時刻。
+        toggles: Vec<HandmarkToggleDto>,
+        /// 入力ごとに切った／戻した（カーソル・クリック）。ポインタの値は持たない。区間指定削除では `toggles` と同じく区間に入る要素を消す。古い行には無い。
+        #[serde(default)]
+        input_toggles: Vec<HandmarkInputToggleDto>,
+        /// 手跡を出し始めた時刻（再生で位相の起点に使う）。
+        stage_starts: Vec<u64>,
+        /// `toggles`・`input_toggles`・`stage_starts` のどれかが 1 日 64 個を超えた。
+        overflow: bool,
+        /// 割付の表のバイト列の SHA-256（64 桁の小文字の 16 進）。
+        table_sha256: Option<String>,
+        /// 描画の種（16 桁の 16 進の文字列。JSON の数の精度を避ける）。
+        draw_seed: Option<String>,
+        /// 出せなかった理由（出せたら `null`）。
+        reason: Option<HandmarkReasonDto>,
+    },
+}
+
+/// 手跡の切った／戻した。
+#[derive(Serialize, JsonSchema)]
+pub struct HandmarkToggleDto {
+    pub t: u64,
+    pub on: bool,
+}
+
+/// 手跡の入力ごとの切った／戻した。
+#[derive(Serialize, JsonSchema)]
+pub struct HandmarkInputToggleDto {
+    pub t: u64,
+    pub input: HandmarkPointerInputDto,
+    pub on: bool,
+}
+
+/// 入力ごとの入れ切りの対象。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandmarkPointerInputDto {
+    Cursor,
+    Click,
+}
+
+/// 手跡のその日の割付。`unknown` は表が読めないなど。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandmarkAssignedDto {
+    Before,
+    LateFirst,
+    On,
+    Off,
+    After,
+    Unknown,
+}
+
+/// 手跡を出せなかった（出さなかった）理由。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandmarkReasonDto {
+    TableMissing,
+    TableBroken,
+    ShaMissing,
+    ShaMismatch,
+    StateBroken,
+    StateUnwritable,
+    OffToday,
+    AssignedOff,
+    BeforeLate,
+    AfterTable,
+    WindowUnavailable,
+    PathsUnavailable,
+}
+
+/// 段 1 の候補を出さなかった理由。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProbeSuppressReasonDto {
+    Away,
+    Warmup,
+    Gap,
+    Cap,
+    Yielded,
+    CardOpen,
+    NoAsk,
+}
+
+/// 段 1 の日の終わりの問いの契機。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DayQuestionTriggerDto {
+    EveningIdle,
+    Quit,
+    PauseResume,
+    Pickup,
+}
+
+/// 段 1 の日の終わりの問いのカードが閉じた理由。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DayQuestionClosedByDto {
+    Answer,
+    Dismiss,
+    DayEnd,
+    Quit,
+}
+
+/// 招待の契機の種類。NDJSON 文字列は "estimator" / "rising" / "random" / "none"。
+#[derive(Serialize, JsonSchema)]
+pub enum InvitationConditionDto {
+    #[serde(rename = "estimator")]
+    Estimator,
+    #[serde(rename = "rising")]
+    Rising,
+    #[serde(rename = "random")]
+    Random,
+    #[serde(rename = "none")]
+    None,
 }
 
 /// EH3 のその日の条件。NDJSON 文字列は "blank" / "decor" / "a_none" / "a_seed"。
@@ -667,13 +916,15 @@ pub enum ProbeSourceDto {
     SelfMarker,
 }
 
-/// `realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip。
+/// `realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip、
+/// `superseded` = 段 1 で層化のカードが無作為の問いに差し替えられた（調停器だけが書く）。
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SkipReasonDto {
     None,
     DontRemember,
     Dismissed,
+    Superseded,
 }
 
 /// `vignette_response` の想定象限。教示の正解ラベル (`idle` を含む)。

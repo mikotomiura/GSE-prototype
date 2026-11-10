@@ -142,6 +142,17 @@ pub enum ProbeStratum {
     Resumption,
 }
 
+impl From<crate::analysis::probe_arbiter::Stratum> for ProbeStratum {
+    fn from(s: crate::analysis::probe_arbiter::Stratum) -> Self {
+        use crate::analysis::probe_arbiter::Stratum;
+        match s {
+            Stratum::Random => Self::Random,
+            Stratum::LowOperationEnd => Self::LowOperationEnd,
+            Stratum::Resumption => Self::Resumption,
+        }
+    }
+}
+
 impl ProbeStratum {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -274,6 +285,10 @@ pub enum SkipReason {
     None,
     DontRemember,
     Dismissed,
+    /// 段 1: 層化のカードが未回答のまま、無作為の問いに差し替えられた（2026-11-06・計画の判断 9）。
+    /// ⚠️ 調停器だけが書く値。UI からは受けない（`record_realtime_skip` が拒む）。
+    /// 本人の未回答（`dismissed`）と混ぜると回答率（S1-A4・A7）が歪むので分ける。
+    Superseded,
 }
 
 impl SkipReason {
@@ -282,6 +297,7 @@ impl SkipReason {
             Self::None => "none",
             Self::DontRemember => "dont_remember",
             Self::Dismissed => "dismissed",
+            Self::Superseded => "superseded",
         }
     }
 
@@ -290,7 +306,29 @@ impl SkipReason {
             "none" => Some(Self::None),
             "dont_remember" => Some(Self::DontRemember),
             "dismissed" => Some(Self::Dismissed),
+            "superseded" => Some(Self::Superseded),
             _ => None,
+        }
+    }
+
+    /// 全列挙（★ 読む側の検査がここを単一の出所にする・`calibration_eval::SkipReasonKind`）。
+    pub const ALL: [Self; 4] = [
+        Self::None,
+        Self::DontRemember,
+        Self::Dismissed,
+        Self::Superseded,
+    ];
+
+    /// ★ `ALL` の網羅をコンパイラに思い出させるための印（`ActivityCategory::exhaustive_marker` と同じ作り）。
+    /// 値を足すとこの `match` が非網羅でビルドが落ちる。そのとき `ALL` も一緒に直す
+    /// （直し忘れを機械で止める保証は無い・`skip_reason_all_is_exhaustive` の doc）。
+    #[cfg(test)]
+    fn exhaustive_marker(self) -> usize {
+        match self {
+            Self::None => 0,
+            Self::DontRemember => 1,
+            Self::Dismissed => 2,
+            Self::Superseded => 3,
         }
     }
 }
@@ -401,7 +439,9 @@ impl Condition {
 }
 
 /// ラベルプール (label_pool)。`calibration_blind` = blind 較正で集めたラベル (X1 判定に使用)、
-/// `post_intervention` = 介入可視環境で集めたラベル (合算せず別管理)。
+/// `post_intervention` = 第2週の条件で集めたラベル (合算せず別管理)。
+/// ⚠️ 介入の有無は `intervention_enabled` で分ける。ADR-040 D1 (2026-10-31) 以降の第2週は
+/// `intervention_enabled=false` で、それ以前のこのプールは Nudge が出る環境で集めた。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelPool {
     CalibrationBlind,
@@ -666,6 +706,21 @@ fn format_session_meta_line(
     )
 }
 
+/// 段 1 の研究者の画面の確かめ用のカードの行に `"debug":true` を足す（M5 の 3 本目の判断 3）。
+///
+/// ★ 偽のときは 1 バイトも変えない（本物の行の byte 固定の検査がそのまま効く）。
+/// 行は書式関数が作る `{...}` の 1 行なので、末尾の `}` の前に足す。
+fn mark_debug(line: String, debug: bool) -> String {
+    if !debug {
+        return line;
+    }
+    match line.strip_suffix('}') {
+        Some(head) => format!(r#"{head},"debug":true}}"#),
+        // ★ 書式関数は必ず `}` で閉じる。閉じていなければ印を付けずに返す（行を壊さない）
+        None => line,
+    }
+}
+
 /// `LogEntry::ProbeAssignment` の NDJSON 1 行を生成する純粋関数。
 fn format_probe_assignment_line(
     probe_id: &str,
@@ -813,6 +868,72 @@ fn format_vignette_response_line(
         timestamp,
     )
 }
+
+/// `day_question` 行の中身（段 1・ADR-048 D3・S1-F5〜F10）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DayQuestionRow {
+    /// 閉じた時刻（★ 区間の削除の鍵 `"t"`）。
+    pub timestamp: u64,
+    pub shown_ts: u64,
+    /// 問いを出したとき、現地の時刻が日の問いの時間帯の中だったか。
+    /// ★ 現地の分そのものは書かない（UTC の `shown_ts` と並べると時差が分の精度で出るため・本タスクの判断 9）。
+    pub in_eod_window: bool,
+    /// 対象の日（現地の日の番号・`eh3::local_day` と同じ数え方）。
+    pub target_day: i64,
+    pub trigger: crate::analysis::probe_arbiter::DayTrigger,
+    /// 翌日の拾い直しで尋ねたか。
+    pub delayed: bool,
+    pub answered: bool,
+    pub closed_by: crate::analysis::probe_arbiter::DayClosedBy,
+    /// 項目の文の版（★ 固定の文字列だけ・外部由来の文字列を入れない）。
+    pub items_version: &'static str,
+    /// 動機づけの 1 項目（1..5）。答えていなければ `None`。
+    pub motivation: Option<u8>,
+    /// 表示から最初の操作まで。
+    pub latency_ms: Option<u64>,
+    /// 最初の操作から送信まで。
+    pub duration_ms: Option<u64>,
+    /// 研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+    pub debug: bool,
+}
+
+/// `handmark_day` 行の中身（段 1 の後期・ADR-051 D4）。その日の累計の写し。
+///
+/// ★ 書く値はすべて型の決まった数・真偽・固定の文字列・16 進だけ（外部由来の文字列を入れない）。
+/// ★ 打鍵の時刻・キー・風の値（速さ・不規則さ・位相）を持つ欄は無い。
+/// 机上では日ごとに最後の行を採る。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HandmarkDayRow {
+    /// 書いた時刻（UTC の ms）。
+    pub timestamp: u64,
+    /// 現地の日の番号（`eh3::local_day`・現地の分は書かない）。
+    pub day: i64,
+    /// `before`・`late_first`・`on`・`off`・`after`・`unknown`。
+    pub assigned: &'static str,
+    pub late_start_day: Option<i64>,
+    pub first_shown_day: Option<i64>,
+    pub shown_ms: u64,
+    /// 見えていた時間（1a・1b では常に `None`・PR 2 で計り方が決まる）。
+    pub visible_ms: Option<u64>,
+    /// 切った／戻した（時刻・出す側か）。
+    pub toggles: Vec<(u64, bool)>,
+    /// 入力ごとに切った／戻した（時刻・`cursor` か `click`・入れた側か）。ポインタの値は持たない。
+    pub input_toggles: Vec<(u64, &'static str, bool)>,
+    pub stage_starts: Vec<u64>,
+    pub overflow: bool,
+    /// 64 桁の小文字の 16 進（それ以外は書かない）。
+    pub table_sha256: Option<String>,
+    pub draw_seed: Option<u64>,
+    /// 出せなかった理由（固定の文字列）。
+    pub reason: Option<&'static str>,
+}
+
+/// `handmark_day` の `assigned` に書いてよい値。
+pub const HANDMARK_ASSIGNED_VALUES: [&str; 6] =
+    ["before", "late_first", "on", "off", "after", "unknown"];
+
+/// 日の終わりの問いの項目の文の仮の版（S-DQ の候補の表からの仮の文・妥当性は無いものとして扱う・S1-F7）。
+pub const DAY_QUESTION_ITEMS_VERSION: &str = "dq-draft-1";
 
 /// ログエントリの種別
 #[derive(Debug)]
@@ -1034,6 +1155,8 @@ pub enum LogEntry {
         /// ⚠️★★★ **`Option` にしない** —— ★ `Random` を含む 3 値を常に書くので、
         /// **キーの不在がそのまま「本フィールドを持たない古いビルド」を意味する**。
         stratum: ProbeStratum,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+        debug: bool,
     },
     /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
     /// 不変条件は `realtime_label_answered` / `realtime_label_skipped` で保証する:
@@ -1050,6 +1173,8 @@ pub enum LogEntry {
         latency_ms: u64,
         analysis_window_start_ms: u64,
         analysis_window_end_ms: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+        debug: bool,
     },
     /// v0.3 較正スモーク: 尺度理解テスト回答 (ビネット 8 問)。
     /// 常に回答あり (q1/q2 は 1..=5)。`expected_quadrant` は教示の正解ラベル。
@@ -1104,6 +1229,8 @@ pub enum LogEntry {
         /// → ★ `redaction::line_interval` がこの 2 つを見て**区間の交差**で落とす。
         recall_window_start_ms: u64,
         recall_window_end_ms: u64,
+        /// 段 1 の研究者の画面の確かめ用のカード（M5 の 3 本目の判断 3）。★ 真のときだけ行に `"debug":true`。
+        debug: bool,
     },
     /// ⚠️★★★ **記録の一時停止 / 再開の遷移マーカー** (O1 / ADR-014 **D7-ii**)。
     ///
@@ -1161,6 +1288,37 @@ pub enum LogEntry {
     },
     /// EH3 の招待を出した時刻（理由を載せない・解除の時刻は記録しない）。
     InvitationPresent { timestamp: u64 },
+    /// 通常のモードで招待を許すセッションの条件（契機の種類と値・推定器の版）。
+    ///
+    /// `session_meta` とは別の行。セッションの開始時（条件が決まった時点）に 1 行出す。EH3 は出さない
+    /// （EH3 は `eh3_day` が条件を持つ）。値域は `invitation::TriggerKind` で閉じている。
+    InvitationCondition {
+        timestamp: u64,
+        kind: crate::analysis::invitation::TriggerKind,
+        /// セッションの開始時刻(`session_start` 行の `t`)。無作為の実効 seed を導く。
+        session_start_ms: u64,
+    },
+    /// 段 1: 問いの枠（seed・起点・調停器の定数）。★ 系の設定だけで、行動も申告も持たない。
+    /// ★ 区間の削除で消さない（`meta`・`invitation_condition` と同じ側・計画の判断 8）。
+    ProbeFrame {
+        timestamp: u64,
+        frame_seed: u64,
+        anchor_ms: u64,
+        config: crate::analysis::probe_arbiter::ArbiterConfig,
+    },
+    /// 段 1: 問いの候補を出さなかった記録（計画の判断 9）。時刻と固定の理由だけ。
+    ProbeSuppressed {
+        timestamp: u64,
+        candidate_ts: u64,
+        stratum: ProbeStratum,
+        reason: crate::analysis::probe_arbiter::SuppressReason,
+    },
+    /// 段 1: 日の終わりの問い（ADR-048 D3・閉じた時刻に 1 行）。★ 時差は書かない（計画の判断 4）。
+    /// ⚠️ 自由記述・理由を持たない（`data-privacy` ルール 7）。回答は 1..5 の 1 項目か `null`。
+    DayQuestion(DayQuestionRow),
+    /// 段 1 の後期: 手跡の日ごとの累計の写し（ADR-051 D4）。机上では日ごとに最後の行を採る。
+    /// ⚠️ 打鍵の時刻・キー・風の値を持たない（`HandmarkDayRow`）。
+    HandmarkDay(HandmarkDayRow),
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
     ///
@@ -1182,6 +1340,23 @@ pub enum LogEntry {
 }
 
 impl LogEntry {
+    /// 段 1 の研究者の画面の確かめ用のカードの行に印を立てる（M5 の 3 本目の判断 3）。
+    ///
+    /// ★ 組み立て関数（`realtime_label_*`・`activity_label_*`）の引数を増やさずに印を付ける。
+    /// 印を持たない行種はそのまま返す。`debug` が偽なら何も変えない。
+    pub fn with_s1_debug(mut self, debug: bool) -> Self {
+        if debug {
+            match &mut self {
+                LogEntry::ProbeAssignment { debug: d, .. }
+                | LogEntry::RealtimeLabel { debug: d, .. }
+                | LogEntry::ActivityLabel { debug: d, .. } => *d = true,
+                LogEntry::DayQuestion(row) => row.debug = true,
+                _ => {}
+            }
+        }
+        self
+    }
+
     /// このエントリが NDJSON に書く `"type"` の値。★ **制御用の内部エントリは `None`**。
     ///
     /// ## ⚠️★★★ なぜ要るのか
@@ -1217,6 +1392,11 @@ impl LogEntry {
             LogEntry::SecureInput { .. } => "secure_input",
             LogEntry::Eh3Day { .. } => "eh3_day",
             LogEntry::InvitationPresent { .. } => "invitation_present",
+            LogEntry::InvitationCondition { .. } => "invitation_condition",
+            LogEntry::ProbeFrame { .. } => "probe_frame",
+            LogEntry::ProbeSuppressed { .. } => "probe_suppressed",
+            LogEntry::DayQuestion(_) => "day_question",
+            LogEntry::HandmarkDay(_) => "handmark_day",
             // ★ ここから下は**行を書かない制御エントリ**である
             //   (`BlockEnd` / `Rotate` は `meta`(session_end/session_start) を副作用で書くが、
             //   ⚠️ それは `meta` 行であってこのエントリ自身の行ではない)。
@@ -1248,6 +1428,7 @@ impl LogEntry {
             latency_ms,
             analysis_window_start_ms,
             analysis_window_end_ms,
+            debug: false,
         }
     }
 
@@ -1282,6 +1463,7 @@ impl LogEntry {
             latency_ms,
             analysis_window_start_ms,
             analysis_window_end_ms,
+            debug: false,
         }
     }
 
@@ -1310,6 +1492,7 @@ impl LogEntry {
             latency_ms,
             recall_window_start_ms,
             recall_window_end_ms,
+            debug: false,
         }
     }
 
@@ -1335,6 +1518,7 @@ impl LogEntry {
             latency_ms,
             recall_window_start_ms,
             recall_window_end_ms,
+            debug: false,
         }
     }
 
@@ -1596,11 +1780,38 @@ fn keyboard_layout_fragment() -> String {
 /// ★ 値域は `O1Source` で型に閉じているので、⚠️ 外部由来の文字列が JSON を壊す経路は無い
 /// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
 fn o1_mode_fragment() -> String {
-    let mut s = o1_meta_fragment(crate::o1::mode(), crate::o1::install_id().as_deref());
-    s.push_str(&eh3_meta_fragment(
+    mode_meta_fragments(
+        crate::o1::mode(),
+        crate::o1::install_id().as_deref(),
+        crate::s1::mode(),
         crate::eh3::mode().zip(crate::eh3::assignment().map(|a| a.trigger)),
-    ));
+    )
+}
+
+/// `o1_mode_fragment` の純関数部分。★ キーの順は `o1_mode` → `o1_install_id` → `s1_mode` → `eh3_*`。
+///
+/// ★ 段 1 と EH3 は同時に立たない（`s1::resolve`）が、順は両方あっても固定しておく。
+fn mode_meta_fragments(
+    o1: Option<crate::o1::O1Source>,
+    install_id: Option<&str>,
+    s1: Option<crate::s1::S1Source>,
+    eh3: Option<(crate::eh3::Eh3Source, crate::eh3::TriggerStage)>,
+) -> String {
+    let mut s = o1_meta_fragment(o1, install_id);
+    s.push_str(&s1_meta_fragment(s1));
+    s.push_str(&eh3_meta_fragment(eh3));
     s
+}
+
+/// `meta` に足す段 1 の断片（★ 段 1 でなければ空文字列 = 従来と 1 バイトも変わらない）。
+///
+/// ★ `o1_mode` / `o1_install_id` の直後・`eh3_*` の前（段 1 は O1 の上でだけ立つ・`s1::resolve`）。
+/// 値域は `S1Source` で閉じているので、外部由来の文字列が JSON を壊す経路は無い。
+fn s1_meta_fragment(mode: Option<crate::s1::S1Source>) -> String {
+    match mode {
+        Some(src) => format!(r#","s1_mode":"{}""#, src.as_str()),
+        None => String::new(),
+    }
 }
 
 /// `meta` に足す EH3 の断片 (★ 非 EH3 なら空文字列 = 従来と 1 バイトも変わらない)。
@@ -1651,9 +1862,233 @@ fn format_eh3_day_line(timestamp: u64, day: u32, condition: crate::eh3::Conditio
     )
 }
 
+/// `probe_frame` 行の本文（改行なし）。系の設定（seed・起点・調停器の版と定数）だけを持つ。
+pub(crate) fn format_probe_frame_line(
+    timestamp: u64,
+    frame_seed: u64,
+    anchor_ms: u64,
+    c: &crate::analysis::probe_arbiter::ArbiterConfig,
+) -> String {
+    let num = |x: f64| serde_json::to_string(&x).unwrap_or_else(|_| "null".to_string());
+    let r = &c.random;
+    format!(
+        concat!(
+            r#"{{"type":"probe_frame","t":{},"frame_seed":{},"anchor_ms":{},"arbiter_version":"{}","#,
+            r#""lambda_per_ms":{},"gap_min_ms":{},"cap_window_ms":{},"cap_count":{},"max_gap_ms":{},"#,
+            r#""away_idle_ms":{},"warmup_ms":{},"#,
+            r#""strata_enabled":{},"strat_low_op_min_gap_ms":{},"strat_resume_min_gap_ms":{},"#,
+            r#""strat_guard_after_any_ms":{},"strat_cap_count":{},"strat_cap_window_ms":{},"#,
+            r#""strat_yield_before_random_ms":{},"#,
+            r#""no_ask_enabled":{},"no_ask_block_ms":{},"no_ask_fraction":{},"#,
+            r#""eod_window_start_min":{},"eod_window_end_min":{},"eod_idle_ms":{},"#,
+            r#""eod_yield_before_random_ms":{}}}"#
+        ),
+        timestamp,
+        frame_seed & crate::analysis::probe_arbiter::FRAME_SEED_MAX,
+        anchor_ms,
+        crate::analysis::probe_arbiter::ARBITER_VERSION,
+        num(r.lambda_per_ms),
+        r.gap_min_ms,
+        r.cap_window_ms,
+        r.cap_count,
+        r.max_gap_ms,
+        r.away_idle_ms,
+        r.min_session_elapsed_ms,
+        c.strata_enabled,
+        c.strat_low_op_min_gap_ms,
+        c.strat_resume_min_gap_ms,
+        c.strat_guard_after_any_ms,
+        c.strat_cap_count,
+        c.strat_cap_window_ms,
+        c.strat_yield_before_random_ms,
+        c.no_ask_enabled,
+        c.no_ask_block_ms,
+        num(c.no_ask_fraction),
+        c.eod_window_start_min,
+        c.eod_window_end_min,
+        c.eod_idle_ms,
+        c.eod_yield_before_random_ms,
+    )
+}
+
+/// `probe_suppressed` 行の本文（改行なし）。時刻と固定の層・理由だけ。
+fn format_probe_suppressed_line(
+    timestamp: u64,
+    candidate_ts: u64,
+    stratum: ProbeStratum,
+    reason: crate::analysis::probe_arbiter::SuppressReason,
+) -> String {
+    format!(
+        r#"{{"type":"probe_suppressed","t":{},"candidate_ts":{},"stratum":"{}","reason":"{}"}}"#,
+        timestamp,
+        candidate_ts,
+        stratum.as_str(),
+        reason.as_str()
+    )
+}
+
+/// `day_question` 行の本文（改行なし）。回答は 1..5 に閉じ、範囲外は `null` にする。
+fn format_day_question_line(r: &DayQuestionRow) -> String {
+    let opt = |v: Option<u64>| v.map_or_else(|| "null".to_string(), |x| x.to_string());
+    // ★ 答えていない行には回答を書かない（`answered` と食い違う行を作らない）
+    let motivation = r
+        .motivation
+        .filter(|m| r.answered && (1..=5).contains(m))
+        .map_or_else(|| "null".to_string(), |m| m.to_string());
+    // ★ 版は固定の文字列だけを想定するが、念のため英数と `-` 以外を含むなら書かない
+    let items_version = if r
+        .items_version
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
+        r.items_version
+    } else {
+        "invalid"
+    };
+    format!(
+        concat!(
+            r#"{{"type":"day_question","t":{},"shown_ts":{},"in_eod_window":{},"target_day":{},"#,
+            r#""trigger":"{}","delayed":{},"answered":{},"closed_by":"{}","items_version":"{}","#,
+            r#""motivation":{},"latency_ms":{},"duration_ms":{}}}"#
+        ),
+        r.timestamp,
+        r.shown_ts,
+        r.in_eod_window,
+        r.target_day,
+        r.trigger.as_str(),
+        r.delayed,
+        r.answered,
+        r.closed_by.as_str(),
+        items_version,
+        motivation,
+        opt(r.latency_ms),
+        opt(r.duration_ms),
+    )
+}
+
+/// `handmark_day` 行の本文（改行なし）。数・真偽・固定の文字列・16 進だけを書く。
+fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
+    let opt_i = |v: Option<i64>| v.map_or_else(|| "null".to_string(), |x| x.to_string());
+    let opt_u = |v: Option<u64>| v.map_or_else(|| "null".to_string(), |x| x.to_string());
+    // ★ 固定の語以外は書かない（外部由来の文字列を入れない）
+    let assigned = if HANDMARK_ASSIGNED_VALUES.contains(&r.assigned) {
+        r.assigned
+    } else {
+        "unknown"
+    };
+    let reason_ok =
+        |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'_');
+    // 理由は `CloseReason::as_str` の固定の語だけのはず。外れたら開発中に気づく（本番は null に落とす）。
+    debug_assert!(
+        r.reason.is_none_or(reason_ok),
+        "handmark_day: invalid reason string"
+    );
+    let reason = r
+        .reason
+        .filter(|s| reason_ok(s))
+        .map_or_else(|| "null".to_string(), |s| format!("\"{s}\""));
+    let sha = r
+        .table_sha256
+        .as_deref()
+        .filter(|s| s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+        .map_or_else(|| "null".to_string(), |s| format!("\"{s}\""));
+    let seed = r
+        .draw_seed
+        .map_or_else(|| "null".to_string(), |v| format!("\"{v:016x}\""));
+    let toggles = r
+        .toggles
+        .iter()
+        .map(|(t, on)| format!(r#"{{"t":{t},"on":{on}}}"#))
+        .collect::<Vec<_>>()
+        .join(",");
+    // ★ 入力の種類は固定の 2 語だけ（それ以外は書かない）
+    let input_toggles = r
+        .input_toggles
+        .iter()
+        .filter(|(_, input, _)| matches!(*input, "cursor" | "click"))
+        .map(|(t, input, on)| format!(r#"{{"t":{t},"input":"{input}","on":{on}}}"#))
+        .collect::<Vec<_>>()
+        .join(",");
+    let starts = r
+        .stage_starts
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        concat!(
+            r#"{{"type":"handmark_day","t":{},"day":{},"assigned":"{}","late_start_day":{},"#,
+            r#""first_shown_day":{},"shown_ms":{},"visible_ms":{},"toggles":[{}],"#,
+            r#""input_toggles":[{}],"stage_starts":[{}],"overflow":{},"table_sha256":{},"draw_seed":{},"reason":{}}}"#
+        ),
+        r.timestamp,
+        r.day,
+        assigned,
+        opt_i(r.late_start_day),
+        opt_i(r.first_shown_day),
+        r.shown_ms,
+        opt_u(r.visible_ms),
+        toggles,
+        input_toggles,
+        starts,
+        r.overflow,
+        sha,
+        seed,
+        reason,
+    )
+}
+
+/// 検査用: `handmark_day` の行の本文（`handmark_guard` が書く行のキーを見る）。
+#[cfg(test)]
+pub(crate) fn format_handmark_day_line_for_test(r: &HandmarkDayRow) -> String {
+    format_handmark_day_line(r)
+}
+
 /// `invitation_present` 行の本文（改行なし）。時刻しか書けない形にしてある（理由・状態・回数を持たない）。
 fn format_invitation_present_line(timestamp: u64) -> String {
     format!(r#"{{"type":"invitation_present","t":{}}}"#, timestamp)
+}
+
+/// `invitation_condition` 行の本文（改行なし）。契機の種類と値・推定器の版だけを持つ
+/// （本文・打鍵・人の設定は持たない）。
+fn format_invitation_condition_line(
+    timestamp: u64,
+    kind: crate::analysis::invitation::TriggerKind,
+    session_start_ms: u64,
+    hmm_version: &str,
+) -> String {
+    use crate::analysis::invitation::TriggerKind;
+    // 数値は serde_json で書く（有限でない値は `null` になり、NaN の文字列を出さない）
+    let num = |x: f64| serde_json::to_string(&x).unwrap_or_else(|_| "null".to_string());
+    let extra = match kind {
+        TriggerKind::Estimator { p_stuck, hold_ms } => {
+            format!(r#","p_stuck":{},"hold_ms":{}"#, num(p_stuck), hold_ms)
+        }
+        TriggerKind::Rising { delta, window_ms } => {
+            format!(r#","delta":{},"window_ms":{}"#, num(delta), window_ms)
+        }
+        TriggerKind::Random {
+            per_active_hour,
+            seed,
+        } => format!(
+            // 設定の seed は 2^53 以下に制限してある(JS で丸められない)。導いた実効 seed は u64 全体なので
+            // 文字列で書く。
+            r#","per_active_hour":{},"seed":{},"seed_effective":"{}""#,
+            num(per_active_hour),
+            seed,
+            crate::analysis::invitation::effective_seed(seed, session_start_ms)
+        ),
+        TriggerKind::Off {} => String::new(),
+    };
+    // hmm_version は定数（semver）。念のため JSON 文字列として書く
+    let hmm = serde_json::to_string(hmm_version).unwrap_or_else(|_| "null".to_string());
+    format!(
+        r#"{{"type":"invitation_condition","t":{},"condition":"{}"{},"hmm_version":{}}}"#,
+        timestamp,
+        kind.condition_name(),
+        extra,
+        hmm,
+    )
 }
 
 /// `meta`(session_start) 行を書く。★ **新しいファイルを開くたびに必ず呼ぶ**
@@ -1743,6 +2178,9 @@ pub struct SessionLogger {
     /// いま書いている先 + その状態 (ローテートで更新される共有ハンドル)。
     pub target: SharedLogTarget,
     _handle: thread::JoinHandle<()>,
+    /// 記録のスレッドのループの周回数（テスト専用。空回りの回帰を数えて捕まえる）。
+    #[cfg(test)]
+    loop_iters: Arc<AtomicU64>,
 }
 
 /// `LogChannel` がまだ `start()` されていないことを表す `LogStatus::Disabled` の理由文字列。
@@ -1901,6 +2339,10 @@ impl SessionLogger {
             };
         }
         let target_for_thread = target.clone();
+        #[cfg(test)]
+        let loop_iters = Arc::new(AtomicU64::new(0));
+        #[cfg(test)]
+        let loop_iters_for_thread = loop_iters.clone();
 
         let handle = thread::spawn(move || {
             let mut writer = BufWriter::new(boxed);
@@ -1919,13 +2361,19 @@ impl SessionLogger {
 
             tracing::info!("SessionLogger: writing to {:?}", actual_path);
 
-            let flush_interval = Duration::from_secs(5);
-            let mut last_flush = Instant::now();
+            let mut flush_clock = FlushClock::new(FLUSH_INTERVAL, Instant::now());
             let mut dirty = false;
 
             loop {
-                let timeout = flush_interval.saturating_sub(last_flush.elapsed());
-                match rx.recv_timeout(timeout) {
+                #[cfg(test)]
+                loop_iters_for_thread.fetch_add(1, Ordering::Relaxed);
+                // 5秒間隔でバッファフラッシュ (I/O負荷軽減)。
+                // 判断はループの先頭に置く: 一時停止中に行を落とす `continue` の道も通るように。
+                if flush_clock.on_tick(Instant::now(), dirty) {
+                    let _ = writer.flush();
+                    dirty = false;
+                }
+                match rx.recv_timeout(flush_clock.wait(Instant::now())) {
                     Ok(entry) => {
                         // ⚠️★★★ **一時停止中はここで落とす** (O1 / ADR-014 D7-ii)。
                         //
@@ -2195,15 +2643,19 @@ impl SessionLogger {
                                 scheduled_ts,
                                 session_elapsed_ms,
                                 stratum,
+                                debug,
                             } => {
                                 let _ = writeln!(
                                     writer,
                                     "{}",
-                                    format_probe_assignment_line(
-                                        &probe_id,
-                                        scheduled_ts,
-                                        session_elapsed_ms,
-                                        stratum
+                                    mark_debug(
+                                        format_probe_assignment_line(
+                                            &probe_id,
+                                            scheduled_ts,
+                                            session_elapsed_ms,
+                                            stratum
+                                        ),
+                                        debug
                                     ),
                                 );
                                 dirty = true;
@@ -2216,18 +2668,22 @@ impl SessionLogger {
                                 latency_ms,
                                 recall_window_start_ms,
                                 recall_window_end_ms,
+                                debug,
                             } => {
                                 let _ = writeln!(
                                     writer,
                                     "{}",
-                                    format_activity_label_line(
-                                        timestamp,
-                                        probe_id.as_deref(),
-                                        category,
-                                        answered,
-                                        latency_ms,
-                                        recall_window_start_ms,
-                                        recall_window_end_ms
+                                    mark_debug(
+                                        format_activity_label_line(
+                                            timestamp,
+                                            probe_id.as_deref(),
+                                            category,
+                                            answered,
+                                            latency_ms,
+                                            recall_window_start_ms,
+                                            recall_window_end_ms
+                                        ),
+                                        debug
                                     ),
                                 );
                                 dirty = true;
@@ -2243,21 +2699,25 @@ impl SessionLogger {
                                 latency_ms,
                                 analysis_window_start_ms,
                                 analysis_window_end_ms,
+                                debug,
                             } => {
                                 let _ = writeln!(
                                     writer,
                                     "{}",
-                                    format_realtime_label_line(
-                                        timestamp,
-                                        probe_id.as_deref(),
-                                        source,
-                                        q1_friction,
-                                        q2_progress,
-                                        answered,
-                                        skip_reason,
-                                        latency_ms,
-                                        analysis_window_start_ms,
-                                        analysis_window_end_ms,
+                                    mark_debug(
+                                        format_realtime_label_line(
+                                            timestamp,
+                                            probe_id.as_deref(),
+                                            source,
+                                            q1_friction,
+                                            q2_progress,
+                                            answered,
+                                            skip_reason,
+                                            latency_ms,
+                                            analysis_window_start_ms,
+                                            analysis_window_end_ms,
+                                        ),
+                                        debug
                                     ),
                                 );
                                 dirty = true;
@@ -2301,7 +2761,7 @@ impl SessionLogger {
                                 //   「止めた」直後にアプリが落ちたときに**止めた事実が消え**、
                                 //   その先の空白が「信号が無かった」と読まれる。
                                 let _ = writer.flush();
-                                last_flush = Instant::now();
+                                flush_clock.reset(Instant::now());
                                 dirty = false;
                             }
                             LogEntry::FocusTransition { timestamp } => {
@@ -2355,6 +2815,68 @@ impl SessionLogger {
                                 );
                                 dirty = true;
                             }
+                            LogEntry::InvitationCondition {
+                                timestamp,
+                                kind,
+                                session_start_ms,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_invitation_condition_line(
+                                        timestamp,
+                                        kind,
+                                        session_start_ms,
+                                        crate::analysis::engine::HMM_VERSION
+                                    )
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ProbeFrame {
+                                timestamp,
+                                frame_seed,
+                                anchor_ms,
+                                config,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_probe_frame_line(
+                                        timestamp, frame_seed, anchor_ms, &config
+                                    )
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ProbeSuppressed {
+                                timestamp,
+                                candidate_ts,
+                                stratum,
+                                reason,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_probe_suppressed_line(
+                                        timestamp,
+                                        candidate_ts,
+                                        stratum,
+                                        reason
+                                    )
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::DayQuestion(row) => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    mark_debug(format_day_question_line(&row), row.debug)
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::HandmarkDay(row) => {
+                                let _ = writeln!(writer, "{}", format_handmark_day_line(&row));
+                                dirty = true;
+                            }
                             LogEntry::BlockEnd => {
                                 // ★ 閉じるだけ。次のファイルは開かない (11 本目の空ファイル対策)。
                                 if !block_closed {
@@ -2362,7 +2884,7 @@ impl SessionLogger {
                                     block_closed = true;
                                 }
                                 let _ = writer.flush();
-                                last_flush = Instant::now();
+                                flush_clock.reset(Instant::now());
                                 dirty = false;
                                 // ★ **flush の後**に知らせる。⚠️ 先に知らせると、収束器が
                                 //   `session_end` の無いファイルを見て「まだ閉じていない」と
@@ -2429,7 +2951,7 @@ impl SessionLogger {
                                 }
 
                                 block_closed = false;
-                                last_flush = Instant::now();
+                                flush_clock.reset(Instant::now());
                                 dirty = false;
                             }
                             LogEntry::End => {
@@ -2442,16 +2964,9 @@ impl SessionLogger {
                         }
                     }
                     Err(RecvTimeoutError::Timeout) => {
-                        // 5秒間アイドル → バッファフラッシュ
+                        // 何もしない。期限の判断は次の周回の先頭 (`flush_clock.on_tick`) で行う
                     }
                     Err(RecvTimeoutError::Disconnected) => break,
-                }
-
-                // 5秒間隔でバッファフラッシュ (I/O負荷軽減)
-                if dirty && last_flush.elapsed() >= flush_interval {
-                    let _ = writer.flush();
-                    last_flush = Instant::now();
-                    dirty = false;
                 }
             }
 
@@ -2466,9 +2981,54 @@ impl SessionLogger {
             log_path: resolved_path,
             target,
             _handle: handle,
+            #[cfg(test)]
+            loop_iters,
         };
 
         (logger, status)
+    }
+}
+
+/// 記録のスレッドが書いた行を書き出す間隔。
+const FLUSH_INTERVAL: Duration = Duration::from_secs(5);
+
+/// 記録のスレッドの書き出しの時計。書いた行は最大 `interval` で書き出す。
+///
+/// 時刻は引数で受ける（テストで眠らずに時刻を進めるため）。
+struct FlushClock {
+    interval: Duration,
+    last: Instant,
+}
+
+impl FlushClock {
+    fn new(interval: Duration, now: Instant) -> Self {
+        Self {
+            interval,
+            last: now,
+        }
+    }
+
+    /// 次の期限までの待ち時間。
+    fn wait(&self, now: Instant) -> Duration {
+        self.interval
+            .saturating_sub(now.saturating_duration_since(self.last))
+    }
+
+    /// 期限が来ていれば時計を進め、書いた行があれば `true`（＝ いま flush する）を返す。
+    ///
+    /// 書いた行が無くても期限が来たら時計を進める。進めないと `wait` が 0 のまま戻らず、
+    /// 記録のスレッドが `recv_timeout(0)` で回り続ける（2026-10-30 に 1 コアの 93〜98% を実測）。
+    fn on_tick(&mut self, now: Instant, dirty: bool) -> bool {
+        if now.saturating_duration_since(self.last) < self.interval {
+            return false;
+        }
+        self.last = now;
+        dirty
+    }
+
+    /// 期限を待たずに flush したときに時計を合わせる。
+    fn reset(&mut self, now: Instant) {
+        self.last = now;
     }
 }
 
@@ -3021,6 +3581,126 @@ mod tests {
         }
         let line = format_invitation_present_line(1_700_000_000_000);
         assert_eq!(keys(&line), ["t", "type"].map(String::from).into());
+    }
+
+    #[test]
+    fn invitation_condition_line_carries_only_the_condition() {
+        use crate::analysis::invitation::{Trigger, TriggerKind};
+        let line = |k: TriggerKind| {
+            format_invitation_condition_line(1_700_000_000_000, k, 1_699_999_999_000, "9.9.9")
+        };
+        let obj = |l: &str| -> serde_json::Map<String, serde_json::Value> {
+            serde_json::from_str::<serde_json::Value>(l)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .clone()
+        };
+        let keys = |m: &serde_json::Map<String, serde_json::Value>| -> Vec<String> {
+            let mut k: Vec<String> = m.keys().cloned().collect();
+            k.sort();
+            k
+        };
+        let m = obj(&line(Trigger::MAIN.into()));
+        assert_eq!(
+            keys(&m),
+            [
+                "condition",
+                "hmm_version",
+                "hold_ms",
+                "p_stuck",
+                "t",
+                "type"
+            ]
+        );
+        assert_eq!(m["condition"], "estimator");
+        assert_eq!(m["type"], "invitation_condition");
+        assert_eq!(m["hmm_version"], "9.9.9");
+        assert_eq!(m["hold_ms"], 30_000);
+        let m = obj(&line(TriggerKind::Rising {
+            delta: 0.3,
+            window_ms: 10_000,
+        }));
+        assert_eq!(
+            keys(&m),
+            [
+                "condition",
+                "delta",
+                "hmm_version",
+                "t",
+                "type",
+                "window_ms"
+            ]
+        );
+        let m = obj(&line(TriggerKind::Random {
+            per_active_hour: 6.0,
+            seed: 42,
+        }));
+        assert_eq!(
+            keys(&m),
+            [
+                "condition",
+                "hmm_version",
+                "per_active_hour",
+                "seed",
+                "seed_effective",
+                "t",
+                "type"
+            ]
+        );
+        assert_eq!(m["seed"], 42);
+        // 導いた seed は u64 全体なので文字列で書く(JS で丸めない)
+        assert_eq!(
+            m["seed_effective"],
+            crate::analysis::invitation::effective_seed(42, 1_699_999_999_000).to_string()
+        );
+        let m = obj(&line(TriggerKind::Off {}));
+        assert_eq!(keys(&m), ["condition", "hmm_version", "t", "type"]);
+        assert_eq!(m["condition"], "none");
+    }
+
+    /// ⚠️★★★ 印 `s1.mode` が無い O1 の `meta` の断片は、段 1 を足す前と 1 バイトも変わらない。
+    #[test]
+    fn o1_meta_unchanged_without_s1_marker() {
+        use crate::eh3::{Eh3Source, TriggerStage};
+        use crate::o1::O1Source;
+        let id = Some("0123456789abcdef");
+        // 段 1 を足す前の組み立て（o1 → eh3）と同じ文字列になること
+        for o1 in [None, Some(O1Source::Marker), Some(O1Source::Env)] {
+            for eh3 in [None, Some((Eh3Source::Marker, TriggerStage::Main))] {
+                let before = format!("{}{}", o1_meta_fragment(o1, id), eh3_meta_fragment(eh3));
+                assert_eq!(mode_meta_fragments(o1, id, None, eh3), before);
+            }
+        }
+        assert_eq!(s1_meta_fragment(None), "");
+    }
+
+    /// 段 1 の断片は `o1_install_id` の直後・`eh3_*` の前に入り、`meta` 行が JSON として読める。
+    #[test]
+    fn s1_meta_fragment_order() {
+        use crate::eh3::{Eh3Source, TriggerStage};
+        use crate::o1::O1Source;
+        use crate::s1::S1Source;
+        assert_eq!(
+            mode_meta_fragments(
+                Some(O1Source::Marker),
+                Some("0123456789abcdef"),
+                Some(S1Source::Marker),
+                None
+            ),
+            r#","o1_mode":"marker","o1_install_id":"0123456789abcdef","s1_mode":"marker""#
+        );
+        // 実際には同時に立たないが、順は固定しておく
+        let both = mode_meta_fragments(
+            Some(O1Source::Env),
+            None,
+            Some(S1Source::Env),
+            Some((Eh3Source::Env, TriggerStage::Proto)),
+        );
+        assert!(both.starts_with(r#","o1_mode":"env","s1_mode":"env","eh3_mode""#));
+        let line = format!(r#"{{"type":"meta","session_start":1{both}}}"#);
+        let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
+        assert_eq!(v["s1_mode"], "env");
     }
 
     #[test]
@@ -3704,6 +4384,278 @@ mod tests {
     }
 
     /// ★ `line_type_matches_known_line_types` 用の代表エントリ (全 variant)。
+    fn sample_day_question_row() -> DayQuestionRow {
+        use crate::analysis::probe_arbiter::{DayClosedBy, DayTrigger};
+        DayQuestionRow {
+            timestamp: 1_800_000_060_000,
+            shown_ts: 1_800_000_000_000,
+            in_eod_window: true,
+            target_day: 20_833,
+            trigger: DayTrigger::EveningIdle,
+            delayed: false,
+            answered: true,
+            closed_by: DayClosedBy::Answer,
+            items_version: DAY_QUESTION_ITEMS_VERSION,
+            motivation: Some(4),
+            latency_ms: Some(2_500),
+            duration_ms: Some(1_200),
+            debug: false,
+        }
+    }
+
+    fn sample_handmark_day_row() -> HandmarkDayRow {
+        HandmarkDayRow {
+            timestamp: 1_800_000_000_000,
+            day: 20_411,
+            assigned: "on",
+            late_start_day: Some(20_410),
+            first_shown_day: Some(20_410),
+            shown_ms: 3_600_000,
+            visible_ms: None,
+            toggles: vec![(1_799_999_000_000, false), (1_799_999_500_000, true)],
+            input_toggles: vec![(1_799_999_200_000, "cursor", false)],
+            stage_starts: vec![1_799_990_000_000],
+            overflow: false,
+            table_sha256: Some("ab".repeat(32)),
+            draw_seed: Some(0x0123_4567_89ab_cdef),
+            reason: None,
+        }
+    }
+
+    /// `handmark_day` の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る。
+    /// `input_toggles` は handmark-pr3 の判断 3 で見直し済み）。
+    #[test]
+    fn handmark_day_line_is_fixed_and_valid_json() {
+        let line = format_handmark_day_line(&sample_handmark_day_row());
+        assert_eq!(
+            line,
+            format!(
+                concat!(
+                    r#"{{"type":"handmark_day","t":1800000000000,"day":20411,"assigned":"on","late_start_day":20410,"#,
+                    r#""first_shown_day":20410,"shown_ms":3600000,"visible_ms":null,"#,
+                    r#""toggles":[{{"t":1799999000000,"on":false}},{{"t":1799999500000,"on":true}}],"#,
+                    r#""input_toggles":[{{"t":1799999200000,"input":"cursor","on":false}}],"#,
+                    r#""stage_starts":[1799990000000],"overflow":false,"table_sha256":"{}","#,
+                    r#""draw_seed":"0123456789abcdef","reason":null}}"#
+                ),
+                "ab".repeat(32)
+            )
+        );
+        let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
+        assert_eq!(v["draw_seed"], "0123456789abcdef");
+        // 閉じた日: 出せなかった理由・空の配列・null
+        let mut r = sample_handmark_day_row();
+        r.assigned = "unknown";
+        r.late_start_day = None;
+        r.first_shown_day = None;
+        r.shown_ms = 0;
+        r.toggles.clear();
+        r.input_toggles.clear();
+        r.stage_starts.clear();
+        r.table_sha256 = None;
+        r.draw_seed = None;
+        r.reason = Some("table_missing");
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert_eq!(v["reason"], "table_missing");
+        assert_eq!(v["toggles"], serde_json::json!([]));
+        assert_eq!(v["input_toggles"], serde_json::json!([]));
+        assert!(v["table_sha256"].is_null() && v["draw_seed"].is_null());
+    }
+
+    /// 外部由来の文字列は書けない（固定の語・64 桁の小文字の 16 進以外は落とす）。
+    #[test]
+    fn handmark_day_line_refuses_free_strings() {
+        let mut r = sample_handmark_day_row();
+        r.input_toggles = vec![(1, "cursor", true), (2, "x\"y", false), (3, "click", false)];
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert_eq!(v["input_toggles"].as_array().map(Vec::len), Some(2));
+        r.assigned = "x\"y";
+        r.table_sha256 = Some("AB".repeat(32));
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert_eq!(v["assigned"], "unknown");
+        assert!(v["table_sha256"].is_null());
+        r.table_sha256 = Some("a".repeat(63));
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert!(v["table_sha256"].is_null());
+    }
+
+    /// 不正な理由は本番では null に落とし、開発中（debug）は `debug_assert` で止まる。
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "invalid reason string")]
+    fn handmark_day_invalid_reason_trips_the_debug_assert() {
+        let mut r = sample_handmark_day_row();
+        r.reason = Some("bad\"reason");
+        let _ = format_handmark_day_line(&r);
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn handmark_day_invalid_reason_is_null_in_release() {
+        let mut r = sample_handmark_day_row();
+        r.reason = Some("bad\"reason");
+        let v: serde_json::Value =
+            serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
+        assert!(v["reason"].is_null());
+    }
+
+    /// 段 1 の 3 行種の書き出しを byte-equal で固定する（欄を増やすには要件の見直しが要る）。
+    /// M5 の 3 本目の判断 3: 印は真のときだけ末尾に足し、偽なら 1 バイトも変えない。
+    #[test]
+    fn mark_debug_appends_only_when_true() {
+        let line = format_probe_assignment_line("p-1", 2000, 1000, ProbeStratum::Random);
+        assert_eq!(mark_debug(line.clone(), false), line);
+        assert_eq!(
+            mark_debug(line, true),
+            r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random","debug":true}"#
+        );
+        let day = format_day_question_line(&sample_day_question_row());
+        let marked = mark_debug(day.clone(), true);
+        assert!(marked.ends_with(r#","debug":true}"#));
+        let v: serde_json::Value = serde_json::from_str(&marked).expect("JSON のまま");
+        assert_eq!(v["debug"], serde_json::Value::Bool(true));
+        assert_eq!(mark_debug("not json".to_string(), true), "not json");
+    }
+
+    /// `with_s1_debug` は印を持つ 4 行種だけに立て、偽なら何も変えない。
+    #[test]
+    fn with_s1_debug_marks_only_the_four_row_types() {
+        let probe = ProbeRef::RandomProbe {
+            probe_id: "p-1".to_string(),
+        };
+        let rt = || LogEntry::realtime_label_skipped(1, &probe, SkipReason::Dismissed, 0, 0, 1);
+        assert!(matches!(
+            rt().with_s1_debug(true),
+            LogEntry::RealtimeLabel { debug: true, .. }
+        ));
+        assert!(matches!(
+            rt().with_s1_debug(false),
+            LogEntry::RealtimeLabel { debug: false, .. }
+        ));
+        let gate = crate::o1::activity_label_allowed(true, true).expect("門を通る");
+        let act = LogEntry::activity_label_skipped(&gate, 1, Some("p-1"), 0, 0, 1);
+        assert!(matches!(
+            act.with_s1_debug(true),
+            LogEntry::ActivityLabel { debug: true, .. }
+        ));
+        let LogEntry::DayQuestion(row) =
+            LogEntry::DayQuestion(sample_day_question_row()).with_s1_debug(true)
+        else {
+            panic!("行種が変わった");
+        };
+        assert!(row.debug);
+        assert!(matches!(
+            LogEntry::SessionStart { timestamp: 1 }.with_s1_debug(true),
+            LogEntry::SessionStart { timestamp: 1 }
+        ));
+    }
+
+    #[test]
+    fn s1_rows_format_byte_equal() {
+        use crate::analysis::probe_arbiter::{ArbiterConfig, SuppressReason};
+        assert_eq!(
+            format_probe_suppressed_line(10, 9, ProbeStratum::Resumption, SuppressReason::Yielded),
+            r#"{"type":"probe_suppressed","t":10,"candidate_ts":9,"stratum":"resumption","reason":"yielded"}"#
+        );
+        assert_eq!(
+            format_day_question_line(&sample_day_question_row()),
+            concat!(
+                r#"{"type":"day_question","t":1800000060000,"shown_ts":1800000000000,"#,
+                r#""in_eod_window":true,"target_day":20833,"trigger":"evening_idle","#,
+                r#""delayed":false,"answered":true,"closed_by":"answer","items_version":"dq-draft-1","#,
+                r#""motivation":4,"latency_ms":2500,"duration_ms":1200}"#
+            )
+        );
+        assert_eq!(
+            format_probe_frame_line(5, 42, 3, &ArbiterConfig::default()),
+            concat!(
+                r#"{"type":"probe_frame","t":5,"frame_seed":42,"anchor_ms":3,"arbiter_version":"s1-arbiter-1","#,
+                r#""lambda_per_ms":1.111111111111111e-6,"gap_min_ms":360000,"cap_window_ms":1200000,"#,
+                r#""cap_count":2,"max_gap_ms":1320000,"away_idle_ms":180000,"warmup_ms":31000,"#,
+                r#""strata_enabled":true,"strat_low_op_min_gap_ms":90000,"strat_resume_min_gap_ms":15000,"#,
+                r#""strat_guard_after_any_ms":360000,"strat_cap_count":1,"strat_cap_window_ms":1200000,"#,
+                r#""strat_yield_before_random_ms":120000,"#,
+                r#""no_ask_enabled":false,"no_ask_block_ms":3600000,"no_ask_fraction":0.2,"#,
+                r#""eod_window_start_min":1020,"eod_window_end_min":1380,"eod_idle_ms":1200000,"#,
+                r#""eod_yield_before_random_ms":120000}"#
+            )
+        );
+    }
+
+    /// 段 1 の行は content-free: 数値・真偽・固定の文字列だけ。範囲外の回答・不正な版は書かない。
+    #[test]
+    fn s1_rows_are_content_free_and_bounded() {
+        let mut r = sample_day_question_row();
+        r.motivation = Some(9);
+        r.items_version = "x\",\"evil";
+        r.latency_ms = None;
+        let line = format_day_question_line(&r);
+        let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
+        assert_eq!(v["motivation"], serde_json::Value::Null, "範囲外は書かない");
+        assert!(v.get("shown_local_minute").is_none(), "現地の分を書かない");
+        assert_eq!(v["items_version"], "invalid");
+        assert_eq!(v["latency_ms"], serde_json::Value::Null);
+        assert!(v.get("evil").is_none());
+        let mut unanswered = sample_day_question_row();
+        unanswered.answered = false;
+        let v: serde_json::Value =
+            serde_json::from_str(&format_day_question_line(&unanswered)).expect("valid json");
+        assert_eq!(
+            v["motivation"],
+            serde_json::Value::Null,
+            "答えていない行に回答を書かない"
+        );
+        // seed は 2^53 − 1 を超えて書かない
+        let f = format_probe_frame_line(
+            1,
+            u64::MAX,
+            1,
+            &crate::analysis::probe_arbiter::ArbiterConfig::default(),
+        );
+        let v: serde_json::Value = serde_json::from_str(&f).expect("valid json");
+        assert_eq!(
+            v["frame_seed"].as_u64(),
+            Some(crate::analysis::probe_arbiter::FRAME_SEED_MAX)
+        );
+    }
+
+    /// `SkipReason::ALL` は、網羅の印の順に値を 1 回ずつ持つ。
+    ///
+    /// ⚠️ 保証の範囲（2026-11-06 /cross-review 3 巡目 Codex P2）: 値を足すと `exhaustive_marker` の
+    /// `match` がコンパイルで止まる。そこで `ALL` を直し忘れると、新しい値の印が `ALL` の長さと
+    /// 食い違うので、この検査で新しい値を 1 つ書いて確かめる必要がある。マクロなしに列挙型の値を
+    /// 数え上げる方法が無いので、`ActivityCategory::ALL` と同じ水準にとどめる。
+    #[test]
+    fn skip_reason_all_is_exhaustive() {
+        for (i, r) in SkipReason::ALL.iter().enumerate() {
+            assert_eq!(r.exhaustive_marker(), i, "{r:?}");
+        }
+    }
+
+    /// 差し替えは `superseded` で書かれ、`dismissed` に正規化されない。
+    #[test]
+    fn realtime_label_skip_superseded() {
+        let probe = ProbeRef::RandomProbe {
+            probe_id: "abcdefghijkl".to_string(),
+        };
+        let e = LogEntry::realtime_label_skipped(1, &probe, SkipReason::Superseded, 0, 0, 0);
+        match e {
+            LogEntry::RealtimeLabel {
+                skip_reason,
+                answered,
+                ..
+            } => {
+                assert_eq!(skip_reason, SkipReason::Superseded);
+                assert!(!answered);
+            }
+            _ => panic!("realtime_label ではない"),
+        }
+    }
+
     fn sample_entries_for_line_type() -> Vec<LogEntry> {
         vec![
             LogEntry::Eh3Day {
@@ -3712,6 +4664,25 @@ mod tests {
                 condition: crate::eh3::Condition::PortraitSeed,
             },
             LogEntry::InvitationPresent { timestamp: 1 },
+            LogEntry::InvitationCondition {
+                timestamp: 1,
+                kind: crate::analysis::invitation::TriggerKind::default(),
+                session_start_ms: 1,
+            },
+            LogEntry::ProbeFrame {
+                timestamp: 1,
+                frame_seed: 1,
+                anchor_ms: 1,
+                config: crate::analysis::probe_arbiter::ArbiterConfig::default(),
+            },
+            LogEntry::ProbeSuppressed {
+                timestamp: 1,
+                candidate_ts: 1,
+                stratum: ProbeStratum::Random,
+                reason: crate::analysis::probe_arbiter::SuppressReason::Away,
+            },
+            LogEntry::DayQuestion(sample_day_question_row()),
+            LogEntry::HandmarkDay(sample_handmark_day_row()),
             LogEntry::Key {
                 vk_code: 0x41,
                 timestamp: 1,
@@ -4644,6 +5615,7 @@ mod tests {
             SkipReason::None,
             SkipReason::DontRemember,
             SkipReason::Dismissed,
+            SkipReason::Superseded,
         ] {
             assert_eq!(SkipReason::parse(r.as_str()), Some(r));
         }
@@ -5029,6 +6001,7 @@ mod tests {
             latency_ms,
             analysis_window_start_ms,
             analysis_window_end_ms,
+            debug: _,
         } = entry
         else {
             panic!("expected RealtimeLabel");
@@ -5230,6 +6203,7 @@ mod tests {
         assert_eq!(SkipReason::None.as_str(), "none");
         assert_eq!(SkipReason::DontRemember.as_str(), "dont_remember");
         assert_eq!(SkipReason::Dismissed.as_str(), "dismissed");
+        assert_eq!(SkipReason::Superseded.as_str(), "superseded");
         assert_eq!(ExpectedQuadrant::Flow.as_str(), "flow");
         assert_eq!(ExpectedQuadrant::Stuck.as_str(), "stuck");
         assert_eq!(ExpectedQuadrant::Incubation.as_str(), "incubation");
@@ -5270,6 +6244,7 @@ mod tests {
             scheduled_ts: 2000,
             session_elapsed_ms: 1000,
             stratum: ProbeStratum::Random,
+            debug: false,
         })
         .unwrap();
         tx.send(LogEntry::activity_label_answered(
@@ -5589,5 +6564,140 @@ mod tests {
         assert_eq!(load_id_from(&path), None);
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// 書いた行が無いまま期限を過ぎても、次の待ちが 0 にならない（2026-10-30）。
+    ///
+    /// 0 になると記録のスレッドが `recv_timeout(0)` で回り続け、1 コアを使い切る
+    /// （何も届かない間と、一時停止中に届いた行を全部落とす間に起きた）。
+    #[test]
+    fn flush_clock_idle_past_deadline_does_not_spin() {
+        let t0 = Instant::now();
+        let interval = Duration::from_secs(5);
+        let mut c = FlushClock::new(interval, t0);
+        let t1 = t0 + Duration::from_secs(6);
+        assert!(!c.on_tick(t1, false), "書いた行が無いのに flush しない");
+        assert!(
+            c.wait(t1) > Duration::ZERO,
+            "期限を過ぎた後の待ちが 0 のまま: {:?}",
+            c.wait(t1)
+        );
+        assert_eq!(c.wait(t1), interval);
+    }
+
+    /// 書いた行は期限で flush し、期限の前は flush しない（従来の約束）。
+    #[test]
+    fn flush_clock_flushes_dirty_at_deadline_only() {
+        let t0 = Instant::now();
+        let interval = Duration::from_secs(5);
+        let mut c = FlushClock::new(interval, t0);
+        assert!(!c.on_tick(t0 + Duration::from_secs(4), true));
+        assert_eq!(c.wait(t0 + Duration::from_secs(4)), Duration::from_secs(1));
+        let t5 = t0 + interval;
+        assert!(c.on_tick(t5, true));
+        assert_eq!(c.wait(t5), interval);
+    }
+
+    /// 期限を待たずに flush した箇所（`recording_pause` など）は時計を合わせる。
+    #[test]
+    fn flush_clock_reset_restarts_interval() {
+        let t0 = Instant::now();
+        let interval = Duration::from_secs(5);
+        let mut c = FlushClock::new(interval, t0);
+        let t3 = t0 + Duration::from_secs(3);
+        c.reset(t3);
+        assert_eq!(c.wait(t3), interval);
+        assert!(
+            !c.on_tick(t0 + interval, true),
+            "reset の後 5 秒たつまで flush しない"
+        );
+    }
+
+    /// 一時停止中に届いた行を落とし続けても、記録のスレッドが空回りしない（2026-10-30）。
+    ///
+    /// `FlushClock` 単体のテストはループからの呼び方の回帰を捕まえないので、実際のループの
+    /// 周回数を数える。期限（5 秒）を越えるまで動かすので 6 秒あまりかかる。
+    /// 直す前は 5 秒を過ぎたところで 1 コアを使い切っていた（周回数は桁違いに増える）。
+    #[test]
+    fn paused_logger_does_not_spin_past_flush_deadline() {
+        let p = rot_test_path("paused_spin", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::RecordingPause {
+            timestamp: 1_700_000_000_000,
+            paused: true,
+        })
+        .unwrap();
+        // 一時停止の行を処理し終えた時刻を取る（2 周目に入っている）。時計はそれより前に作られて
+        // いるので、ここから 5.5 秒たてば期限は必ず過ぎている（スレッドの起動が遅れても）。
+        let paused_at = wait_for_iters(&logger, 2);
+        // 500ms ごとに 13 行。どれも一時停止のゲートで落とされる。
+        for i in 0..13u64 {
+            std::thread::sleep(Duration::from_millis(500));
+            tx.send(LogEntry::FocusTransition {
+                timestamp: 1_700_000_000_001 + i,
+            })
+            .unwrap();
+        }
+        let rest = Duration::from_millis(5_500).saturating_sub(paused_at.elapsed());
+        std::thread::sleep(rest);
+        // 届いた 14 行を処理し終えている（1 周目 + 14 行）。
+        wait_for_iters(&logger, 15);
+        let iters = logger.loop_iters.load(Ordering::Relaxed);
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        // 届いた行 14 本と、期限ごとの数回だけ回ればよい。
+        assert!(iters < 200, "記録のスレッドが空回りしている: {iters} 周");
+    }
+
+    /// 書いた行は、終了・一時停止・ローテートを待たずに期限（5 秒）で書き出される（2026-10-30）。
+    ///
+    /// `FlushClock` 単体のテストは「flush せよ」の戻り値しか見ないので、実際のループで
+    /// ファイルに出ることを確かめる。6 秒あまりかかる。
+    #[test]
+    fn logger_flushes_written_line_at_deadline() {
+        let p = rot_test_path("deadline_flush", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::Key {
+            vk_code: 0x41,
+            timestamp: 1_700_000_000_000,
+            is_press: true,
+        })
+        .unwrap();
+        let sent_at = Instant::now();
+        let mut flushed = false;
+        while sent_at.elapsed() < Duration::from_secs(8) {
+            let c = fs::read_to_string(&p).unwrap_or_default();
+            if c.contains(r#""type":"key""#) {
+                flushed = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        assert!(flushed, "書いた行が 8 秒たってもファイルに出ていない");
+    }
+
+    /// 記録のスレッドの周回数が `n` に届くまで待ち、届いた時刻を返す（5 秒で諦める）。
+    fn wait_for_iters(logger: &SessionLogger, n: u64) -> Instant {
+        let start = Instant::now();
+        while logger.loop_iters.load(Ordering::Relaxed) < n {
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "記録のスレッドが {n} 周に届かない"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Instant::now()
     }
 }

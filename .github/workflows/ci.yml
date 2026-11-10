@@ -251,6 +251,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+          # 2026-11-05 追加: リポジトリの変数 GSE_WIN_FORCE_HOSTED が "1" なら、gse-win が online でも
+          #   hosted に固定する。probe は online/offline だけを見て busy を見ないので、G-GEAR が
+          #   別の計算で忙しい間（2026-11 中）にランナーが起き上がると、CI のビルドとテストが計算と重なる。
+          #   戻すときは `gh variable delete GSE_WIN_FORCE_HOSTED`（未設定・"1" 以外は従来どおり probe する）。
+          #   記録: .steering/20261105-ci-win-force-hosted/
+          GSE_WIN_FORCE_HOSTED: ${{ vars.GSE_WIN_FORCE_HOSTED }}
         run: |
           set -uo pipefail
           HOSTED='["windows-latest"]'
@@ -261,6 +267,14 @@ jobs:
             echo "resolved runs-on = $1"
             exit 0
           }
+
+          if [ "${GSE_WIN_FORCE_HOSTED:-}" = "1" ]; then
+            echo "::notice::vars.GSE_WIN_FORCE_HOSTED=1 -> hosted (forced; gse-win is not probed)"
+            decide "$HOSTED"
+          fi
+          if [ -n "${GSE_WIN_FORCE_HOSTED:-}" ]; then
+            echo "::notice::vars.GSE_WIN_FORCE_HOSTED='${GSE_WIN_FORCE_HOSTED}' is not \"1\" -> probe as usual"
+          fi
 
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "::notice::RUNNER_STATUS_TOKEN is unset -> hosted (fail-safe)"
@@ -330,7 +344,13 @@ jobs:
     # ⚠️ `|| '["windows-latest"]'` は decide-win-runner が failure/skip で outputs.runs_on を
     #   一度も書けなかった場合のフォールバック (空文字列は fromJSON に渡すと失敗するため)。
     runs-on: ${{ matrix.runner == 'gse-mac-selfhosted' && fromJSON('["self-hosted","gse-mac"]') || fromJSON(needs.decide-win-runner.outputs.runs_on || '["windows-latest"]') }}
-    timeout-minutes: 30
+    # 2026-11-05: Windows が hosted（windows-latest）に振られたときだけ 60 分、それ以外は従来の 30 分。
+    #   PR #387 の実測で、hosted の Windows は Rust の段（build〜clippy）が約 15 分で通ったが、
+    #   Loop の git-bash のテストが遅く（run guard だけで約 13 分）、30 分で job ごと cancel された。
+    #   G-GEAR（self-hosted）では 30 分に収まっていた。runs_on が self-hosted 以外（強制・fallback・
+    #   出力の欠落）は全部 hosted なので、「self-hosted でない Windows」を条件にする。
+    #   記録: .steering/20261105-ci-win-force-hosted/ 判断 7
+    timeout-minutes: ${{ (matrix.runner == 'gse-win-selfhosted' && needs.decide-win-runner.outputs.runs_on != '["self-hosted","gse-win"]') && 60 || 30 }}
     steps:
       - uses: actions/checkout@v4
       # ⚠️★★★ 2026-09-12 (R-4): `cargo test` (下方) の **env 前提** を、job の先頭で検査する。
@@ -679,6 +699,12 @@ jobs:
       - run: npm ci
       - name: TypeScript type check
         run: npx tsc --noEmit
+      # 手跡の窓の枠・受け取り・場の補間の node のテスト（`.ts` を型を除いて直接読むので Node 22.18 以上が要る。
+      # 足りなければ静かに失敗せず、理由を言って落とす）。
+      - name: Handmark window logic tests (node --test)
+        run: |
+          node -e "const [a,b]=process.versions.node.split('.').map(Number); if (a<22||(a===22&&b<18)) { console.error('node >= 22.18 is required, got '+process.versions.node); process.exit(1); }"
+          npm run test:handmark
       - name: Vite production build
         run: npm run build
       # ★ PreReg-1 ビネット構成の機械検査 (禁止語 / 隣接象限 / 均等配置 / 不透明 ID)。

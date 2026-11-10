@@ -1,0 +1,19 @@
+{
+ "git_head": "94f54f299f736870dbf9e7195053b58dc38145c2",
+ "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+ "input_files": 10,
+ "inputs_sha256_digest": "74b03a2c3857f0d5d2e06d2236e615d15039dd5eabce71c12884253adbe4f43b",
+ "seed": "20261103",
+ "prereg_p1_episode_sha256": "dd1bb614021af09e2eab2112e27a7dc9ff42ae219364dfb122acaa68d30f3267",
+ "scripts_sha256": {
+  "experiments/20261103-o1-unseen-confirm/confirm.py": "0be92f247b180cfe510930a642cb69ed7cd78ecf4a6359f9bcdc3fcd879074d5",
+  "experiments/20261103-o1-unseen-confirm/mutants.py": "50879cf9586c414b51a6ff6c80d6de31c4232e0e16e1d6f4e07219c25fda5f1e",
+  "experiments/20261103-o1-unseen-confirm/started.py": "b7c9b087250037f9dbe0f09e857fa53585b95e8b48f6c16787a26e2f1feab7a6",
+  "experiments/20261103-stall-candidates-c1c2c6/candidates.py": "03b033183493d8cd6f60391aa1bb030d89750dab1406df0101ca51c93c4199e8",
+  "experiments/20261103-stall-candidates-c1c2c6/results/candidates.json": "7fbf5ab7788ac0461d9045f3b0b2864b8d372daf8ea350dc4e2398c9236032e1",
+  "experiments/20261102-stall-decomposition/o1/build_o1.py": "299dbadaf82548c1086dc7673dfb9d0dc0ea6f4aae1df430fd3da5fd3079e118",
+  "experiments/20261102-stall-decomposition/o1/analyze_o1.py": "c31eb63a4380bfd0a421858eef7ddca2fd245879ff192358bedce34fd42771f9",
+  "experiments/20261102-stall-decomposition/types_core.py": "c47b0324576972e15452fbb54c3f586eba1bb91e32ed8aba8fc9937bfaa12b19",
+  "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22"
+ }
+}
