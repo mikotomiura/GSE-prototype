@@ -66,3 +66,9 @@
   3. 交差検証の単位を課題にする（時間順に 1 つずつ外す）。改善の 3 の λ の選び方にそのまま当たる。
   4. 課題は書き手の間で共通なので、課題の切片を入れられる。§3 の「書き手の中の向きか、書き手の間の水準か」を分けやすい。
 - 注意: 書き手は 31 人（取っておいた 13 人は見ない・`~/gse-public-data/cs1/holdout.json` は照合にだけ使う）。ラベルは作業上の認知状態でも詰まりでもない。挿入の中身（`InsertText`）には触れない（俯瞰の事後の数えで空白かどうかをメモリの中で見たのが約束の際）。`Move Cursor`（24,307 件）はクリックで動いたカーソルの可能性がある（推定・B では使わない）。Codex に CS1 の記録も値も送らない。
+
+## 使用済み（2026-11-04）
+
+このメモから `.steering/20261104-gse-coauthor-ml-improve/` のタスクを始めた（判断 1〜13）。条件・コード・門は枝 `exp/gse-coauthor-ml-improve` にコミット済み。本計算は職場の HP Z2 で回す。続きは 2 本:
+- 職場の PC で回す: `.steering/_handoff/next-session-gse-coauthor-ml-run-on-hp-z2.md`
+- 結果が戻った後（Mac）: `.steering/_handoff/next-session-gse-coauthor-ml-after-run.md`
