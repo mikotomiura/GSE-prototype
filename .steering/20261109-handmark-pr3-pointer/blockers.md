@@ -1,0 +1,96 @@
+# blockers / 自分で決めた細部（A1〜A4・実装役）
+
+仕様どおりに進められなかった点は無い。次の細部は仕様に書かれていなかったので実装役が決めた。レビューで確かめてほしい。
+
+1. `TraceField::new` の前の押下は `true`（最初の一点まで「押されている」とみなす）。駆動役が窓を開いた瞬間に押しっぱなしでも波紋が出ない。副作用: 再生の合成の押下が刻み 1 に当たると、その 1 回は波紋にならない。
+2. `advance_to` は `Step { sample: None, cursor_on: false, click_on: false }` で刻みを埋める（読みなしでは入れ切りは結果に効かないので同じ）。場・速さが 0 で最後の入力が無い（`is_idle`）間は、刻みを回さず格子へまとめて進める。
+3. 「最後の入力」は、カーソルが前の一点から動いた刻み、または波紋の出た刻み。位置が動かないまま 8 秒で、場は正確に 0 になる。
+4. `PointerDriver`: 窓を最初に開いた tick（実効の入れ切りが立った最初の tick）で `TraceField::new(now)`。その tick は世代を進めず（epoch 0）、全部 0 の `Trace` を 1 回出す。刻みが無い tick（`target - grid_t < 16`）は `read` を呼ばない。以後の変化は `reset()`（世代 +1）して 0 の `Trace` を出す。窓がまだ一度も開いていないときの変化は何も出さない。
+5. `PointerOut::Trace` は `Box<TraceState>`（clippy の large_enum_variant）。`PointerOut` に `Debug` は無い（テストは `matches!` と `==`）。
+6. `next_wait_ms`（A4 の直しで書き換え）: 実効の入れ切りがある（窓が開いていて・一時停止でなく・カーソルかクリックが入っている）間は、止まっていても常に 16。250 は読まない間（閉じている・一時停止・両方切っている）だけ。理由: 補訂 1 の項目 1 は 16ms ごとの読みで、8 秒止まった後に 250ms で読むと最初の短いクリックを取りこぼす。これで `WARM_MS`・`warm_until_ms` は不要になり消した（`TraceField::is_active` は pub のまま残る）。
+7. 合成の一点（`trace_replay`）: 区間が重なる・逆順の行は前を優先（直前に採った行の終端以前の行は捨て、始めを直前の終端へ切り詰める）。`t0` 以前の行は使わない。向きは `SplitMix64::new(seed ^ timestamp).below(16)`。座標は f64 で計算して f32 に落とす。表の `cos 45°` は clippy の approx_constant のため `FRAC_1_SQRT_2` を使う（表の末位が 1 ulp 変わるだけ）。
+8. ライブの一致のテストは、`tick` を 16ms ちょうど（格子の時刻）ごとに呼び、読みは合成の一点を順に返す。窓を最初に開く tick（`t0`）では読まない前提。epoch は両方 0 で、`bits()`（世代込み）が一致する。確かめていないこと: 16ms ちょうどでない呼び出し間隔でのライブと再生の差（仕様の外）。
+9. 確かめていないこと: macOS の実機読み（A5 以降）・窓の受け取り・Windows の CI（`input/handmark_pointer.rs` は cfg なしの `pub`）。
+
+## A5（入力ごとの入れ切りの記録・実装役が決めた細部）
+
+10. 状態ファイルの `version` は **1 のまま**。`input_toggles`・`cursor_off`・`click_off` は `serde(default)` の追加で、古い状態ファイル（欄なし）をそのまま読める。上げると `is_valid` が古いファイルを Broken にして当日の累計が消えるため。逆向き（新しいファイルを古いバイナリで読む）は `deny_unknown_fields` で Broken になるが、配布は前に進むだけなので扱わない。固定のテストは、古い形を読めるテスト（`the_old_json_shape_is_still_read`）と新しい形の固定（`json_shape_is_fixed`）に分けた。
+11. 関数は既存の `turn_off`/`turn_on` に合わせて 2 本: `turn_input_off(fs, ev, input, now) -> ToggleOutcome`（`State` か `NotPersisted`。印は作らない＝`MarkOnly` は返さない）・`turn_input_on(...) -> Result<(), RestoreFailed>`（書けなければ前の状態へ戻して Err）。駆動役の `set_input` が `on` で振り分ける。`Evaluation::inputs_on() -> (カーソルが入っている, クリックが入っている)` を足した（累計が無いときは `(true, true)`・そのとき窓は開かない）。
+12. 記録の日が今日と違う間（時計の巻き戻り）は、切る側は状態（`cursor_off`/`click_off`）だけ切って記録には足さない・入れる側は `RestoreFailed`（`turn_on` と同じ作法）。
+13. 区間の削除で書き直せず最小の形に落とすとき（`scrub_state_file` と駆動役の `on_redact`）は、`DayRecord::minimal_keeping_off` で `off` に加え `cursor_off`/`click_off` も残す（切った側に倒す）。時刻の列は全部落とす。
+14. `schema_dto` の `input_toggles` は `serde(default)`（schemars では必須から外れる）。PR 3 より前の行（欄なし）が schema に対して有効なままになる。gse-dataset の同期で確かめてほしい。
+15. `handmark_guard.rs` の `the_handmark_day_schema_has_exactly_the_designed_fields` は A5 の時点で赤になるので、欄名の一覧に `input_toggles` を足した（A7 の予定の一部を前倒し）。
+16. `capabilities.rs` は行種の名前の一覧だけで欄の列挙は無いので変更なし。
+
+## A6（駆動役・実装役が決めた細部）
+
+17. `Effect::PointerGate` は `last_gate`（`(open, cursor, click)`・初期値は閉じた `(false, true, true)`）と比べて、変わったときだけ出す。例外は日が変わる `tick` で、変わらなくても 1 回出す（仕様の「日が変わるたびに」）。初期値を閉じた側にしたので、閉じた日の起動・段 1 でない走行では何も出ない（既存の「段 1 でなければ出来事なし」のテストを保つ）。
+18. `set_input` は窓を出していないとき何もしない（トレイの項目も出ない）。切った・入れたら行も 1 つ出す（`turn_off` と同じ）。入れるのが書けずに失敗したときは出来事を何も出さない。
+19. `lib.rs` の `run_handmark_effects` は網羅の match なので `Effect::PointerGate { .. } => {}`（受け取って捨てる）を足しただけ。配線は B2。
+20. 駆動役の `on_redact` の最小の形も `minimal_keeping_off` を使う（A5 の 13）。
+
+## A7（検査・実装役が決めた細部）
+
+21. `FILES` は 8 → 12 件（末尾に `trace.rs`・`trace_replay.rs`・`input/handmark_pointer.rs`・`handmark_pointer_thread.rs`）。`FILES[5]` の添字は不変。ポインタの本文の検査は `pointer_files()`（`FILES[8..]`）を見る。**B1・B4 で足すとき**: `FILES` の末尾に `("input/handmark_pointer_macos.rs", include_str!(...))` を足し、配列の長さを 13 に、`pointer_files()` は `FILES[8..]` のままで新しい分も含む（`assert_eq!(files.len(), 4)` を 5 に直す）。macOS の読みには、試作の「境界」の検査（`modifierFlags`・`keyCode`・`CGEvent`・`addGlobalMonitor`・`unsafe` が無いこと・`mouseLocation`/`pressedMouseButtons` が在ること）を写して足す。窓の TS（`HandmarkStage.tsx`・`handmarkStageTrace.ts`）は `include_str!("../../src/components/...")` の別の一覧（試作の `WINDOW`）で、`invoke`・`localStorage`・`fetch`・`console`・配列を作る行の名前の一覧（試作の `d4_lists_only_named_slots`）を写す。TS の検査は B4 で作る。
+22. 禁じる語の一覧は検査ファイル（走査の対象外）に書き、陽性対照は「実際の本文の先頭に語を実行時に足した本文」で赤になることを確かめる（試作と同じ作法）。`File` は部分一致だが、現在の 4 ファイルの本文には当たらない（当たったらその語を単位で見るよう直す）。追加で禁じた語: `log_tx`・`info!(`・`warn!(`・`debug!(`・`error!(`・`trace!(`・`println`・`eprintln`・`dbg!`。
+23. 型の層は試作の `Probe`（固有の定数と trait の既定の定数の特殊化）を写し、`assert_not_printable!` マクロで 7 型 × 3 trait を `const _: () = assert!` にした（実装すればテストのビルドが止まる）。陽性対照 `Probe::<f64>`・`Probe::<String>` が真。記録の側への逆向きは型の名前を `std::any::type_name` から実行時に得る（改名に追従）。
+24. 列の検査は構造体の定義（`struct Name {` から対応する `}`）だけを見る（関数の中の `Vec` は対象外。`TraceState::bits` が `Vec` を返すのは定義でないので許す）。識別子の単位で比べる（`Vec` が `VecDeque` に当たらないように）。`PointerReader` は今は存在しないので、あれば検査する形にした。
+25. 振る舞いの検査は、駆動役を 600 秒ぶん（16ms ごと）回し、`PointerGate` の値を `PointerDriver` の `Gate` へ流して、合成の一点（`trace_replay::synth_points`）を読みとして通す。カーソル・クリックの入れ切り・全体のやめる・描くを途中に入れ、`Trace`・`Ripple` が出ていること（空回りでない）と、記録へ向かうのが `Row` だけであることを見る。`PointerOut` の網羅の match（`pointer_out_goes_to_the_log`）は腕を足すとコンパイルが止まる。
+26. 自分で変異を 1 つ入れて確かめた: `trace.rs` の末尾に `std::fs::read` を足すとソースの検査が赤になり、戻すと緑（メインの変異の確認は別に行う）。
+
+## B（macOS の配線・トレイ・窓・node のテスト・実装役が決めた細部）
+
+27. **objc2-app-kit の宣言（B1 で確認）**: `~/.cargo/registry/src/*/objc2-app-kit-0.3.2/src/generated/NSEvent.rs` の `mouseLocation`（1140 行）と `pressedMouseButtons`（1148 行）はどちらも `pub fn`（safe）で、`MainThreadMarker` を引数に取らず、`extern_class!` にも `MainThreadOnly` の指定が無い（`NSEvent` は `super(NSObject)` のみ）。→ メインスレッドでないポインタのスレッドから呼べる宣言。ただし「宣言が許す」ことの確認で、Apple の実装がスレッドセーフかまでは確かめていない（試作は同じ読みを別スレッドで動かして実測している）。
+28. `emit_trace` / `emit_ripple` は仕様の `(app, &TraceState)` に **`t_ms: u64` を足した**（窓が遅れた値を捨てるのに送った時刻が要り、時計を駆動役と同じ UTC の ms にするため呼び出し側の `now` を渡す）。`emit_ripple` は `&RipplePoint` を取る。payload の欄名は試作に合わせて camelCase（`epoch`・`tMs`・`cells` / `tMs`・`x`・`y`）。Rust の欄は `t_ms`。
+29. `BEND_MAX`・`MOTE_MAX` は `trace.rs` で `pub` にした（窓への量子化が使う）。窓の TS 側の同名の定数は手で写している（`handmarkStageTrace.ts`）。値の一致を機械で検査してはいない（変えたら両方直す）。
+30. 画面の大きさは `handmark_stage::prepare` で `monitor.size() / scale_factor`（論理 point）を `AtomicU32` 2 つ（f32 のビット）に置く。窓を出すたびに置き直す。`scale_factor <= 0` のときは置かない（前の値のまま・最初は 0 で `to_point` が `None`）。ディスプレイ構成が変わったとき（主画面の入れ替え）は次に窓を出すまで古い。
+31. ポインタのスレッドは終了の `is_shutting_down()` を 1 周ごとに見て抜ける。駆動スレッドが落ちたときは `HandmarkWindowGuard::drop` が門を 0 にする（ポインタのスレッドは次の tick で `PointerDriver` が閉じた門を見て 0 の場を 1 回送り、250ms 待ちに戻る）。ポインタのスレッド自体がパニックしたときの再起動はしない（窓は動かないだけで、打鍵の側は影響を受けない）。
+32. トレイの項目（B3）: 状態は 2 つの `AtomicU8` の配列（あるべき状態・実際に出している状態、符号 0 = 出さない・1 = 印なし・2 = 印あり）。駆動役の `Effect::PointerGate { open, cursor, click }` から `open.then_some((cursor, click))` で書く（`input_items()` と同じ値）。メニューの `CheckMenuItem` は押すと **自分で印を反転する**ので、押した直後に `HANDMARK_INPUT_RESYNC` を立て、更新スレッドが次の 1 秒の周回で駆動役の状態へ印を言い直す（`handmark_input_plan` の `force`）。駆動役が拒否した（表示が古い・入れるのが書けなかった）ときもこれで印が戻る。差し込みの位置は「やめる」の上（無ければ終了の前）、カーソルはクリックの前。純関数は `handmark_input_plan`・`handmark_input_after`・`handmark_input_step`（実行を closure で受け、成功した結果を照合の値として返す）・`handmark_input_index`。
+33. 押下の向き: メニューに出ていた印の反対を `on` として `handmark_set_input_from_tray` へ渡し、そこで駆動役の今の状態（`input_items()`）と `on` が食い違うとき（= 表示が古い）は何もしない。窓を出していない（`input_items()` が `None`）・終了中も何もしない。
+34. 窓（B4）: 場の寄せは `TRACE_TICK_MS = 33`（Rust の送る間隔）で線形。窓の時計は `performance.now()`。TTL（1000ms）は場を最後に受け取ってから。**場が 0 だけの写し（Rust は止まる時に 1 回送る）も「受け取った」に数える**（その後は 0 のまま・描画は絞る）。`handmark-state` の null で場と波紋を消す。世代が進んだ（`receive` の `reset`）ときも消す。波紋の種は世代を持たないので遅れ（場と同じ基準）だけで捨てる。波紋の 2 重の輪は配列のリテラルを避けて `ring()` を 2 回呼ぶ（D4 の検査が列の作成を見るため）。
+35. 検査（`handmark_guard.rs`）: `FILES` は 13 件（末尾に macOS の読み）。`pointer_files()` は `FILES[8..]` のまま 5 件。新しい検査: macOS の読みが `NSEvent::` で `mouseLocation`・`pressedMouseButtons` 以外を読まない（陽性対照つき）／窓の TS が保存・返送・通信の語を含まない／他の `src/` のファイルが `handmark-trace`・`handmark-ripple` を含まない（`read_dir` で `src/` を辿り、手跡の窓の 2 ファイルを除く・陽性対照つき）／`handmark_stage.rs` が全窓への `.emit(` を使わない／窓の列が名前を許した枠（草・粒・波紋・場の 3 本）だけ（陽性対照つき）。変異で赤を確認: macOS の読みに `NSEvent::modifierFlags_class` を足す→赤、窓の TSX に `localStorage`・`const trail = [];` を足す→赤、`src/` に `handmark-ripple` を含む .ts を置く→赤（どれも戻して緑）。
+36. node のテスト（B5）: 試作の 9 件からホイールの件（7 件目）を外し、8 件目（実時間で減らす）を「最後の受け取りから 1 秒で場が 0 になる」件に置き換え、場の件（i8 を戻す・不正な場を受けない・補間 3 件・寄せ・波紋の遅れ・世代）を足して 14 件。TTL で実際に場を消す処理は `HandmarkStage.tsx` の中（`sweepPointer`）にあり node では試していない（判定 `traceExpired` と、消した後の場の読みだけ）。
+37. `package.json` に `test:handmark`。`ci.yml` の frontend-check（`npx tsc --noEmit` の後）に step を足した。**node のバージョン**: `setup-node@v4` の `node-version: 22` はメジャーの範囲で、最新の 22.x に解決されるか、ランナーのツールキャッシュに既にある 22.x が使われる（`check-latest` は既定 false）。後者が 22.18 未満だと `.ts` を直接読めないので、step の先頭で `process.versions.node` を見て 22.18 未満なら理由を言って落とす（静かに失敗しない）。ランナーの実際の版は確かめていない（CI を回さないと分からない）。
+38. `tsc --noEmit`: `tsconfig.json` の `include` は `["src"]` なので `scripts/` は入らない。`src/components/handmarkStageTrace.ts` は tsc を通る（`.mjs` のテストは型検査の対象外）。
+39. **Windows の cfg の目視確認**（手元は macOS で Windows のビルドは走らない）: macOS だけが使う `HANDMARK_POINTER_GATE`・`spawn_handmark_pointer`・`handmark_stage::{emit_trace, emit_ripple, screen_size_pt}`・`input::handmark_pointer_macos` には `#[cfg(target_os = "macos")]`（`handmark_stage.rs` は `imp` の中）。`Effect::PointerGate` の腕は `open`・`cursor`・`click` を全 OS で使う（トレイの状態へ）。トレイの関数・`handmark_set_input_from_tray` は全 OS で使われる。定数 `TRACE_EVENT`・`RIPPLE_EVENT` はモジュール直下（検査が全 OS で使う）。これで未使用の警告は出ないはずだが、Windows の clippy は走らせていない。
+40. 確かめていないこと: 実機で動くか（読み・場の送り・窓の描画・波紋）／トレイの押下が実際に効くか（CheckMenuItem の自動反転と言い直し・差し込み位置・押した後の印）／格子の粗さの見え方／Windows の clippy／CI の node の版／16 ms ごとの `epoch_ms()` と `is_paused()` の費用（軽いはずだが測っていない）。B1+B2 の commit は `tray::set_handmark_inputs` を参照するので、その commit 単独ではビルドできない（B3 の commit と対）。
+
+## レビューの指摘の修正（実装役が決めた細部・メインが decisions に写す）
+
+### コミット 1: 時計と刻み
+
+41. **時計**: ポインタのスレッドの時計は `std::time::Instant`（スレッドの起動）からの単調な ms。payload の `tMs` も同じ。再生 `replay_trace` は `pointer_bin` の絶対時刻のまま。窓は `receive` で世代が進んだとき `minLag` を `Infinity` に戻し、遅れの判定が `REBASE_AFTER`（5）回続けて「捨てる」になったら `minLag` をその遅れに取り直して、その値を受ける（波紋も同じ `judgeLag`・基準も共有）。副作用: 世代が進んだ最初の値は遅れていても受ける（旧テスト「世代を進める知らせは、遅れて届いても効く」の `use: false` を `use: true` に直した・`reset: true` は同じ）。確かめていない: macOS の `Instant` はスリープの間進まない（`mach_absolute_time`）のに対し、WKWebView の `performance.now()` の扱いはスリープ中の挙動を確かめていない（だから取り直しを入れた）。
+42. **時計が戻ったとき（Rust）**: `PointerDriver::tick` は前回の `now_ms` を持ち、小さくなったら `TraceField::rebase(now)`（`reset` ＋ 格子を取り直す＝世代 +1）して 0 の写しを 1 回出す。単調な時計では起きないはずの防御。窓が開いていないときは何もしない。
+43. **刻みの飛ばし**: `TraceField::step` は `cursor_on` が真で `sample` が `None` の刻みで速さを保つ（場へは足さない）。`advance_to` は `advance_held(t, false)`（旧と同じ・速さは 0 へ）。`PointerDriver::tick` は `advance_held(target - 16, gate.cursor)` で間の刻みを埋める。`next_wait_ms(now_ms)` は次の 16ms の格子の境目までの残り（1〜16）。
+44. **80% の件は届かなかった**: 17・16・33ms を繰り返す呼び出しで、飛ばした刻み（4 刻みのうち 1 つ）に場へ足さない規則なので、草を倒す量の最大値は 16ms ちょうどの 0.73 倍（旧い「速さを 0 に戻す」扱いは 0.65 倍）。テストの下限は 0.7 にした（`jittered_call_intervals_do_not_weaken_the_bend`）。8 割にするには、飛ばした刻みで最後の一点と保った速さで足し込む必要があり、指示の「足し込みはしない」と衝突するので入れていない（相談: 入れるなら `step` の `(true, None)` で最後の位置を使う）。
+45. `RipplePoint` に `epoch: u32` を足した（押下の刻みの世代・波紋の payload の `epoch`）（波紋の世代・項目 8）は時計の変更と同じ窓の受け取りの直しなので、コミット 1 に含めた（窓は `epoch < rc.epoch` の波紋を捨てる・node のテスト 1 件）。
+
+### コミット 2: トレイの押下の経路
+
+46. 照合を純関数 `handmark_driver::decide_tray_input(shown_checked, driver_items, input) -> Option<bool>` に切り出した（窓を出していない・表示が古いなら `None`・そうでなければ入れる側 = 出ていた印の反対）。`handmark_set_input_from_tray` の第 3 引数は「入れる側 `on`」から「出ていた印 `shown_checked`」に変えた（反転は純関数の中）。tray 側は `handmark_input_request(which)`（出ていた印を読み・言い直しを頼む）と `set_handmark_inputs_from_gate(open, cursor, click)`（`Effect::PointerGate` → 項目の「あるべき状態」）に切り出し、`lib.rs` の腕もこれを呼ぶ。
+47. 1 本通すテスト `tray::tests::a_tray_press_reaches_the_marks_through_the_driver`（MemFs の `HandmarkDriver`・押下 → 照合 → `set_input` → `PointerGate` → `set_handmark_inputs_from_gate` → `HANDMARK_INPUT_WANT`/`SHOWN` が駆動役の `input_items()` と一致・古い表示の押下は何も起きない・窓を閉じると項目が消える）。メニュー本体（`CheckMenuItem`）は AppHandle が要るので、更新スレッドの「あるべき状態に合わせて実際の状態を書く」だけを `handmark_input_step` で写した（メニューを触る `handmark_input_reconcile` と `handmark_input_pressed` の AppHandle 部分は通っていない）。`HANDMARK_INPUT_*` は全体で 1 組なので、触る 2 つのテストを `INPUT_ATOMICS` の Mutex で直列にした。
+
+### コミット 3: 状態の持続と後始末（項目 10: 入力の切りを書けたとき・書けないときの規則）
+
+48. **入力の切りの規則（メインが decisions に写す）**: `turn_input_off` は、(a) 状態ファイルに書けたら `State`（今までどおり・全体は切らない）。(b) 書けなかったら、全体の「やめる」と同じ日付つきの印 `handmark_off_<日>`（`fs.write_mark(today)`）を試し、書けたら `MarkOnly`: 記録に `set_off(now, true)`・`off_today = true`・`redecide`（`turn_off` と同じ・この走行でも窓を閉じる。駆動役の `set_input` が `reconcile` で窓を閉じ、行と門の出来事を出す）。再起動してもその日は出ない（ADR-051 D2「書き残せなかったときは、切った側に倒す（出さない）」）。(c) 印も書けなければ `NotPersisted`: 今までどおりこの走行の中だけ切る（再起動では戻る）。記録の日が今日と違う間（時計の巻き戻り）と累計が無い（状態が壊れている）ときは書き込みを試みないので印も作らない。入れる側（`turn_input_on`）は変えていない（書けなければ切ったまま）。
+49. **既存の 2 つのテストの前提を保った**: `a_failed_write_keeps_the_input_off_and_cannot_turn_it_on`（store）・`a_failed_write_cuts_an_input_but_cannot_turn_it_on`（driver）は、状態の書き込みだけ失敗させていたため、(b) が働いて期待が変わる。意図（書けなくても切る・入れるのは書けなければ切ったまま）を保つため、`fail_mark_write` も立てて (c) の経路にした（期待は弱めていない）。(b) は別のテストで見る。
+50. **区間の削除の書き直し失敗（項目 6）**: `handmark_store::rewrite_or_remove(fs, &record)` に始末を寄せ、`scrub_state_file` と駆動役の `on_redact` が共通で呼ぶ。`off` が偽でも `cursor_off`/`click_off` が真なら、消す前に `minimal_keeping_off` で書き直す。それも書けなければ、切りが戻らないよう全体の印を試して（書けなくても）状態ファイルを消す（時刻を残さないことを優先。仕様に無い追加なのでレビューで確かめてほしい）。全体を切っていた日の規則は変えていない。`MemFs` に `fail_state_writes_left`（次の n 回だけ失敗）を足した。
+51. **駆動役を捨てる（項目 7）**: `HandmarkWindowGuard::drop` が `handmark_clear_driver()`（`*handmark_lock() = None`・毒を受けたロックでも取れる）を呼ぶ。★ 終了の処理中（`is_shutting_down()`）は捨てない（`handmark_finish_before_end` が最後の行を書くのに駆動役が要る。駆動スレッドは終了を見て抜けるので、先に捨てると最後の行と保存が消える）。テストは `lib.rs` の末尾の `handmark_wiring_tests`（ロックを持ったままパニックするスレッドで毒を作る → 捨てる → 駆動役が無く、押下の入口が何もしない）。`HandmarkWindowGuard` 自体（AppHandle が要る・macOS 限定）は通していない。`lib.rs` の本文の検査（最初の `#[cfg(test)]` より前を見る）のため、テストの module は末尾に置いた。
+52. 項目 9（`live_matches_replay_bit_for_bit` の assert）と項目 8（波紋の世代）はコミット 1 に含めた。
+
+### コミット 4: 検査の穴（security-checker の LOW 1〜4）
+
+53. 項目 11: `ts_sources` は `src/` の `.ts`・`.tsx`・`.js`・`.jsx`・`.mjs`（`TS_EXTS`）と、worktree 直下の `index.html` を走査する。HTML は Rust の字句の読み（`body`）に通すとアポストロフィで崩れるので、`.html` は本文をそのまま `contains` で見る（コメントも含めて見る）。Rust 側は新しい検査 `only_the_stage_rs_names_the_events_and_nobody_uses_listen_any`（`src-tauri/src/` を再帰で読み、`TRACE_EVENT`・`RIPPLE_EVENT`・その文字列を `handmark_stage.rs` 以外が本文に持たない・`listen` + `_any` を誰も使わない・陽性対照つき）。
+54. 項目 12: ポインタの 5 ファイルの禁止語に `applog`・`fs::`・`OpenOptions` を足した（`write(` は足していない: `write_all` など別の語・テストの `write!` と紛れる恐れが大きい）。`screen_size_pt`・`emit_trace`・`emit_ripple` を `pub(crate)` にし（`handmark_stage.rs` の再エクスポートを `pub(crate) use` に分けた）、`only_lib_and_the_stage_call_the_emit_and_screen_size_functions` で呼べるファイルを `lib.rs`・`handmark_stage.rs` に限った（許したファイルが本当に使っていることと陽性対照つき）。
+55. 項目 13: `the_record_side_does_not_know_the_pointer_types` は識別子の単位（`contains_ident`・`assert_clean_idents`）で照合し、型の名前に `Point`・`Step` を足して 7 つにし、対象に `applog.rs`・`redaction.rs`・`handmark_driver.rs`・`handmark_store.rs`・`o1.rs` を足した。実際の本文は全部通った（`handmark_driver.rs` の `PointerGate` は `Gate` と別の識別子なので当たらない）。陽性対照: 先頭に識別子を足せば見つかる・`Points`/`xPoint` では見つからない。変異で赤を確認: `o1.rs`・`redaction.rs`・`handmark_driver.rs` に文字列で `Step`/`Point` を足す、ポインタのファイルに `applog`/`OpenOptions`、`lib.rs` に `listen_any`、`tray.rs` に `emit_trace` を足す（どれも戻して緑）。
+56. 項目 14: `LIST_MAKERS` に `new Float32Array`・`new Array`・`.concat(`・`[...` を足した（9 → 13）。今の正当な枠（`makeField` の `bend:`/`pullX:`/`pullY:`・`ripples`）は許す名前の一覧のまま通る。変異で赤を確認: `HandmarkStage.tsx` の末尾に 4 つのそれぞれの作り方の行を足す（戻して緑）。
+
+### レビュー指摘の修正（完了時の /cross-review と security-checker）
+
+57. **トレイの 2 回目の押下**: 更新スレッドが書く表示の印 `HANDMARK_INPUT_SHOWN` は 1 秒ごとなので、押下の側が、駆動役の `set_input` まで通ったとき（`handmark_set_input_from_tray` が `true` を返す）に `handmark_input_after_press(which)` で `SHOWN[which]` を新しい状態へ進める（純関数 `shown_after_press(want, shown)`: 出ていて望む状態がある項目だけ望む状態へ・出ていない項目や窓が閉じた（want が None）ときは触らない）。`handmark_set_input_from_tray` は `()` から `bool`（入れ切りを変えたか）に変えた。テストは `two_presses_within_one_second_both_reach_the_driver`（直す前は 2 回目が `None` で赤）。
+58. **印の言い直しの再試行**: `handmark_input_retry(plan, ok)`（`SetChecked` が失敗したときだけ真）を `handmark_input_reconcile` が見て、`HANDMARK_INPUT_RESYNC` を立て直す。`Insert`/`Remove` の失敗は出している状態が変わらないので次の周回の計画が同じになり、立て直さない。
+59. **画面の外**: `Step.lost`（読んで `None`）。`lost` の刻みは `last = None`・速さ 0・`prev_down = true`。OS の読みの失敗も `to_point` と同じ `None` で来るので、区別せず `lost` として扱う（読めなかったときも古い一点をつなげない側に倒す）。読まなかった刻み（`advance_held`）は変えない。クリックだけが入っているときも `lost` は同じに効く（`prev_down` の扱いが要るため）。
+60. **パニック時の順**: `HandmarkWindowGuard::drop` は `handmark_clear_driver()` を最初に呼ぶ（窓を閉じる・項目を隠す・門を 0 にするより前）。指示は「門を 0 にする前」だったが、窓の閉じ・項目の隠しの間の押下も古い駆動役から `PointerGate{open:true}` を出せるので、先頭にした。
+61. **ポインタのスレッドの本体**: `handmark_pointer_thread::run_loop(gate_bits, paused, now_ms, read, send_trace, send_ripple, sleep_ms, should_stop)`。引数名は `emit_trace`/`emit_ripple` にしない（`only_lib_and_the_stage_call_...` の検査がこのファイルの本文に当たるため `send_*`）。画面の大きさ `screen_size_pt` は `read` の閉包の中で、読むときだけ取る（以前は毎周回取っていた。読まない間は取らなくなる）。`Gate::from_bits` を同じファイルへ移した。`#[allow(clippy::too_many_arguments)]` を付けた（引数が 8 つ・閉包で OS・Tauri を渡す形のため）。テストは `run_loop_reads_only_while_open_and_emits_to_the_window_only`（偽の時計・門で、閉じている間・一時停止の間は読まない・待ちの値）と `gate_bits_decode`。
+62. **読みの境界の検査**: `only_lib_and_the_pointer_thread_read_the_pointer`（`handmark_pointer_macos::`・`handmark_pointer::to_point`・`to_point(` を本文に持てるのは `lib.rs`・`handmark_pointer_thread.rs`・定義の 2 ファイル。`lib.rs` が使っていることと陽性対照つき）。
+63. **窓の列の検査**: `LIST_MAKERS` に `.map(`・`.slice(`・`.filter(`・`Array.of`・`structuredClone` を足し（13 → 18）、型付き配列は `new` の後ろが大文字で始まり `Array` で終わる語という形（`has_typed_array_ctor`）で拾う。今の窓のコードは許す名前の一覧を足さずに通った。陽性対照: 一覧の各語・型付き配列 10 種。

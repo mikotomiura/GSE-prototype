@@ -1,0 +1,48 @@
+# タスクリスト —— M5 の 1 本目（B1〜B3）
+
+場面ごとに使うもの（完了の前に照合する）: `*.rs` → `rust-standards`・`architecture-rules`／logger・redaction・自己申告 → `data-privacy`／区切りの点検 → `code-reviewer` ＋ `security-checker` を並列／完了 → `/finish-task`（`/cross-review` を含む・Codex に記録の本文を送らない）。
+
+## 準備
+- [x] 計画の requirement・design・decisions・tasklist を読む
+- [x] file-finder と impact-analyzer を並列で（R1 の後の main で行番号を引き直す）
+- [x] 指摘の一次の確かめ（`SkipReasonKind`・replay の未知のキー・削除の台帳の約束と `invitation_condition` の先例）
+- [x] design.md・研究者の承認
+
+## B1 段 1 の層
+- [x] `s1.rs` と検査（`s1_requires_o1`・`s1_and_eh3_both_dropped`・`s1_marker_beats_env`・`env_value_exactly_1`）
+- [x] `lib.rs` の起動時の判定（判断 7）と `mod s1;`
+- [x] `meta` の `s1_mode`（`o1_meta_unchanged_without_s1_marker`・`s1_meta_fragment_order`）
+- [x] `o1::activity_label_allowed` の読み替え（`activity_label_none_for_o1_even_with_consent`・`activity_label_some_only_for_s1_with_ack`）
+- [x] `submission` の段 1 の同意の印の読み書きと検査
+
+## B2 調停器
+- [x] `SplitMix64`・`sample_interval_ms` の公開範囲
+- [x] 定数と `ArbiterConfig`・`RandomFrame`
+- [x] `StrataDetector`・`NoAskPlan`
+- [x] `DayQuestion`・`DayState`
+- [x] `Arbiter::tick` と検査一式
+
+## B3 行種と記録
+- [x] `SkipReason::Superseded`・`SkipReasonKind::Superseded`・`record_realtime_skip` で拒む
+- [x] `LogEntry` の 3 行種・整形・書き出し・`line_type`・検査
+- [x] `capabilities.rs`（`KNOWN_LINE_TYPES`・`emitterless` の両 OS）
+- [x] `redaction.rs`（`probe_frame` を外す・他は `"t"` で消える・検査）
+- [x] `schema_dto.rs` → `emit_schema` → `schema/current.json`
+
+## 検証
+- [x] `cargo test --workspace`（test-runner）
+- [x] `cargo clippy --all-targets -- -D warnings`・`cargo fmt --check`
+- [x] ゴールデンの `gse-replay --snapshot`
+- [x] `emit_schema` の byte-equal
+- [x] code-reviewer ＋ security-checker を並列・HIGH に対応
+
+## 完了
+- [x] `docs/functional-design.md` の追記（Step H）と glossary の要否
+- [x] 2 本目の引き継ぎ（`config_gated` への移し・登録の画面・JST と UTC の検査・駆動役）
+- [x] `/finish-task`（`/cross-review`）・push と PR は研究者に確かめる
+
+## 完了の記録（2026-11-06）
+
+- /cross-review は 3 巡（判断 11〜13）。4 巡目は研究者の判断で回さない。
+- schema parity check は drift（gse-dataset は EH3・R1・段 1 の行種を欠く）。研究者の判断で R3 は 3 本目でまとめて行う。
+- ⚠️ `/finish-task` の parity check の手順は zsh で走らせると schema の変更を見落として「skip」と出る（クォートしない `$SCHEMA_PATHS` を zsh は分けない）。bash で走らせ直した。別タスクの候補。

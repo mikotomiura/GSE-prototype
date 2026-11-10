@@ -1,13 +1,14 @@
 {
   "name": "gse-next",
   "private": true,
-  "version": "0.1.40",
+  "version": "0.1.41",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:handmark": "node --test scripts/handmark-stage-trace.test.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",

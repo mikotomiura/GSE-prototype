@@ -180,7 +180,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 ### 4.4 analysis::engine — HMM エンジン
 
-- **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う
+- **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う（2026-11-05 注: HMM 0.5.0 は段 1 の終わりまで固定し、`p_stuck` の役は固定の比べの床と H3 の手がかりに限る・ADR-044。推定は招待の契機を作らない・ADR-047 D2。3 状態の名前は主張に使わない・ADR-046 D1）
 - **依存先**: analysis::features, **analysis::heads**（§4.4b）
 - **インターフェース**: `new_for_domain()`, `set_domain()`, `head_id()`, `update()`, `update_silence()`, `register_keystroke()`, `state_probs()`
 - **状態管理**: HMM 内部状態（forward 確率、EWMA 軸値、display_probs、**走行中の head**）を Mutex で保護
@@ -451,6 +451,16 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
   ★ 分岐はすべて `o1::*` の純関数の中に閉じており、非 O1 では `session_active` と**同値**である
 - 詳細: `.steering/20260827-o1-collection-enablement/` / ADR-014 D6・D8 / ADR-016 判断 4b
 
+### 招待の契機と通常のモードの配線（ADR-040 D4・2026-11-01）
+
+招待の状態機械（`analysis/invitation.rs`）は、出す規則（1 区間 1 回・失効 60 秒・閉じた後 30 分・1 日の上限・時間帯・研究の条件・一時停止）を共有し、差し替えるのは「この tick で契機が立ったか」だけである（`TriggerKind`: `estimator` / `rising` / `random` / `none`）。
+
+- EH3: 契機は割り当ての段（`eh3::TriggerStage`）のまま。新しい設定ファイルは読まない。
+- 通常のモード（EH3・O1・G1 でない走行）: `lib.rs` の `InvitationRunner` を作り、契機は研究者の設定 `~/.gse/invitation_trigger.json`（`invitation_trigger.rs`・本人の画面には出さない）で選ぶ。無い→推定器の既定、読めない・未知の欄・値の欠け・範囲外→招待を出さない。研究の条件は `NORMAL_INVITATION_ALLOWED`（セッション開始の宣言 `invitationEnabled`＝第 2 週だけ真・設定が読めた・条件の行を送れた、のすべてが揃ったときだけ真。`start_session` と宣言の入口で偽に戻す）。
+- 無作為の契機(`random`): 整数秒 `s` ごとに `SplitMix64(実効 seed ^ s)` の最初の値が `per_active_hour/3600` 未満なら立つ。実効 seed は設定の `seed`(2^53 - 1 以下)とセッションの開始時刻(`session_start` 行の `t`)から `SplitMix64(seed ^ session_start)` で導く。秒の番号で引くので、tick が欠けても列がずれず、記録の `session_start` 行と設定から実機と同じ秒を再現できる(`gse-replay --invitation` は `session_start` 行の `t` から導く。設定 64 KiB・記録の 1 行 1 MiB が上限・`p_stuck` の欠けた `feat` 行は exit 1)。`rising` は非有限の `p_stuck` で履歴を捨てる。`hold_ms`・`window_ms` は 1 時間以下。設定ファイルは通常のファイルで 64 KiB 以下。
+- 記録: 通常のモードで招待を許すセッションの開始時に `invitation_condition` 行（契機の種類と値・`hmm_version`。`random` は設定の `seed` と導いた `seed_effective`(u64 を文字列で)）を 1 行(宣言が再び呼ばれたときは複数行)。提示は `invitation_present`。立ったが出さなかった契機は記録しない。
+- 再現: `gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs N]`（`feat` 行の `p_stuck` と `key` 行の押下の時刻だけを読む）。
+
 ### EH3 の層（招待と肖像・2026-10-11）
 
 EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く。EH3 でないときの記録と挙動は変わらない。
@@ -464,6 +474,22 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 
 - 肖像の「終わり」は終了・スリープの直前・4:00 の区切り、「始まり」は起動・復帰・その日を数えた時点。終了の待ち合わせは固定の長さ（2 秒）でバックグラウンドのスレッドで行う（待ち時間から本人の操作が読めないように）。
 - EH3 では probe と自己申告のカードを止め、GSE の窓への遷移を `focus_transition` に書かない。
+
+### 段 1 の層（問いの調停と配布の門・ADR-043・2026-11-07）
+
+段 1 のモード（O1 の上でだけ立つ・`s1.rs`・印 `s1.mode` か env `GSE_S1_MODE=1`）のときだけ動く。印の無い O1 の記録と挙動は変わらない（`logger::tests::o1_meta_unchanged_without_s1_marker`）。EH3 の印と同時にあれば両方を落として素の O1 として動く（`s1::resolve_with_eh3`）。Nudge と招待は出さない。
+
+| 層 | 置き場 | スレッド | 記録 |
+|---|---|---|---|
+| 調停器（無作為の枠 → 層化 → 日の問い） | `analysis/probe_arbiter.rs`（純粋・推定器の出力を入力に持たない） | 段 1 の駆動スレッド（1 秒ごと・時刻は 2 秒遅らせ押下が届き切ってから判定） | `probe_frame`・`probe_suppressed`・`probe_assignment` |
+| 駆動役 | `s1_driver.rs`（純粋・`Action` を `Effect` に変える）→ `lib.rs`（行の組み立て・6 択の門・emit） | 同上 | 回答は `realtime_label` と `activity_label`（同じ `probe_id`）、差し替えは `skip_reason = superseded`、日の終わりの問いは `day_question` |
+| カード | overlay（段 1 では `show()`・画面共有と録画から外す） | WebView | — |
+| 再生 | `s1_replay.rs`・`gse-replay --probes` / `--day-questions` | オフライン | 照合の JSON（研究者の手元だけ・gse-dataset へは共有しない） |
+
+- 6 択の門は `o1::activity_label_allowed(段 1, 本人の同意の印)`。素の O1 では通さない（ADR-043 D8）。
+- `GSE_DISABLE_PROBES` は段 1 では見ない（立っていたら warn を 1 行・Windows の自動起動は launcher を通らないため）。止めるときは `s1.mode` を外す。
+- 配布: `make-common-app-zip.sh --mode s1` が本人の試し（R5）の配布物だけを組む（`o1.mode` と、中身 `audience=self` の `s1.mode`・launcher `launch-s1-windows.bat`）。配る前に `scripts/check-s1-release-readiness.sh --audience self --dist <Windows の zip> --dist <macOS の zip>` を通す（片方の OS だけなら `--os-only windows|macos`）。この門は組み立てと launcher・段 1 を含むタグの新しさ・同意（他の参加者向けは段 1 の同意文書の承認の印 `<!-- s1-esm-consent: approved -->`）・配布物の印と中身（`eh3.mode`・`g1.mode` の不在、本人用の配布物を他の参加者向けの門で弾く）・自動送信に要るファイル・launcher が repo の段 1 の launcher とバイト一致することを見る。O1 の門は、`s1.mode` の書き出しが段 1 の分岐（`[ "$MODE" = s1 ] &&`）の中にだけあることを確かめる。
+- 詳細: `.steering/20261106-gse-m5-s1-core/`・`.steering/20261107-gse-m5-s1-driver-ui/`・`.steering/20261107-gse-m5-s1-replay-gate/`・`docs/functional-design.md` の段 1 の節。
 
 ## 5. データフロー
 
@@ -485,7 +511,9 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 ### フロー 2: Opportunity 判定と Lv1 Nudge 介入
 
 > ⚠️★★★ **2026-08-23 改訂**: 旧フローは **Lv2 Wall**（QR → Zen Timer → `POST /unlock`）を記述していたが、
-> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。通常モードで出る介入は Nudge である（2026-11-03 更新: PC 側の身体回帰の招待は EH3 モードで実装済み・`analysis/invitation.rs`。散歩の促進とその計測は行わず、身体回帰の後は離席候補明けの作業上の状態（打鍵の再開と受領の有無・フォーカスの遷移・ポインタ）で見る〔2026-11-03 研究者の言・ADR-024・ADR-023 D4・ADR-016〕。通常モードの Nudge は本体では出さないと決めた・ADR-040）。
+> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。通常モードで出る介入は Nudge だった（2026-11-03 更新: PC 側の身体回帰の招待は EH3 モードで実装済み・`analysis/invitation.rs`。散歩の促進とその計測は行わず、身体回帰の後は離席候補明けの作業上の状態（打鍵の再開と受領の有無・フォーカスの遷移・ポインタ）で見る〔2026-11-03 研究者の言・ADR-024・ADR-023 D4・ADR-016〕）。
+> ⚠️ **2026-10-31 改訂**: ADR-040 D1 で **Nudge も既定で無効**にした（`lib.rs` の `INTERVENTION_ENABLED` の初期値と、開始画面の第2週の `interventionEnabled` を false）。
+> 下のフローは介入が有効なとき（研究者が戻したとき）の経路であり、判断のロジックは `gse-replay --intervention` の評価に残す（D2）。招待は EH3 モードと、通常のモードの第 2 週で動く（上の「招待の契機と通常のモードの配線」）。
 
 1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
 2. Main Window が 500ms ごとに `get_intervention_decision` を invoke

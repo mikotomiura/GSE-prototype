@@ -28,7 +28,7 @@
 //!
 //! ★ `recording_pause` 行は**一時停止中でも書く**（★ そうしないと「再開した」が記録できない）。
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// 記録を一時停止しているか。
 ///
@@ -46,7 +46,22 @@ pub fn is_paused() -> bool {
 ///
 /// ★ 呼び出し側は「値が変わったときだけ `recording_pause` 行を書く」ために直前値を使う。
 pub fn set_paused(paused: bool) -> bool {
-    RECORDING_PAUSED.swap(paused, Ordering::AcqRel)
+    let prev = RECORDING_PAUSED.swap(paused, Ordering::AcqRel);
+    if prev != paused {
+        PAUSE_EPOCH.fetch_add(1, Ordering::AcqRel);
+    }
+    prev
+}
+
+/// 一時停止と再開の切り替えの回数（値が変わったときだけ進む）。
+///
+/// ★ 段 1 の駆動役（1 秒に 1 回 `is_paused` を読む）が、1 秒の中の「止めてすぐ再開」を
+///   取りこぼさないために見る。止めていない走行では誰も読まない。
+static PAUSE_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+/// 一時停止と再開の切り替えの回数。
+pub fn pause_epoch() -> u64 {
+    PAUSE_EPOCH.load(Ordering::Acquire)
 }
 
 /// 一時停止中に**それでも書いてよい**行種か。

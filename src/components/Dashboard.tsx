@@ -614,6 +614,39 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
         </button>
       )}
 
+      {/* 段 1（M5 の 2 本目）の画面の確かめ用。debugView gate に加え、backend も GSE_DEBUG=1 を要求する。
+          ★ 調停器の外で出すので、記録の照合（gse-replay --probes）の対象ではない。 */}
+      {debugView && (
+        <div className="debug-s1">
+          {(["random", "low_operation_end"] as const).map((stratum) => (
+            <button
+              key={stratum}
+              className="debug-force-button"
+              onClick={() =>
+                invoke("debug_force_s1_probe", { stratum }).catch((e) =>
+                  console.error("debug_force_s1_probe failed:", e)
+                )
+              }
+            >
+              段1 プローブ ({stratum})
+            </button>
+          ))}
+          {[false, true].map((delayed) => (
+            <button
+              key={String(delayed)}
+              className="debug-force-button"
+              onClick={() =>
+                invoke("debug_force_s1_day_question", { delayed }).catch((e) =>
+                  console.error("debug_force_s1_day_question failed:", e)
+                )
+              }
+            >
+              段1 日の問い{delayed ? " (拾い直し)" : ""}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ⚠️★★★ 研究者向け: `ime_shadow` の生存読み出し (issue 008 の AC 6 を画面で確かめる)。
           ★ `gse-replay` は `ime_shadow` を読み飛ばすので、従来の確認手段は NDJSON を jq で
           開くことだけだった。⚠️ しかも NDJSON は 1 セッションで 2 本できる (起動時に 1 本 →
