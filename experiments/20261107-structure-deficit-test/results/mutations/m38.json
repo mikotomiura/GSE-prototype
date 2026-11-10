@@ -1,0 +1,15 @@
+{
+ "run_id": "20261109T122107-1576",
+ "mutate": [
+  "m38"
+ ],
+ "P-OTHER": {
+  "passed": false,
+  "max_abs_dev": 0.14784036771196263,
+  "v_model_dev": 0.0,
+  "cells": 26,
+  "p30_cells": 2
+ },
+ "seconds": 217.00588703155518,
+ "all_passed": false
+}
