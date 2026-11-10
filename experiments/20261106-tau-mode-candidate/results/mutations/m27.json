@@ -1,0 +1,22 @@
+{
+ "run_id": "20261106T205818-149",
+ "mutate": [
+  "m27"
+ ],
+ "P-NEGINF": {
+  "passed": false,
+  "w02_neg_inf": false,
+  "others_finite": true,
+  "counts_ok": false,
+  "quantiles_ok": true,
+  "mode_counts": {
+   "writers": 8,
+   "neg_inf": 2,
+   "zero_row_hit": 3
+  },
+  "w1_zero_row_hit": true,
+  "json_ok": true
+ },
+ "seconds": 4.076802015304565,
+ "all_passed": false
+}
