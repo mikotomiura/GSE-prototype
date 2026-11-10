@@ -112,9 +112,9 @@ cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/sna
 # GT メトリクス算出（Phase 1 Task 2、UserLabel 付きセッション向け）
 cargo run --bin gse-replay -- <session.ndjson> --metrics         # pretty-print
 cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSON
-# ⚠️ 2026-09-01 訂正 — モード系フラグは 9 本が相互排他:
-#   --metrics / --segment / --segments / --snapshot / --intervention
-#   / --calibration / --sweep / --nudge-diag / --corr-floor
+# ⚠️ 2026-11-07 更新 — モード系フラグは 13 本が相互排他（src-tauri/src/bin/replay.rs の parse_args_from）:
+#   --metrics / --segment / --segments / --snapshot / --intervention / --invitation
+#   / --probes / --day-questions / --calibration / --sweep / --nudge-diag / --corr-floor / --features
 # --json はこのうち --metrics / --segments / --intervention / --calibration
 #   / --sweep / --nudge-diag / --corr-floor と併用できる（--snapshot とは併用不可）。
 
@@ -146,7 +146,8 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
   HIR/Precision/DC/Burden を算出 (gse-v2-intervention-eval、`analysis::intervention_eval`)。
   logged feat の p_stuck/f3/f4/f6 で `decide()` を時刻順ステップ、GT は point label を
   forward-fill で区間化。**screening 用途**（GT 仮定依存、詳細は steering の decisions.md/results.md）
-- **モード系フラグ (`--metrics` / `--segment` / `--segments` / `--snapshot` / `--intervention`) は相互排他** (両指定で exit 2)
+- **`gse-replay <s1> [s2 ...] --probes [--utc-offset-secs <N>] [--day-state <path>]`**: 段 1 の問いの行を記録から調停器を回し直して照合（JSON・`s1_replay.rs`）。`--day-questions --utc-offset-secs <N>` は日の問いの回答の後の押下の数。記録・状態ファイルが不正なら exit 1 で stdout は空
+- **モード系フラグは相互排他**（13 本・一覧は上のコードブロックのコメント・両指定は exit 1 で stdout は空）
 - **`--json` は `--metrics` / `--segments` / `--intervention` 併用必須** (生 snapshot 出力には使わない)
 
 ### テストの方針

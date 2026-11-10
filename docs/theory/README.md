@@ -10,7 +10,7 @@
 |---|---|---|
 | [`theory-architecture-and-roadmap.md`](theory-architecture-and-roadmap.md) | 理論群の索引・主張階層・命題の四系列・証拠階梯・構築ロードマップ | `.steering/20260918-theory-critical-review/review-A.md` |
 | [`generative-relinquishment-theory.md`](generative-relinquishment-theory.md) | 生成的返権論（TH-GR・★ 名称は 2026-09-21 に確定）の理論構築メモ | `.steering/20260918-theory-critical-review/review-B.md` |
-| [`measurement-terminating-practice-portraiture.md`](measurement-terminating-practice-portraiture.md) | 計測終端型実践肖像論（TH-MTP）の作業メモ | ⚠️ 段 1 のレビューの対象外（参考として読んだだけ） |
+| [`measurement-terminating-practice-portraiture.md`](measurement-terminating-practice-portraiture.md) | 計測終端型実践肖像論（TH-MTP）の作業メモ。2026-10-16 に 4 つ目の語の候補「手跡 / Handmark」（§1.4）を足し、2026-11-08 に ADR-048 D2 に合わせて main へ持ち込んだ | ⚠️ 段 1 のレビューの対象外（参考として読んだだけ） |
 
 ## 読むときの約束
 

@@ -40,7 +40,7 @@ PY
 )"
 ADDF="$EXP/../20261031-coauthor-pre-request-signal/scripts/add_feat.py"
 for w in dux_work dux_work_tabnav swell_work; do
-  [ -f "$X/$w/build_ok" ] || { echo "build が最後まで成功していない: $w（REBUILD=1 で作り直す）" >&2; exit 1; }
+  [ -f "$X/$w/build_ok" ] || { echo "build が最後まで成功していない: ${w}（REBUILD=1 で作り直す）" >&2; exit 1; }
   python3 -I - "$X/$w/build_summary.json" "$w" "$(sha "$HERE/convert_extend.py")" "$(sha "$HERE/build_extend.py")" \
     "$(sha "$X/holdout.json")" "$(sha "$ADDF")" "$(sha "$BIN")" "$(sha "$V0")" "$(sha "$V1")" "$SWD" <<'PY'
 import json, sys

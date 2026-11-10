@@ -350,7 +350,9 @@ impl ProbeScheduler {
     /// soft max-gap (DB-15): 間隔を `max_gap_ms` で上限クランプ (censored exponential:
     /// 打ち切り点に確率質量。再正規化なし)。候補は必ず `max_gap_ms` 以内に到来し、指数裾
     /// による数十分の枯渇を防ぐ。「均等カバレッジ」と「条件付き一様性」のトレードオフ (D3)。
-    fn sample_interval_ms(rng: &mut StdRng, config: &ProbeConfig) -> u64 {
+    ///
+    /// ★ 段 1 の無作為の枠（`probe_arbiter::RandomFrame`）も同じ分布を使う（`pub(crate)`・2026-11-06）。
+    pub(crate) fn sample_interval_ms(rng: &mut StdRng, config: &ProbeConfig) -> u64 {
         let u: f64 = rng.gen::<f64>();
         let one_minus_u = (1.0 - u).max(f64::EPSILON);
         let interval = -one_minus_u.ln() / config.lambda_per_ms;

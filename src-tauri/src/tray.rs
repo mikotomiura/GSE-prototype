@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::AppHandle;
 
@@ -70,6 +70,14 @@ pub fn measure_title(state: MeasureState) -> &'static str {
     }
 }
 
+/// 招待の「印の説明と設定」をトレイに出すか（純関数）。
+///
+/// EH3 は常に出す（起動時に作る項目・今のまま）。通常のモードは、招待が許されているセッションの間
+/// （`NORMAL_INVITATION_ALLOWED` が真の間）だけ出す。第 1 週・セッションが無い・O1・G1 では出さない。
+pub fn invitation_item_visible(eh3: bool, normal_allowed: bool) -> bool {
+    eh3 || normal_allowed
+}
+
 /// いまの状態を Atomic から読む。
 ///
 /// ⚠️★★ 「フックが生きている」は **2 つの AND** である:
@@ -98,6 +106,292 @@ fn current_state(session_active: &AtomicBool) -> MeasureState {
         ),
         installed && !starved,
     )
+}
+
+/// 手跡の「やめる」／「描く」の項目の ID(段 1 の後期・ADR-051)。
+const MENU_HANDMARK: &str = "gse-tray-handmark";
+
+/// 手跡のトレイの項目の状態(駆動役が書き、更新スレッドが読む)。0 = 出さない・1 = やめる・2 = 描く。
+static HANDMARK_TRAY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// メニューに実際に出している手跡の項目の状態(更新スレッドが書き、押下の処理が読む)。
+static HANDMARK_TRAY_SHOWN: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn handmark_item_code(t: crate::handmark_driver::TrayItem) -> u8 {
+    use crate::handmark_driver::TrayItem;
+    match t {
+        TrayItem::Hidden => 0,
+        TrayItem::Stop => 1,
+        TrayItem::Restore => 2,
+    }
+}
+
+fn handmark_item_from_code(c: u8) -> crate::handmark_driver::TrayItem {
+    use crate::handmark_driver::TrayItem;
+    match c {
+        1 => TrayItem::Stop,
+        2 => TrayItem::Restore,
+        _ => TrayItem::Hidden,
+    }
+}
+
+/// 手跡の項目の出し入れの計画(純関数で決め、ループはその結果だけを反映する)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HandmarkTrayPlan {
+    Nothing,
+    Remove,
+    /// 項目を出す(文言を決めて差し込む)。
+    Insert(&'static str),
+    /// 出ている項目の文言だけを替える。
+    Relabel(&'static str),
+}
+
+fn handmark_tray_plan(
+    want: crate::handmark_driver::TrayItem,
+    shown: crate::handmark_driver::TrayItem,
+) -> HandmarkTrayPlan {
+    use crate::handmark_driver::TrayItem;
+    if want == shown {
+        return HandmarkTrayPlan::Nothing;
+    }
+    match (want.label(), shown) {
+        (None, _) => HandmarkTrayPlan::Remove,
+        (Some(label), TrayItem::Hidden) => HandmarkTrayPlan::Insert(label),
+        (Some(label), _) => HandmarkTrayPlan::Relabel(label),
+    }
+}
+
+/// 計画を実行した結果(`ok`)から、メニューに実際に出ている状態を返す。この値を押下の照合に使う。
+fn handmark_tray_after(
+    plan: HandmarkTrayPlan,
+    want: crate::handmark_driver::TrayItem,
+    shown: crate::handmark_driver::TrayItem,
+    ok: bool,
+) -> crate::handmark_driver::TrayItem {
+    if plan == HandmarkTrayPlan::Nothing || !ok {
+        shown
+    } else {
+        want
+    }
+}
+
+/// 手跡の「カーソル」「クリック」のチェックの項目の ID(窓を出している日だけ出す)。
+const MENU_HANDMARK_CURSOR: &str = "gse-tray-handmark-cursor";
+const MENU_HANDMARK_CLICK: &str = "gse-tray-handmark-click";
+/// 項目の添字(カーソル = 0・クリック = 1)。
+const INPUT_CURSOR: usize = 0;
+const INPUT_CLICK: usize = 1;
+
+/// 入力の項目の「あるべき状態」(駆動役が書き、更新スレッドが読む)。符号は [`input_code`]。
+static HANDMARK_INPUT_WANT: [std::sync::atomic::AtomicU8; 2] = [
+    std::sync::atomic::AtomicU8::new(0),
+    std::sync::atomic::AtomicU8::new(0),
+];
+/// メニューに実際に出している入力の項目の状態(更新スレッドが書き、押下の処理が読む)。
+static HANDMARK_INPUT_SHOWN: [std::sync::atomic::AtomicU8; 2] = [
+    std::sync::atomic::AtomicU8::new(0),
+    std::sync::atomic::AtomicU8::new(0),
+];
+/// 押された直後に印の表示を駆動役の状態へ合わせ直す(メニューの項目は押すと自分で印が反転するため)。
+static HANDMARK_INPUT_RESYNC: AtomicBool = AtomicBool::new(false);
+
+/// 入力の項目の状態の符号。`None` = 出さない・`Some(印が入っているか)`。
+fn input_code(v: Option<bool>) -> u8 {
+    match v {
+        None => 0,
+        Some(false) => 1,
+        Some(true) => 2,
+    }
+}
+
+fn input_from_code(c: u8) -> Option<bool> {
+    match c {
+        1 => Some(false),
+        2 => Some(true),
+        _ => None,
+    }
+}
+
+/// 入力の項目の出し入れの計画(純関数で決め、ループはその結果だけを反映する)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputPlan {
+    Nothing,
+    Remove,
+    /// 項目を出す(印の状態を決めて差し込む)。
+    Insert(bool),
+    /// 出ている項目の印だけを合わせる。
+    SetChecked(bool),
+}
+
+/// `want` = 駆動役が望む状態、`shown` = 実際に出している状態。`force` は印を言い直す(押した直後)。
+fn handmark_input_plan(want: Option<bool>, shown: Option<bool>, force: bool) -> InputPlan {
+    match (want, shown) {
+        (None, None) => InputPlan::Nothing,
+        (None, Some(_)) => InputPlan::Remove,
+        (Some(c), None) => InputPlan::Insert(c),
+        (Some(c), Some(s)) => {
+            if force || c != s {
+                InputPlan::SetChecked(c)
+            } else {
+                InputPlan::Nothing
+            }
+        }
+    }
+}
+
+/// 計画を実行した結果(`ok`)から、メニューに実際に出ている状態を返す。この値を押下の照合に使う。
+fn handmark_input_after(
+    plan: InputPlan,
+    want: Option<bool>,
+    shown: Option<bool>,
+    ok: bool,
+) -> Option<bool> {
+    match (plan, ok) {
+        (InputPlan::Nothing, _) | (_, false) => shown,
+        (InputPlan::Remove, true) => None,
+        (InputPlan::Insert(_) | InputPlan::SetChecked(_), true) => want,
+    }
+}
+
+/// 1 項目ぶんの更新。計画を決め、`apply` で実行し、実際の状態を返す(呼び出し側がそれを照合の値に書く)。
+fn handmark_input_step(
+    want: Option<bool>,
+    shown: Option<bool>,
+    force: bool,
+    apply: impl FnOnce(InputPlan) -> bool,
+) -> Option<bool> {
+    let plan = handmark_input_plan(want, shown, force);
+    if plan == InputPlan::Nothing {
+        return shown;
+    }
+    let ok = apply(plan);
+    handmark_input_after(plan, want, shown, ok)
+}
+
+/// 項目を差し込む位置。`ids` は今のメニューの ID の並び、`before` はその前に置きたい項目(最初に見つかったもの)。
+/// どれも無ければ、最後の項目(終了)の前。
+fn handmark_input_index(ids: &[&str], before: &[&str]) -> usize {
+    ids.iter()
+        .position(|i| before.contains(i))
+        .unwrap_or_else(|| ids.len().saturating_sub(1))
+}
+
+/// 駆動役が入力の項目の状態を知らせる。`None` = 窓を出していない(項目を出さない)・
+/// `Some((カーソルが入っているか, クリックが入っているか))`。
+pub fn set_handmark_inputs(v: Option<(bool, bool)>) {
+    HANDMARK_INPUT_WANT[INPUT_CURSOR].store(input_code(v.map(|x| x.0)), Ordering::Release);
+    HANDMARK_INPUT_WANT[INPUT_CLICK].store(input_code(v.map(|x| x.1)), Ordering::Release);
+}
+
+/// 駆動役の `Effect::PointerGate { open, cursor, click }` を項目の状態へ写す（窓を出していなければ出さない）。
+pub fn set_handmark_inputs_from_gate(open: bool, cursor: bool, click: bool) {
+    set_handmark_inputs(open.then_some((cursor, click)));
+}
+
+/// 押された項目（添字 `which`）の、駆動役へ渡す値。メニューに出ていた印を返し（出ていなければ `None`）、
+/// 印の言い直しを頼む（メニューの項目は押すと自分で印が反転するので、駆動役の結果に合わせ直させる）。
+fn handmark_input_request(
+    which: usize,
+) -> Option<(crate::analysis::handmark::day::PointerInput, bool)> {
+    use crate::analysis::handmark::day::PointerInput;
+    let shown = input_from_code(HANDMARK_INPUT_SHOWN[which].load(Ordering::Acquire));
+    HANDMARK_INPUT_RESYNC.store(true, Ordering::Release);
+    let checked = shown?;
+    let input = if which == INPUT_CURSOR {
+        PointerInput::Cursor
+    } else {
+        PointerInput::Click
+    };
+    Some((input, checked))
+}
+
+/// 押下の後に書く「出している印」。出ている項目で、駆動役の望む状態があるときだけ、それへ進める
+/// （メニューの項目は押すと自分で印が反転するので、表示とも合う）。出ていない項目は書かない。
+fn shown_after_press(want: Option<bool>, shown: Option<bool>) -> Option<bool> {
+    match (want, shown) {
+        (Some(w), Some(_)) => Some(w),
+        (_, s) => s,
+    }
+}
+
+/// 計画の実行に失敗したとき、次の周回で印の言い直しをやり直すか。印の合わせだけが対象
+/// （出し入れの失敗は、出している状態が変わらないので次の周回の計画がまた同じになる）。
+fn handmark_input_retry(plan: InputPlan, ok: bool) -> bool {
+    matches!(plan, InputPlan::SetChecked(_)) && !ok
+}
+
+/// 押下が駆動役まで通って入れ切りが変わった直後に、メニューに出している印の記録（`HANDMARK_INPUT_SHOWN`）を
+/// 新しい状態へ書く。
+fn handmark_input_after_press(which: usize) {
+    let want = input_from_code(HANDMARK_INPUT_WANT[which].load(Ordering::Acquire));
+    let shown = input_from_code(HANDMARK_INPUT_SHOWN[which].load(Ordering::Acquire));
+    HANDMARK_INPUT_SHOWN[which].store(
+        input_code(shown_after_press(want, shown)),
+        Ordering::Release,
+    );
+}
+
+/// 入力の項目が押された。`which` は添字。押された時点で出ていた印を駆動役へ渡す（照合は
+/// `handmark_driver::decide_tray_input`）。
+fn handmark_input_pressed(app: &AppHandle, which: usize) {
+    let req = handmark_input_request(which);
+    if req.is_none() {
+        // 表示の印が分からない押下は捨てる。捨てたことだけ残す(lib.rs の handmark_set_input_from_tray の注記)。
+        tracing::warn!("handmark: input press ignored (menu mark unknown)");
+    }
+    if let Some((input, checked)) = req {
+        // 駆動役まで通って入れ切りが変わったら、表示の印の記録を新しい状態へ進める（更新スレッドは 1 秒ごと
+        // にしか書かないので、1 秒以内の次の押下が「表示が古い」で捨てられないように）。
+        if crate::handmark_set_input_from_tray(app, input, checked) {
+            handmark_input_after_press(which);
+        }
+    }
+}
+
+/// 入力の項目 1 つをメニューに反映する(更新スレッドから)。結果の状態を返す。
+fn handmark_input_reconcile(
+    menu: &Menu<tauri::Wry>,
+    item: &CheckMenuItem<tauri::Wry>,
+    which: usize,
+    shown: Option<bool>,
+    force: bool,
+) -> Option<bool> {
+    let want = input_from_code(HANDMARK_INPUT_WANT[which].load(Ordering::Acquire));
+    let before: &[&str] = if which == INPUT_CURSOR {
+        &[MENU_HANDMARK_CLICK, MENU_HANDMARK]
+    } else {
+        &[MENU_HANDMARK]
+    };
+    let mut retry = false;
+    let after = handmark_input_step(want, shown, force, |plan| {
+        let ok = match plan {
+            InputPlan::Nothing => true,
+            InputPlan::Remove => menu.remove(item).is_ok(),
+            InputPlan::SetChecked(c) => item.set_checked(c).is_ok(),
+            InputPlan::Insert(c) => {
+                let ids: Vec<String> = menu
+                    .items()
+                    .map(|v| v.iter().map(|k| k.id().as_ref().to_string()).collect())
+                    .unwrap_or_default();
+                let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+                let position = handmark_input_index(&refs, before);
+                item.set_checked(c).is_ok() && menu.insert(item, position).is_ok()
+            }
+        };
+        retry |= handmark_input_retry(plan, ok);
+        ok
+    });
+    if retry {
+        // 印の言い直しに失敗した: 合図は呼び出し側が消費済みなので、立て直して次の周回でやり直す。
+        HANDMARK_INPUT_RESYNC.store(true, Ordering::Release);
+    }
+    HANDMARK_INPUT_SHOWN[which].store(input_code(after), Ordering::Release);
+    after
+}
+
+/// 駆動役が手跡の項目の状態を知らせる(項目の出し入れは更新スレッドが 1 秒ごとに行う)。
+pub fn set_handmark_item(t: crate::handmark_driver::TrayItem) {
+    HANDMARK_TRAY.store(handmark_item_code(t), Ordering::Release);
 }
 
 /// メニュー項目の ID。
@@ -145,6 +439,18 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
     )?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "GSE を終了", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
+    // 通常のモード用: 招待が許されている間だけ後から差し込む項目（EH3 は下の静的な項目を使う）。
+    let dynamic_invitation = if crate::eh3::is_eh3() {
+        None
+    } else {
+        Some(MenuItem::with_id(
+            app,
+            MENU_INVITATION,
+            "印の説明と設定",
+            true,
+            None::<&str>,
+        )?)
+    };
     let menu = if crate::eh3::is_eh3() {
         let invitation =
             MenuItem::with_id(app, MENU_INVITATION, "印の説明と設定", true, None::<&str>)?;
@@ -172,10 +478,23 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         .on_menu_event(|app, event| {
             if event.id.as_ref() == MENU_QUIT {
                 tracing::info!("tray: quit requested");
-                crate::shutdown_and_exit(app);
+                // 段 1 では日の終わりの問いを挟みうる（段 1 でなければ今のまま `shutdown_and_exit`）。
+                crate::request_quit(app);
             } else if event.id.as_ref() == MENU_PORTRAIT_STOP {
                 // ⚠️ 選んだことは記録しない（applog にも出さない・R-P9）。
                 crate::stop_portrait_by_person();
+            } else if event.id.as_ref() == MENU_HANDMARK {
+                // ⚠️ 選んだことは applog にも出さない(日の行に切った／戻した時刻が残るだけ)。
+                // 押された項目の文言(メニューに出ていた状態)を渡し、駆動役の今の状態と照らす
+                crate::handmark_toggle_from_tray(
+                    app,
+                    handmark_item_from_code(HANDMARK_TRAY_SHOWN.load(Ordering::Acquire)),
+                );
+            } else if event.id.as_ref() == MENU_HANDMARK_CURSOR {
+                // ⚠️ 選んだことは applog にも出さない(日の行に入れ切りの時刻が残るだけ)。
+                handmark_input_pressed(app, INPUT_CURSOR);
+            } else if event.id.as_ref() == MENU_HANDMARK_CLICK {
+                handmark_input_pressed(app, INPUT_CLICK);
             } else if event.id.as_ref() == MENU_INVITATION {
                 // ⚠️ 開いたことは記録しない（applog にも出さない・R-I1）。
                 let _ = crate::show_invitation_settings_window(app);
@@ -185,11 +504,38 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         builder = builder.icon(icon.clone());
     }
     let tray = builder.build(app)?;
+    // 手跡の項目(今日の割付が出す日のときだけ駆動役が `Hidden` 以外にする)
+    let handmark_menu_item = MenuItem::with_id(app, MENU_HANDMARK, "やめる", true, None::<&str>)?;
+    // 入力ごとの入れ切り(窓を出している日だけ「やめる」の上に出す。文言は入力の名前だけ)
+    let handmark_cursor_item = CheckMenuItem::with_id(
+        app,
+        MENU_HANDMARK_CURSOR,
+        "カーソル",
+        true,
+        true,
+        None::<&str>,
+    )?;
+    let handmark_click_item = CheckMenuItem::with_id(
+        app,
+        MENU_HANDMARK_CLICK,
+        "クリック",
+        true,
+        true,
+        None::<&str>,
+    )?;
 
     std::thread::Builder::new()
         .name("gse-tray".to_string())
         .spawn(move || {
             let mut last = initial;
+            // 通常のモード: 項目をいま差し込んでいるか
+            let mut invitation_shown = false;
+            // 差し込みの失敗は最初の 1 回だけ警告する(毎秒の連投を避ける・内容は書かない)
+            let mut insert_failure_warned = false;
+            // 手跡の項目をいま差し込んでいる文言
+            let mut handmark_shown = crate::handmark_driver::TrayItem::Hidden;
+            // 入力の項目(カーソル・クリック)をいま出している状態
+            let mut input_shown: [Option<bool>; 2] = [None, None];
             loop {
                 std::thread::sleep(Duration::from_millis(1000));
                 // ★ 終了処理が始まったら抜ける。⚠️ 落ちるまでの数百 ms のあいだ
@@ -198,6 +544,57 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                     tracing::info!("tray updater stopping (shutdown in progress)");
                     return;
                 }
+                // ⚠️ 項目の出し入れは記録しない（applog にも出さない・R-I1）。
+                if let Some(item) = dynamic_invitation.as_ref() {
+                    let want =
+                        invitation_item_visible(false, crate::normal_invitation_allowed_now());
+                    if want && !invitation_shown {
+                        // 状態表示・区切りの次（静的な並びの「印の説明と設定」と同じ位置）
+                        invitation_shown = menu.insert(item, 2).is_ok();
+                        if !invitation_shown && !insert_failure_warned {
+                            insert_failure_warned = true;
+                            tracing::warn!("tray invitation item could not be inserted");
+                        }
+                    } else if !want && invitation_shown && menu.remove(item).is_ok() {
+                        invitation_shown = false;
+                    }
+                }
+                // 手跡の項目: 状態が変わったときだけ触る(出し入れは記録しない)
+                let want = handmark_item_from_code(HANDMARK_TRAY.load(Ordering::Acquire));
+                let plan = handmark_tray_plan(want, handmark_shown);
+                let ok = match plan {
+                    HandmarkTrayPlan::Nothing => true,
+                    HandmarkTrayPlan::Remove => menu.remove(&handmark_menu_item).is_ok(),
+                    HandmarkTrayPlan::Relabel(label) => handmark_menu_item.set_text(label).is_ok(),
+                    HandmarkTrayPlan::Insert(label) => {
+                        // 終了の直前に差し込む(招待の項目は静的な並びの 2 番目なので食い違わない)
+                        let position = menu.items().map_or(2, |i| i.len().saturating_sub(1));
+                        handmark_menu_item.set_text(label).is_ok()
+                            && menu.insert(&handmark_menu_item, position).is_ok()
+                    }
+                };
+                if plan != HandmarkTrayPlan::Nothing {
+                    handmark_shown = handmark_tray_after(plan, want, handmark_shown, ok);
+                    // 押下の照合に使う値は、出し入れ・文言の変更のどれでも成功したときに更新する
+                    HANDMARK_TRAY_SHOWN
+                        .store(handmark_item_code(handmark_shown), Ordering::Release);
+                }
+                // 入力の項目: クリックが先(カーソルの項目の位置がクリックの前に決まるように)
+                let force = HANDMARK_INPUT_RESYNC.swap(false, Ordering::AcqRel);
+                input_shown[INPUT_CLICK] = handmark_input_reconcile(
+                    &menu,
+                    &handmark_click_item,
+                    INPUT_CLICK,
+                    input_shown[INPUT_CLICK],
+                    force,
+                );
+                input_shown[INPUT_CURSOR] = handmark_input_reconcile(
+                    &menu,
+                    &handmark_cursor_item,
+                    INPUT_CURSOR,
+                    input_shown[INPUT_CURSOR],
+                    force,
+                );
                 let next = current_state(&session_active);
                 if next == last {
                     continue; // ★ 変わっていないなら触らない（無用な UI 更新を出さない）
@@ -282,7 +679,19 @@ mod tests {
             MeasureState::Measuring,
             MeasureState::HookDown,
         ] {
-            for text in [measure_label(state), measure_title(state)] {
+            // 手跡の「やめる」／「描く」も同じ禁止語の対象(状態に依らない文言)
+            let handmark = [
+                crate::handmark_driver::TrayItem::Stop.label().unwrap_or(""),
+                crate::handmark_driver::TrayItem::Restore
+                    .label()
+                    .unwrap_or(""),
+            ];
+            for text in [
+                measure_label(state),
+                measure_title(state),
+                handmark[0],
+                handmark[1],
+            ] {
                 for word in banned {
                     assert!(
                         !text.contains(word),
@@ -291,6 +700,394 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// 手跡のトレイの文言(「やめる」／「描く」)も非開示語を含まず、手跡の語を出さない。
+    #[test]
+    fn handmark_tray_labels_are_plain() {
+        use crate::handmark_driver::TrayItem;
+        let banned = [
+            "Flow",
+            "flow",
+            "Incubation",
+            "incubation",
+            "Stuck",
+            "stuck",
+            "フロー",
+            "スタック",
+            "停滞",
+            "確率",
+            "p_",
+            "手跡",
+            "Handmark",
+            "handmark",
+            "背景",
+            "状態",
+        ];
+        for t in [TrayItem::Stop, TrayItem::Restore] {
+            let label = t.label().expect("label");
+            for w in banned {
+                assert!(!label.contains(w), "{label:?} has {w:?}");
+            }
+        }
+        assert_eq!(TrayItem::Hidden.label(), None);
+        for t in [TrayItem::Hidden, TrayItem::Stop, TrayItem::Restore] {
+            assert_eq!(handmark_item_from_code(handmark_item_code(t)), t);
+        }
+    }
+
+    /// 手跡の項目: 出す・文言を替える・隠すのどれでも、成功したときに照合の値が実際の表示になる。
+    #[test]
+    fn handmark_tray_step_updates_the_match_value_on_every_success() {
+        use crate::handmark_driver::TrayItem::{Hidden, Restore, Stop};
+        // Hidden -> Stop(挿入成功): 照合の値が Stop になる(押下が通る)
+        let plan = handmark_tray_plan(Stop, Hidden);
+        assert_eq!(plan, HandmarkTrayPlan::Insert("やめる"));
+        assert_eq!(handmark_tray_after(plan, Stop, Hidden, true), Stop);
+        // 挿入の失敗では Hidden のまま
+        assert_eq!(handmark_tray_after(plan, Stop, Hidden, false), Hidden);
+        // Stop -> Restore(文言の変更成功)
+        let plan = handmark_tray_plan(Restore, Stop);
+        assert_eq!(plan, HandmarkTrayPlan::Relabel("描く"));
+        assert_eq!(handmark_tray_after(plan, Restore, Stop, true), Restore);
+        assert_eq!(handmark_tray_after(plan, Restore, Stop, false), Stop);
+        // 隠す
+        let plan = handmark_tray_plan(Hidden, Restore);
+        assert_eq!(plan, HandmarkTrayPlan::Remove);
+        assert_eq!(handmark_tray_after(plan, Hidden, Restore, true), Hidden);
+        assert_eq!(handmark_tray_after(plan, Hidden, Restore, false), Restore);
+        // 変わらなければ何もしない
+        assert_eq!(handmark_tray_plan(Stop, Stop), HandmarkTrayPlan::Nothing);
+        assert_eq!(
+            handmark_tray_plan(Hidden, Hidden),
+            HandmarkTrayPlan::Nothing
+        );
+        // 照合の値の符号化は往復する
+        for t in [Hidden, Stop, Restore] {
+            assert_eq!(handmark_item_from_code(handmark_item_code(t)), t);
+        }
+    }
+
+    /// 入力の項目(カーソル・クリック)の文言は入力の名前だけで、手跡の語・状態の名前を出さない。
+    #[test]
+    fn handmark_input_labels_are_plain() {
+        let labels = ["カーソル", "クリック"];
+        let banned = [
+            "Flow",
+            "flow",
+            "Incubation",
+            "incubation",
+            "Stuck",
+            "stuck",
+            "フロー",
+            "スタック",
+            "停滞",
+            "確率",
+            "p_",
+            "手跡",
+            "Handmark",
+            "handmark",
+            "背景",
+            "状態",
+            "跡",
+            "波紋",
+        ];
+        for l in labels {
+            for w in banned {
+                assert!(!l.contains(w), "{l:?} has {w:?}");
+            }
+        }
+        for v in [None, Some(false), Some(true)] {
+            assert_eq!(input_from_code(input_code(v)), v);
+        }
+    }
+
+    /// 出す日・出さない日・入れ切りの反転(印だけを合わせる)・何も変わらない日。
+    #[test]
+    fn handmark_input_plan_matrix() {
+        use InputPlan::{Insert, Nothing, Remove, SetChecked};
+        // 出さない日
+        assert_eq!(handmark_input_plan(None, None, false), Nothing);
+        assert_eq!(handmark_input_plan(None, None, true), Nothing);
+        // 出す日(印は入れ切りの状態)
+        assert_eq!(handmark_input_plan(Some(true), None, false), Insert(true));
+        assert_eq!(handmark_input_plan(Some(false), None, false), Insert(false));
+        // 反転
+        assert_eq!(
+            handmark_input_plan(Some(false), Some(true), false),
+            SetChecked(false)
+        );
+        assert_eq!(
+            handmark_input_plan(Some(true), Some(false), false),
+            SetChecked(true)
+        );
+        // 変わらない
+        assert_eq!(handmark_input_plan(Some(true), Some(true), false), Nothing);
+        // 押した直後(メニューが自分で反転している)は、同じでも言い直す
+        assert_eq!(
+            handmark_input_plan(Some(true), Some(true), true),
+            SetChecked(true)
+        );
+        // 窓を閉じた日は消す
+        assert_eq!(handmark_input_plan(None, Some(true), false), Remove);
+        assert_eq!(handmark_input_plan(None, Some(false), false), Remove);
+    }
+
+    /// 照合の値(出している状態)は、挿入・印の変更・削除のどれでも成功したときに実際の表示になる。
+    #[test]
+    fn handmark_input_step_updates_the_match_value_on_every_success() {
+        // 挿入: 成功で Some(want)・失敗で None のまま
+        assert_eq!(
+            handmark_input_step(Some(true), None, false, |p| {
+                assert_eq!(p, InputPlan::Insert(true));
+                true
+            }),
+            Some(true)
+        );
+        assert_eq!(
+            handmark_input_step(Some(true), None, false, |_| false),
+            None
+        );
+        // 反転: 成功で新しい印・失敗で前の印のまま
+        assert_eq!(
+            handmark_input_step(Some(false), Some(true), false, |_| true),
+            Some(false)
+        );
+        assert_eq!(
+            handmark_input_step(Some(false), Some(true), false, |_| false),
+            Some(true)
+        );
+        // 押した直後の言い直し: 同じ印でも実行され、成功の値が残る
+        let mut called = false;
+        assert_eq!(
+            handmark_input_step(Some(false), Some(false), true, |_| {
+                called = true;
+                true
+            }),
+            Some(false)
+        );
+        assert!(called);
+        // 削除
+        assert_eq!(handmark_input_step(None, Some(true), false, |_| true), None);
+        assert_eq!(
+            handmark_input_step(None, Some(true), false, |_| false),
+            Some(true)
+        );
+        // 何も変わらないときは実行しない
+        assert_eq!(
+            handmark_input_step(Some(true), Some(true), false, |_| panic!("apply")),
+            Some(true)
+        );
+    }
+
+    /// 入力の項目は「やめる」の上・無ければ終了の前に差し込む。
+    #[test]
+    fn handmark_input_index_goes_above_the_handmark_item() {
+        let quit = "gse-tray-quit";
+        let ids = ["status", "sep", MENU_HANDMARK, quit];
+        assert_eq!(handmark_input_index(&ids, &[MENU_HANDMARK]), 2);
+        // 「やめる」が無ければ終了の前
+        let ids = ["status", "sep", quit];
+        assert_eq!(handmark_input_index(&ids, &[MENU_HANDMARK]), 2);
+        // カーソルはクリックの前
+        let ids = ["status", "sep", MENU_HANDMARK_CLICK, MENU_HANDMARK, quit];
+        assert_eq!(
+            handmark_input_index(&ids, &[MENU_HANDMARK_CLICK, MENU_HANDMARK]),
+            2
+        );
+        assert_eq!(handmark_input_index(&[], &[MENU_HANDMARK]), 0);
+    }
+
+    /// 入力の項目の Atomic（`HANDMARK_INPUT_*`）は全体で 1 組なので、触るテストは直列にする。
+    static INPUT_ATOMICS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// 駆動役の出来事のうち `PointerGate` を、実際の経路（`set_handmark_inputs_from_gate`）で項目の「あるべき状態」へ。
+    fn apply_gate(fx: &[crate::handmark_driver::Effect]) -> usize {
+        let mut n = 0;
+        for e in fx {
+            if let crate::handmark_driver::Effect::PointerGate {
+                open,
+                cursor,
+                click,
+            } = e
+            {
+                set_handmark_inputs_from_gate(*open, *cursor, *click);
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// 更新スレッドが 1 秒ごとにする「あるべき状態に合わせ、実際に出している状態を書く」を、メニューなしで写す。
+    fn reconcile_without_menu(force: bool) {
+        for i in [INPUT_CURSOR, INPUT_CLICK] {
+            let want = input_from_code(HANDMARK_INPUT_WANT[i].load(Ordering::Acquire));
+            let shown = input_from_code(HANDMARK_INPUT_SHOWN[i].load(Ordering::Acquire));
+            let after = handmark_input_step(want, shown, force, |_| true);
+            HANDMARK_INPUT_SHOWN[i].store(input_code(after), Ordering::Release);
+        }
+    }
+
+    /// 押下 → 照合 → `set_input` → `PointerGate` → `set_handmark_inputs_from_gate` → 印の Atomic まで 1 本で通す
+    /// （PR 1 判断 10: 純関数だけのテストで、押しても効かない不具合を出した）。
+    #[test]
+    fn a_tray_press_reaches_the_marks_through_the_driver() {
+        use crate::analysis::handmark::day::PointerInput;
+        use crate::handmark_driver::{decide_tray_input, HandmarkDriver};
+        use crate::handmark_store::testfs::with_table;
+        let _lock = INPUT_ATOMICS.lock().unwrap_or_else(|p| p.into_inner());
+        const T0: u64 = 1_800_000_000_000;
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, 20_411);
+        assert_eq!(apply_gate(&fx), 1);
+        reconcile_without_menu(false);
+        let want = |i: usize| input_from_code(HANDMARK_INPUT_WANT[i].load(Ordering::Acquire));
+        let shown = |i: usize| input_from_code(HANDMARK_INPUT_SHOWN[i].load(Ordering::Acquire));
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(true), Some(true))
+        );
+
+        // 押す（カーソル）: 印は入っている → 切る。
+        let (input, checked) = handmark_input_request(INPUT_CURSOR).expect("shown");
+        assert!(input == PointerInput::Cursor && checked);
+        let on = decide_tray_input(checked, d.input_items(), input).expect("fresh");
+        assert!(!on);
+        let fx = d.set_input(&fs, input, on, T0 + 1_000);
+        assert_eq!(apply_gate(&fx), 1);
+        assert_eq!(d.input_items(), Some((false, true)));
+        assert_eq!(
+            (want(INPUT_CURSOR), want(INPUT_CLICK)),
+            (Some(false), Some(true))
+        );
+        // 押した直後は印の言い直しが頼まれている（メニューの自動反転を戻す）
+        assert!(HANDMARK_INPUT_RESYNC.swap(false, Ordering::AcqRel));
+        reconcile_without_menu(true);
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(false), Some(true))
+        );
+
+        // 古い表示で押す（まだ入っている印のつもり）→ 何も起きない。
+        assert_eq!(
+            decide_tray_input(true, d.input_items(), PointerInput::Cursor),
+            None
+        );
+
+        // 押す（クリック）→ 切る・もう一度カーソルを押す → 入れる。
+        let (input, checked) = handmark_input_request(INPUT_CLICK).expect("shown");
+        let on = decide_tray_input(checked, d.input_items(), input).expect("fresh");
+        apply_gate(&d.set_input(&fs, input, on, T0 + 2_000));
+        reconcile_without_menu(true);
+        let (input, checked) = handmark_input_request(INPUT_CURSOR).expect("shown");
+        assert!(!checked);
+        let on = decide_tray_input(checked, d.input_items(), input).expect("fresh");
+        assert!(on);
+        apply_gate(&d.set_input(&fs, input, on, T0 + 3_000));
+        reconcile_without_menu(true);
+        // 印の Atomic が、駆動役の状態と一致する。
+        let (c, k) = d.input_items().expect("open");
+        assert_eq!((c, k), (true, false));
+        assert_eq!((want(INPUT_CURSOR), want(INPUT_CLICK)), (Some(c), Some(k)));
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(c), Some(k))
+        );
+        HANDMARK_INPUT_RESYNC.store(false, Ordering::Release);
+        // 窓を閉じる（全体のやめる）→ 項目が消える。
+        let fx = d.turn_off(&fs, T0 + 4_000);
+        apply_gate(&fx);
+        reconcile_without_menu(false);
+        assert_eq!((shown(INPUT_CURSOR), shown(INPUT_CLICK)), (None, None));
+        // 出ていない項目の押下は何も渡さない（言い直しだけ頼む）。
+        assert!(handmark_input_request(INPUT_CURSOR).is_none());
+        HANDMARK_INPUT_RESYNC.store(false, Ordering::Release);
+        set_handmark_inputs(None);
+    }
+
+    /// 1 秒以内の 2 回目の押下も駆動役に届く（更新スレッドは 1 秒ごとにしか表示の印を書かないので、押下の側が
+    /// 書かないと 2 回目が「表示が古い」で捨てられる・2026-11-09 の画面の確かめ）。
+    #[test]
+    fn two_presses_within_one_second_both_reach_the_driver() {
+        use crate::handmark_driver::{decide_tray_input, HandmarkDriver};
+        use crate::handmark_store::testfs::with_table;
+        let _lock = INPUT_ATOMICS.lock().unwrap_or_else(|p| p.into_inner());
+        const T0: u64 = 1_800_000_000_000;
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, 20_411);
+        apply_gate(&fx);
+        reconcile_without_menu(false);
+        let mut changes = 0;
+        // 更新スレッドを挟まずに、カーソルを 3 回続けて押す（切る → 入れる → 切る）。
+        for (k, expect_on) in [(1u64, false), (2, true), (3, false)] {
+            let (input, checked) = handmark_input_request(INPUT_CURSOR).expect("shown");
+            let on = decide_tray_input(checked, d.input_items(), input);
+            assert_eq!(on, Some(expect_on), "press {k} must reach set_input");
+            let fx = d.set_input(&fs, input, expect_on, T0 + k * 100);
+            assert_eq!(apply_gate(&fx), 1);
+            handmark_input_after_press(INPUT_CURSOR);
+            changes += 1;
+        }
+        assert_eq!(changes, 3);
+        assert_eq!(d.input_items(), Some((false, true)));
+        let shown = |i: usize| input_from_code(HANDMARK_INPUT_SHOWN[i].load(Ordering::Acquire));
+        assert_eq!(
+            (shown(INPUT_CURSOR), shown(INPUT_CLICK)),
+            (Some(false), Some(true))
+        );
+        HANDMARK_INPUT_RESYNC.store(false, Ordering::Release);
+        set_handmark_inputs(None);
+        reconcile_without_menu(false);
+    }
+
+    /// 押下の後の「出している印」: 出ていて・望む状態がある項目だけを望む状態へ。出ていない項目は書かない。
+    #[test]
+    fn shown_after_press_follows_want_only_for_a_shown_item() {
+        assert_eq!(shown_after_press(Some(true), Some(false)), Some(true));
+        assert_eq!(shown_after_press(Some(false), None), None);
+        // 望む状態が無い（窓が閉じた）ときは触らない（項目の取り外しは更新スレッドの仕事）。
+        assert_eq!(shown_after_press(None, Some(true)), Some(true));
+        assert_eq!(shown_after_press(None, None), None);
+    }
+
+    /// 印の言い直しが失敗したら、次の周回でやり直す（消費した合図を立て直す）。
+    #[test]
+    fn a_failed_set_checked_asks_for_a_retry() {
+        let mut retry = false;
+        let after = handmark_input_step(Some(false), Some(false), true, |p| {
+            assert_eq!(p, InputPlan::SetChecked(false));
+            false
+        });
+        assert_eq!(after, Some(false));
+        assert!(handmark_input_retry(InputPlan::SetChecked(false), false));
+        assert!(!handmark_input_retry(InputPlan::SetChecked(false), true));
+        assert!(!handmark_input_retry(InputPlan::Insert(true), false));
+        assert!(!handmark_input_retry(InputPlan::Nothing, false));
+        retry |= handmark_input_retry(InputPlan::Remove, false);
+        assert!(!retry);
+    }
+
+    /// 駆動役が知らせた状態が、項目ごとの「あるべき状態」になる(出さない日は両方 None)。
+    #[test]
+    fn set_handmark_inputs_writes_both_wants() {
+        let _lock = INPUT_ATOMICS.lock().unwrap_or_else(|p| p.into_inner());
+        let read = |i: usize| input_from_code(HANDMARK_INPUT_WANT[i].load(Ordering::Acquire));
+        set_handmark_inputs(Some((false, true)));
+        assert_eq!(
+            (read(INPUT_CURSOR), read(INPUT_CLICK)),
+            (Some(false), Some(true))
+        );
+        set_handmark_inputs(None);
+        assert_eq!((read(INPUT_CURSOR), read(INPUT_CLICK)), (None, None));
+    }
+
+    /// 招待の項目の出し入れ: EH3 は常に、通常のモードは許されている間だけ。
+    #[test]
+    fn invitation_item_visibility() {
+        assert!(invitation_item_visible(true, false));
+        assert!(invitation_item_visible(true, true));
+        assert!(invitation_item_visible(false, true));
+        assert!(!invitation_item_visible(false, false));
     }
 
     /// 3 状態が**互いに違う文言**であること（同じだと区別できない）。
