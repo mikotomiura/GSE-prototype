@@ -37,8 +37,8 @@
   "_comment_merge_2026_10_12_public_matching": "2026-10-12: docs/public-keystroke-matching-prereg に origin/main を merge した際、today が衝突した。共通の起点の today は 10-12 の 99497 / 2 回。和を採った: 起点 99497 / 2 ＋ 本ブランチ +101499 / +2（合成の記録の検査の /cross-review 2 巡の Codex） ＋ origin/main +108780 / +4 = 309776 / 8 回。",
   "_comment_merge_2026_10_14_rhythm_stage": "2026-10-14: docs/rhythm-stage-graded-world に origin/main を merge した際、台帳が衝突した。共通の起点（60eb1021）の today は 10-13 の 214879 / 7 回。10-13 は和を採った: 起点 214879 / 7 ＋ 本ブランチ +91960 / +3（背景のステージの第 2 回の /cross-review の Codex） ＋ origin/main +229964 / +4 = 536803 / 14 回を history に入れた。today は本ブランチの 10-14 の 251688 / 8 回（origin/main に 10-14 の記帳は無い）。",
   "today": {
-    "date": "2026-11-06",
-    "tokens_used": 62573,
+    "date": "2026-11-08",
+    "tokens_used": 74663,
     "invocations": 2
   },
   "history": [
@@ -316,6 +316,16 @@
       "date": "2026-11-04",
       "tokens_used": 135946,
       "invocations": 4
+    },
+    {
+      "date": "2026-11-06",
+      "tokens_used": 62573,
+      "invocations": 2
+    },
+    {
+      "date": "2026-11-07",
+      "tokens_used": 277167,
+      "invocations": 6
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。 ★★★ 2026-09-21 訂正（研究者判断・blockers.md 起票 22）: ⚠️ **上の『実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)』は誤りである。** ★ 回転させるコードは scripts/run-codex-review.sh の `d['history'] = sorted(...)[-30:]` に在った。★ 2026-09-21 に実測: 日付が 09-20 → 09-21 へ変わった最初の記帳で、歴代最古の 2026-08-12 (25290 / 1 回) が実際に消えた。→ ★ 切り捨てを外し、消えた 1 件を実測値で戻した。★ history の件数上限は【置かない】と裁定した（研究者判断 2026-09-21）。⚠️ 本文は当時の記録として残してあるので、この訂正と併せて読むこと。",
@@ -349,5 +359,8 @@
   "_comment_merge_2026_10_10_matching_attack": "2026-10-10: docs/matching-attack-prototype に origin/main（PR #338 の後）を merge した際、台帳が衝突した。_comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った: 2026-10-10（today）= 本ブランチ 137707 / 3 回（合成入力での照合攻撃の試作の /cross-review・1 巡目 2 回 93891 ＋ 2 巡目 1 回 43816）＋ origin/main 65072 / 2 回（docs/portrait-eh1-round2）= 202779 / 5 回。2026-10-09 は本ブランチが起点（385073 / 11 回）から足していないので、それを含む origin/main の 639903 / 18 回を採った。daily_token_budget は origin/main の値のまま（変えていない）。一次記録: .steering/20261009-matching-attack-prototype/decisions.md 判断 6・7。",
   "_comment_merge_2026_10_10_portrait_round3": "2026-10-10: docs/portrait-eh1-round3 に origin/main（matching-attack-prototype の merge の後）を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った: 起点 65072 / 2 回 ＋ 本ブランチ +107017 / +4 回（第 3 回の /cross-review 4 回） ＋ origin/main +137707 / +3 回 = 309796 / 9 回。",
   "_comment_merge_2026_10_10_ime_counts_only": "2026-10-10: fix/ime-counts-only に origin/main（PR #340 の後）を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った: 起点（9be88ca1）202779 / 5 回 ＋ 本ブランチ +78863 / +2 回（IME 論文の逸脱 D13 の完了時の /cross-review 2 巡・1 巡目 48948 ＋ 2 巡目 29915） ＋ origin/main +107017 / +4 回（docs/portrait-eh1-round3） = 388659 / 11 回。daily_token_budget は変えていない（450000 のまま）。一次記録: .steering/20260927-ime-observation-paper-eval-design/decisions.md 判断 228。",
-  "_comment_merge_2026_10_10_portrait_round4": "2026-10-10 夜: docs/portrait-eh1-round4 に origin/main（PR #342 の後）を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った: 起点（72b6aca7）309796 / 9 回 ＋ 本ブランチ +126730 / +4 回（第 4 回の固定の前の /cross-review 2 回 62373 ＋ まとめの 2 巡 64357） ＋ origin/main +124993 / +4 回（fix/ime-counts-only ほか） = 561519 / 17 回。daily_token_budget は 450000 のまま。一次記録: .steering/20261010-portrait-eh1-round4/decisions.md 判断 7。"
+  "_comment_merge_2026_10_10_portrait_round4": "2026-10-10 夜: docs/portrait-eh1-round4 に origin/main（PR #342 の後）を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った: 起点（72b6aca7）309796 / 9 回 ＋ 本ブランチ +126730 / +4 回（第 4 回の固定の前の /cross-review 2 回 62373 ＋ まとめの 2 巡 64357） ＋ origin/main +124993 / +4 回（fix/ime-counts-only ほか） = 561519 / 17 回。daily_token_budget は 450000 のまま。一次記録: .steering/20261010-portrait-eh1-round4/decisions.md 判断 7。",
+  "_comment_merge_2026_11_10_coauthor_ml": "2026-11-10: exp/gse-coauthor-ml-improve に origin/main（PR #403 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
+  "_comment_merge_2026_11_10_tau_extend": "2026-11-10: exp/gse-timeseries-tau-extend に origin/main（PR #404 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
+  "_comment_merge_2026_11_10_tau_mode": "2026-11-10: exp/gse-tau-mode-candidate に origin/main（PR #405 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。"
 }

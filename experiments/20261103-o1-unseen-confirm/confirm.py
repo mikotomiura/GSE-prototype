@@ -303,6 +303,50 @@ def h5(bouts, n_days, seed):
     return res
 
 
+# ---------- U7 同じ日付の本をまとめた感度の記述（判断 9・判定には使わない） ----------
+
+def date_key(path):
+    """ファイル名 gse_o1_<日付>_<時刻>.ndjson の <日付>。形が違えば名前そのもの（まとめない）。"""
+    base = os.path.basename(path)
+    parts = base.split("_")
+    if len(parts) >= 4 and parts[0] == "gse" and parts[1] == "o1" and len(parts[2]) == 8 and parts[2].isdigit():
+        return parts[2]
+    return base
+
+
+def c0_post_warm(d):
+    """1 本の中間の (温まりを除いた観測時間, その中に原点がある C0 の件数)。H4a の主と同じ数え方。"""
+    dy = cc.Day(d)
+    ori = [x[1] for x in dy.c0()[0]]
+    pw = post_warm(dy.intervals, warm_end(dy.press, dy.intervals))
+    return sum(b - a for a, b in pw), sum(1 for o in ori if any(a <= o <= b for a, b in pw))
+
+
+def by_date_h4a(inters, files):
+    """フォーカス 0 の本を外した後、同じ日付の本の (温まりを除いた観測時間, C0 の件数) を足し、
+    足した観測時間が 4 時間以上の日付だけを単位にする（温まりは本ごと・そろわない本は 0 時間 0 件）。
+    戻り値は集計値だけ（日付を出さない）。"""
+    per = {}
+    for d, f in zip(inters, files):
+        if not d["focus"]:
+            continue
+        t, n = c0_post_warm(d)
+        u = per.setdefault(date_key(f), [0, 0, 0])
+        u[0] += t
+        u[1] += n
+        u[2] += 1
+    units = [(t, n) for t, n, _ in per.values() if t >= MIN_DAY_OBS]
+    st = h4a_stats(units)
+    try:   # 判定に使わない記述のために run を落とさない
+        st["verdict_if_judged"] = h4a_verdict(st)
+    except SystemExit:
+        st["verdict_if_judged"] = "both_support_and_refute"
+    st["dates"] = len(per)
+    st["dates_with_several_files"] = sum(1 for *_, k in per.values() if k > 1)
+    st["dates_excluded_post_warm_lt_4h"] = len(per) - len(units)
+    return st
+
+
 # ---------- U4 ----------
 
 READ_RULES = {"a_C0_is_C2": lambda x: 0.35 <= x <= 0.65, "b_C0_hit_C1": lambda x: 0.30 <= x <= 0.60,
@@ -399,6 +443,7 @@ def run(work, seed_file, out, *files):
         if k != "C0":
             h["verdict"] = "not_judged"
         res["H5"][k] = h
+    res["U7_by_date_C0"] = by_date_h4a(inters, files)   # 記述・判定には使わない（判断 9）
     if days:
         cur = cc.summarize(days, all_rows, no_warm)
         res["U4_summary"] = cur
@@ -561,6 +606,31 @@ def selftest():
     miss["O1_counts_rates"]["C1"]["day_unit_sd"] = None
     assert readings(miss, ref14)["f_sd_ratio"]["repeated"] is None
     assert abs(rd["a_C0_is_C2"]["value"] - 0.5093) < 1e-4
+    # U7 同じ日付の本をまとめる（判断 9）
+    assert date_key("/x/gse_o1_20261104_083000.ndjson") == "20261104" and date_key("/x/day0.ndjson") == "day0.ndjson"
+    rng = random.Random(13)
+    ds = [_synth_day(rng, 0, h, 6) for h in (3, 3, 6, 6, 6)]
+    fs = ["gse_o1_20261104_000000.ndjson", "gse_o1_20261104_120000.ndjson", "gse_o1_20261105_000000.ndjson",
+          "gse_o1_20261105_090000.ndjson", "gse_o1_20261106_000000.ndjson"]
+    pf = [c0_post_warm(d) for d in ds]
+    assert all(2 * H < t < 4 * H for t, _ in pf[:2]) and all(t >= 4 * H for t, _ in pf[2:]), pf
+    st = by_date_h4a(ds, fs)
+    # 3 時間の 2 本は 1 日に足されて残る・観測時間と件数は本ごとの和
+    assert st["dates"] == 3 and st["days"] == 3 and st["dates_with_several_files"] == 2, st
+    assert st["dates_excluded_post_warm_lt_4h"] == 0
+    assert abs(st["pooled_per_h"] - sum(n for _, n in pf) / (sum(t for t, _ in pf) / H)) < 1e-12, st
+    want = h4a_stats([(pf[0][0] + pf[1][0], pf[0][1] + pf[1][1]), (pf[2][0] + pf[3][0], pf[2][1] + pf[3][1]), pf[4]])
+    assert abs(st["X2"] - want["X2"]) < 1e-12
+    # 同じ日付に θ がそろわない本（押下 60 個）が混じっても、0 時間 0 件として足されるだけ
+    nowarm = cc.synth([[j * 120_000, "alphabetic"] for j in range(60)], focus=[1000], intervals=((0, 5 * H),))
+    assert c0_post_warm(nowarm) == (0, 0)
+    st2 = by_date_h4a(ds + [nowarm], fs + ["gse_o1_20261106_150000.ndjson"])
+    assert st2["X2"] == st["X2"] and st2["days"] == 3 and st2["dates_with_several_files"] == 3, st2
+    # 片方がフォーカス 0 なら、残る 3 時間だけでは 4 時間に届かず外れる
+    ds[1] = dict(ds[1], focus=[])
+    st = by_date_h4a(ds, fs)
+    assert st["dates"] == 3 and st["days"] == 2 and st["dates_excluded_post_warm_lt_4h"] == 1, st
+    assert st["dates_with_several_files"] == 1
     # 通し（run の配線）: 合成の 6 日（うち 1 日はフォーカス 0）を中間の形で置いて回す
     with tempfile.TemporaryDirectory() as tmp:
         rng = random.Random(11)
@@ -593,6 +663,11 @@ def selftest():
         assert res["H5"]["C0"]["days"] == 5 and set(res["U4_readings"]) == set(READ_RULES)
         # 打鍵だけの合成なので C1 の流れは押下と同じ・C2 は 0 件（止まりの間は何も動かない）
         assert res["U4_summary"]["O1_counts_rates"]["C2"]["n"] == 0
+        # U7: 日付が全部違えば、まとめた値は主の H4a（C0）と同じ日・同じ値になる
+        u7 = res["U7_by_date_C0"]
+        assert u7["days"] == c0["days"] and u7["dates"] == 6 and u7["dates_with_several_files"] == 0, u7
+        assert u7["X2"] == c0["X2"] and u7["pooled_per_h"] == c0["pooled_per_h"], (u7, c0)
+        assert u7["dates_excluded_post_warm_lt_4h"] == 1 and u7["verdict_if_judged"] == c0["verdict"]
         # 止まる道: 自己検査の不一致・入力の SHA-256 の不一致
         p0 = os.path.join(tmp, "day0.json")
         orig = open(p0).read()

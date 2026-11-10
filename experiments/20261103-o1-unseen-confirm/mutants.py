@@ -50,6 +50,13 @@ MUTANTS = [
     ("SD の比を丸める", "ratio = sd_b / sd_p if sd_p else None", "ratio = round(sd_b, 4) / round(sd_p, 4) if sd_p else None"),
     ("f の欠けを繰り返さなかったにする", "\"repeated\": None if missing else rule(x)", "\"repeated\": False if missing else rule(x)"),
     ("U4 の割合のキー", "\"C0_is_C2\", \"ratio\")", "\"C0_is_C2\", \"num\")"),
+    # U7（判断 9）
+    ("U7 日付でまとめない", "        return parts[2]\n", "        return base\n"),
+    ("U7 まとめた後の 4 時間", "if t >= MIN_DAY_OBS]", "if t >= 0]"),
+    ("U7 フォーカス 0 を外さない", "        if not d[\"focus\"]:\n            continue\n        t, n = c0_post_warm(d)",
+     "        t, n = c0_post_warm(d)"),
+    ("U7 温まりを除かない", "pw = post_warm(dy.intervals, warm_end(dy.press, dy.intervals))\n    return",
+     "pw = dy.intervals\n    return"),
 ]
 
 

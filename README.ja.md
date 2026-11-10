@@ -7,14 +7,14 @@
 GSE はあなたの脳内を読みません。読むのは*キーストローク動態*（打鍵の時刻と種類）だけで、本文は保存しません。そこから、
 画面から一度離れる招待を「今」差し出すか、それとも黙っているべきかを判断します。招待は開始も完了も測りません。
 
-> **現況:** 通常モードで稼働している介入は今も **Nudge** です。全画面の Wall と Monk Mode は
+> **現況:** GSE 本体は**既定では介入を出しません**。Nudge はコードに残っていますが既定で無効です
+> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。全画面の Wall と Monk Mode は
 > **2026-08 に削除しました**（[ADR-015](docs/adr/ADR-015-wall-removal.md)）。
-> 身体回帰の招待（Physical Anchor の PC 面）は検証用の EH3 モードで図像として動きます。
+> 身体回帰の招待（Physical Anchor の PC 面）は検証用の EH3 モードと、通常のモードの第 2 週（開始画面の「第2週 (招待)」・第 1 週・O1・G1 では出ない）で図像として動きます。
 > 散歩の促進とその計測は行いません（2026-11-03）。身体回帰の後は、離席候補（打鍵の途絶 180 秒以上）明けの作業上の状態で見ます。打鍵の再開と受領の有無（[ADR-024](docs/adr/ADR-024-resumption-outcome-without-estimator.md)）に、ウィンドウを離れずに再開したか（フォーカスの遷移）とポインタの動きを併せます。
 >
 > **2026-10-31 の方針:** Nudge は GSE 本体の介入としては出さず、本体の介入は身体回帰の機会を差し出す招待にします
-> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。既定の変更は別作業で、それまでの実装は上のとおりです。
-> 招待の図像は今は検証用の EH3 モードでだけ動きます。
+> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。Nudge の既定は無効にしました。通常のモードの第 2 週に、差し替えられる契機（推定器 / 上がり / 無作為 / なし。研究者の `~/.gse/invitation_trigger.json` で選び、読めなければ出さない）で招待を配線し、`gse-replay --invitation` で記録から再現できます。
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)
