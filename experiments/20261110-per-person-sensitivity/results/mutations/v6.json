@@ -1,0 +1,85 @@
+{
+ "run_id": "20261110T110745-81150",
+ "mutate": [
+  "v6"
+ ],
+ "P-HASH": {
+  "passed": true,
+  "hashes": {
+   "hmm2.py": "d71f4c206789b2dd33e2acc1569ac69a75006be2d33de227f7f094456a3966bc",
+   "data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+   "ml.py": "93a3935cef367f1702d2aa4d51715b428945be3dd29a1962aa7aaecaaf64701c",
+   "hmm_b.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a"
+  },
+  "seconds": 0.00019502639770507812
+ },
+ "P-PLANT0": {
+  "passed": true,
+  "same": true,
+  "g": 0.0,
+  "seconds": 0.7458689212799072
+ },
+ "P-MEAN": {
+  "passed": false,
+  "max_abs": 0.872885998034835,
+  "seconds": 8.017383098602295
+ },
+ "P-DIFF": {
+  "passed": true,
+  "seconds": 0.14590001106262207
+ },
+ "P-CAL": {
+  "passed": true,
+  "lam": 0.02272456910714027,
+  "g": 0.009994129762587178,
+  "ok": true,
+  "target": 0.01,
+  "g_hi": 2.96605270574911,
+  "seconds": 43.82569909095764
+ },
+ "P-GROUP": {
+  "passed": true,
+  "n_planted": 11,
+  "seconds": 0.14282584190368652
+ },
+ "P-SPLIT": {
+  "passed": true,
+  "seconds": 1.027899980545044
+ },
+ "P-NULLSAME": {
+  "passed": true,
+  "seconds": 0.00017905235290527344
+ },
+ "P-JOINTW": {
+  "passed": true,
+  "made_ok": true,
+  "flips": 0,
+  "seconds": 0.1545867919921875
+ },
+ "P-RECOVER": {
+  "passed": true,
+  "main": {
+   "median": 0.038225818395899225,
+   "q25": 0.03634495971126084,
+   "q75": 0.04241793814733508,
+   "better_share": 1.0,
+   "n": 8
+  },
+  "g": {
+   "median": 0.1088615410245084,
+   "q25": 0.0981191872385665,
+   "q75": 0.11479985025937589,
+   "better_share": 1.0,
+   "n": 8
+  },
+  "chosen_tau": {
+   "10000": 8
+  },
+  "chosen_struct": {
+   "ar2": 8
+  },
+  "seconds": 192.47848224639893
+ },
+ "seconds": 246.53954482078552,
+ "passed": false
+}

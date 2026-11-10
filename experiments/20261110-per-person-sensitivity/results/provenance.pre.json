@@ -1,0 +1,30 @@
+{
+ "run_id": "20261110T110745-81150",
+ "git_head": "bd5b36c015091fdea4e5db3847ddecdf22eaf52d",
+ "uncommitted": [
+  "?? experiments/20261110-per-person-sensitivity/results/"
+ ],
+ "jobs": 8,
+ "python": "3.14.4",
+ "numpy": "2.5.2",
+ "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+ "scripts": {
+  "analysis.py": "ce20b5855bbe89cbe635f6af40e6f5993f9cb0ff3e47d8771ccd7bbfdfb3f4ef",
+  "pinned.py": "02317ec7174be93aa60c18a022ba411d5652cc1f97aab7fd1c0408e254ab8006",
+  "run_synth.py": "103ad29bcae6eee2b7c95fa117906a7098399effe494203b00775b7f2d951f5f",
+  "sens_check_mutations.py": "f4471e272c4cec5ceed168f32d5f85c2b368349a420085111030497a62049037",
+  "sens_report.py": "45e3e9e30f93d1ba429b6baf1acbdde85493e31fffa53d2b329b712ec938b453",
+  "sens_selftest.py": "f9fe2a94ad1d534ffe710218acbf7906ddcb2d81eac9558c1c03644fe85fa829",
+  "synth.py": "41c60dd5ec954f6d1bd526560c318f96847641533e31f3826f099fb443d64ee3"
+ },
+ "run_sh": "f9c2d9751f70fa3f5898610ea3472b875457924faddc28b012eda0ba7e3bcc2b",
+ "mutate_sh": "080dfd23aece2c0d582442d77dbda86c895f6e432e052330ba4bc6d7653b147d",
+ "conditions": "dcfa8b19af3182e2a7b68c913d0f69d7d6964d3dc314eaa5f1f58809384351b1",
+ "seed_file": "20c54ec65085a18aa01aaf67c8a8703cd4916c341a4c21450497a08b2b8bd37d",
+ "pinned": {
+  "hmm2.py": "d71f4c206789b2dd33e2acc1569ac69a75006be2d33de227f7f094456a3966bc",
+  "data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+  "ml.py": "93a3935cef367f1702d2aa4d51715b428945be3dd29a1962aa7aaecaaf64701c",
+  "hmm_b.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a"
+ }
+}
