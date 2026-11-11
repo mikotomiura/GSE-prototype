@@ -27,12 +27,20 @@ def main():
     hs = {(R.get("seed"), R.get("code_hash")) for R in reps}
     if len(hs) != 1 or None in next(iter(hs)):
         sys.exit("複製の seed かコードのハッシュが揃っていない: %r" % hs)
+    cal = json.load(open(os.path.join(out, "calibration.json")))
+    plan = json.load(open(os.path.join(out, "plan.json")))
+    # 計画の複製の集合と完全に一致するか（余り・欠け・重複）と、計画・較正と seed・ハッシュが揃うか（Codex の指摘 1）
+    nos = [R["rep"]["no"] for R in reps]
+    if len(nos) != len(set(nos)) or sorted(nos) != sorted(plan["kept"]):
+        sys.exit("複製の番号が plan.json の kept と一致しない: 複製 %r・kept %r" % (sorted(nos), plan["kept"]))
+    if {(plan.get("seed"), plan.get("code_hash")), (cal.get("seed"), cal.get("code_hash"))} != hs:
+        sys.exit("plan.json か calibration.json の seed・コードのハッシュが複製と違う")
     S = AN.summarize(reps)
     S["code_hash"] = next(iter(hs))[1]
     S["run_ids"] = sorted({R.get("run_id") for R in reps if R.get("run_id")})
     S["run_id"] = run_id
-    S["calibration"] = json.load(open(os.path.join(out, "calibration.json")))
-    S["plan"] = json.load(open(os.path.join(out, "plan.json")))
+    S["calibration"] = cal
+    S["plan"] = plan
     json.dump(S, open(os.path.join(out, "summary.json"), "w"), indent=1)
     L = ["# 感度の合成の表（合成の値だけ・実データではない）", "",
          "主の量 = 2 段（他人）の本人 − 同じ構造の共通（1 記号あたりの対数尤度・全記号）。良 = > 0 の割合。g = 真の本人の利得。", "",

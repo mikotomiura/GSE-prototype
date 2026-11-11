@@ -7,21 +7,21 @@
 - [x] conditions.md と SEED（コードより前にコミット）
 
 ## 実装
-- [ ] scripts/synth.py（真の母数・λ の較正・単位の生成）
-- [ ] scripts/run_synth.py（複製ごとに手順を当てて集計）
-- [ ] scripts/selftest.py（V1 の対照）・check_mutations.py・mutate.sh
-- [ ] scripts/report.py（読みの形の機械の当て・tables.md）
-- [ ] run.sh（selftest → 変異 → 時間の見積もり → 本計算 → report）
-- [ ] code-reviewer（本計算の前）
+- [x] scripts/synth.py（真の母数・λ の較正・単位の生成）
+- [x] scripts/run_synth.py（複製ごとに手順を当てて集計）
+- [x] scripts/selftest.py（V1 の対照）・check_mutations.py・mutate.sh
+- [x] scripts/report.py（読みの形の機械の当て・tables.md）
+- [x] run.sh（selftest → 変異 → 時間の見積もり → 本計算 → report）
+- [x] code-reviewer（本計算の前）
 
 ## 本計算
-- [ ] selftest と変異が通る
-- [ ] 時間の見積もりと D6 の削り
-- [ ] 本計算
+- [x] selftest と変異が通る
+- [x] 時間の見積もりと D6 の削り（12.8 時間・削り 0 段）
+- [x] 本計算（27 複製・2f2b2c24）
 
 ## まとめ
-- [ ] notes.md（読みの形に当てた結論）
-- [ ] 外枠の S15・4.3・限界・open items・Status の行
+- [x] notes.md（読みの形に当てた結論）
+- [x] 外枠の S15・4.3・限界・open items・Status の行
 - [ ] code-reviewer と /cross-review（Codex を含む）
 
 ## attack-me round 3
