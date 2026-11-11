@@ -22,11 +22,11 @@
 ## まとめ
 - [x] notes.md（読みの形に当てた結論）
 - [x] 外枠の S15・4.3・限界・open items・Status の行
-- [ ] code-reviewer と /cross-review（Codex を含む）
+- [x] code-reviewer と /cross-review（Codex を含む・47,362 tokens）
 
 ## attack-me round 3
-- [ ] Step 0〜5（Codex を 5 本の後に直列・既知の未決の一覧を添える）
-- [ ] verdict.md・推移を見て次を研究者に聞く
+- [x] Step 0〜5（Codex を 5 本の後に直列・既知の未決の一覧を添える）
+- [x] verdict.md・推移を見て次を研究者に聞く（major・判断 24）
 
 ## 照合の表（場面 → 使う道具）
 - コード → code-reviewer（本計算の前）・/cross-review（完了前）
