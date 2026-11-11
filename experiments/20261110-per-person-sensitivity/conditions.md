@@ -192,3 +192,4 @@
   - 下限が上がる（3e-3 以上）: 「（値）以上の個人差が無いことと合う。（値）未満は拾えない」と下限を替える。
   - 下限が無い: CS1 の「consistent with」の文を外し、「CS1 の記録の量では、この手順は 3e-2 までの埋めた差を各段の 2 種で揃って拾わなかった」と書く。
 - CoAuthor の読みは変わらない（足すのは CS1 だけ）。
+- コードの置き場の直し（2026-11-11・足す複製のコードを書く途中・結果は見ていない）: `run_synth.py` は変えず、足す 6 本は新しい `scripts/run_add.py`（`run_synth` を読み込み、`plan()` の後ろに 27〜32 を足す・較正を読む・P-REREP）と `run_add.sh` で回す。`run_synth.py` は計算 1（`experiments/20261111-sensitivity-mode-decomposition/`）がハッシュで照らしているため。上の「`run_synth.py` の差分は…に限る」は「`run_synth.py`・`synth.py`・`pinned.py`・`analysis.py` は bd5b36c0 と同じ」に読み替える。`sens_report.py` は 2 群（plan.json と plan_add.json）を照らすように直し、足さない場合の出力が前の summary.json・tables.md とバイト同じことを確かめた。来歴は `provenance_add.json`（前の provenance.json は書き換えない）。

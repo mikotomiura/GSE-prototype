@@ -24,19 +24,38 @@ def main():
         i = argv.index("--run-id"); run_id = argv[i + 1]; argv = argv[:i] + argv[i + 2:]
     out = argv[0]
     reps = [json.load(open(p)) for p in sorted(glob.glob(os.path.join(out, "replicates", "*.json")))]
-    hs = {(R.get("seed"), R.get("code_hash")) for R in reps}
-    if len(hs) != 1 or None in next(iter(hs)):
-        sys.exit("複製の seed かコードのハッシュが揃っていない: %r" % hs)
     cal = json.load(open(os.path.join(out, "calibration.json")))
     plan = json.load(open(os.path.join(out, "plan.json")))
-    # 計画の複製の集合と完全に一致するか（余り・欠け・重複）と、計画・較正と seed・ハッシュが揃うか（Codex の指摘 1）
+    # 計画（前の 27 本は plan.json・追記の 6 本は plan_add.json）ごとに、複製の集合が完全に一致し（余り・欠け・重複）、
+    # seed とコードのハッシュが計画と揃うか（Codex の指摘 1・2026-11-11 の追記で 2 群に）
+    if plan.get("seed") is None or plan.get("code_hash") is None:
+        sys.exit("plan.json に seed かコードのハッシュが無い")
+    plans = [plan]
+    pa = os.path.join(out, "plan_add.json")
+    if os.path.exists(pa):
+        plan_add = json.load(open(pa))
+        if (not plan_add.get("p_rerep") or plan_add.get("base_code_hash") != plan.get("code_hash")
+                or plan_add.get("seed") != plan.get("seed") or plan_add.get("code_hash") is None):
+            sys.exit("plan_add.json の P-REREP が通っていないか、前の計画の seed・ハッシュと合わない")
+        rows_add = {r["no"]: r for r in plan_add["rows"]}
+        bad_rows = [R["rep"]["no"] for R in reps if R["rep"]["no"] in rows_add and R["rep"] != rows_add[R["rep"]["no"]]]
+        if bad_rows or sorted(rows_add) != sorted(plan_add["kept"]):
+            sys.exit("足した複製の行が plan_add.json の rows と違う: %r" % bad_rows)
+        plans.append(plan_add)
     nos = [R["rep"]["no"] for R in reps]
-    if len(nos) != len(set(nos)) or sorted(nos) != sorted(plan["kept"]):
-        sys.exit("複製の番号が plan.json の kept と一致しない: 複製 %r・kept %r" % (sorted(nos), plan["kept"]))
-    if {(plan.get("seed"), plan.get("code_hash")), (cal.get("seed"), cal.get("code_hash"))} != hs:
-        sys.exit("plan.json か calibration.json の seed・コードのハッシュが複製と違う")
+    if len(nos) != len(set(nos)) or sorted(nos) != sorted(n for pl in plans for n in pl["kept"]):
+        sys.exit("複製の番号が計画の kept と一致しない: 複製 %r" % sorted(nos))
+    for pl in plans:
+        hs_pl = {(R.get("seed"), R.get("code_hash")) for R in reps if R["rep"]["no"] in pl["kept"]}
+        if hs_pl != {(pl.get("seed"), pl.get("code_hash"))}:
+            sys.exit("複製の seed かコードのハッシュが計画と揃っていない: %r" % hs_pl)
+    if (cal.get("seed"), cal.get("code_hash")) != (plan.get("seed"), plan.get("code_hash")):
+        sys.exit("calibration.json の seed・コードのハッシュが前の計画と違う")
+    hs = {(R.get("seed"), R.get("code_hash")) for R in reps}
     S = AN.summarize(reps)
-    S["code_hash"] = next(iter(hs))[1]
+    S["code_hash"] = next(iter(hs))[1] if len(hs) == 1 else sorted(h for _, h in hs)
+    if len(plans) > 1:
+        S["plan_add"] = plans[1]
     S["run_ids"] = sorted({R.get("run_id") for R in reps if R.get("run_id")})
     S["run_id"] = run_id
     S["calibration"] = cal

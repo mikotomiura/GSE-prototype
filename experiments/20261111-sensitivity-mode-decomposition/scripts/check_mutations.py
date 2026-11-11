@@ -1,0 +1,29 @@
+"""変異の門の判定（conditions.md V1）: 名指しの門が赤（exit 3・passed False）で、run_id が今回のもの。外れれば exit 1。"""
+import json
+import os
+import sys
+
+WANT = {"u1": "P-MODEW", "u2": "P-MODEW", "u3": "P-NEGINF", "u4": "P-NEGINF", "u5": "P-AB"}
+
+
+def main():
+    d, run_id = sys.argv[1], sys.argv[2]
+    bad = []
+    for m, ctl in WANT.items():
+        ex = open(os.path.join(d, m + ".exit")).read().strip()
+        p = os.path.join(d, m + ".json")
+        if ex != "3" or not os.path.exists(p):
+            bad.append((m, "exit " + ex))
+            continue
+        S = json.load(open(p))
+        if S.get("run_id") != run_id or S[ctl]["passed"]:
+            bad.append((m, ctl))
+        others = {n: S[n]["passed"] for n in S if n.startswith("P-") and n != ctl}
+        print(m, ctl, "赤", "それ以外:", others)
+    if bad:
+        sys.exit("変異の門が外れた: %r" % bad)
+    print("変異の門: すべて名指しの門が赤")
+
+
+if __name__ == "__main__":
+    main()
