@@ -16,4 +16,5 @@
 - [x] 結果がそろったら外枠を直す（判断 6・7）
 - [x] T4 の文献の一次の確かめ・カード・references・novelty の文（判断 9・Uto 2020 の評価の設計は未確認で Open items に残す）
 - [x] context-B を今の外枠に合わせる（round 4 の下書き）
-- [ ] round 4 を回すかを研究者に問う
+- [x] attack-me round 4〜7 を回した（判断 6〜13）。round 7 でメインの確かめで閉じた
+- [ ] 本文を書く（paper-write）・その後に attack-me（stage manuscript）
