@@ -58,4 +58,11 @@ PYTHON=python DATA_DIR="C:/Users/SDS02/gse-public-data" bash run.sh 2>&1 | tee "
 
 ## 7 HP Z2 での実行の記録
 
-（職場の PC のセッションが追記する）
+記入: 2026-11-11（HP Z2 のセッション）。
+
+- 機械と版: HP Z2・Python 3.11.9・numpy 2.4.4・git-bash。worktree `C:/Users/SDS02/GSE-prototype-paper3`、コードは `99f4e681`。`run_id` は `20261111T223426-2966`（`summary.json` と `provenance.json` で同じ）。終了コード 0。
+- 準備: `.gitattributes` を足した版を取り込んだ後も、前に CRLF で取り出したファイル（計算 3 の `results/summary.json` など）が CRLF のまま残っていた。experiments/ の下を repo の中身（LF）のまま取り出し直した（作業ツリーの変更は 0）。照合に使う summary の SHA-256 は計算 3 が `bd80a809…`、最頻値の試験が `b775d7cf…` で、条件の値と同じ。
+- 時刻: 開始 22:34:26 → selftest 5 門（P-HASH・P-MEAN・P-NOW・P-NEGINF・P-SAMEMED）緑 → 変異 3 個（o1〜o3）すべて名指しの門が赤 → P-REPRO → 集計 → P-NEVAL → P-SAMESEL → provenance → 終わり 22:35:05（39 秒）。
+- `checks.json`: `p_repro` coauthor true・cs1 true、`p_neval` coauthor true・cs1 true、`p_samesel` true。`pkl_sha256` coauthor `a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c`・cs1 `08cdd31e567b164397473dbb0531a16f7b11729070317b78c0c9c6510d8bf7e6`（計算 3 と同じ）。
+- `provenance.json` の `git_dirty_paths` は `?? experiments/20261111-objective-and-pause/results/` だけ（run.sh が書いた出力そのもの）。
+- `summary.json`・`tables.md` は `run_id` の確かめまでで、値は読んでいない。入力の pickle と記号は開いていない・repo に入れていない。
