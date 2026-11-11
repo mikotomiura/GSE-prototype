@@ -1,0 +1,76 @@
+# verdict —— attack-me round 4（stage outline・外枠 commit 8baf8f80）
+
+## 1. 判定: major revision（直して再査読）
+
+- 有効な査読: R1・R2・R3・E の 4 本。全員が必要な本数の文献から基準を逐語で抜き出した。接地の逐語は査読者ごとに 1 件以上を本文で確かめた（R1: Pohle "the focus lies on out-of-sample predictive accuracy"・Singer "This method requires priors"・Monaco "dependent on the typing task"〔改行と記号の違いのみ〕／R2: Saeb "record-wise CV often massively overestimates"・Aalbers "the person-specific average level of stress in the participant"／R3: Varma "is a kind of training, it should be included as part of the classifier training algorithm"・"less than 30% on 38%"・Liu & Meng "our inference will be less relevant"／E: Mensh "Focus on a single message"・"Only the central idea of the paper should be touched upon multiple times"）。捏造なし。
+- 各役の判定: R1 major・R2 major・R3 major・E「直してから回す」・Codex major（別枠）。
+- 判定の推移: round 1 major → round 2 major → round 3 major → round 4 major。round 3 で minor だった R1〜R3 が major に戻った。理由は round 3 の対応で入れた最頻値との比べ（新しい計算）が、Take-home の新しい主張と新しい穴（選びの目的・最頻値の定義・パネルの範囲）を作ったため。指摘の多くは本文の中身（主張の範囲・手順の欠陥）で、記録や言い回しではない。
+- 費用: Opus 5 本（各 6.7 万〜10.7 万 tokens）・Codex 約 33,000 tokens（この日の累計 166,822 / 2,400,000）。
+- 4c 分量: 外枠のファイル 5,112 語・78 行（round 3 は 3,732 語・74 行）。本文なし。節ごとの予算の合計は 7,000 語のまま。
+
+## 2. 一致した指摘（分母は有効な査読 4 本。Codex と監査役は別枠）
+
+| # | 指摘 | 挙げた役 | 裏取り |
+|---|---|---|---|
+| U1 | Take-home と 4.3 の見出しの「the per-person model does not beat the shared model's prior mode」がパネルを限らない。30-session の k = 30 は +5.4e-4（7/9 正）で逆、CS1 は作りの上で 0。データが最も多いセルの逆転を values only で済ませるのは非対称 | R1（nit 7）・R2・R3・E（4/4）・監査役 2-A・Codex | 真。外枠 7・13・14・50 行。限界（65 行）だけが「in the 15-session panel」と限る |
+| U2 | 最頻値の定義が読めない（どちらが平滑を持つか・確率 0 が出る理由）。τ → ∞ の行き先は最頻値で、候補の τ = ∞（共通そのもの）とは別の点 | R1・R2・R3（D）・E（N6）（4/4） | 真。コードで確かめた: 事前の擬似度数は「基の擬似度数 + τ · S̄」（`experiments/20261106-tau-mode-candidate/scripts/hmm2.py` make_prior）なので τ → ∞ の行き先は normalize(S̄)（mode_of の説明も「τ → ∞ の行き先」）。共通そのものは基の擬似度数で平滑した母数。平滑を持つのは共通の側で、最頻値は持たない（だから確率 0 が出る）。外枠 31 行の "differs from the shared parameters by the smoothing of the prior" は向きが読めない。R2 の読み「本人 − 共通の残りの大部分は最頻値と共通の差＝共通の平滑の差」は、本人 − 最頻値が負なのでそのとおり |
+| U3 | 選びの目的（他人の 本人 − 連鎖 の中央値）が予測の良さを選ばず、候補にした最頻値（11〜15 人で選ばれたモデルより良い）をほとんど選ばない。「候補に置く」推奨は選びを改善せず、唯一の作用は確率 0 の書き手への割り当て | R1（1）・R3（A）（2/4）・Codex（3） | 真。外枠 13・33・51 行の数値から読める。Codex の round 3 の指摘（選びの目的）の続き |
+| U4 | CS1 の「consistent with no difference of this kind of 1e-3 … or more」が 2 種と 1 人分の余裕（23 人で 78% = 18 人・80% = 19 人）に乗る。「or its mode」は感度の合成（最頻値を置く前）より広い。合成は最頻値が共通より悪く、実データと逆 | R1（4）・R3（E）（2/4）・監査役 N3・Codex（2） | 真。外枠 50 行。感度の notes の持ち込みの文は「共通そのものが選ばれたこと」だけ |
+| U5 | 外枠が 2,088 → 2,808 → 3,732 → 5,112 語と増え続け、4.3 の本文の欄が 1,300 語に収まらない。C1 の Instance に数値が 10 以上 | R1（6）・R2・R3（F）・E（N4・M5）（4/4） | 真 |
+| U6 | 後の確かめの数が冒頭（three later checks・合成は別）と 3.4（four later checks）で違う | R3（H）・E（N5）（2/4）・監査役 3-C | 真。合成への分解の当てはどちらにも数えていない |
+
+## 3. 1 人だけの指摘（裏取り）
+
+- R1 2 [major] 主指標が休止中の秒を含む。真（README 28-29 行 "During pauses the features are replaced by pause-dependent values, so a symbol is still emitted every second."）。押された秒だけの値は計算 3 の summary にすでにある（条件 D3 の副）: P15 の 2 段で本人 − 最頻値 −3.1e-4〜−1.0e-4（正 12〜41%）・本人 − 共通 +3.6e-4〜+5.6e-4。向きは全記号と同じ。休止の秒の割合は集計に無い（実データの計算が要る）。
+- R1 5 [minor] CS1 の評価は最後の課題で、課題の違いが個人差と交絡。真（外枠 47 行）。限界に 1 項目。
+- R2 3 [major] 推奨する手順は埋めた差の一部しか返さない（保守的な偏り）。読者が「差なし」から何を結論してよいかが無い。真（13・50 行）。推奨に「記録の長さでの最小の検出の大きさを合成で報告する」と、偏りの向きの 1 文。
+- R2 4 [minor] 尺度の段落が 680 nats（弱い相手に対する値）と並べ小ささを強調する。1.5〜2.6 nats は尤度比で約 4.5〜13 倍。真（51 行）。
+- R2 nit −∞ の書き手の説明が 3 か所（13・50・68 行）。真。
+- R3 C [major] 最頻値との比べが合成で確かめられていない・合成と実データが最頻値の向きで逆。真。計算 1 の合成の a（本人 − 最頻値）は埋めた段ごとにある（差 0 でも正・合成の最頻値は共通より悪い）ので、合成は最頻値との比べの陰性対照にならない。
+- R3 G [minor] 「公開の記号化が元の記号を再現する」は読者が確かめられない。真（README 78 行 "That comparison used the raw datasets and is not part of this kit."）。
+- R3 I [nit] Liu & Meng の版（接地は arXiv 2015・外枠は 2016）。真。引く版で逐語を照らす。
+- E N2 [major] 頑健な発見（弱い相手での利得が消える）と分解能より下の値（1e-3・最頻値に勝たない）が同じ重さ。真。Take-home の並べ替えで直る。
+- E N7 Uto 2020 が未確認。既知の未決（Open items）。
+- E m2 "recommendations, stated only here" が Take-home と結論と合わない。真（51 行）。
+- 監査役 N1 最頻値に勝たないことは個人差の不在を示さない（notes の文）が外枠に無い。真。
+- 監査役 N2 同点の規則で最頻値の位置が書かれていない。真（条件の D2 は ∞ → 最頻値 → 10^6 → … の順）。
+- 監査役 N4 返る割合（0.1〜0.4）を C1 に上げ、CoAuthor k = 15 の限定を落とした。感度の notes は本文に書かないとした（判断 7 が C1 に並べると決めた・意図どうしの食い違い）。真。
+- 監査役 N6 3.3 の "so the joint choice and the choice with structure fixed can pick different candidates" は、理由の推測を書かない決め（判断 7・notes）より強い。真。
+- 監査役 N7 [重い] Table 2 の縮みだけの行（4.2 "beats it by +0.043 at k = 5"・ar1 は 10^6）と構造だけの行が前の値のまま。後の値（最頻値を候補に置く）にすると ar1 は多くのセルで全員が最頻値になり、3.3 の縮みだけの行の定義と合わない。Table 2 にどちらを載せるかが読めない。真。
+- 監査役 I2・I3 意図の資料（context-B の持ち帰り 3 の範囲・requirement.md の貢献の数）。真。論文の外。
+- 監査役 2-E code availability に計算 3 と分解の当てのコードの置き場が無い。真。
+
+## 4. Codex（別枠・既知の未決 9 件を添えた）
+
+判定 major。新しい指摘 4 件: (1) 選びは対象の書き手の訓練の単位を他人の共通を通して使うので、新規の利用者の評価にならない（入れ子か用途の限定）・真（33 行は開示済み・round 3 の Codex の情報の経路の続き）。(2) 2 種からの非検出の解釈（U4 と重なる）。(3) 中央値で選ぶ推奨と予測の損失（U3 と重なる・失敗率と下側分位点の併記）。(4) 見出しの否定がパネルを越える（U1 と重なる）。既知の未決の再掲なし。
+
+## 5. 直す順（案）
+
+- major
+  1. Take-home・4.3 の見出し・C1 を、15-session のパネル（k ≤ 15）に限り、30-session の k = 30 の逆転を同じ重みで 1 文（U1）。Take-home を「弱い相手での利得が消える → 残りは手順の分解能より下 → 推奨」の順に並べ替え、1e-3 は 4.3 へ（E N2）。最頻値に勝たないことは個人差の不在を示さないと書く（監査役 N1）。
+  2. 3.3 に最頻値と共通の母数を式で並べ、平滑を持つのは共通の側・τ → ∞ の行き先は最頻値で、候補の τ = ∞（共通そのもの）とは別の点と書く。Table 2 に「最頻値 − 共通」の列。残りの大部分が共通の平滑の差であることを 4.4 で値として書く（U2・設計の判断: 主張の向き）。
+  3. 選びの目的（U3）: 推奨を「最頻値を比べの相手に置く」に限り、目的の限界を限界に書くか、目的を他人の held-out の予測（平均の対数尤度など）に替えた選びを条件を先に固定して計算するか（設計の判断）。
+  4. Table 2 の行の値（前・後）を決め、縮みだけの行と構造だけの行の定義と合わせる（監査役 N7・設計の判断と同じ問い）。
+  5. 4.3 を 4.3（選びと残り）と 4.4（最頻値との比べ）に分け、C1 の数値を表と節の参照へ、本文の欄の細部を補足へ移し、外枠を減らす（U5・E N3・N4）。
+  6. 推奨に、記録の長さでの最小の検出の大きさを合成で報告することと、手順が保守的に返す向きを書く（R2 3・Codex 2）。
+  7. 主指標と休止の秒（R1 2）: 押された秒だけの値（既にある）を S6 に足して本文で向きを 1 文。休止の秒の割合を Table 1 に足すか（実データの計算・設計の判断）。
+- minor
+  8. CS1 の文を事実の記述にし（2 種とも検出・陰性対照の最大 78% は 23 人中 18 人で規則まで 1 人）、「or its mode」を外す。合成は最頻値が共通より悪い作りで、最頻値の比べの陰性対照にならないと書く（U4・R3 C）。
+  9. 後の確かめの数を 1 つに（U6）。CS1 の課題の違いを限界に（R1 5）。尺度の段落に尤度比と同じ尺度の他の値を（R2 4）。再現の文を落とすかハッシュを載せる（R3 G）。返る割合を C1 から外し S15 の値に（監査役 N4）。3.3 の "so" を外す（監査役 N6）。同点での最頻値の位置（監査役 N2）。Codex 1: 用途の文を「選びは到着の前に固定しない」に合わせて限る。
+- nit
+  10. "stated only here" を "stated in full only here"。−∞ の説明を 6 節に 1 回。4.3 の見出しと +1.1e-3。Liu & Meng の版。code availability に計算 3 と分解の当てのコード。
+- 論文の外: context-B の持ち帰り 3 に「重なる窓」・requirement.md の貢献の数（監査役 I2・I3）。
+
+## 6. 逸脱・注入の疑い
+
+- 依頼文は「次のファイルが依頼文なので Read で読め」の 1 文で渡した（中身は brief-*.md）。応答はメインが要点と引用を落とさずに写した（書式を整えた）。機械の検査（secrets-filter・絶対パス）は 6 本とも通った。
+- R1 は最初の Grep を sources/ 全体に掛け、指定の外の mensh.txt と varma.txt の行が数行出た（根拠に使っていない・同じ round-1/tmp/sources/ の接地の本文）。
+- 規程は Springer が curl を拒否のページで返し、この round も再照合していない（2026-11-07 の Chrome の照合のまま）。
+- 注入の疑い: どの役からもなし。
+
+## 7. 研究者に問うこと
+
+1. 判定は major（4 回目）。直す一覧（5）を承認するか。
+2. 選びの目的（U3）: 推奨と限界で受けるか、目的を替えた選びを計算するか。
+3. 最頻値と共通の差（U2）の主張の向き: 「残りの大部分は共通の平滑の差」を本文の主張にするか、値として 4.4 に置くか。
+4. 休止の秒の割合（R1 2）を実データで数えるか。
