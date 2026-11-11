@@ -71,7 +71,8 @@ Figures and tables in the body: Table 1 (data and pause share), Figure 1 (compar
 
 ## Open items before writing the body
 
-- Related work: the evaluation design of Uto et al. 2020 is not yet checked in the full text (its 30 s frames and 10 s step were); the novelty sentence does not describe it until then. Add the discrete Markov-switching lineage of the AR(1)-HMM with a checked citation.
-- Cite Liu and Meng in the version whose wording was checked, or check the 2016 version.
-- Per-record hashes of the original symbol sequences, so that readers can check that the public symbolization reproduces them (S2); until then the paper and the kit describe it only as the authors' own check.
-- Number the supplement in order of first mention before submission. Preprint policy of the target journal (not yet read in the primary source). Abstract and keywords with the introduction.
+- Related work: the evaluation design of Uto et al. 2020 is not yet checked in the full text (its 30 s frames and 10 s step were); the publisher's version is not free and the university repository was down on 2026-11-11. The novelty sentence does not describe it; check again before submission.
+- Done 2026-11-11: the discrete Markov-switching lineage (double chain Markov model, mixture transition distribution) is cited through Berchtold and Raftery 2002, Sect. 6.3, checked in the full text; the 1999 original was not available.
+- Done 2026-11-11: Liu and Meng are cited in the 2016 journal version; the wording used was checked in arXiv 1510.08539v1, and S1 says so. Try the journal wording again before submission.
+- Per-record hashes of the original symbol sequences, so that readers can check that the public symbolization reproduces them (S2); planned as a separate task. Until then the paper and the kit describe it only as the authors' own check.
+- Number the supplement in order of first mention before submission. Preprint policy of the target journal (not yet read in the primary source). Move the draft to the Springer Nature template.

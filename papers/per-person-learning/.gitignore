@@ -1,0 +1,10 @@
+# LaTeX build artifacts
+manuscript/*.aux
+manuscript/*.log
+manuscript/*.bbl
+manuscript/*.blg
+manuscript/*.fls
+manuscript/*.fdb_latexmk
+manuscript/*.out
+manuscript/*.pdf
+manuscript/build.log

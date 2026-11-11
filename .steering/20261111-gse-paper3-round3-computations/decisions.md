@@ -78,3 +78,10 @@
 - 採用（次に同じコードを使うときの直し・回し直さない）: obj.py:292 で押下のある記号の値が None のとき落ちる（本計算は最後まで走ったので起きていない）。副の行（最頻値を外した並べ）・pause_share・mode_minus_pool に合成の門が無い（V1 の門の表は求めていないので規定違反ではない）。
 - 却下: Codex P1「セルごとでなくパネルの和で 1 回」（panel_members は全 k に同じ書き手を返し、mode と pool の値は k に依らない）。Codex P2「None の候補を黙って除く」（選びに使う全記号の量は常に float）。
 - 記録だけ: select_agg が NaN で止まる（D2 の「NaN は出さない」どおりで fail-closed）。
+
+## 判断 15（2026-11-11・外枠の Open items と本文の草稿 1 版）
+- 記録ごとのハッシュ: 研究者の選択で作る。条件とコードを Mac で書き、HP Z2 で回す引き継ぎ `.steering/_handoff/next-session-gse-paper3-record-hashes.md`（f6bcb5e5）。
+- 離散の Markov-switching の系譜: Berchtold & Raftery 2002（Statistical Science・[V538]）の §6.3 の逐語で確かめて引いた（AR(1)-HMM は二重連鎖マルコフモデルの 1 次の場合）。原典の Berchtold 1999 は無料の全文が無く未読なので引かない。
+- Liu & Meng: 研究者の選択で 2016 年の雑誌版を引き、補足 S1 に「文言は arXiv 1510.08539v1 で確かめた」と書く。雑誌版は有料・Harvard DASH は 429。本文の文は逐語に合わせて「目標の人の誤差を n − 1 人から推すのは頑健だが関連が下がる」に直した。
+- Uto 2020 の評価の設計: 研究者の選択で書かずに進め、投稿前に UEC のリポジトリ（2026-10-28 から保守で停止）を再び試す。出版版は OpenAlex・Semantic Scholar が OA と表示するが実際は有料だった。
+- 本文: paper-write に従い `papers/per-person-learning/manuscript/main.tex` に草稿 1 版（article クラス・natbib。投稿前に Springer Nature の様式へ移す）。序論〜結論は約 4,400 語で予算 6,800 語の内。数は第 3 段の tables.md・最頻値の試験・目的と休止・感度の notes から引き、独立の照合をサブエージェント（Opus）に渡した。
