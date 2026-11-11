@@ -19,3 +19,13 @@
 - [x] context-B を今の外枠に合わせる（round 4 の下書き）
 - [x] attack-me round 4〜7 を回した（判断 6〜13）。round 7 でメインの確かめで閉じた
 - [ ] 本文を書く（paper-write）・その後に attack-me（stage manuscript）
+
+## 本文の round 1 の計算 A・B・D（2026-11-12〜）
+- [x] A・B・D の採否を研究者に問う（判断 17）
+- [x] 条件 2 つと SEED をコードより前にコミット
+- [ ] A・B のコード・selftest と変異（Mac で通る）
+- [ ] D のコード・selftest と変異（Mac で通る）
+- [ ] /cross-review（Codex 込み・wrapper は本線から）と code-reviewer の指摘の採否
+- [ ] HP Z2 への引き継ぎ（push は研究者に確かめる）
+- [ ] HP Z2 で回す（A・B 約 1.5 時間・D 約 10 時間）
+- [ ] notes（読みの形の当て）と本文の書き直し・manuscript round 2
