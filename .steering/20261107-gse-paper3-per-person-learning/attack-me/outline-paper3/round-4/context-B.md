@@ -21,7 +21,7 @@
 ## 意図の資料（読んでよい・指定の節まで）
 - /Users/johnd/GSE-prototype-paper3/.steering/20261107-gse-paper3-per-person-learning/requirement.md（全体）
 - /Users/johnd/GSE-prototype-paper3/.steering/20261107-gse-paper3-per-person-learning/decisions.md（判断 10〜24）
-- /Users/johnd/GSE-prototype-paper3/.steering/20261111-gse-paper3-round3-computations/decisions.md（判断 1〜7）
+- /Users/johnd/GSE-prototype-paper3/.steering/20261111-gse-paper3-round3-computations/decisions.md（判断 1〜9）
 - /Users/johnd/GSE-prototype-paper3/experiments/20261104-timeseries-tau-extend/notes.md（「言えること・言えないこと」の節）
 - /Users/johnd/GSE-prototype-paper3/experiments/20261106-tau-mode-candidate/notes.md（「論文 3 へのつなぎ」と「言えること・言えないこと」の節）
 - /Users/johnd/GSE-prototype-paper3/experiments/20261107-unsmoothed-residual-check/notes.md（「言えること・言えないこと」の節）
