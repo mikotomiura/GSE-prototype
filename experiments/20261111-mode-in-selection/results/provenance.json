@@ -1,0 +1,38 @@
+{
+ "run_id": "20261111T123353-1922",
+ "git_head": "7cf2ce84697e28946d67e2886a85d3578e2f355f",
+ "git_dirty_paths": [
+  "?? experiments/20261111-mode-in-selection/results/"
+ ],
+ "python": "3.11.9",
+ "numpy": "2.4.4",
+ "machine": "Windows-10-10.0.26200-SP0",
+ "scripts": {
+  "check_mutations.py": "1a7559f06368f2bc7f0fc9ed279b8fe1f11b575fb8afd938f02ac5ef64115def",
+  "pinned3.py": "72c8ad1dc4e785d4a4c0ecc9efbcdc84dcb0ab2fc17262d9a3f083fff406573c",
+  "sel.py": "68772f23418703d5727da5c60993788c0f3c4638ab731eb2185ab866d5372a39",
+  "selftest.py": "2cb482e6ae29feeb6335410dca777d80daa0b15cfe56eab0fd09b7c164d7b664"
+ },
+ "run_sh": "c93b16807e244a189168bdefe45c67ca50bba8ca97d0e367d3a95d33cfbbc638",
+ "conditions": "a1dd51192f07afb3068a87566947edefc38b966e0c46239bd6d28c2e9aa8429e",
+ "seed_file": "38edc78db92da3832bffae3b969e11c7c014fb3a812f0882b5f16a82feba6828",
+ "pinned": {
+  "ml.py": "1cf816f8148066c5135867306fd5a8bc129b9dfc0e0705a158f9728cac47d265",
+  "hmm2.py": "f0e0888f8212d5887c6356b7451771370c4d3117404a304f20ecddfb156dfa0a",
+  "data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+  "hmm_b.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a",
+  "results/summary.json": "b775d7cf08b9b826fac31a74a7d5048030aa67119da58e42ff19f9f358c18865"
+ },
+ "repro_check": {
+  "run_id": "20261111T123353-1922",
+  "pkl_sha256": {
+   "coauthor": "a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c",
+   "cs1": "08cdd31e567b164397473dbb0531a16f7b11729070317b78c0c9c6510d8bf7e6"
+  },
+  "p_repro": {
+   "coauthor": true,
+   "cs1": true
+  }
+ },
+ "summary_sha256": "0137ffb12c907428fc274424e88ea317f3b1e3db87e2756e3e7c337f1906ea25"
+}
