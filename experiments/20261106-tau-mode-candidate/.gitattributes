@@ -3,3 +3,5 @@
 SEED text eol=lf
 *.py text eol=lf
 *.md text eol=lf
+# 計算 3（20261111-mode-in-selection）が results/summary.json の SHA-256 を照合する。HP Z2 で CRLF に化けて止まった（2026-11-11）
+*.json text eol=lf

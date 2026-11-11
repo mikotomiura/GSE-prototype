@@ -65,3 +65,7 @@ PYTHON=python DATA_DIR="C:/Users/SDS02/gse-public-data" bash run.sh 2>&1 | tee "
 - P-REPRO（`repro_check.json`）: `p_repro` coauthor true・cs1 true。`pkl_sha256` coauthor `a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c`・cs1 `08cdd31e567b164397473dbb0531a16f7b11729070317b78c0c9c6510d8bf7e6`。
 - `provenance.json` の `git_dirty_paths` は `?? experiments/20261111-mode-in-selection/results/` だけ（run.sh が書いた出力そのもの）。
 - `summary.json`・`tables.md` は `run_id` の確かめまでで、値は読んでいない。入力の pickle は開いていない・repo に入れていない。
+
+## 使用済み（2026-11-11）
+
+このメモで HP Z2 が計算 3 を回し、結果（`e9f77348`）と §7 の記録（`dbc9d7d9`）を push した。Mac のセッションが門・P-REPRO・コードと条件の不変・provenance のハッシュを照合した（`summary.json` の SHA-256 の違いは CRLF で書いて LF でコミットされたため・CRLF に戻すと一致）。§7 の勧めに従い、`.gitattributes`（*.json を含む LF の固定）を `experiments/20261111-mode-in-selection/` と `experiments/20261106-tau-mode-candidate/` に足した（研究者が承諾・中身の改行は変わらない）。HP Z2 で回す続きは無い。notes と読みは Mac のセッションが行う。
