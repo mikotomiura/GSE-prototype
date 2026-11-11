@@ -1,0 +1,66 @@
+{
+ "run_id": "20261111T105437-87451",
+ "mutate": [
+  "u3"
+ ],
+ "P-HASH": {
+  "passed": true,
+  "hashes": {
+   "20261110-per-person-sensitivity/scripts/synth.py": "41c60dd5ec954f6d1bd526560c318f96847641533e31f3826f099fb443d64ee3",
+   "20261110-per-person-sensitivity/scripts/run_synth.py": "103ad29bcae6eee2b7c95fa117906a7098399effe494203b00775b7f2d951f5f",
+   "20261110-per-person-sensitivity/scripts/pinned.py": "02317ec7174be93aa60c18a022ba411d5652cc1f97aab7fd1c0408e254ab8006",
+   "20261110-per-person-sensitivity/scripts/analysis.py": "ce20b5855bbe89cbe635f6af40e6f5993f9cb0ff3e47d8771ccd7bbfdfb3f4ef",
+   "20261106-tau-mode-candidate/scripts/hmm2.py": "f0e0888f8212d5887c6356b7451771370c4d3117404a304f20ecddfb156dfa0a"
+  },
+  "seconds": 0.00022077560424804688
+ },
+ "P-ZERO": {
+  "passed": true,
+  "mode_eval": -1.1878367046755065,
+  "eval_ll": -1.1878367046755065,
+  "seconds": 0.0331730842590332
+ },
+ "P-MODEW": {
+  "passed": true,
+  "same_direct": true,
+  "diff_full": 17,
+  "diff_pool": 32,
+  "seconds": 131.47984790802002
+ },
+ "P-NEGINF": {
+  "passed": false,
+  "v_hit": "-inf",
+  "v_ok": -5.263639674408673,
+  "a": {
+   "median": 0.050000000000000044,
+   "q25": -0.050000000000000044,
+   "q75": 4.263639674408673,
+   "better_share": 0.6666666666666666,
+   "n": 3,
+   "pos_inf": 0,
+   "neg_inf": 0
+  },
+  "b": {
+   "median": -0.04999999999999982,
+   "q25": -4.163639674408673,
+   "q75": 0.050000000000000044,
+   "better_share": 0.3333333333333333,
+   "n": 3,
+   "pos_inf": 0,
+   "neg_inf": 0
+  },
+  "seconds": 0.00828099250793457
+ },
+ "P-AB": {
+  "passed": true,
+  "n": 16,
+  "seconds": 0.0004811286926269531
+ },
+ "P-PICK": {
+  "passed": true,
+  "flips": 0,
+  "seconds": 0.9032058715820312
+ },
+ "seconds": 132.42567706108093,
+ "passed": false
+}
