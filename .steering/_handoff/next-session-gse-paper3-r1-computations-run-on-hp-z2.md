@@ -73,4 +73,17 @@ PYTHON=python JOBS=16 bash run.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/sen
 
 ## 7 HP Z2 での実行の記録
 
-（HP Z2 のセッションが記入する）
+記入: 2026-11-12（HP Z2 のセッション）。
+
+### A・B
+
+- 機械と版: HP Z2・Python 3.11.9・numpy 2.4.4・git-bash・`JOBS=16`。worktree `C:/Users/SDS02/GSE-prototype-paper3`、コードは `2a84c97a`。入力の pickle 2 つ・記号の dir 2 つ・manifest（SHA-256 e0163f1b… 一致）あり。2 つの dir の中身は LF で取り出されていた。
+- 時刻: 開始 01:23:48 → selftest 13 門緑 → 変異 10 個（s1〜s10）すべて名指しの門が赤 → manifest の照合 → compute（P-REPRO-POOL 通過 1,289 秒・`alpha_cut` は空＝α を外していない）→ ab → provenance → 終わり 03:20:09。終了コード 0。`run_id` `20261112T012348-4213`（`summary.json` と `provenance.json` で同じ）。
+- `repro_check.json`: `pkl_sha256` coauthor `a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c`・cs1 `08cdd31e567b164397473dbb0531a16f7b11729070317b78c0c9c6510d8bf7e6`。`p_repro` coauthor true・cs1 true。`p_repro_r1` coauthor true（照らした 140・最大の差 0.0）・cs1 true（92・0.0）。`p_repro_pool` true（68・0.0）。
+- `summary.json` の `p_current`: true（照らした 100）。
+- `provenance.json` の `git_dirty_paths` は `?? experiments/20261112-selection-split-and-smoothing/results/` だけ。
+- 結果は `38b4be20` で push 済み。`summary.json`・`tables.md` の値は読んでいない。`selection_split_smoothing_values.pkl` は開いていない。
+
+### D
+
+- 03:20:27 に開始（A・B の push の後、裏のスクリプトが続けて起動。04:00 から HP Z2 がオフラインになるため、D のコミットはローカルに残し、オンラインに戻ってから push する）。記録はその後で追記する。
