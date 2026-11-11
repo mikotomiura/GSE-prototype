@@ -55,4 +55,13 @@ PYTHON=python DATA_DIR="C:/Users/SDS02/gse-public-data" bash run.sh 2>&1 | tee "
 
 ## 7 HP Z2 での実行の記録
 
-（職場の PC のセッションが追記する）
+記入: 2026-11-11（HP Z2 のセッション）。
+
+- 機械と版: HP Z2・Python 3.11.9・numpy 2.4.4・git-bash。worktree `C:/Users/SDS02/GSE-prototype-paper3`、コードは `7cf2ce84`。`run_id` は `20261111T123353-1922`（`summary.json` と `provenance.json` で同じ）。終了コード 0。
+- 準備で起きたこと（コードと条件は変えていない）:
+  - `experiments/20261111-mode-in-selection/` に `.gitattributes` が無く、`core.autocrlf=true` の HP Z2 では run.sh・SEED・scripts が CRLF で取り出された。repo の中身（LF）のまま `git -c core.autocrlf=false checkout` で取り出し直した。
+  - 1 回目（12:33:35）は P-HASH の前の固定の照合で止まった（終了コード 1・`results/summary.json` の SHA-256 が違う）。原因は `experiments/20261106-tau-mode-candidate/results/summary.json` が CRLF で取り出されていたこと（その試験の `.gitattributes` は *.json を含まない）。repo の中身の SHA-256 は条件の値 `b775d7cf…` と同じで、LF で取り出し直すと一致した。次から Windows で取り出すなら、この 2 つに `.gitattributes`（*.json も）を足すのを勧める（採否は研究者）。
+- 2 回目: 開始 12:33:53 → selftest 6 門（P-HASH・P-OLDSAME・P-MODECAND・P-ZEROCOL・P-ORDER・P-NEGINF）緑 → 変異 4 個（n1〜n4）すべて名指しの門が赤 → P-REPRO → 集計 → provenance → 終わり 12:34:17（24 秒）。
+- P-REPRO（`repro_check.json`）: `p_repro` coauthor true・cs1 true。`pkl_sha256` coauthor `a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c`・cs1 `08cdd31e567b164397473dbb0531a16f7b11729070317b78c0c9c6510d8bf7e6`。
+- `provenance.json` の `git_dirty_paths` は `?? experiments/20261111-mode-in-selection/results/` だけ（run.sh が書いた出力そのもの）。
+- `summary.json`・`tables.md` は `run_id` の確かめまでで、値は読んでいない。入力の pickle は開いていない・repo に入れていない。
