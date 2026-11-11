@@ -66,3 +66,7 @@ PYTHON=python DATA_DIR="C:/Users/SDS02/gse-public-data" bash run.sh 2>&1 | tee "
 - `checks.json`: `p_repro` coauthor true・cs1 true、`p_neval` coauthor true・cs1 true、`p_samesel` true。`pkl_sha256` coauthor `a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c`・cs1 `08cdd31e567b164397473dbb0531a16f7b11729070317b78c0c9c6510d8bf7e6`（計算 3 と同じ）。
 - `provenance.json` の `git_dirty_paths` は `?? experiments/20261111-objective-and-pause/results/` だけ（run.sh が書いた出力そのもの）。
 - `summary.json`・`tables.md` は `run_id` の確かめまでで、値は読んでいない。入力の pickle と記号は開いていない・repo に入れていない。
+
+## 使用済み（2026-11-11）
+
+このメモで HP Z2 が回し、結果（`f7e3abd1`）と §7 の記録（`89d6faaf`）を push した。Mac のセッションがコードの不変・門・照らし・provenance のハッシュを照合し、notes を書いた（`experiments/20261111-objective-and-pause/notes.md`）。HP Z2 で回す続きは無い。
