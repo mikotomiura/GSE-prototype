@@ -50,7 +50,7 @@ PYTHON=python DATA_DIR="C:/Users/SDS02/gse-public-data" bash run.sh 2>&1 | tee "
 
 ## 6 Mac 側の状態（2026-11-11）
 
-- 枝 `docs/gse-paper3-per-person-learning`。条件は `51b7656c`。コードのコミットは（コミットの後に追記する）。push は研究者が確かめてから行う。
+- 枝 `docs/gse-paper3-per-person-learning`。条件は `51b7656c`。コードと合成の門は `e645fc11`（code-reviewer の指摘を直した後）。push は 2026-11-11 に研究者が確かめた。
 - Mac（Python 3.14.4・numpy 2.5.2）で selftest 6 門が緑、変異 4 個がすべて名指しの門を赤にした（`SELFTEST_ONLY=1 bash run.sh`）。
 
 ## 7 HP Z2 での実行の記録
