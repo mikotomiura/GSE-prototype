@@ -85,3 +85,10 @@
 - Liu & Meng: 研究者の選択で 2016 年の雑誌版を引き、補足 S1 に「文言は arXiv 1510.08539v1 で確かめた」と書く。雑誌版は有料・Harvard DASH は 429。本文の文は逐語に合わせて「目標の人の誤差を n − 1 人から推すのは頑健だが関連が下がる」に直した。
 - Uto 2020 の評価の設計: 研究者の選択で書かずに進め、投稿前に UEC のリポジトリ（2026-10-28 から保守で停止）を再び試す。出版版は OpenAlex・Semantic Scholar が OA と表示するが実際は有料だった。
 - 本文: paper-write に従い `papers/per-person-learning/manuscript/main.tex` に草稿 1 版（article クラス・natbib。投稿前に Springer Nature の様式へ移す）。序論〜結論は約 4,400 語で予算 6,800 語の内。数は第 3 段の tables.md・最頻値の試験・目的と休止・感度の notes から引き、独立の照合をサブエージェント（Opus）に渡した。
+
+## 判断 16（2026-11-12・本文の attack-me〔stage manuscript〕round 1 の採否）
+- 判定: major revision（R1〜R3 major・E「直してから回す」・Codex major）。記録は `.steering/20261107-gse-paper3-per-person-learning/attack-me/manuscript-paper3/round-1/verdict.md`。
+- 研究者の選択（AskUserQuestion で 1 問ずつ）: 直す一覧（verdict §5 の 1〜11）を承認。計算は A（選びの楽観の大きさ）・B（共通の基の平滑と本人の連鎖の平滑を他人で選ぶ）・D（感度の反復を増やす）を行い、C（格子を広げる）と E（判断の側の量など）は行わない。中心の貢献は発見に絞る。結果に依らない直しはこのセッションで入れ、計算は引き継ぐ。
+- メインが一次で確かめたこと: k = 15 の結合と ar3 固定の τ の違いは、選びの目的の違い（固定の行は他の書き手の 本人 − 同じ構造の共通 の中央値・結合は 本人 − r1 の中央値。tau-extend conditions.md 35・38 行）。本文に無かった。固定の行では選びの目的と報告する量が同じで、楽観がそのまま乗る（R3 M1 の論理は正しい）。
+- 本文の直し: verdict §9。本文 5,086 語・要旨 245 語。
+- 次: 計算 A・B・D の条件とコードを Mac で書き、HP Z2 で回す（引き継ぎ `next-session-gse-paper3-manuscript-r1-computations.md`）。結果で「残り」の読みを直し、manuscript round 2 を回す。
