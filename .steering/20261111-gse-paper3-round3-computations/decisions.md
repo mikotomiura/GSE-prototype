@@ -23,3 +23,12 @@
 - 入れた所: T10（擬似残差は 5 × 5 の格子の 2 つの順序の軸の周辺で作り、長い削除の記号は除く。一次: `experiments/20261107-unsmoothed-residual-check/conditions.md` の擬似残差の節と `scripts/residual.py`）。T9（3.4 の解析の状態に後の確かめを 3 つ: 平滑の無い記号と擬似残差・構造の補い・感度の合成）。T8（データの声明を「code availability に挙げたコードで」に限り、code availability に S13・S14・S15 のコードを足す）。監査役 2-D（陰性対照の "below the CoAuthor remainder" を外す）・3-A（限界の ar3 の上端の文を原の記号化に限る）・3-B（限界の「閾値」に S15 の検出の規則を足す）。R2 m3（Aalbers の要約を本文の数値に合わせる。一次: 本文の「for 89.3% (200/224) of participants, the person-specific baseline outperformed all nomothetic models」「for 80.4% (180/224) of participants at least one of the idiographic models outperformed the person-specific baseline」「the median person-specific MAE for each idiographic model was slightly >0.8」）。R2 n1（分け方が場面しだいを Saeb と Little の両方に）。
 - 論文の外: 論文 3 の requirement.md の範囲と受け入れ条件を、判断 11・17・21・24 で加えた試験に合わせた（監査役 3-4）。context-B は round 4 の依頼の準備で書き直す（3-D・3-E）。
 - 残す: T1・T2・T3・T5〜T7・M3・2-B・最頻値・選びの目的と情報の経路は、計算の結果がそろってからまとめて直す。
+
+## 判断 6（2026-11-11・結果の後）Take-home と推奨の書き換え・分解は回し直さない
+- 結果: 計算 1 は「やめる」（k = 15 で差 0 の 5 種のうち 3 種が形 2）。計算 2 は CS1 の下限 1e-3 のまま。計算 3 は CoAuthor P15 が形 N（本人 − 最頻値 −3.5e-4〜−1.6e-4・良い側 0.12〜0.35）、P30 が N、CS1 C5 が M。
+- 決定（研究者が 3 問とも推奨を選んだ）:
+  1. Take-home の 1 文目を「残りは at most about 1e-3 で、選ばれた本人の当てはめは共通の事前分布の最頻値（本人のデータを使わない）を上回らない」に替える。分解は根拠から外し、S9 の値に下げる。外枠の C1・4.3・限界・S15 も合わせて直した。
+  2. Take-home の 2 文目（推奨）に「共通の事前分布の最頻値を比べの相手と候補に置く」を足す。5 章の推奨・1 章の段落・C1 の Protocol も同じ。
+  3. 最頻値が共通を上回る生成で分解を確かめ直すことはしない。限界と S15 に「分解は合成で差 0 と埋めた差を分けなかったので根拠に使わない」と書く。
+- 理由: 最頻値との直接の比べは round 3 の R1・T1 にそのまま答え、分解の較正に頼らない。分解を根拠から外すので、確かめ直しの得は小さい。
+- 却下案: 「読まない」を残して根拠だけ形 N に替える（解釈の語が残り T1 の食い違いの指摘が残りやすい）。値だけにする（Take-home が弱くなる）。
