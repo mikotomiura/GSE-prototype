@@ -1,0 +1,7 @@
+# Windows（git-bash）で取り出しても run.sh・SEED・scripts・結果の改行が CRLF に化けないように。
+# HP Z2 で CRLF に化けて取り出し直した（2026-11-11）
+*.sh text eol=lf
+SEED text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
