@@ -14,6 +14,6 @@
 - [x] /cross-review（Codex 込み・判断 8）
 - [ ] 計算の間に: 文献の調べ（T4）・結果に依らない外枠の直し（T8・T9・T10・言い回し）・意図の資料
 - [x] 結果がそろったら外枠を直す（判断 6・7）
-- [ ] T4 の文献の一次の確かめ・カード・references・novelty の文
-- [ ] context-B を今の外枠に合わせる
+- [x] T4 の文献の一次の確かめ・カード・references・novelty の文（判断 9・Uto 2020 の評価の設計は未確認で Open items に残す）
+- [x] context-B を今の外枠に合わせる（round 4 の下書き）
 - [ ] round 4 を回すかを研究者に問う
