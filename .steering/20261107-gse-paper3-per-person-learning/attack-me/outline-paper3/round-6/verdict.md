@@ -14,7 +14,7 @@
 |---|---|---|---|
 | W1 | 推奨（Take-home・5 節の「structure, shrinkage and smoothing are all chosen on other people」・入れ子）は本研究で当てていない手順。C1 の当てた手順（平滑を固定・入れ子なし）と分けて書いていない | R2（major）・R3（M2）・E（N1）（3/4）・監査役 3-D・1-A | 真。7・49・65 行。5 節は入れ子にだけ "which we did not do" がある |
 | W2 | 「could not have detected per-person differences of that size」（Take-home）と 4.4「both directions are smaller than the protocol could detect」は、返った量を埋めた差の下限と比べる（尺度の混同が形を変えて残った）。合成の条件・k の限定も無い | R1（minor 2・nit）・R3（M1・m4）（2/4）・監査役 2-A・2-B・Codex 2 | 真。7・48 行 |
-| W3 | 主の行で選ばれた tau が本文に無い。縮みの族の極限が共通でなく最頻値なので、残りと最頻値 − 共通が同じ大きさなのは族の形から予想される可能性 | R1（major）・R2（2/4） | 真。tau は S8 だけ。族の形はコードで確かめた（round 4）。最頻値の試験の summary によると、主の行（最頻値を候補に入れない 2 段）で選ばれた τ は P15 の k = 1〜12 で全員 10^6、k = 15 で 16 人が 3 × 10^5（tables の「領域」で確かめる） |
+| W3 | 主の行で選ばれた tau が本文に無い。縮みの族の極限が共通でなく最頻値なので、残りと最頻値 − 共通が同じ大きさなのは族の形から予想される可能性 | R1（major）・R2（2/4） | 真。tau は S8 だけ。族の形はコードで確かめた（round 4）。最頻値の試験の summary によると、主の行（最頻値を候補に入れない 2 段）で選ばれた τ は P15 の k = 1〜12 で全員 10^6、k = 15 で 16 人が 3 × 10^5（最頻値の試験の summary で確かめた）。構造だけの行（ar3 に固定）の本人 − 共通は k = 5 で +5.5e-4・k = 15 で +7.6e-4 |
 | W4 | C1 の「below 1e-2」が k = 15 の場合だけ（k = 5 は 3e-2・k = 1 は測っていない）。5 節の 36 nats も k = 15 だけ | R2・R3（n1）（2/4）・監査役 2-C | 真 |
 | W5 | 補足の README が再現の一致を主張し、外枠の Open items（主張しない）と食い違う | R2・R3（m1）（2/4） | 真（README 75–78 行） |
 | W6 | 本人の連鎖が強い相手であることが重なった窓に由来するかを、重ならない窓での hmm3 − 連鎖の向きで示していない（以前の外枠にあった文が落ちた） | R1・R2（2/4）・監査役 1-B | 真。round 4 の書き直しで Supporting evidence から「with non-overlapping windows (direction only) it beats the chain in CoAuthor (S13)」が落ちた（私の削り過ぎ） |
