@@ -37,7 +37,7 @@ if _h != _want:
 _c = json.load(open(CALIB))
 if _c.get("seed") != SENS_SEED or _c.get("code_hash") != SENS_CODE_HASH:
     sys.exit("sens の calibration.json の seed か code_hash が条件の値と違う")
-sys.path.insert(0, SRC)
+sys.path.append(SRC)  # 自分の scripts を先に（同じ名前の selftest.py などに影されない・レビュー LOW 11）
 import analysis as AN  # noqa: E402,F401
 import run_synth as RS  # noqa: E402,F401
 import synth as SY  # noqa: E402,F401

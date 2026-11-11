@@ -15,7 +15,8 @@ import compute as CP  # noqa: E402
 import pinned4  # noqa: E402
 from pinned4 import H, ml  # noqa: E402
 
-NAMES = ["P-HASH", "P-HALF", "P-SPLITSEL", "P-HAND", "P-FLOOR", "P-SCALE", "P-POOLSAME", "P-INFSWAP", "P-ALPHAW", "P-R1BETA"]
+NAMES = ["P-HASH", "P-HALF", "P-SPLITSEL", "P-HAND", "P-FLOOR", "P-SCALE", "P-POOLSAME", "P-INFSWAP", "P-ALPHAW", "P-R1BETA",
+         "P-LOO", "P-REFW", "P-TIES"]
 SEED = pinned4.SEED
 SN = AB.SN
 
@@ -177,8 +178,76 @@ def p_r1beta():
     return dict(passed=bool(ok))
 
 
+def p_loo():
+    """行列（joint_mats・tau_mats）から w を除く選びで作った中央値が、mode の select_joint / select_other と row_deltas の
+    中央値と同じ（乱数 30 回・レビュー MEDIUM 1。実データでは P-CURRENT が mode の summary とビットまで照らす）。"""
+    rng = np.random.default_rng([SEED, 10])
+    bad = 0
+    for _ in range(30):
+        R = fake_results(rng, n_w=9)
+        ws = sorted(R)
+        jc, sel, reps = AB.joint_mats(R, ws, 5)
+        jv = ml.joint_values(R, ws, 5)
+        pk = {w: ml.select_joint(jv, w, ml.joint_cands()) for w in ws}
+        bad += AB.loo_median(sel, reps["self_minus_pool"]) != ml.q(ml.row_deltas(R, ws, 5, pk, 0, "pool_same"))["median"]
+        for name in ("hmm3", "ar3"):
+            tc, V, rp = AB.tau_mats(R, ws, 5, name)
+            ev = ml.em_values(R, ws, 5, next(s for s in ml.STRUCTS if ml.sname(s) == name))
+            pt = {w: (name, ml.select_other(ev, w, ml.tau_cands())) for w in ws}
+            bad += AB.loo_median(V, rp["self_minus_pool"]) != ml.q(ml.row_deltas(R, ws, 5, pt, 0, "pool_same"))["median"]
+    return dict(passed=bool(bad == 0), mismatches=int(bad))
+
+
+def p_refw():
+    """α*・β* が書き手で分かれる合成（半数ずつ別の値が良い）で、B1・B2 の 2 段の選びと差が、w の α*・β* で手で組んだ値と同じ
+    （乱数 100 回・レビュー MEDIUM 2）。"""
+    rng = np.random.default_rng([SEED, 11])
+    jc = ml.joint_cands()
+    bad, split_ok = 0, True
+    for _ in range(100):
+        R = fake_results(rng, n_w=8)
+        ws = sorted(R)
+        d = 1e-3 * (1 + rng.random())
+        PV = {w: {n: {a: [R[w]["em"]["pool"][n][0] + (d if (a == "0.3" and w < 4) or (a == "0.1" and w >= 4) else 0.0), None]
+                      for a in AB.ALPHAS} for n in SN} for w in ws}
+        RV = {w: {"5": {b: [R[w]["em"]["k"]["5"]["r1"][0] + (d if (b == "0.1" and w < 4) or (b == "1" and w >= 4) else 0.0), None]
+                        for b in AB.BETAS}} for w in ws}
+        ast = {n: AB.alpha_star(PV, ws, n) for n in SN}
+        bst = AB.beta_star(RV, ws, 5)
+        split_ok = split_ok and {ast["ar3"][w] for w in ws} == {"0.1", "0.3"} and {bst[w] for w in ws} == {"0.1", "1"}
+        for case, ref in (("a", AB.Ref(R, 5, PV=PV, astar=ast)), ("b", AB.Ref(R, 5, RV=RV, bstar=bst))):
+            _, pk, dp = AB.joint_rows(ref, ws, np.random.default_rng(0))
+            for i, w in enumerate(ws):
+                def me(v, n, t):
+                    if case == "a" and t == ml.INF:
+                        return PV[v][n][ast[n][w]][0]
+                    return R[v]["em"]["k"]["5"]["self"][n][t][0]
+                r1 = lambda v: RV[v]["5"][bst[w]][0] if case == "b" else R[v]["em"]["k"]["5"]["r1"][0]  # noqa: E731
+                pool = lambda v, n: PV[v][n][ast[n][w]][0] if case == "a" else R[v]["em"]["pool"][n][0]  # noqa: E731
+                vals = {v: {(n, t): me(v, n, t) - r1(v) for n, t in jc} for v in ws}
+                c = ml.select_joint(vals, w, jc)
+                bad += pk[w] != c or dp[i] != me(w, *c) - pool(w, c[0])
+    return dict(passed=bool(bad == 0 and split_ok), mismatches=int(bad), split_ok=bool(split_ok))
+
+
+def p_ties():
+    """同点の規則: 全員が同じ値なら α* = 1・β* = 0.5・2 段は joint_cands の先頭（τ = ∞）・τ 他人は ∞。"""
+    ws = list(range(7))
+    PV = {v: {"ar3": {a: [0.0, None] for a in AB.ALPHAS}} for v in ws}
+    RV = {v: {"5": {b: [0.0, None] for b in AB.BETAS}} for v in ws}
+    jc = ml.joint_cands()
+    flat = {v: {c: 0.0 for c in jc} for v in ws}
+    ok = set(AB.alpha_star(PV, ws, "ar3").values()) == {"1"} and set(AB.beta_star(RV, ws, 5).values()) == {"0.5"}
+    ok = ok and AB.pick(flat, ws, jc) == jc[0] and jc[0][1] == ml.INF
+    ok = ok and AB.pick({v: {t: 0.0 for t in ml.tau_cands()} for v in ws}, ws, ml.tau_cands()) == ml.INF
+    V = np.zeros((7, len(jc)))
+    ok = ok and AB.argbest(V, np.arange(7)) == 0
+    return dict(passed=bool(ok))
+
+
 FUNCS = {"P-HASH": p_hash, "P-HALF": p_half, "P-SPLITSEL": p_splitsel, "P-HAND": p_hand, "P-FLOOR": p_floor,
-         "P-SCALE": p_scale, "P-POOLSAME": p_poolsame, "P-INFSWAP": p_infswap, "P-ALPHAW": p_alphaw, "P-R1BETA": p_r1beta}
+         "P-SCALE": p_scale, "P-POOLSAME": p_poolsame, "P-INFSWAP": p_infswap, "P-ALPHAW": p_alphaw, "P-R1BETA": p_r1beta,
+         "P-LOO": p_loo, "P-REFW": p_refw, "P-TIES": p_ties}
 
 
 def main():

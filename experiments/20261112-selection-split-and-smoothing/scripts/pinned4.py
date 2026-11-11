@@ -30,6 +30,6 @@ _h = hashes()
 _want = dict(PINNED, **{"results/summary.json": MODE_SUMMARY_SHA})
 if _h != _want:
     sys.exit("mode のコードか summary の SHA-256 が条件の値と違う: %r" % sorted(f for f in _h if _h[f] != _want[f]))
-sys.path.insert(0, SRC)
+sys.path.append(SRC)  # 自分の scripts を先に（同じ名前の selftest.py などに影されない・レビュー LOW 11）
 import hmm2 as H  # noqa: E402,F401
 import ml  # noqa: E402,F401

@@ -23,9 +23,9 @@
 ## 本文の round 1 の計算 A・B・D（2026-11-12〜）
 - [x] A・B・D の採否を研究者に問う（判断 17）
 - [x] 条件 2 つと SEED をコードより前にコミット
-- [ ] A・B のコード・selftest と変異（Mac で通る）
-- [ ] D のコード・selftest と変異（Mac で通る）
-- [ ] /cross-review（Codex 込み・wrapper は本線から）と code-reviewer の指摘の採否
+- [x] A・B のコード・selftest と変異（Mac で通る）
+- [x] D のコード・selftest と変異（Mac で通る）
+- [x] /cross-review（Codex 込み・wrapper は本線から）と code-reviewer の指摘の採否（判断 18）
 - [ ] HP Z2 への引き継ぎ（push は研究者に確かめる）
 - [ ] HP Z2 で回す（A・B 約 1.5 時間・D 約 10 時間）
 - [ ] notes（読みの形の当て）と本文の書き直し・manuscript round 2

@@ -6,6 +6,7 @@
   <bvals.pkl>: compute.py が書いた B の値（repo の外・人は開かない）。
 出力: <out_dir>/summary.json（集計値だけ）・tables.md。書き手ごとの値・書き手の番号は書かない。
 """
+import hashlib
 import json
 import os
 import pickle
@@ -18,7 +19,8 @@ import pinned4  # noqa: E402
 from pinned4 import H, ml  # noqa: E402
 
 MUT = set()  # s1: 二分の選びに報告の半分を混ぜる・s2: 1 人を両方の半分に・s3: τ 他人の候補から ∞ を外す・
-#              s5: B1 の τ = ∞ を pool(1) のまま・s6: α の選びに w 自身（s4・s7 は compute.py）
+#              s5: B1 の τ = ∞ を pool(1) のまま・s6: α の選びに w 自身・s8: 2 段の選びの量を 本人 − 共通 に・
+#              s9: B2 の v の r1 に v 自身の β*・s10: B1 の v の共通に v 自身の α*（s4・s7 は compute.py）
 SEED = pinned4.SEED
 N_SPLITS = 1000
 MAIN_PANELS = {"coauthor": ["P15", "P30"], "cs1": ["C5"]}
@@ -29,6 +31,7 @@ ALPHA_ORDER = ["1", "3", "0.3", "0.1", "0.03"]          # 同点は 1 倍、次�
 BETAS = ["0.01", "0.03", "0.1", "0.3", "0.5", "1", "2"]
 BETA_ORDER = ["0.5", "2", "1", "0.3", "0.1", "0.03", "0.01"]  # 同点は 0.5、次に大きい値（D5）
 SN = [ml.sname(s) for s in ml.STRUCTS]
+CHECKS = []  # P-CURRENT の結果（main が全部真でなければ止める）
 
 
 # ---------------------------------------------------------------- 選び（共通）
@@ -108,19 +111,31 @@ def a_summary(res, cand_labels):
                     for nm, x in (("honest", h), ("insample", i), ("optimism", o))}
         out[lab]["honest_pos_share"] = float(np.mean(h > 0))
         out[lab]["honest_zero_share"] = float(np.mean(h == 0))
-    reg = {}
+    reg, sts = {}, {}
     for r in res:
-        rg = region_of(cand_labels[r[0]][1] if isinstance(cand_labels[r[0]], tuple) else cand_labels[r[0]])
+        lab = cand_labels[r[0]]
+        rg = region_of(lab[1] if isinstance(lab, tuple) else lab)
         reg[rg] = reg.get(rg, 0) + 1
+        if isinstance(lab, tuple):
+            sts[lab[0]] = sts.get(lab[0], 0) + 1
     out["chosen_region_on_select_half"] = reg
+    if sts:
+        out["chosen_struct_on_select_half"] = sts  # D3「c_S の (構造, τ) の数」（レビュー LOW 7）
     return out
 
 
 def joint_mats(results, ws, k):
     jc = ml.joint_cands()
-    sel = np.array([[ml.me_of(results, v, k, n, t, 0) - results[v]["em"]["k"][str(k)]["r1"][0] for n, t in jc] for v in ws])
+    r1 = np.array([[ml.me_of(results, v, k, n, t, 0) - results[v]["em"]["k"][str(k)]["r1"][0] for n, t in jc] for v in ws])
     rp = np.array([[ml.me_of(results, v, k, n, t, 0) - results[v]["em"]["pool"][n][0] for n, t in jc] for v in ws])
-    return jc, sel, {"self_minus_pool": rp, "self_minus_r1": sel}
+    return jc, (rp if "s8" in MUT else r1), {"self_minus_pool": rp, "self_minus_r1": r1}
+
+
+def loo_median(Vsel, Vrep):
+    """w を除く選び（今の手順）で、書き手ごとの報告の量の中央値（mode の q と同じ inverted_cdf）。"""
+    n = Vsel.shape[0]
+    d = [float(Vrep[i, argbest(Vsel, np.array([j for j in range(n) if j != i]))]) for i in range(n)]
+    return ml.q(d)["median"]
 
 
 def tau_mats(results, ws, k, name):
@@ -146,12 +161,17 @@ def a_dataset(results, ds, mode_em):
             E = dict(writers=len(ws), half_sizes=[len(ws) // 2, len(ws) - len(ws) // 2])
             jc, sel, reps = joint_mats(results, ws, k)
             E["two_stage_other"] = a_summary(a_pairs(sel, reps, pairs), jc)
-            E["two_stage_other"]["current"] = M["two_stage"]["other"]["two_stage_other"]["all/self_minus_pool_same"]["median"]
+            cur = M["two_stage"]["other"]["two_stage_other"]["all/self_minus_pool_same"]["median"]
+            E["two_stage_other"]["current"] = cur
+            # P-CURRENT（実データの門・レビュー MEDIUM 1）: 行列から w を除く選びで作った中央値が mode の値とビットまで同じ
+            CHECKS.append(loo_median(sel, reps["self_minus_pool"]) == cur)
             E["structs"] = {}
             for name in SN:
                 tc, V, reps = tau_mats(results, ws, k, name)
                 E["structs"][name] = a_summary(a_pairs(V, reps, pairs), tc)
-                E["structs"][name]["current"] = M["structs"][name]["tau_other"]["all/self_minus_pool_same"]["median"]
+                cur = M["structs"][name]["tau_other"]["all/self_minus_pool_same"]["median"]
+                E["structs"][name]["current"] = cur
+                CHECKS.append(loo_median(V, reps["self_minus_pool"]) == cur)
             P[str(k)] = E
         S[pn] = P
     return S
@@ -160,8 +180,9 @@ def a_dataset(results, ds, mode_em):
 # ---------------------------------------------------------------- B: α と β の選び
 def alpha_star(PV, ws, name):
     """{w: α*}。w を除く v の pool_v(α) − pool_v(1) の中央値（D4）。s6 は w を入れる。"""
-    vals = {v: {a: PV[v][name][a][0] - PV[v][name]["1"][0] for a in ALPHAS} for v in ws}
-    return {w: pick(vals, [v for v in ws if v != w or "s6" in MUT], ALPHA_ORDER) for w in ws}
+    order = [a for a in ALPHA_ORDER if all(a in PV[v][name] for v in ws)]  # 時間の規則で削った α は除く（V2）
+    vals = {v: {a: PV[v][name][a][0] - PV[v][name]["1"][0] for a in order} for v in ws}
+    return {w: pick(vals, [v for v in ws if v != w or "s6" in MUT], order) for w in ws}
 
 
 def beta_star(RV, ws, k):
@@ -178,10 +199,14 @@ class Ref:
         self.R, self.k, self.PV, self.a, self.RV, self.b = results, str(k), PV, astar, RV, bstar
 
     def pool(self, v, name, w):
-        return self.PV[v][name][self.a[name][w]][0] if self.a else self.R[v]["em"]["pool"][name][0]
+        if not self.a:
+            return self.R[v]["em"]["pool"][name][0]
+        return self.PV[v][name][self.a[name][v if "s10" in MUT else w]][0]
 
     def r1(self, v, w):
-        return self.RV[v][self.k][self.b[w]][0] if self.b else self.R[v]["em"]["k"][self.k]["r1"][0]
+        if not self.b:
+            return self.R[v]["em"]["k"][self.k]["r1"][0]
+        return self.RV[v][self.k][self.b[v if "s9" in MUT else w]][0]
 
     def me(self, v, name, t, w):
         if t == ml.INF and self.a and "s5" not in MUT:
@@ -320,6 +345,17 @@ def st(s):
     return "%s（良 %.2f）" % (fm(s["median"]), s["better_share"])
 
 
+def write_json(obj, path):
+    """改行を LF に固定して書く（HP Z2 でも repo の LF と同じバイト・レビュー LOW 12）。"""
+    with open(path, "w", newline="\n") as f:
+        json.dump(ml.enc(obj), f, indent=1, ensure_ascii=False, allow_nan=False)
+
+
+def outside_repo(p):
+    repo = os.path.normcase(os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
+    return not os.path.normcase(os.path.realpath(p)).startswith(repo + os.sep)
+
+
 def write_tables(S, path):
     S = json.loads(json.dumps(ml.enc(S)))
     L = ["# 計算 A・B の表（集計値だけ・report が summary から作る）", "",
@@ -368,7 +404,7 @@ def write_tables(S, path):
             if "b12" in E:
                 L.append("| %s | %s | %s | %s |" % (pn, k, st(E["b12"]["self_minus_pool"]), st(E["b12"]["self_minus_r1"])))
     L += ["", "## 読み（D6 の機械の当て）", "", "```", json.dumps(S["readings"], indent=1, ensure_ascii=False), "```"]
-    open(path, "w").write("\n".join(L) + "\n")
+    open(path, "w", newline="\n").write("\n".join(L) + "\n")
 
 
 # ---------------------------------------------------------------- 本計算
@@ -378,22 +414,30 @@ def main():
     if "--run-id" in argv:
         i = argv.index("--run-id"); run_id = argv[i + 1]; argv = argv[:i] + argv[i + 2:]
     raw, bvals, out = argv[0], argv[1], argv[2]
-    repo = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
-    for p in (raw, bvals):
-        if os.path.realpath(p).startswith(repo + os.sep):
-            sys.exit("書き手ごとの値が repo の中を指している")
+    files = {ds: raw + "." + ds + ".pkl" for ds in ("coauthor", "cs1")}
+    if not all(outside_repo(p) for p in list(files.values()) + [bvals]):
+        sys.exit("書き手ごとの値が repo の中を指している")
+    # compute.py が照らした pickle と書いた B の値と同じファイルか（レビュー MEDIUM 6）
+    rc = json.load(open(os.path.join(out, "repro_check.json")))
+    sha = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()  # noqa: E731
+    if any(sha(files[ds]) != rc["pkl_sha256"][ds] for ds in files) or sha(bvals) != rc["bvals_sha256"]:
+        sys.exit("読む pickle が compute.py の照らしたものと違う")
     mode_sum = json.load(open(pinned4.MODE_SUMMARY))["datasets"]
     with open(bvals, "rb") as fp:
         BV = pickle.load(fp)  # compute.py が書いた自前の pickle（人は開かない）
     S = dict(run_id=run_id, A={}, B={})
     rng = np.random.default_rng([SEED + 4, 3])
     for ds in ("coauthor", "cs1"):
-        with open(raw + "." + ds + ".pkl", "rb") as fp:
+        with open(files[ds], "rb") as fp:
             results = pickle.load(fp)  # mode の本計算が書いた自前の pickle（人は開かない・P-REPRO は compute.py で済ませた）
         S["A"][ds] = a_dataset(results, ds, mode_sum[ds]["em"])
         S["B"][ds] = b_dataset(results, ds, BV, mode_sum[ds]["em"], rng)
+    S["p_current"] = dict(passed=all(CHECKS), checked=len(CHECKS))
+    if not all(CHECKS):
+        write_json(S["p_current"], os.path.join(out, "p_current_failed.json"))
+        sys.exit("P-CURRENT が外れた（行列から作った今の値が mode の summary と違う）。止めて調べる")
     S["readings"] = readings(S["A"], S["B"])
-    ml.dump_json(S, os.path.join(out, "summary.json"), indent=1)
+    write_json(S, os.path.join(out, "summary.json"))
     write_tables(S, os.path.join(out, "tables.md"))
 
 

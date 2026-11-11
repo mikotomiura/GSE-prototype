@@ -19,9 +19,11 @@ RUN_ID="${RUN_ID:-$(date +%Y%m%dT%H%M%S)-$$}"
 sha() { "$PY" -I -X utf8 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"; }
 [ "$(cat "$EXP_DIR/SEED")" = 2026110401 ] || { echo "SEED が条件の値と違う" >&2; exit 1; }
 mkdir -p "$OUT"
-rm -rf "$OUT/mutations"; mkdir -p "$OUT/mutations"
+rm -rf "$OUT/mutations" "$OUT/summary.json" "$OUT/tables.md" "$OUT/repro_check.json" "$OUT/timing.json" "$OUT/provenance.json" \
+  "$OUT/selftest.json" "$OUT/input_manifest_check.json" "$OUT/p_current_failed.json"
+mkdir -p "$OUT/mutations"
 "$PY" -I -X utf8 "$SC/selftest.py" "$OUT/selftest.json" --run-id "$RUN_ID"
-for m in s1 s2 s3 s4 s5 s6 s7; do
+for m in s1 s2 s3 s4 s5 s6 s7 s8 s9 s10; do
   set +e
   "$PY" -I -X utf8 "$SC/selftest.py" "$OUT/mutations/$m.json" --mutate "$m" --run-id "$RUN_ID" > "$OUT/mutations/$m.log" 2>&1
   echo $? > "$OUT/mutations/$m.exit"
@@ -34,7 +36,7 @@ MANIFEST="${INPUT_MANIFEST:?INPUT_MANIFEST が要る（mode と同じ manifest�
 [ "$(sha "$MANIFEST")" = "${INPUT_MANIFEST_SHA256:?INPUT_MANIFEST_SHA256 が要る}" ] || { echo "manifest の SHA-256 が違う" >&2; exit 1; }
 [ "$INPUT_MANIFEST_SHA256" = e0163f1b48e94273a9d2e30fe6e6c76de642eae82311a6ca7c125896a3d74406 ] || { echo "manifest が条件の値と違う" >&2; exit 1; }
 "$PY" -I -X utf8 "$EXP_DIR/../20261104-timeseries-tau-extend/scripts/manifest.py" check "$DATA_DIR" "$MANIFEST" > "$OUT/input_manifest_check.json"
-rm -f "$OUT/summary.json" "$OUT/tables.md" "$OUT/repro_check.json" "$OUT/timing.json" "$OUT/provenance.json" "$BVALS"
+rm -f "$BVALS"
 "$PY" -I -X utf8 "$SC/compute.py" "$COA" "$CS1" "$RAW" "$BVALS" "$OUT" "$JOBS" --run-id "$RUN_ID"
 "$PY" -I -X utf8 "$SC/ab.py" "$RAW" "$BVALS" "$OUT" --run-id "$RUN_ID"
 "$PY" -I -X utf8 - "$(git -C "$REPO_ROOT" rev-parse HEAD)" \

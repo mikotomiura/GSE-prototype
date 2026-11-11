@@ -3,7 +3,8 @@ import json
 import os
 import sys
 
-WANT = {"e1": "P-RULE", "e2": "P-RULE", "e3": "P-RULE", "e4": "P-PLAN"}
+WANT = {"e1": "P-RULE", "e2": "P-RULE", "e3": "P-RULE", "e4": "P-PLAN", "e5": "P-RULE", "e6": "P-RULE", "e7": "P-RULE",
+        "e8": "P-PLAN"}
 
 
 def main():

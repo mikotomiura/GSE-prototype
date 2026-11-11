@@ -4,7 +4,7 @@ import os
 import sys
 
 WANT = {"s1": "P-SPLITSEL", "s2": "P-HALF", "s3": "P-FLOOR", "s4": "P-SCALE", "s5": "P-INFSWAP", "s6": "P-ALPHAW",
-        "s7": "P-R1BETA"}
+        "s7": "P-R1BETA", "s8": "P-LOO", "s9": "P-REFW", "s10": "P-REFW"}
 
 
 def main():

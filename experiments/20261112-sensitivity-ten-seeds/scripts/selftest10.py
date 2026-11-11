@@ -27,7 +27,12 @@ def p_plan():
     ok = len(rows) == 55 and rows[:13] == old[:13] and all(r["strand"] == "dose" and r["shape"] == "coauthor" and r["K"] == 3
                                                          for r in old[:13])
     new = rows[13:]
-    ok = ok and [r["no"] for r in new] == list(range(33, 75)) and not ({r["no"] for r in new} & {r["no"] for r in old})
+    ok = ok and all(r["strand"] == "dose" and r["shape"] == "coauthor" and r["K"] == 3 for r in new)
+    # 条件 D1 の表を手で書いた (段, 種) → 番号（陰性対照 5〜14 → 33〜42、段ごとに種 2〜9 → 43〜50・51〜58・59〜66・67〜74）
+    want = {(0.0, s): 33 + s - 5 for s in range(5, 15)}
+    for j, g in enumerate([1e-3, 3e-3, 1e-2, 3e-2]):
+        want.update({(g, s): 43 + 8 * j + s - 2 for s in range(2, 10)})
+    ok = ok and {(r["g"], r["seed"]): r["no"] for r in new} == want and not ({r["no"] for r in new} & {r["no"] for r in old})
     keys = [(r["g"], r["seed"]) for r in rows]
     ok = ok and len(keys) == len(set(keys))
     ok = ok and sorted(s for g, s in keys if g == 0) == list(range(15))
@@ -50,7 +55,22 @@ def p_rule():
     ok = abs(r["U"] - 5e-4) < 1e-15 and r["fa_n"] == 10 and abs(r["FA"] - 0.1) < 1e-12
     ok = ok and DR == {1e-3: 0.5, 3e-3: 0.8, 1e-2: 1.0, 3e-2: 0.9} and r["L80"] == 3e-3
     ok = ok and r["null"]["n"] == 15 and r["null"]["above_real_low"] == 3 and r["null"]["above_real_high"] == 0
-    return dict(passed=bool(ok), U=r["U"], FA=r["FA"], DR={str(k): v for k, v in DR.items()}, L80=r["L80"])
+    # 2 つ目の例（レビュー MEDIUM 3）: DR 0.8 / 0.6 / 0.9 / 1.0 → L80 = 1e-2（後半の条件）。境界: 中央値がちょうど U の種と
+    # 良い側がちょうど 0.8 の種を入れる（前者は検出しない・後者は検出する）。
+    cs2 = [c for c in cs if c["g"] == 0]
+    plan2 = {1e-3: 8, 3e-3: 6, 1e-2: 9, 3e-2: 10}
+    for g, n in plan2.items():
+        cs2 += [dict(g=g, seed=s, median=(1e-3 if s < n else 1e-4), share=0.9) for s in range(10)]
+    edge = [c for c in cs2 if c["g"] == 1e-3 and c["seed"] == 7][0]
+    edge["share"] = 0.8                       # ちょうど 0.8 → 検出（8 種目）
+    cs2.append(dict(g=3e-3, seed=10, median=5e-4, share=0.9))  # ちょうど U → 検出しない（DR = 6/11）
+    r2 = TN.rule(cs2)
+    ok2 = r2["L80"] == 1e-2 and r2["levels"][str(1e-3)]["DR"] == 0.8 and abs(r2["levels"][str(3e-3)]["DR"] - 6 / 11) < 1e-12
+    # L80 が無い例: 3e-2 だけ 0.7
+    cs3 = [c for c in cs if c["g"] != 3e-2] + [dict(g=3e-2, seed=s, median=(1e-3 if s < 7 else 1e-4), share=0.9) for s in range(10)]
+    ok3 = TN.rule(cs3)["L80"] is None
+    return dict(passed=bool(ok and ok2 and ok3), U=r["U"], FA=r["FA"], DR={str(k): v for k, v in DR.items()}, L80=r["L80"],
+                second=dict(ok=bool(ok2), L80=r2["L80"]), none_ok=bool(ok3))
 
 
 def p_pair():

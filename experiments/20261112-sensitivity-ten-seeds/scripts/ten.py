@@ -18,7 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pinned5  # noqa: E402
 from pinned5 import AN, RS, SY, ml  # noqa: E402
 
-MUT = set()  # e1: U を陰性対照 15 種すべてから・e2: 検出の条件から良い側の割合を外す・e3: FA を種 0〜4 で・e4: 足す行の番号を 0 から
+MUT = set()  # e1: U を陰性対照 15 種すべてから・e2: 検出の条件から良い側の割合を外す・e3: FA を種 0〜4 で・e4: 足す行の番号を 0 から・
+#              e5: L80 を「DR ≥ 0.8 の最小の段」に・e6: > U を ≥ U に・e7: 良い側 ≥ 0.8 を > 0.8 に・e8: 足す行の番号を逆順に
 HERE = os.path.dirname(os.path.abspath(__file__))
 U_SEEDS = list(range(5))
 FA_SEEDS = list(range(5, 15))
@@ -38,7 +39,7 @@ def plan():
         add += [dict(strand="dose", shape="coauthor", K=3, g=g, seed=s) for s in PLANT_SEEDS[2:]]
     base = 0 if "e4" in MUT else FIRST_NEW
     for i, r in enumerate(add):
-        r["no"] = base + i
+        r["no"] = base + (len(add) - 1 - i if "e8" in MUT else i)
     return rows + add
 
 
@@ -94,7 +95,7 @@ def run(seed, out, jobs, run_id, budget):
         keep -= c
         applied += 1
     P.update(cuts_applied=applied, estimate_hours=est(keep) / 3600, kept=sorted(keep), first_rep_seconds=t1)
-    json.dump(P, open(os.path.join(out, "plan.json"), "w"), indent=1)
+    write_json(P, os.path.join(out, "plan.json"))
     print("見積もり %.1f 時間（削り %d 段）" % (P["estimate_hours"], applied), flush=True)
     if P["estimate_hours"] > budget:
         sys.exit("削りを全部当てても見積もりが %.1f 時間（予算 %.0f）。止めて研究者に聞く" % (P["estimate_hours"], budget))
@@ -103,12 +104,14 @@ def run(seed, out, jobs, run_id, budget):
         if r["no"] in keep:
             P["seconds"][str(r["no"])] = do(r)
     P["seconds_total_after_first"] = time.time() - t0
-    json.dump(P, open(os.path.join(out, "plan.json"), "w"), indent=1)
+    write_json(P, os.path.join(out, "plan.json"))
 
 
 # ---------------------------------------------------------------- 規則（D3）
 def detected(c, U):
-    return c["median"] > U and ("e2" in MUT or c["share"] >= 0.8)
+    above = c["median"] >= U if "e6" in MUT else c["median"] > U
+    good = c["share"] > 0.8 if "e7" in MUT else c["share"] >= 0.8
+    return above and ("e2" in MUT or good)
 
 
 def rule(cs):
@@ -126,7 +129,10 @@ def rule(cs):
                                      median_mean=float(np.mean(ms)), median_min=float(min(ms)), median_max=float(max(ms)),
                                      old_rule_seeds01=all(detected(c, U) for c in lv if c["seed"] in (0, 1)))
     ran = [g for g in LEVELS if str(g) in out["levels"]]
-    out["L80"] = next((g for i, g in enumerate(ran) if all(out["levels"][str(h)]["DR"] >= 0.8 for h in ran[i:])), None)
+    if "e5" in MUT:
+        out["L80"] = next((g for g in ran if out["levels"][str(g)]["DR"] >= 0.8), None)
+    else:
+        out["L80"] = next((g for i, g in enumerate(ran) if all(out["levels"][str(h)]["DR"] >= 0.8 for h in ran[i:])), None)
     nm = [c["median"] for c in nulls]
     out["null"] = dict(n=len(nm), min=float(min(nm)), median=float(np.median(nm)), max=float(max(nm)),
                        above_real_low=int(sum(x > REAL_REMAINDER[0] for x in nm)),
@@ -136,16 +142,33 @@ def rule(cs):
 
 # ---------------------------------------------------------------- report
 def load_reps(out, plan_):
-    reps = [json.load(open(p)) for p in sorted(glob.glob(os.path.join(out, "replicates", "*.json")))]
+    """計画の kept の複製だけを読む（削った後の再実行で残った複製は読まず、番号を記録する・Codex の指摘 1）。"""
+    files = {int(os.path.basename(p)[:-5]): p for p in glob.glob(os.path.join(out, "replicates", "*.json"))}
+    if any(n not in files for n in plan_["kept"]):
+        sys.exit("計画の kept の複製が欠けている")
+    reps = [json.load(open(files[n])) for n in sorted(plan_["kept"])]
     nos = [R["rep"]["no"] for R in reps]
-    if len(nos) != len(set(nos)) or sorted(nos) != sorted(plan_["kept"]):
+    if nos != sorted(plan_["kept"]):
         sys.exit("複製の番号が計画の kept と一致しない")
     rows = {r["no"]: r for r in plan_["rows"]}
     if any(R["rep"] != rows[R["rep"]["no"]] for R in reps):
         sys.exit("複製の行が計画と違う")
     if {(R.get("seed"), R.get("code_hash")) for R in reps} != {(plan_["seed"], plan_["code_hash"])}:
         sys.exit("複製の seed かコードのハッシュが計画と揃っていない")
-    return reps
+    return reps, sorted(set(files) - set(plan_["kept"]))
+
+
+def picks(R, k):
+    """書き手ごとの 2 段（他人）の選び（analysis.cell と同じ作り）。"""
+    W = R["writers"]
+    ws = list(range(len(W)))
+    jv = {v: {(s, t): W[v]["k"][k]["self"][s][t] - W[v]["k"][k]["r1"] for s in AN.SNAMES for t in ml.TAU_KEYS} for v in ws}
+    return [ml.select_joint(jv, w, ml.joint_cands()) for w in ws]
+
+
+def write_json(obj, path):
+    with open(path, "w", newline="\n") as f:
+        json.dump(obj, f, indent=1)
 
 
 def machine_check(out, reps):
@@ -157,6 +180,10 @@ def machine_check(out, reps):
         if no > 12 or not os.path.exists(p):
             continue
         O = json.load(open(p))
+        if len(R["writers"]) != len(O["writers"]) or any(set(a["k"]) != set(b["k"]) or set(a["pool"]) != set(b["pool"])
+                                                        for a, b in zip(R["writers"], O["writers"])):
+            res.append(dict(no=no, shape_differs=True))  # 人数か鍵が違う（Codex の指摘 5）
+            continue
         diffs = []
         for a, b in zip(R["writers"], O["writers"]):
             diffs.append(abs(a["g"] - b["g"]))
@@ -168,17 +195,17 @@ def machine_check(out, reps):
         for k in MAIN_K:
             ca, cb = AN.cell(R, k), AN.cell(O, k)
             cells[k] = dict(main_median_diff=ca["main"]["median"] - cb["main"]["median"],
-                            same_choice_counts=ca["chosen_struct"] == cb["chosen_struct"] and ca["chosen_tau"] == cb["chosen_tau"])
-        res.append(dict(no=no, max_abs_diff=float(max(diffs)), bit_same=max(diffs) == 0.0, cells=cells))
-    json.dump(dict(replicates=res), open(os.path.join(out, "machine_check.json"), "w"), indent=1)
+                            same_choice_all_writers=picks(R, k) == picks(O, k))  # 書き手ごとの選び（レビュー LOW 9）
+        res.append(dict(no=no, shape_differs=False, max_abs_diff=float(max(diffs)), all_diffs_zero=max(diffs) == 0.0, cells=cells))
+    write_json(dict(replicates=res), os.path.join(out, "machine_check.json"))
 
 
 def report(out, run_id):
     plan_ = json.load(open(os.path.join(out, "plan.json")))
     if plan_.get("code_hash") != code_hash():
         sys.exit("plan.json のコードのハッシュが今のコードと違う")
-    reps = load_reps(out, plan_)
-    S = dict(run_id=run_id, run_ids=sorted({R.get("run_id") for R in reps}), plan=plan_, cells={})
+    reps, extra = load_reps(out, plan_)
+    S = dict(run_id=run_id, run_ids=sorted({R.get("run_id") for R in reps}), plan=plan_, extra_files_not_in_plan=extra, cells={})
     for k in MAIN_K + ["1"]:
         cs = []
         for R in reps:
@@ -187,7 +214,7 @@ def report(out, run_id):
                            share=c["main"]["better_share"], g_median=c["g"]["median"], recovery=c["recovery"],
                            vs_r1=c["vs_r1"]["median"], chosen_tau_region=c["chosen_tau_region"]))
         S["cells"][k] = dict(replicates=cs, rule=rule(cs) if k in MAIN_K else None)
-    json.dump(S, open(os.path.join(out, "summary.json"), "w"), indent=1)
+    write_json(S, os.path.join(out, "summary.json"))
     L = ["# 感度の合成を 10 種に増やした表（合成の値だけ・実データではない）", "",
          "主の量 = 2 段（他人）の本人 − 同じ構造の共通（全記号）。U = 陰性対照の種 0〜4 の中央値の最大。"
          "検出 = 中央値 > U かつ良い側の割合 ≥ 0.8。FA = 陰性対照の種 5〜14 の検出の割合。DR = 段の種 0〜9 の検出の割合。", ""]
@@ -202,7 +229,7 @@ def report(out, run_id):
             L.append("| %s | %d | %.2f | %.2e [%.2e, %.2e] | %s |" % (g, v["n"], v["DR"], v["median_mean"], v["median_min"],
                                                                      v["median_max"], v["old_rule_seeds01"]))
         L.append("")
-    open(os.path.join(out, "tables.md"), "w").write("\n".join(L) + "\n")
+    open(os.path.join(out, "tables.md"), "w", newline="\n").write("\n".join(L) + "\n")
     machine_check(out, reps)
 
 

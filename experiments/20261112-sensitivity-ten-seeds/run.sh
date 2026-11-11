@@ -13,9 +13,12 @@ export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM
 RUN_ID="${RUN_ID:-$(date +%Y%m%dT%H%M%S)-$$}"
 [ "$SEED" = 2026111001 ] || { echo "SEED が条件の値と違う" >&2; exit 1; }
 mkdir -p "$OUT"
-rm -rf "$OUT/mutations"; mkdir -p "$OUT/mutations"
+# 失敗した再実行で前回の集計が残らないように頭で消す（Codex の指摘 4）。複製と plan.json は再開に使うので残す
+rm -rf "$OUT/mutations" "$OUT/summary.json" "$OUT/tables.md" "$OUT/machine_check.json" "$OUT/provenance.json" \
+  "$OUT/provenance.pre.json" "$OUT/selftest.json"
+mkdir -p "$OUT/mutations"
 "$PY" -I -X utf8 "$SC/selftest10.py" "$OUT/selftest.json" --run-id "$RUN_ID"
-for m in e1 e2 e3 e4; do
+for m in e1 e2 e3 e4 e5 e6 e7 e8; do
   set +e
   "$PY" -I -X utf8 "$SC/selftest10.py" "$OUT/mutations/$m.json" --mutate "$m" --run-id "$RUN_ID" > "$OUT/mutations/$m.log" 2>&1
   echo $? > "$OUT/mutations/$m.exit"

@@ -26,6 +26,10 @@ DT = ml.DT
 MUT = set()  # s4: 基の倍率を放出のキーにだけ掛ける・s7: β を遷移にだけ足す（頭は 0.5 のまま）
 SEED = pinned4.SEED
 EMIS = {"B", "H", "C"}
+PKL_SHA = {"coauthor": "a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c",   # mode の本計算の pickle
+           "cs1": "08cdd31e567b164397473dbb0531a16f7b11729070317b78c0c9c6510d8bf7e6"}      # （mode-in-selection の provenance）
+BUDGET_B1_HOURS = 6.0
+ALPHA_CUTS = ["3", "0.03"]  # V2 の削る順
 
 
 def set_mut(mut):
@@ -120,6 +124,9 @@ def pool_values(ds, path, ws, alphas, jobs, writers=None):
 
 
 def same_bits(a, b):
+    """[全記号, 押下] がビットまで同じ（長さも・None は None とだけ・レビューの指摘 3）。"""
+    if len(a) != len(b) or len(a) != 2:
+        return False
     return all((x is None and y is None) or (x is not None and y is not None and np.float64(x).tobytes() == np.float64(y).tobytes())
                for x, y in zip(a, b))
 
@@ -139,20 +146,21 @@ def main():
     if "--run-id" in argv:
         i = argv.index("--run-id"); run_id = argv[i + 1]; argv = argv[:i] + argv[i + 2:]
     coa, cs1, raw, bout, out, jobs = argv[0], argv[1], argv[2], argv[3], argv[4], int(argv[5])
-    repo = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
-    for p in (raw, bout):
-        if os.path.realpath(p).startswith(repo + os.sep):
-            sys.exit("書き手ごとの値が repo の中を指している")
+    if not all(AB.outside_repo(p) for p in (raw + ".coauthor.pkl", raw + ".cs1.pkl", bout)):
+        sys.exit("書き手ごとの値が repo の中を指している")
     os.makedirs(out, exist_ok=True)
     rc = dict(run_id=run_id, pkl_sha256={}, p_repro={}, p_repro_r1={}, p_repro_pool=None)
     T = dict(run_id=run_id)
-    dump = lambda: json.dump(rc, open(os.path.join(out, "repro_check.json"), "w"), indent=1)  # noqa: E731
+    dump = lambda: AB.write_json(rc, os.path.join(out, "repro_check.json"))  # noqa: E731
     BV = {}
     paths = {"coauthor": coa, "cs1": cs1}
     for ds in ("coauthor", "cs1"):
         t0 = time.time()
         p = raw + "." + ds + ".pkl"
         rc["pkl_sha256"][ds] = hashlib.sha256(open(p, "rb").read()).hexdigest()
+        dump()
+        if rc["pkl_sha256"][ds] != PKL_SHA[ds]:
+            sys.exit("mode の pickle の SHA-256 が条件の値と違う（%s）" % ds)
         with open(p, "rb") as fp:
             results = pickle.load(fp)  # mode の本計算が書いた自前の pickle（人は開かない）
         rc["p_repro"][ds] = repro(results, ds)
@@ -193,6 +201,17 @@ def main():
             T["alpha_1_sec"] = time.time() - t1
             print("P-REPRO-POOL 通過（%.0f 秒）" % T["alpha_1_sec"], flush=True)
             rest = [a for a in AB.ALPHAS if a != "1"]
+            # V2 の時間の規則: α = 1 の時間 × 回す α の数が 6 時間を超えたら、α = 3 → α = 0.03 の順に外す
+            T["alpha_cut"] = []
+            for c in ALPHA_CUTS:
+                if T["alpha_1_sec"] * (1 + len(rest)) / 3600 <= BUDGET_B1_HOURS:
+                    break
+                rest.remove(c)
+                T["alpha_cut"].append(c)
+            T["alphas_run"] = ["1"] + rest
+            if T["alpha_1_sec"] * (1 + len(rest)) / 3600 > BUDGET_B1_HOURS:
+                AB.write_json(T, os.path.join(out, "timing.json"))
+                sys.exit("削っても B1 の見積もりが 6 時間を超える。止めて研究者に聞く")
             t2 = time.time()
             PV2 = pool_values(ds, paths[ds], p15, rest, jobs)
             for w in p15:
@@ -200,7 +219,7 @@ def main():
                     PV[w][n].update(PV2[w][n])
             T["alpha_rest_sec"] = time.time() - t2
             BV[ds]["pool"] = PV
-        json.dump(T, open(os.path.join(out, "timing.json"), "w"), indent=1)
+        AB.write_json(T, os.path.join(out, "timing.json"))
     with open(bout, "wb") as fp:
         pickle.dump(BV, fp)
     rc["bvals_sha256"] = hashlib.sha256(open(bout, "rb").read()).hexdigest()
