@@ -40,3 +40,7 @@ worktree /Users/johnd/GSE-prototype-paper3（枝 docs/gse-paper3-per-person-lear
 - 書き直しで既存の結果を落とした（重ならない窓で hmm3 が連鎖に勝つ）。削るときは何を落とすかを確かめる。
 - 本人 − 最頻値の正の数には +∞ の書き手（各セル 2 人）が入る。母数を書く。
 - Windows（HP Z2）で書く JSON は改行を LF に固定する（`open(..., "w", newline="\n")`）。
+
+## 使用済み（2026-11-11）
+
+§2 の 1（/cross-review・判断 14）・2（Open items・判断 15・ハッシュは別の引き継ぎ）・3（本文の草稿 1 版・eff4bc93）を済ませた。続きは `next-session-gse-paper3-manuscript-attack-me.md`。
