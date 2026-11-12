@@ -143,13 +143,13 @@ mod imp {
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                hide_panel(&handle);
+                hide_and_clear(&handle);
             }
         });
         if let Err(e) = make_panel(app.handle(), &window) {
             BUILD_FAILED.store(true, Ordering::Release);
             warn_once(&e);
-            hide_panel(app.handle());
+            hide_and_clear(app.handle());
         }
     }
 
@@ -184,6 +184,14 @@ mod imp {
                 }
             }
         }
+    }
+
+    /// 帯を隠し、出ている印（`SHOWN`・`STRIP_VISIBLE`）も偽にする。閉じる要求・出せなかったとき・`close` が使う
+    /// （印だけ残ると、隠れた帯の見張りが回り続け、近さの計算も帯がある前提で続く）。メインスレッドから呼ぶ。
+    fn hide_and_clear(app: &AppHandle<Wry>) {
+        SHOWN.store(false, Ordering::SeqCst);
+        STRIP_VISIBLE.store(false, Ordering::Release);
+        hide_panel(app);
     }
 
     /// 大きさ・位置を決めて前に出す（メインスレッドで行う）。どれかが失敗したら Err。
@@ -229,12 +237,13 @@ mod imp {
         let dispatched = app.run_on_main_thread(move || match place_and_show(&handle) {
             Ok(()) => {
                 OPEN_GEN.fetch_add(1, Ordering::AcqRel);
-                SHOWN.store(true, Ordering::Release);
+                // SeqCst: 見張りの抜け際(`PROBE_RUNNING` を偽にしてから `SHOWN` を読む)との store→load の相互排他。
+                SHOWN.store(true, Ordering::SeqCst);
                 start_probe(handle);
             }
             Err(e) => {
                 warn_once(&e);
-                hide_panel(&handle);
+                hide_and_clear(&handle);
             }
         });
         if dispatched.is_err() {
@@ -244,7 +253,7 @@ mod imp {
 
     /// 帯を隠す。描画も止めさせる（状態に `null` を送る）。
     pub fn close(app: &AppHandle<Wry>) {
-        SHOWN.store(false, Ordering::Release);
+        SHOWN.store(false, Ordering::SeqCst);
         STRIP_VISIBLE.store(false, Ordering::Release);
         let _ = app.emit_to(
             LABEL,
@@ -255,9 +264,7 @@ mod imp {
         let _ = app.run_on_main_thread(move || {
             // 先に送られた `open` の処理がメインスレッドで後から走って `SHOWN` を真に戻していても、
             // ここ（その後に走る）でもう一度偽にする（隠れた帯の見張りが回り続けないように）。
-            SHOWN.store(false, Ordering::Release);
-            STRIP_VISIBLE.store(false, Ordering::Release);
-            hide_panel(&handle);
+            hide_and_clear(&handle);
         });
     }
 
@@ -273,7 +280,9 @@ mod imp {
 
     /// 見張りを 1 本だけ起こす（すでに回っていれば何もしない）。
     fn start_probe(app: AppHandle<Wry>) {
-        if PROBE_RUNNING.swap(true, Ordering::AcqRel) {
+        // SeqCst: 直前の `SHOWN.store(true)` と、見張りの抜け際の `PROBE_RUNNING.store(false)` → `SHOWN.load` が、
+        // 互いに相手の書きを見落として両方が古い値を読む(見張り 0 本で帯が出たまま)ことを避ける。
+        if PROBE_RUNNING.swap(true, Ordering::SeqCst) {
             return;
         }
         let spawned = std::thread::Builder::new()
@@ -294,16 +303,19 @@ mod imp {
             std::thread::sleep(PROBE_EVERY);
             if !SHOWN.load(Ordering::Acquire) || crate::is_shutting_down() {
                 STRIP_VISIBLE.store(false, Ordering::Release);
-                PROBE_RUNNING.store(false, Ordering::Release);
+                // SeqCst: `open` 側の `SHOWN.store(true)` → `PROBE_RUNNING.swap(true)` と store→load が向かい合う。
+                // Release/Acquire では両側が古い値を読みうるので、この 4 つの操作は全順序にする。
+                PROBE_RUNNING.store(false, Ordering::SeqCst);
                 // 抜ける直前に開き直されていたら、自分が続ける。
-                if SHOWN.load(Ordering::Acquire)
+                if SHOWN.load(Ordering::SeqCst)
                     && !crate::is_shutting_down()
-                    && !PROBE_RUNNING.swap(true, Ordering::AcqRel)
+                    && !PROBE_RUNNING.swap(true, Ordering::SeqCst)
                 {
                     continue;
                 }
                 return;
             }
+            // 読みの前に世代を覚える。書く直前に同じでなければ(読む間に閉じ→開き直しがあった)捨てる。
             let gen = OPEN_GEN.load(Ordering::Acquire);
             if gen != seen_gen {
                 // 開き直し: 窓は見えているかを覚えていないので、最初の読みを必ず送る。
@@ -335,8 +347,8 @@ mod imp {
             let Ok(visible) = rx.recv_timeout(PROBE_EVERY * 4) else {
                 continue;
             };
-            // 読んでいる間に閉じられていたら捨てる。
-            if !SHOWN.load(Ordering::Acquire) {
+            // 読んでいる間に閉じられていた・閉じて開き直されていたら捨てる(古い読みを新しい窓の値にしない)。
+            if !SHOWN.load(Ordering::Acquire) || OPEN_GEN.load(Ordering::Acquire) != gen {
                 continue;
             }
             STRIP_VISIBLE.store(visible, Ordering::Release);
