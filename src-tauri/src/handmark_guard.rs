@@ -1574,6 +1574,10 @@ fn the_strip_rs_touches_no_recorder_file_network_estimator_and_emits_only_to_its
             "p_stuck",
             "handmark_pointer::",
             "handmark_pointer_macos",
+            // 宛先の絞りを迂回する口(`emit_to` の第 1 引数の検査と対にする)
+            "emit_filter",
+            "EventTarget",
+            "Emitter::emit",
         ],
     );
     let all = [".", "emit", "("].concat();
@@ -1705,4 +1709,198 @@ fn the_strip_window_copies_the_constants_exactly() {
         strip_const_mismatches(&changed, frame_ts),
         vec!["STATE_EVENT"]
     );
+}
+
+/// `emit_to(` の呼び出しごとの第 1 引数（空白を除いた文字列）。本文（コメント・テストを除く）から読む。
+fn emit_to_targets(src: &str) -> Vec<String> {
+    let b = body(src);
+    let mut out = Vec::new();
+    let mut rest = b.as_str();
+    let head = ["emit", "_to("].concat();
+    while let Some(i) = rest.find(&head) {
+        let after = &rest[i + head.len()..];
+        let end = after.find(',').unwrap_or(after.len());
+        out.push(after[..end].split_whitespace().collect::<String>());
+        rest = after;
+    }
+    out
+}
+
+/// 帯の層の送りは、宛先がすべて帯の窓の `LABEL`（宛先を変数・別の窓・全窓にすると赤）。
+#[test]
+fn every_emit_to_in_the_strip_rs_targets_label() {
+    let targets = emit_to_targets(STRIP_RS);
+    assert!(
+        targets.len() >= 4,
+        "送りの数が想定より少ない（空回り）: {targets:?}"
+    );
+    assert!(
+        targets.iter().all(|t| t == "LABEL"),
+        "emit_to の第 1 引数が LABEL でない: {targets:?}"
+    );
+    // 陽性対照: 別の宛先（文字列・別の定数・改行を挟む形）を足すと見つかる。
+    for planted_target in ["\"main\"", "OTHER", "self.target"] {
+        for call in [
+            format!("fn f() {{ app.emit_to({planted_target}, X, 1); }}"),
+            format!("fn f() {{ app.emit_to(\n    {planted_target},\n    X, 1); }}"),
+        ] {
+            let planted = format!("{call}\n{STRIP_RS}");
+            let t = emit_to_targets(&planted);
+            assert_eq!(t.len(), targets.len() + 1);
+            assert!(
+                t.iter().any(|x| x != "LABEL"),
+                "対照が赤にならない: {planted_target}"
+            );
+        }
+    }
+}
+
+/// 帯の層の `tracing` は `warn_once` の 1 か所だけ（値・状態をログに出さない）。
+#[test]
+fn the_strip_rs_has_exactly_one_tracing_call_in_warn_once() {
+    let needle = ["tracing", "::"].concat();
+    let count = |src: &str| body(src).matches(needle.as_str()).count();
+    assert_eq!(count(STRIP_RS), 1, "tracing:: は warn_once の 1 か所だけ");
+    let b = body(STRIP_RS);
+    let from = b.find("fn warn_once").expect("warn_once");
+    let end = b[from..].find("\n    }\n").expect("warn_once の終わり");
+    assert!(
+        b[from..from + end].contains(needle.as_str()),
+        "tracing:: が warn_once の外にある"
+    );
+    // 陽性対照: 1 行足すと数が増える。
+    let planted = format!("{STRIP_RS}\nfn x() {{ {needle}debug!(\"x\"); }}");
+    assert_eq!(count(&planted), 2);
+}
+
+/// `emit_near` を `lib.rs` が呼ぶのは 1 か所だけ（ポインタのスレッドの配線）。
+#[test]
+fn lib_rs_calls_emit_near_exactly_once() {
+    let files = rs_sources();
+    let lib = files.iter().find(|(n, _)| n == "lib.rs").expect("lib.rs");
+    let count = |src: &str| body(src).matches("emit_near").count();
+    assert_eq!(count(&lib.1), 1, "lib.rs の emit_near は 1 か所だけ");
+    let planted = format!("{}\nfn x() {{ emit_near(); }}", lib.1);
+    assert_eq!(count(&planted), 2, "対照が赤にならない");
+}
+
+const CONF: &str = include_str!("../tauri.conf.json");
+
+/// CSP の指令ごとの値（文字列でもオブジェクトでも読む）。
+fn csp_directives(conf: &str) -> Vec<(String, Vec<String>)> {
+    let v: serde_json::Value = serde_json::from_str(conf).expect("tauri.conf.json");
+    let csp = &v["app"]["security"]["csp"];
+    match csp {
+        serde_json::Value::String(s) => s
+            .split(';')
+            .filter_map(|d| {
+                let mut it = d.split_whitespace();
+                let name = it.next()?.to_string();
+                Some((name, it.map(str::to_string).collect()))
+            })
+            .collect(),
+        serde_json::Value::Object(m) => m
+            .iter()
+            .map(|(k, val)| {
+                let toks = match val {
+                    serde_json::Value::String(s) => {
+                        s.split_whitespace().map(str::to_string).collect()
+                    }
+                    serde_json::Value::Array(a) => a
+                        .iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                (k.clone(), toks)
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// 外の宛先を許す指令(`connect-src`・`img-src`・`default-src`)の値。
+fn csp_external(conf: &str) -> Vec<String> {
+    let banned = ["http:", "https:", "ws:", "wss:", "*"];
+    csp_directives(conf)
+        .into_iter()
+        .filter(|(n, _)| ["connect-src", "img-src", "default-src"].contains(&n.as_str()))
+        .flat_map(|(n, toks)| toks.into_iter().map(move |t| format!("{n} {t}")))
+        .filter(|nt| banned.iter().any(|b| nt.contains(b)))
+        .collect()
+}
+
+/// CSP に外の宛先が無い(窓が外へ送れない)。`default-src` が `connect-src` の既定になるので、これも要る。
+#[test]
+fn the_csp_names_no_external_destination() {
+    let dirs = csp_directives(CONF);
+    assert!(
+        dirs.iter()
+            .any(|(n, t)| n == "default-src" && t.iter().any(|x| x == "'self'")),
+        "default-src 'self' が無い: {dirs:?}"
+    );
+    assert_eq!(csp_external(CONF), Vec::<String>::new());
+    // 陽性対照: 外の宛先を足すと赤になる(文字列の形・オブジェクトの形、どちらの指令でも)。
+    for (find, put) in [
+        (
+            "default-src 'self'",
+            "default-src 'self' https://example.invalid",
+        ),
+        (
+            "img-src 'self' data:",
+            "img-src 'self' data: http://example.invalid",
+        ),
+        ("default-src 'self'", "default-src *"),
+        (
+            "default-src 'self'",
+            "default-src 'self'; connect-src ws://example.invalid",
+        ),
+        (
+            "default-src 'self'",
+            "default-src 'self'; connect-src wss://example.invalid",
+        ),
+    ] {
+        let planted = CONF.replacen(find, put, 1);
+        assert_ne!(planted, CONF, "対照の置き換えが当たっていない: {find}");
+        assert!(
+            !csp_external(&planted).is_empty(),
+            "対照が赤にならない: {put}"
+        );
+    }
+    let object_form = r#"{"app":{"security":{"csp":{"default-src":"'self'","connect-src":["'self'","https://example.invalid"]}}}}"#;
+    assert_eq!(csp_external(object_form).len(), 1);
+}
+
+/// 帯のイベント名の接頭辞(連結の片割れ: `"handmark-strip-" + x`)も、帯の 2 ファイルの外に現れない。
+#[test]
+fn the_strip_event_prefix_appears_only_in_the_strip_window() {
+    let files = ts_sources();
+    assert!(files.len() > 5, "src/ の走査が空回り: {}", files.len());
+    let prefix = ["handmark", "-strip-"].concat();
+    assert_eq!(
+        ts_files_naming_except(&prefix, &files, &STRIP_WINDOW),
+        Vec::<String>::new(),
+        "帯の窓の外のコードが接頭辞を書いている"
+    );
+    // 帯の窓は実際に書いている(探し方が空回りしていない)
+    assert!(body(STRIP_WINDOW[0].1).contains(prefix.as_str()));
+    // 陽性対照: 連結の片割れだけでも、拡張子ごと・HTML も見つかる。
+    for planted_name in [
+        "Planted.tsx",
+        "planted.ts",
+        "planted.js",
+        "planted.mjs",
+        "planted.html",
+    ] {
+        let mut planted = files.clone();
+        planted.push((
+            planted_name.to_string(),
+            format!("const n = \"{prefix}\" + kind;"),
+        ));
+        assert_eq!(
+            ts_files_naming_except(&prefix, &planted, &STRIP_WINDOW),
+            vec![planted_name.to_string()],
+            "対照が赤にならない（{planted_name}）"
+        );
+    }
 }
