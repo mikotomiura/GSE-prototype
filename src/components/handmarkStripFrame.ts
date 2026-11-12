@@ -99,7 +99,6 @@ export interface FrameInput {
   fadeSettling: boolean;
 }
 
-/** 次に描くまでの ms。描かない（閉じた・全部覆われた）なら null。 */
 /**
  * 届いた状態・近さ・見えるようになった知らせで描画を早めるときの待ち（ms）。null は今の予約のままでよい。
  * 最後に描いてから ACTIVE_FRAME_MS は空ける（近さはカーソルが動くと 16ms ごとに届くので、
@@ -118,6 +117,7 @@ export function kickDelayMs(
   return target - now;
 }
 
+/** 次に描くまでの ms。描かない（閉じた・全部覆われた）なら null。 */
 export function nextFrameMs(input: FrameInput): number | null {
   if (!input.open || !input.visible) {
     return null;

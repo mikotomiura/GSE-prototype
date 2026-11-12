@@ -27,8 +27,8 @@
 - [x] 直した版の画面・開け閉め 5 往復でスレッドが増えない（判断 12）
 - [ ] ロック中の実機の確かめ（Claude のセッションを走らせていない時間に研究者だけで・`visible_ms` が伸びないこと）
 - [x] CPU（累積の秒の差・帯の有無）（判断 10・見えている間 計 15.4%）
-- [ ] 完了時のレビュー（code-reviewer・security-checker・/cross-review に Codex）
-- [ ] gse-dataset の同期（schema の文が変わったら）
+- [x] 完了時のレビュー（code-reviewer・security-checker・/cross-review に Codex）（判断 13・14）
+- [x] gse-dataset の同期（schema の文が変わったら）（`~/gse-dataset-handmark-pr2`・枝 `chore/schema-handmark-pr2`・2560d50・parity OK）
 - [ ] push の前に `target` を消す（空き 8 GiB）・push と PR は研究者に確かめる
 
 ## 場面ごとの対応

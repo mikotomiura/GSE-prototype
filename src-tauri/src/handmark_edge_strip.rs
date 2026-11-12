@@ -54,6 +54,30 @@ struct SessionView {
     on_console: bool,
 }
 
+/// 開いた回数（世代）と見えているかを 1 つの値に詰める（下位 1 ビットが見えているか）。
+/// 見張りが「確かめてから書く」間に閉じて開き直されても、古い世代の読みを書かないように、比べて書く（CAS）。
+fn pack_seen(gen: u32, visible: bool) -> u64 {
+    (u64::from(gen) << 1) | u64::from(visible)
+}
+
+fn gen_of(v: u64) -> u32 {
+    (v >> 1) as u32
+}
+
+fn seen_of(v: u64) -> bool {
+    v & 1 == 1
+}
+
+/// 今の値 `cur` が世代 `gen` のときだけ、見えているかを `visible` にした値を返す（違う世代なら書かない）。
+fn write_if_gen(cur: u64, gen: u32, visible: bool) -> Option<u64> {
+    (gen_of(cur) == gen).then(|| pack_seen(gen, visible))
+}
+
+/// 開き直し: 世代を 1 つ進め、見えているかを偽にする（最初の読みまで見えていない）。
+fn next_open(cur: u64) -> u64 {
+    pack_seen(gen_of(cur).wrapping_add(1), false)
+}
+
 /// 見えているかが前回の送りから変わったか（最初の読みは必ず送る）。
 fn visibility_changed(last: Option<bool>, now: bool) -> bool {
     last != Some(now)
@@ -64,7 +88,7 @@ mod imp {
     use super::*;
     use crate::analysis::handmark::state::StageState;
     use crate::handmark_pointer_thread::StripSpot;
-    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::mpsc;
     use std::time::Duration;
     use tauri::{AppHandle, Emitter, Manager, Wry};
@@ -77,8 +101,8 @@ mod imp {
 
     /// 帯が出ている間だけ true。
     static SHOWN: AtomicBool = AtomicBool::new(false);
-    /// 帯が出ていて、見えている（`occlusionState`）か。閉じたら偽。
-    static STRIP_VISIBLE: AtomicBool = AtomicBool::new(false);
+    /// 開いた回数（世代）と、帯が見えているか（`strip_seen`）。`pack_seen` の形。閉じたら見えているは偽。
+    static STRIP_SEEN: AtomicU64 = AtomicU64::new(0);
     /// `setup()` で窓を作れなかった（以後の `open` はすぐ失敗にする）。
     static BUILD_FAILED: AtomicBool = AtomicBool::new(false);
     /// 「作れなかった・出せなかった」警告を出した（1 走行に 1 回）。
@@ -87,8 +111,6 @@ mod imp {
     static SESSION_WARNED: AtomicBool = AtomicBool::new(false);
     /// 見張りのスレッドが生きている（開け閉めを何度しても 1 本）。
     static PROBE_RUNNING: AtomicBool = AtomicBool::new(false);
-    /// 開いた回数（見張りが開き直しに気づいて、最初の読みを必ず送る）。
-    static OPEN_GEN: AtomicU32 = AtomicU32::new(0);
     /// 帯の下端の高さ（点・f64 のビット）と主画面の高さ（点・f64 のビット）。近さの計算が読む。記録しない。
     static BOTTOM_BITS: AtomicU64 = AtomicU64::new(0);
     static SCREEN_H_BITS: AtomicU64 = AtomicU64::new(0);
@@ -102,7 +124,21 @@ mod imp {
 
     /// 帯が出ていて見えているか（駆動役が刻みごとに読む）。閉じたら偽。
     pub fn visible() -> bool {
-        SHOWN.load(Ordering::Acquire) && STRIP_VISIBLE.load(Ordering::Acquire)
+        SHOWN.load(Ordering::Acquire) && seen_of(STRIP_SEEN.load(Ordering::Acquire))
+    }
+
+    /// 見えているかを偽にする（世代は残す）。
+    fn clear_seen() {
+        STRIP_SEEN.fetch_and(!1, Ordering::SeqCst);
+    }
+
+    /// 世代 `gen` の読みとして見えているかを書く。その間に開き直されていたら書かずに偽を返す。
+    fn set_seen_for(gen: u32, visible: bool) -> bool {
+        STRIP_SEEN
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |cur| {
+                write_if_gen(cur, gen, visible)
+            })
+            .is_ok()
     }
 
     /// 帯の置き場（出ていなければ `None`）。ポインタのスレッドが近さの計算にだけ使う。
@@ -212,11 +248,11 @@ mod imp {
         }
     }
 
-    /// 帯を隠し、出ている印（`SHOWN`・`STRIP_VISIBLE`）も偽にする。閉じる要求・出せなかったとき・`close` が使う
+    /// 帯を隠し、出ている印（`SHOWN`・`STRIP_SEEN` の見えている）も偽にする。閉じる要求・出せなかったとき・`close` が使う
     /// （印だけ残ると、隠れた帯の見張りが回り続け、近さの計算も帯がある前提で続く）。メインスレッドから呼ぶ。
     fn hide_and_clear(app: &AppHandle<Wry>) {
         SHOWN.store(false, Ordering::SeqCst);
-        STRIP_VISIBLE.store(false, Ordering::Release);
+        clear_seen();
         hide_panel(app);
     }
 
@@ -262,9 +298,11 @@ mod imp {
         let handle = app.clone();
         let dispatched = app.run_on_main_thread(move || match place_and_show(&handle) {
             Ok(()) => {
-                // 前の開きの見張りが閉じた後に書いた古い「見えている」を持ち越さない（最初の読みまで見えていない）。
-                STRIP_VISIBLE.store(false, Ordering::Release);
-                OPEN_GEN.fetch_add(1, Ordering::AcqRel);
+                // 世代を進め、見えているかを偽にする（前の開きの読みを持ち越さない・最初の読みまで見えていない）。
+                // 古い世代の見張りの書き込みは `set_seen_for` で捨てられる。
+                let _ = STRIP_SEEN.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |cur| {
+                    Some(next_open(cur))
+                });
                 // SeqCst: 見張りの抜け際(`PROBE_RUNNING` を偽にしてから `SHOWN` を読む)との store→load の相互排他。
                 SHOWN.store(true, Ordering::SeqCst);
                 start_probe(handle);
@@ -282,7 +320,7 @@ mod imp {
     /// 帯を隠す。描画も止めさせる（状態に `null` を送る）。
     pub fn close(app: &AppHandle<Wry>) {
         SHOWN.store(false, Ordering::SeqCst);
-        STRIP_VISIBLE.store(false, Ordering::Release);
+        clear_seen();
         let _ = app.emit_to(
             LABEL,
             crate::handmark_stage::STATE_EVENT,
@@ -326,11 +364,11 @@ mod imp {
     /// 閉じたら抜ける（抜けたあとに開き直されていたら引き継ぐ）。
     fn probe_loop(app: AppHandle<Wry>) {
         let mut last: Option<bool> = None;
-        let mut seen_gen = OPEN_GEN.load(Ordering::Acquire);
+        let mut seen_gen = gen_of(STRIP_SEEN.load(Ordering::Acquire));
         loop {
             std::thread::sleep(PROBE_EVERY);
             if !SHOWN.load(Ordering::Acquire) || crate::is_shutting_down() {
-                STRIP_VISIBLE.store(false, Ordering::Release);
+                clear_seen();
                 // SeqCst: `open` 側の `SHOWN.store(true)` → `PROBE_RUNNING.swap(true)` と store→load が向かい合う。
                 // Release/Acquire では両側が古い値を読みうるので、この 4 つの操作は全順序にする。
                 PROBE_RUNNING.store(false, Ordering::SeqCst);
@@ -344,7 +382,7 @@ mod imp {
                 return;
             }
             // 読みの前に世代を覚える。書く直前に同じでなければ(読む間に閉じ→開き直しがあった)捨てる。
-            let gen = OPEN_GEN.load(Ordering::Acquire);
+            let gen = gen_of(STRIP_SEEN.load(Ordering::Acquire));
             if gen != seen_gen {
                 // 開き直し: 窓は見えているかを覚えていないので、最初の読みを必ず送る。
                 seen_gen = gen;
@@ -375,18 +413,20 @@ mod imp {
                         .contains(objc2_app_kit::NSWindowOcclusionState::Visible),
                 );
             });
+            // 読めなかった刻みは、見えていない側に倒す（前の「見えている」を残さない）。窓への送りは変えない。
             if dispatched.is_err() {
+                set_seen_for(gen, false);
                 continue;
             }
             let Ok(occlusion_visible) = rx.recv_timeout(PROBE_EVERY * 4) else {
+                set_seen_for(gen, false);
                 continue;
             };
             let visible = strip_seen(occlusion_visible, session, asleep);
             // 読んでいる間に閉じられていた・閉じて開き直されていたら捨てる(古い読みを新しい窓の値にしない)。
-            if !SHOWN.load(Ordering::Acquire) || OPEN_GEN.load(Ordering::Acquire) != gen {
+            if !SHOWN.load(Ordering::Acquire) || !set_seen_for(gen, visible) {
                 continue;
             }
-            STRIP_VISIBLE.store(visible, Ordering::Release);
             if visibility_changed(last, visible) {
                 last = Some(visible);
                 let _ = app.emit_to(LABEL, VISIBLE_EVENT, visible);
@@ -604,6 +644,25 @@ mod tests {
         assert!(!strip_seen(true, open, true));
         // セッションが読めない。
         assert!(!strip_seen(true, None, false));
+    }
+
+    #[test]
+    fn a_read_from_an_older_open_is_not_written() {
+        let open1 = next_open(0);
+        let g1 = gen_of(open1);
+        // 同じ世代の読みは書ける。
+        let seen = write_if_gen(open1, g1, true).expect("same gen");
+        assert!(seen_of(seen));
+        // 確かめた後に閉じて開き直された: 世代が進み、見えているは偽から始まる。
+        let open2 = next_open(seen);
+        assert!(!seen_of(open2));
+        assert_ne!(gen_of(open2), g1);
+        // 古い世代の読みは書かない（前の開きの「見えている」を新しい開きへ持ち越さない）。
+        assert_eq!(write_if_gen(open2, g1, true), None);
+        // 世代が一周しても詰め方が崩れない。
+        let wrapped = next_open(pack_seen(u32::MAX, true));
+        assert_eq!(gen_of(wrapped), 0);
+        assert!(!seen_of(wrapped));
     }
 
     #[test]

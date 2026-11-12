@@ -15,7 +15,7 @@
 
 - 窓: label `handmark-edge-strip`。`setup()`（メインスレッド）で隠したまま作る。14pt・透明・影なし・焦点を取らない・タスクバーに出さない。`overlay_panel::convert_overlay_to_panel` で非アクティブの NSPanel にし、クリック透過・浮く層・全 Space・全画面の補助（試作の `prepare` の 4 つの振る舞い・run16）。NSPanel にした窓は壊さない（閉じる要求は `order_out`）。
 - 間引き: 背景の窓と同じく `background_throttling(Disabled)` を付ける（PR 3 の判断 12）。覆われたときに描かないのは窓の側の判断で行う（3 節）。
-- 開け閉め: 駆動役の `Effect::OpenWindow` / `CloseWindow` で、背景の窓と一緒に開け閉めする（`run_handmark_effects` の 1 か所）。帯を作れなかった・出せなかったときは、背景は閉じない（帯は従）。applog に理由を 1 行（`handmark: edge strip unavailable`）残す。
+- 開け閉め: 駆動役の `Effect::OpenWindow` / `CloseWindow` で、背景の窓と一緒に開け閉めする（`run_handmark_effects` の 1 か所）。帯を作れなかった・出せなかったときは、背景は閉じない（帯は従）。applog に理由を 1 行（`handmark: edge strip: unavailable`）残す。
 - 置き場（試作の判断 5・6）: 見張りのスレッドが 250ms ごとに、主画面の `visibleFrame` の下端に帯を置く。画面に出ている層 0 の窓（自分のものを除く）に、主画面の幅いっぱいで下端まで届く窓があれば全画面とみなし、画面の下端に置く（`CGWindowListCopyWindowInfo` の層・pid・大きさだけを読む。アプリや窓の名前は読まない）。置いた下端の高さ（点）を Atomic に置く（近さの計算が読む）。
 - 見えているか: 同じ見張りで `occlusionState` を読み、帯が出ていて見えているかを Atomic `STRIP_VISIBLE` に置く。変わったときだけ帯の窓へ `handmark-strip-visible`（真偽値）を `emit_to` する。
 - 見張りは帯が出ている間だけ回す（閉じたら止まり、`STRIP_VISIBLE` を偽にする）。

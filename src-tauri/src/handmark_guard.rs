@@ -1451,18 +1451,15 @@ fn the_strip_probe_judges_visibility_through_strip_seen() {
         "見張りが occlusion_visible を strip_seen の外で使っている"
     );
     // 判定した値が、印と窓への送りに使われている。
-    assert_eq!(
-        probe
-            .matches("STRIP_VISIBLE.store(visible, Ordering::Release);")
-            .count(),
-        1
-    );
+    assert_eq!(probe.matches("|| !set_seen_for(gen, visible)").count(), 1);
     assert_eq!(
         probe
             .matches("app.emit_to(LABEL, VISIBLE_EVENT, visible);")
             .count(),
         1
     );
+    // 読めなかった刻み（メインスレッドへ投げられない・返事が来ない）は見えていない側に倒す（Codex の指摘・判断 14）。
+    assert_eq!(probe.matches("set_seen_for(gen, false);").count(), 2);
     assert!(probe.contains("let session = read_session();"));
     assert!(probe.contains("let asleep = main_display.is_asleep();"));
 }
@@ -1498,10 +1495,11 @@ fn read_session_reads_only_the_two_session_keys() {
         keys,
         ["CGSSessionScreenIsLocked", "kCGSSessionOnConsoleKey"]
     );
+    // 辞書に触れるのは truthy の中の 1 か所だけ（find 以外の読み方・直の CF 呼び出しも数える）。
     assert_eq!(
-        f.matches("dict.find(").count(),
+        f.matches("dict.").count(),
         1,
-        "鍵の読みは truthy の 1 か所だけ"
+        "辞書の読みは truthy の 1 か所だけ"
     );
     // 陽性対照の語は実行時に組み立てる（この検査の本文に検査対象の語を書かない）。
     let banned = [
@@ -1510,6 +1508,7 @@ fn read_session_reads_only_the_two_session_keys() {
         [".it", "er("].concat(),
         ["{", ":?}"].concat(),
         ["tracing", "::"].concat(),
+        ["Get", "Value"].concat(),
     ];
     for b in &banned {
         assert!(!f.contains(b.as_str()), "read_session に {b} がある");
@@ -1520,6 +1519,17 @@ fn read_session_reads_only_the_two_session_keys() {
         &format!("\"{}\"", ["kCGSSession", "User", "Name", "Key"].concat()),
     );
     assert!(planted.contains(&banned[0]));
+    let planted_keys: Vec<&str> = planted
+        .match_indices("truthy(\"")
+        .map(|(i, _)| {
+            let rest = &planted[i + "truthy(\"".len()..];
+            &rest[..rest.find('"').expect("閉じない鍵")]
+        })
+        .collect();
+    assert_ne!(
+        planted_keys,
+        ["CGSSessionScreenIsLocked", "kCGSSessionOnConsoleKey"]
+    );
 }
 
 /// 帯のイベント名（近さ・見えているか）を TS で知ってよいのは帯の 2 ファイルだけ（`target` なしの `listen` で
@@ -1913,12 +1923,14 @@ fn csp_directives(conf: &str) -> Vec<(String, Vec<String>)> {
 
 /// 外の宛先を許す指令(`connect-src`・`img-src`・`default-src`)の値。
 fn csp_external(conf: &str) -> Vec<String> {
-    let banned = ["http:", "https:", "ws:", "wss:", "*"];
+    // 許す source expression の一覧（これ以外は外の宛先になりうるとみなす。スキームを省いたホスト名も赤）。
+    let allowed = ["'self'", "data:", "'none'"];
     csp_directives(conf)
         .into_iter()
         .filter(|(n, _)| ["connect-src", "img-src", "default-src"].contains(&n.as_str()))
-        .flat_map(|(n, toks)| toks.into_iter().map(move |t| format!("{n} {t}")))
-        .filter(|nt| banned.iter().any(|b| nt.contains(b)))
+        .flat_map(|(n, toks)| toks.into_iter().map(move |t| (n.clone(), t)))
+        .filter(|(_, t)| !allowed.contains(&t.as_str()))
+        .map(|(n, t)| format!("{n} {t}"))
         .collect()
 }
 
@@ -1950,6 +1962,11 @@ fn the_csp_names_no_external_destination() {
         (
             "default-src 'self'",
             "default-src 'self'; connect-src wss://example.invalid",
+        ),
+        // スキームを省いたホスト名（2026-11-12 の Codex の指摘・旧い検査は通していた）。
+        (
+            "default-src 'self'",
+            "default-src 'self'; connect-src example.invalid",
         ),
     ] {
         let planted = CONF.replacen(find, put, 1);
