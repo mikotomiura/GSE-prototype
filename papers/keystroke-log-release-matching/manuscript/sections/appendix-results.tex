@@ -215,4 +215,24 @@ writer whose chunks were generated on the CPU, no accuracy changed by more than 
 \end{table*}
 
 \paragraph{Results on all writers.}
-\textbf{[After the computation on all writers: attackers A0 to A3 on all writers after exclusion.]}
+Table~\ref{tab:app:all} gives the strongest attacker among A0 to A3 on full texts for all 4,992 writers; no writer
+met an exclusion criterion. At every $N$ the order of the forms is the same as for the 500 writers, and at
+$N = 1{,}000$ R3 kept 89.6\% [88.8, 90.4] against 86.7\%. The one difference from Section~\ref{sec:results} is R4(8) at $N = 10$, where the
+gain over A0 was 2.0 points [1.1, 3.0] (500 writers: 1.2 [0.0, 4.3]).
+
+\begin{table*}
+  \caption{The strongest attacker among A0 to A3 on full texts, all 4,992 writers: accuracy with its 95\% interval, in
+  percent, and the selected attacker with the percentage of resamples in which it was selected when this is below
+  100. Last column: the strongest attacker for the 500 writers at $N = 1{,}000$ (Table~\ref{tab:main}a).}
+  \label{tab:app:all}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{lllllllr}
+    \toprule
+    & \multicolumn{2}{c}{$N = 10$} & \multicolumn{2}{c}{$N = 100$} & \multicolumn{2}{c}{$N = 1{,}000$} & 500 writers \\
+    Form & Strongest & Attacker & Strongest & Attacker & Strongest & Attacker & $N = 1{,}000$ \\
+    \midrule
+    \tabinput{sections/generated/all-writers.tex}
+    \bottomrule
+  \end{tabular}
+\end{table*}

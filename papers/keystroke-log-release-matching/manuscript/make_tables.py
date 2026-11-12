@@ -3,7 +3,8 @@
     python3 -I make_tables.py <results dir> <output dir>
 
 <results dir> is experiments/20261012-public-keystroke-matching/results. The script reads main.json,
-main_a4.json and main_a4_without_cpu_writer.json (the KeyTAR rows), enja15_main.json and
+main_a4.json and main_a4_without_cpu_writer.json (the KeyTAR rows), main_all.json (the appendix on all writers),
+enja15_main.json and
 exploratory_{unicity,dp,dp_utility_r0,tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
 into <output dir> (sections/generated). The tables are included by the sections; values are never typed by hand.
 Accuracies are printed in percent.
@@ -349,10 +350,35 @@ def dp_tables(dp, du, m):
     return match, util[0], util[1]
 
 
+def all_writers_table(full, m):
+    """The strongest attacker on full texts for all writers after exclusion, beside the 500 writers at N = 1,000.
+    Stops if the 500-writer part of main_all.json differs from main.json (the positive control), if the number of
+    writers differs from sample_sizes, or if an attacker outside A0 to A3 is selected."""
+    def strip(d):
+        return {k: v for k, v in d.items() if k not in ("all", "seconds")}
+    if full["main500"] != m["main500"] or strip(full) != strip(m):
+        raise SystemExit("main_all.json: the main500 part or the header differs from main.json")
+    a = full["all"]
+    everyone = sum(full["writers_after_exclusion"].values())
+    allowed = {"A0", "A1", "A1p", "A2", "A2b", "A3"}
+    rows = []
+    for f in MAIN_FORMS:
+        cells = []
+        for n in ("10", "100", "1000"):
+            v = a["strongest"][f"full|{f}|{n}"]
+            if a["cells"][f"full|{f}|A0|{n}"]["writers"] != everyone or not set(v["share_selected"]) <= allowed:
+                raise SystemExit(f"main_all.json: unexpected writers or attacker at {f}|{n}")
+            cells.append(f"{pct(v['acc'])} {ci(v['ci'])} & {attacker(v, a, f, n)}")
+        cells.append(pct(full["main500"]["strongest"][f"full|{f}|1000"]["acc"]))
+        rows.append(" & ".join([form_tex(f)] + cells) + " \\\\")
+    return rows
+
+
 def main():
     res, out = sys.argv[1], sys.argv[2]
     os.makedirs(out, exist_ok=True)
-    m = json.load(open(os.path.join(res, "main.json"), encoding="utf-8"))["main500"]
+    whole = json.load(open(os.path.join(res, "main.json"), encoding="utf-8"))
+    m = whole["main500"]
     write(out, "main-1000.tex", main_table(m, "1000", True))
     write(out, "main-10.tex", main_table(m, "10", False))
     write(out, "figure-coords.tex", figure_coords(m))
@@ -392,6 +418,9 @@ def main():
     write(out, "explore-dp.tex", dp_match)
     write(out, "explore-dp-r0.tex", dp_r0)
     write(out, "explore-dp-score.tex", dp_score)
+    full = json.load(open(os.path.join(res, "main_all.json"), encoding="utf-8"))
+    rows = all_writers_table(full, whole)
+    write(out, "all-writers.tex", rows)
 
 
 if __name__ == "__main__":
