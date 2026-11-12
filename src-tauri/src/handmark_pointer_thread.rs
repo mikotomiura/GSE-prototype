@@ -17,6 +17,36 @@ const WAIT_ACTIVE_MS: u64 = STEP_MS;
 /// 止まっている間の待ち（ms）。
 const WAIT_IDLE_MS: u64 = 250;
 
+/// 帯の縦の幅（点）。試作と同じ。
+const STRIP_HEIGHT_PT: f64 = 14.0;
+/// 帯からこの距離（点）で近さが 0 になる。
+const STRIP_NEAR_RANGE_PT: f64 = 80.0;
+
+/// 帯（下の縁）の置き場。帯の窓の層が決める（今は口だけで、層は実装 B）。値は座標の点で、記録しない。
+#[derive(Clone, Copy)]
+pub struct StripSpot {
+    /// 帯の下端の高さ（点・主画面の左下が原点）。
+    pub bottom_pt: f64,
+    /// 主画面の高さ（点）。読んだ一点（正準の箱）から点へ戻すのに使う。
+    pub screen_h_pt: f64,
+}
+
+/// 下の縁の帯へのカーソルの近さを 0〜10（0.1 刻み）にする。`y_pt`・`bottom_pt` は主画面の左下が原点の点。
+/// カーソルを切っている間・値が壊れているとき（非有限）は 0。帯の上にいれば 10、帯の下端より下は下端からの距離、
+/// 上は帯の上端からの距離で 80 点まで薄れて 0 になる。
+pub fn strip_near(cursor_on: bool, y_pt: f64, bottom_pt: f64) -> u8 {
+    if !cursor_on || !y_pt.is_finite() || !bottom_pt.is_finite() {
+        return 0;
+    }
+    let d = if y_pt < bottom_pt {
+        bottom_pt - y_pt
+    } else {
+        (y_pt - bottom_pt - STRIP_HEIGHT_PT).max(0.0)
+    };
+    let near = (1.0 - d / STRIP_NEAR_RANGE_PT).clamp(0.0, 1.0);
+    (near * 10.0).round() as u8
+}
+
 /// 駆動役（打鍵側）が決める入れ切り。
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Gate {
@@ -46,6 +76,8 @@ pub enum PointerOut {
     Trace(Box<TraceState>),
     /// 押下が始まった位置（波紋の種）。
     Ripple(RipplePoint),
+    /// 帯へのカーソルの近さ（0〜10）。行き先は帯の窓だけで、場（`TraceField`）には入れない。変わったときだけ出る。
+    StripNear(u8),
 }
 
 /// ポインタのスレッドの駆動役。
@@ -60,6 +92,8 @@ pub struct PointerDriver {
     sent_zero: bool,
     /// 実効の入れ切りがある（読んでいる）。
     hot: bool,
+    /// 最後に出した近さ（初めは 0）。
+    near_sent: u8,
 }
 
 impl Default for PointerDriver {
@@ -77,6 +111,7 @@ impl PointerDriver {
             last_now_ms: 0,
             sent_zero: true,
             hot: false,
+            near_sent: 0,
         }
     }
 
@@ -107,6 +142,21 @@ impl PointerDriver {
         now_ms: u64,
         gate: Gate,
         paused: bool,
+        read: &mut dyn FnMut() -> Option<Point>,
+    ) -> Vec<PointerOut> {
+        self.tick_with_strip(now_ms, gate, paused, None, read)
+    }
+
+    /// [`Self::tick`] に帯の置き場 `strip` を足したもの。`None`（帯が無い）なら近さは 0。
+    /// 近さは読んだ一点から作るだけで、場には触れない（場の値・波紋は `strip` の有無で変わらない）。
+    /// 出すのは値が変わったときだけ。カーソルが切れている・一時停止・窓が閉じている・帯が無い・
+    /// 一点が画面の外のときは 0 に戻り、0 を 1 回出してそれ以上は出さない。
+    pub fn tick_with_strip(
+        &mut self,
+        now_ms: u64,
+        gate: Gate,
+        paused: bool,
+        strip: Option<StripSpot>,
         read: &mut dyn FnMut() -> Option<Point>,
     ) -> Vec<PointerOut> {
         let mut out = Vec::new();
@@ -143,6 +193,9 @@ impl PointerDriver {
             self.sent_zero = true;
         }
 
+        // 読んでいない間・入れ切りが変わった刻みは近さを 0 に戻す。読んだ刻みでは下で作り直す。
+        let mut near: Option<u8> = if reading && !changed { None } else { Some(0) };
+
         if reading {
             let target = now_ms / STEP_MS * STEP_MS;
             if target.saturating_sub(field.grid_t()) >= STEP_MS {
@@ -151,6 +204,14 @@ impl PointerDriver {
                 // 読んで画面の外だった（`None`）刻みは `lost`。読まなかった刻み（上の `advance_held`）とは別。
                 let sample = read();
                 let lost = sample.is_none();
+                near = Some(match (sample, strip) {
+                    (Some(p), Some(spot)) => strip_near(
+                        gate.cursor,
+                        (1.0 - f64::from(p.y)) * spot.screen_h_pt,
+                        spot.bottom_pt,
+                    ),
+                    _ => 0,
+                });
                 let ripple = field.step(Step {
                     sample,
                     cursor_on: gate.cursor,
@@ -172,6 +233,12 @@ impl PointerDriver {
             }
         }
         self.hot = reading;
+        if let Some(n) = near {
+            if n != self.near_sent {
+                self.near_sent = n;
+                out.push(PointerOut::StripNear(n));
+            }
+        }
         out
     }
 }
@@ -183,6 +250,8 @@ impl PointerDriver {
 /// - `gate_bits`: 駆動役が書く門の値（[`Gate::from_bits`] の並び）。
 /// - `read`: 一点を 1 回読む口（画面の外は `None`）。開いていて入っている間だけ呼ばれる。
 /// - `send_trace` / `send_ripple`: 窓へ送る（`lib.rs` が `handmark_stage` の送りを渡す）（第 2 引数は今の時刻）。
+/// - `strip_spot`: 帯の置き場（帯が無ければ `None`・近さは 0）。
+/// - `send_near`: 帯の窓へ近さを送る（変わったときだけ呼ばれる・第 2 引数は今の時刻）。
 /// - `sleep_ms`: 待つ。
 #[allow(clippy::too_many_arguments)]
 pub fn run_loop(
@@ -192,6 +261,8 @@ pub fn run_loop(
     mut read: impl FnMut() -> Option<Point>,
     mut send_trace: impl FnMut(&TraceState, u64),
     mut send_ripple: impl FnMut(&RipplePoint, u64),
+    mut strip_spot: impl FnMut() -> Option<StripSpot>,
+    mut send_near: impl FnMut(u8, u64),
     mut sleep_ms: impl FnMut(u64),
     mut should_stop: impl FnMut() -> bool,
 ) {
@@ -202,11 +273,12 @@ pub fn run_loop(
         }
         let gate = Gate::from_bits(gate_bits());
         let now = now_ms();
-        let out = driver.tick(now, gate, paused(), &mut read);
+        let out = driver.tick_with_strip(now, gate, paused(), strip_spot(), &mut read);
         for o in out {
             match o {
                 PointerOut::Trace(s) => send_trace(&s, now),
                 PointerOut::Ripple(r) => send_ripple(&r, now),
+                PointerOut::StripNear(n) => send_near(n, now),
             }
         }
         sleep_ms(driver.next_wait_ms(now_ms()));
@@ -237,7 +309,7 @@ mod tests {
         out.iter()
             .filter_map(|o| match o {
                 PointerOut::Trace(s) => Some(**s),
-                PointerOut::Ripple(_) => None,
+                PointerOut::Ripple(_) | PointerOut::StripNear(_) => None,
             })
             .collect()
     }
@@ -521,6 +593,8 @@ mod tests {
             },
             |_, _| *traces_out.borrow_mut() += 1,
             |_, _| *ripples_out.borrow_mut() += 1,
+            || None,
+            |_, _| {},
             |ms| {
                 slept.borrow_mut().push(ms);
                 clock.set(clock.get() + ms);
@@ -772,5 +846,203 @@ mod tests {
         }
         let live = d.trace_state().expect("opened");
         assert!(live.bits() != replay_trace(&bins, seed, t0, t_end).bits());
+    }
+
+    // ---- 帯の近さ ----
+
+    #[test]
+    fn strip_near_boundaries() {
+        // 帯（下端 0・高さ 14）の上は 10、80 点で 0
+        assert_eq!(strip_near(true, 0.0, 0.0), 10);
+        assert_eq!(strip_near(true, 14.0, 0.0), 10);
+        assert_eq!(strip_near(true, 54.0, 0.0), 5);
+        assert_eq!(strip_near(true, 94.0, 0.0), 0);
+        assert_eq!(strip_near(true, 900.0, 0.0), 0);
+        // 帯が Dock の上（下端 48）にあるとき: 帯の下端より下は下端からの距離
+        assert_eq!(strip_near(true, 48.0, 48.0), 10);
+        assert_eq!(strip_near(true, 55.0, 48.0), 10);
+        assert_eq!(strip_near(true, 8.0, 48.0), 5);
+        assert_eq!(strip_near(true, -32.0, 48.0), 0);
+        assert_eq!(strip_near(true, 102.0, 48.0), 5);
+        // 上端から 80 点ちょうどで 0、1 点手前は 1
+        assert_eq!(strip_near(true, 48.0 + 14.0 + 80.0, 48.0), 0);
+        assert_eq!(strip_near(true, 48.0 + 14.0 + 72.0, 48.0), 1);
+        // カーソルを切っている・非有限は 0
+        assert_eq!(strip_near(false, 0.0, 0.0), 0);
+        assert_eq!(strip_near(true, f64::NAN, 0.0), 0);
+        assert_eq!(strip_near(true, f64::INFINITY, 0.0), 0);
+        assert_eq!(strip_near(true, 10.0, f64::NAN), 0);
+        assert_eq!(strip_near(true, 10.0, f64::NEG_INFINITY), 0);
+    }
+
+    const SPOT: StripSpot = StripSpot {
+        bottom_pt: 0.0,
+        screen_h_pt: 900.0,
+    };
+
+    /// 主画面の高さ 900 点で、下端から `y_pt` 点の高さの一点（正準の箱の縦は下向き）。
+    fn at_pt(y_pt: f32) -> Point {
+        pt(0.8, 1.0 - y_pt / 900.0, false)
+    }
+
+    fn nears(out: &[PointerOut]) -> Vec<u8> {
+        out.iter()
+            .filter_map(|o| match o {
+                PointerOut::StripNear(n) => Some(*n),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn near_is_sent_only_when_it_changes_and_zero_once_when_cut() {
+        let mut d = PointerDriver::new();
+        let mut now = 1_600u64;
+        let mut all = Vec::new();
+        let mut run = |d: &mut PointerDriver, n: usize, y: f32, gate: Gate, paused: bool| {
+            let mut v = Vec::new();
+            for _ in 0..n {
+                let mut r = || Some(at_pt(y));
+                v.extend(nears(&d.tick_with_strip(
+                    now,
+                    gate,
+                    paused,
+                    Some(SPOT),
+                    &mut r,
+                )));
+                now += 16;
+            }
+            v
+        };
+        // 開いた直後（最初の刻みは読まない）は 0 のまま何も出ない。帯の上で 10 が 1 回。
+        all.push(run(&mut d, 20, 5.0, ON, false));
+        assert_eq!(all[0], vec![10], "変わったときだけ");
+        // 動かさなければ出ない。離れると変わるたびに出る。
+        assert!(run(&mut d, 20, 5.0, ON, false).is_empty());
+        assert_eq!(run(&mut d, 5, 54.0, ON, false), vec![5]);
+        // カーソルを切ると 0 が 1 回だけ。
+        let off = Gate {
+            cursor: false,
+            ..ON
+        };
+        assert_eq!(run(&mut d, 30, 54.0, off, false), vec![0]);
+        // 戻すと再び出て、一時停止で 0 が 1 回、窓を閉じても出ない（すでに 0）。
+        assert_eq!(run(&mut d, 20, 5.0, ON, false), vec![10]);
+        assert_eq!(run(&mut d, 30, 5.0, ON, true), vec![0]);
+        assert!(run(&mut d, 30, 5.0, Gate { open: false, ..ON }, false).is_empty());
+        // 開いたまま 10 のときに窓を閉じると 0 が 1 回。
+        assert_eq!(run(&mut d, 20, 5.0, ON, false), vec![10]);
+        assert_eq!(
+            run(&mut d, 30, 5.0, Gate { open: false, ..ON }, false),
+            vec![0]
+        );
+    }
+
+    #[test]
+    fn near_is_zero_without_a_strip_or_when_the_point_is_lost() {
+        let mut d = PointerDriver::new();
+        let mut now = 1_600u64;
+        let mut got = Vec::new();
+        for _ in 0..40 {
+            let mut r = || Some(at_pt(5.0));
+            got.extend(nears(&d.tick_with_strip(now, ON, false, None, &mut r)));
+            now += 16;
+        }
+        assert!(got.is_empty(), "帯が無ければ近さは 0 のまま");
+        // 帯があって 10 → 一点が画面の外（読めない）で 0
+        for _ in 0..10 {
+            let mut r = || Some(at_pt(5.0));
+            got.extend(nears(&d.tick_with_strip(
+                now,
+                ON,
+                false,
+                Some(SPOT),
+                &mut r,
+            )));
+            now += 16;
+        }
+        for _ in 0..10 {
+            let mut r = || None;
+            got.extend(nears(&d.tick_with_strip(
+                now,
+                ON,
+                false,
+                Some(SPOT),
+                &mut r,
+            )));
+            now += 16;
+        }
+        assert_eq!(got, vec![10, 0]);
+    }
+
+    /// 近さは場に触れない: 帯の口が有り・無しで、場と波紋の出来事がビット単位で同じ。
+    #[test]
+    fn near_never_changes_the_field_or_the_ripples() {
+        let run = |strip: Option<StripSpot>| {
+            let mut d = PointerDriver::new();
+            let mut others = Vec::new();
+            let mut states = Vec::new();
+            for k in 0..400u64 {
+                let a = k as f32 * 0.07;
+                // 下の縁を行き来する（帯の有無で近さは大きく変わる）。押下もある。
+                let mut r = || Some(pt(0.8 + 0.5 * a.cos(), 0.97 + 0.03 * a.sin(), k % 50 > 25));
+                let gate = if k == 200 {
+                    Gate {
+                        cursor: false,
+                        ..ON
+                    }
+                } else {
+                    ON
+                };
+                for o in d.tick_with_strip(1_600 + k * 16, gate, k == 300, strip, &mut r) {
+                    if !matches!(o, PointerOut::StripNear(_)) {
+                        others.push(o);
+                    }
+                }
+                states.push(d.trace_state());
+            }
+            (others, states)
+        };
+        let with = run(Some(SPOT));
+        let without = run(None);
+        assert!(with.0 == without.0, "出来事（場の写し・波紋）が同じ");
+        assert!(with.0.iter().any(|o| matches!(o, PointerOut::Ripple(_))));
+        assert_eq!(with.1.len(), without.1.len());
+        for (a, b) in with.1.iter().zip(without.1.iter()) {
+            match (a, b) {
+                (Some(a), Some(b)) => assert_eq!(a.bits(), b.bits(), "場の値がビット単位で同じ"),
+                (None, None) => {}
+                _ => panic!("開き方が違う"),
+            }
+        }
+    }
+
+    /// `run_loop` の近さの送り口: 帯の置き場が有れば変わったときだけ呼ばれ、無ければ呼ばれない。
+    #[test]
+    fn run_loop_sends_near_only_with_a_strip() {
+        use std::cell::{Cell, RefCell};
+        let go = |with_strip: bool| {
+            let clock = Cell::new(1_600u64);
+            let n = Cell::new(0u32);
+            let sent = RefCell::new(Vec::new());
+            run_loop(
+                || 0b111,
+                || false,
+                || clock.get(),
+                || Some(at_pt(5.0)),
+                |_, _| {},
+                |_, _| {},
+                || with_strip.then_some(SPOT),
+                |v, _| sent.borrow_mut().push(v),
+                |ms| clock.set(clock.get() + ms),
+                || {
+                    n.set(n.get() + 1);
+                    n.get() > 60
+                },
+            );
+            sent.into_inner()
+        };
+        assert_eq!(go(true), vec![10]);
+        assert!(go(false).is_empty());
     }
 }

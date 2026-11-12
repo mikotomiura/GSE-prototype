@@ -1144,6 +1144,7 @@ fn pointer_out_goes_to_the_log(o: &PointerOut) -> bool {
     match o {
         PointerOut::Trace(_) => false,
         PointerOut::Ripple(_) => false,
+        PointerOut::StripNear(_) => false,
     }
 }
 
@@ -1207,6 +1208,7 @@ fn a_day_of_typing_and_pointer_toggles_produces_only_handmark_day_rows() {
             match o {
                 PointerOut::Trace(_) => traces += 1,
                 PointerOut::Ripple(_) => ripples += 1,
+                PointerOut::StripNear(_) => {}
             }
         }
         if i.is_multiple_of(16) {

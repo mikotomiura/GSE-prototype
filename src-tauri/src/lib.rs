@@ -2560,6 +2560,9 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
                 },
                 |s, now| crate::handmark_stage::emit_trace(&app, s, now),
                 |r, now| crate::handmark_stage::emit_ripple(&app, r, now),
+                // 帯の窓の層は実装 B で足す。それまでは帯無し（近さは 0）・送りは何もしない。
+                || None,
+                |_, _| {},
                 |ms| thread::sleep(Duration::from_millis(ms)),
                 is_shutting_down,
             );
