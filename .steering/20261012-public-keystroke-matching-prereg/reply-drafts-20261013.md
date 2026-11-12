@@ -128,22 +128,22 @@ Mikoto
 
 ### 4 の簡易版（2026-11-12・研究者の指示「少し簡易的に」・こちらを送る）
 
-長い版から、結果の要約・Kaggle の扱い・問い 2 つ・お礼を短くして残した（最初に作った「超簡易」の版は研究者が止めたので消した）。
+長い版から、結果の要約・Kaggle の扱い・問い 2 つ・お礼を短くして残した（最初に作った「超簡易」の版は研究者が止めたので消した）。2026-11-12 研究者の指示で 3 か所直した: 冒頭を「主な解析は終わり、補足の解析を続けているが草稿を送る」の形に（6・7 の文を冒頭へ移した）、「I have two questions」を「I would be grateful for your advice on two points」に、「keep the draft to yourself」を「keep the draft confidential」に。
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
 
 Hi Yu,
 
-I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before submission.
+The main analyses of the paper that uses the KLiCKe corpus are now complete, so I attach a draft here. I am still running a supplementary analysis for an appendix and will send you the updated version when it is ready, but as promised, I wanted you to see the draft before submission.
 
-In brief, the paper asks how far the processing of publicly released keystroke logs keeps the logs apart from their texts, using KLiCKe because its texts are known. Under the Kaggle competition's masking, an attacker that rebuilds the final draft chose the true essay among 1,000 candidates for every log. All results are reported in aggregate only, as you recommended. I am still adding one exploratory analysis to an appendix and will send the updated version when it is ready.
+In brief, the paper asks how far the processing of publicly released keystroke logs keeps the logs apart from their texts, using KLiCKe because its texts are known. Under the Kaggle competition's masking, an attacker that rebuilds the final draft chose the true essay among 1,000 candidates for every log. All results are reported in aggregate only, as you recommended.
 
-The competition data were not used and were not matched against any text. The paper reports, as a personal communication from you, that the competition data were drawn from KLiCKe before its release (Section 3.3, and briefly in the introduction and the ethics section), and describes the IRB approval and consent as you explained them to me. I have two questions:
+The competition data were not used and were not matched against any text. The paper reports, as a personal communication from you, that the competition data were drawn from KLiCKe before its release (Section 3.3, and briefly in the introduction and the ethics section), and describes the IRB approval and consent as you explained them to me. I would be grateful for your advice on two points:
 
 1. May I report these as a personal communication from you, and is the wording accurate? If you know whether all or only some of the competition essays are in the released corpus, I would be glad to add that. If you would prefer anything to be reported differently or not at all, please let me know.
 2. I plan to let The Learning Agency Lab know about the paper before submission, without sending them the draft. Would you recommend doing so?
 
-I plan to submit to the Proceedings on Privacy Enhancing Technologies by the end of November. As the review is double-blind, I would appreciate it if you could keep the draft to yourself for now.
+I plan to submit to the Proceedings on Privacy Enhancing Technologies by the end of November. As the review is double-blind, I would appreciate it if you could keep the draft confidential for now.
 
 Thank you again. As an independent researcher, I have had to work through questions of research ethics on my own, and your openly available corpus and your generous answers made this study possible. I hope we can stay in touch.
 
