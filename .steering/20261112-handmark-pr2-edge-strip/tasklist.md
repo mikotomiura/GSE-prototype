@@ -25,11 +25,11 @@
 - [x] 画面の確かめ（研究者が gse-next を止めた時間に・一時の HOME）（判断 10・①〜④ 可・ロック中も見えている扱いの不具合）
 - [x] 見えているかにロック・ユーザーの切り替え・主画面のスリープを足す（判断 11）・テスト・本文検査・変異
 - [x] 直した版の画面・開け閉め 5 往復でスレッドが増えない（判断 12）
-- [ ] ロック中の実機の確かめ（Claude のセッションを走らせていない時間に研究者だけで・`visible_ms` が伸びないこと）
+- [ ] ロック中の実機の確かめ（Claude のセッションを走らせていない時間に研究者だけで・`visible_ms` が伸びないこと）（手順は `.steering/_handoff/next-session-gse-handmark-pr2-lock-check.md`）
 - [x] CPU（累積の秒の差・帯の有無）（判断 10・見えている間 計 15.4%）
 - [x] 完了時のレビュー（code-reviewer・security-checker・/cross-review に Codex）（判断 13・14）
 - [x] gse-dataset の同期（schema の文が変わったら）（`~/gse-dataset-handmark-pr2`・枝 `chore/schema-handmark-pr2`・2560d50・parity OK）
-- [ ] push の前に `target` を消す（空き 8 GiB）・push と PR は研究者に確かめる
+- [x] push の前に `target` を消す（空き 8 GiB）・push と PR は研究者に確かめる（G-GEAR のランナーが offline なら可・#408・gse-dataset#8・マージはまだ）
 
 ## 場面ごとの対応
 | 場面 | 使うもの |
