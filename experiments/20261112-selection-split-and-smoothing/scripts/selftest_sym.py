@@ -14,7 +14,7 @@ import pinned4  # noqa: E402
 import sym as SM  # noqa: E402
 from pinned4 import H, ml  # noqa: E402
 
-NAMES = ["P-HASH", "P-REPLAY", "P-SYMPRIOR", "P-SELW"]
+NAMES = ["P-HASH", "P-REPLAY", "P-REPLAY03", "P-SYMPRIOR", "P-SELW", "P-SYMCELL"]
 SEED = pinned4.SEED
 
 
@@ -23,6 +23,7 @@ def unit_of(seq):
 
 
 def p_hash():
+    """記録だけ（ハッシュが違えば pinned4 の import の時点で止まる）。"""
     return dict(passed=True, hashes=pinned4.hashes())
 
 
@@ -52,6 +53,58 @@ def p_replay():
                 n += 1
         ok = ok and r1.bit_generator.state == r2.bit_generator.state
     return dict(passed=bool(ok), compared=n)
+
+
+def p_replay03():
+    """倍率 0.03 の引き直しが、mode の em_writer の基を 0.03 倍に差し替えた独立の参照と同じで、倍率 1 の値とは違う
+    （本人に倍率が渡っているか・レビュー MEDIUM 1）。"""
+    rng = np.random.default_rng([SEED, 24])
+    A = 0.95 * np.eye(2) + 0.05 * rng.dirichlet(np.ones(2), 2)
+    m = dict(kind="ar", pi=np.ones(2) / 2, A=A / A.sum(1, keepdims=True), H=rng.dirichlet(np.ones(H.NSYM), 2),
+             C=np.stack([rng.dirichlet(np.full(H.NSYM, 0.3), H.NSYM) for _ in range(2)]))
+    writers = [[unit_of(s) for s in H.sample(m, [80] * 9, rng)] for _ in range(4)]
+    full = {ml.sname(s): ml.fit_pool_full(dict(ds="coauthor", si=ml.SEQ_NO[s], seed=SEED, writers=writers))[0] for s in ml.STRUCTS}
+    pools = {}
+    for s in ml.STRUCTS:
+        pm, sb, _ = ml.fit_pool_excl(dict(ds="coauthor", writers=writers, w=1, start=full[ml.sname(s)]))
+        pools[ml.sname(s)] = (pm, sb)
+    ks = [k for k in ml.DATASETS["coauthor"]["grid"] if k <= len(writers[1]) - 5]
+    orig = H.base_prior
+    H.base_prior = lambda kind, K: {k: v * 0.03 for k, v in orig(kind, K).items()}
+    try:
+        ref = ml.em_writer(writers[1], 5, ks, pools, np.random.default_rng([SEED + 10, 1]))
+    finally:
+        H.base_prior = orig
+    mine = SM.replay_writer(writers[1], 5, ks, [3], pools["ar3"][0], pools["ar3"][1], np.random.default_rng([SEED + 10, 1]), 0.03)
+    one = SM.replay_writer(writers[1], 5, ks, [3], pools["ar3"][0], pools["ar3"][1], np.random.default_rng([SEED + 10, 1]), 1.0)
+    ts = list(map(str, ml.TAUS_FIT))
+    ok = all(mine["3"][t] == ref["k"]["3"]["self"]["ar3"][t] for t in ts) and any(mine["3"][t] != one["3"][t] for t in ts)
+    return dict(passed=bool(ok))
+
+
+def p_symcell():
+    """手の例（書き手 6 人・k = 5）: 本人' は有限の τ で共通(0.03) − 1e-3（10^6 だけ +2e-3）、共通(0.03) は −1.0、r1 は −1.1、
+    共通(1) は −1.0005。対称 2 段は他の 5 人の 本人' − r1 の中央値で 10^6（+0.102）を選び、本人' − 共通(0.03) = +2e-3、
+    本人' − r1 = +0.102、本人' − 共通(1) = +2.5e-3。対称 τ 他人も 10^6（+2e-3 > ∞ の 0）。形: R0 = 1e-3 で「戻る」、
+    R0 = 5e-3 で「縮む」、Rs = 0 で「消えたまま」。"""
+    ws = list(range(6))
+    R = {v: dict(em=dict(pool={"ar3": [-1.0005, None]}, k={"5": dict(r1=[-1.1, None], self={"ar3": {}})})) for v in ws}
+    S03 = {v: {"5": {t: [(-1.0 + 2e-3) if t == "1000000" else (-1.0 - 1e-3), None] for t in ml.TAU_KEYS}} for v in ws}
+    P03 = {v: [-1.0, None] for v in ws}
+    for v in ws:
+        R[v]["em"]["k"]["5"]["self"]["ar3"] = {t: [-1.0, None] for t in ml.TAU_KEYS}
+    C = SM.sym_cell(ws, 5, R, S03, P03, np.random.default_rng(0))
+    j = C["joint"]
+    ok = abs(j["self_minus_pool03"]["median"] - 2e-3) < 1e-12 and abs(j["self_minus_r1"]["median"] - 0.102) < 1e-12
+    ok = ok and abs(j["self_minus_pool1"]["median"] - 2.5e-3) < 1e-12 and j["chosen_tau_region"]["high_finite_end"] == 6
+    ok = ok and abs(C["tau_other"]["self_minus_pool03"]["median"] - 2e-3) < 1e-12
+    # ∞ が選ばれる例: 有限の τ をすべて悪くすると 2 段の 本人' − 共通(0.03) はちょうど 0
+    S03b = {v: {"5": {t: [-1.5, None] for t in ml.TAU_KEYS}} for v in ws}
+    Cb = SM.sym_cell(ws, 5, R, S03b, P03, np.random.default_rng(0))
+    ok = ok and Cb["joint"]["self_minus_pool03"]["median"] == 0.0 and Cb["joint"]["chosen_tau_region"]["inf"] == 6
+    ok = ok and SM.sym_form(1e-3, 2e-3) == "戻る" and SM.sym_form(5e-3, 2e-3) == "縮む" and SM.sym_form(1e-3, 0.0) == "消えたまま"
+    ok = ok and SM.sym_form(4e-3, 2e-3) == "戻る"
+    return dict(passed=bool(ok))
 
 
 def p_symprior():
@@ -85,7 +138,8 @@ def p_selw():
     return dict(passed=bool(flips == 0), flips=int(flips))
 
 
-FUNCS = {"P-HASH": p_hash, "P-REPLAY": p_replay, "P-SYMPRIOR": p_symprior, "P-SELW": p_selw}
+FUNCS = {"P-HASH": p_hash, "P-REPLAY": p_replay, "P-REPLAY03": p_replay03, "P-SYMPRIOR": p_symprior, "P-SELW": p_selw,
+         "P-SYMCELL": p_symcell}
 
 
 def main():

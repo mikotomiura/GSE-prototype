@@ -21,7 +21,9 @@ import pinned4  # noqa: E402
 from pinned4 import H, ml  # noqa: E402
 
 DT = ml.DT
-MUT = set()  # y1: 折り目の乱数を引かない・y2: 基に倍率を掛けない・y3: 選びに w を入れる
+MUT = set()  # y1: 折り目の乱数を引かない・y2: 基に倍率を掛けない・y3: 選びに w を入れる・y4: 本人に倍率を渡さない・
+#              y5: 対称 2 段の τ = ∞ を共通(1) にする
+BUDGET_HOURS = 2.0
 SEED = pinned4.SEED
 AR3 = ("ar", 3)
 ALPHA = "0.03"
@@ -43,6 +45,8 @@ def prior_sym(kind, K, tau, sbar, alpha):
 def fit_self_sym(kind, K, D, pool_m, sb, rng, h, T, alpha):
     """mode の fit_self_all と同じ開始点・同じ乱数の引き方で、事前分布だけを prior_sym にする。"""
     out = {}
+    if "y4" in MUT:
+        alpha = 1.0
     m0, _ = H.fit([("pool", pool_m), ("rand", H.random_model(kind, K, rng, r1=T, r0=h))], D, prior_sym(kind, K, 0, None, alpha))
     out[0] = m0
     for tau in ml.TAUS_FIT[1:]:
@@ -110,9 +114,10 @@ def sym_picks(ws, k, R, S03, P03):
 
 def sym_cell(ws, k, R, S03, P03, rng):
     """R: mode の pickle。S03: {w: {k: {τ: [..]}}}（倍率 0.03 の本人）。P03: {w: [..]}（共通 0.03）。"""
-    selfp = lambda v, t: P03[v][0] if t == ml.INF else S03[v][str(k)][t][0]  # noqa: E731
-    r1 = lambda v: R[v]["em"]["k"][str(k)]["r1"][0]  # noqa: E731
     pool1 = lambda v: R[v]["em"]["pool"]["ar3"][0]  # noqa: E731
+    inf_of = (lambda v: pool1(v)) if "y5" in MUT else (lambda v: P03[v][0])
+    selfp = lambda v, t: inf_of(v) if t == ml.INF else S03[v][str(k)][t][0]  # noqa: E731
+    r1 = lambda v: R[v]["em"]["k"][str(k)]["r1"][0]  # noqa: E731
     pj, pt = sym_picks(ws, k, R, S03, P03)
     st = lambda d: ml.delta_stats(d, rng)  # noqa: E731
     return dict(
@@ -170,10 +175,16 @@ def main():
     members = ml.panel_members(R, cfg, {w: R[w]["n"] for w in R})
     ws = next(iter(members["P15"].values()))
     ks_fit = sorted(members["P15"])
+    if any(v != ws for v in members["P15"].values()) or len(ws) != 17:
+        sys.exit("P15 の書き手が k で違うか 17 人でない（条件の追記の前提と違う）")
+    writers, _ = ml.load(DS, coa, SEED)
+    if any(len(writers[w]) != R[w]["n"] for w in R):
+        sys.exit("中間のデータの単位の数が pickle と違う")
+    del writers
     if set(AB.alpha_star(BV[DS]["pool"], ws, "ar3").values()) != {ALPHA}:
         sys.exit("P15 の ar3 の α* が 0.03 でない書き手がいる（条件の追記の前提と違う）")
     elig = sorted(R)
-    ck = dict(run_id=run_id)
+    ck = dict(run_id=run_id, pkl_sha256=sha(pkl), bvals_sha256=sha(bvals))
     T = dict(run_id=run_id)
     t0 = time.time()
     V = {}
@@ -198,6 +209,9 @@ def main():
                 if not ck["p_repro_self"]["passed"]:
                     sys.exit("P-REPRO-SELF が外れた（倍率 1 の引き直しが mode の本人と同じにならない）。止めて報告する")
                 print("P-REPRO-SELF 通過（%.0f 秒）" % (time.time() - t0), flush=True)
+                if (time.time() - t0) * 2 / 3600 > BUDGET_HOURS:  # 倍率 0.03 も同じだけかかる見積もり（条件の「時間と場所」）
+                    AB.write_json(T, os.path.join(out, "sym_timing.json"))
+                    sys.exit("見積もりが 2 時間を超える。止めて報告する")
             else:
                 cmp = [(pools[w]["ll"], BV[DS]["pool"][w]["ar3"][ALPHA]) for w in ws]
                 ck["p_repro_b1"] = dict(passed=all(CP.same_bits(x, y) for x, y in cmp), compared=len(cmp),

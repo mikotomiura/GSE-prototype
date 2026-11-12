@@ -51,6 +51,21 @@ PYTHON=python JOBS=16 bash run.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/sen
 - 中身: selftest（4 門）→ 変異 8 個 → 本計算 55 本（最初の 1 本の時間で見積もり、24 時間を超えれば条件 D5 の順に削る。全部削っても超えれば止まる）→ report → provenance。実データは使わない（合成だけ）。
 - 途中で止まっても、もう一度同じ命令で回せば、できた複製を照らして続きから回る（`results/replicates/` と `plan.json` を消さない）。
 
+### 3.3 B1 の対称版（判断 19・D が終わってから・1 時間以下の見込み）
+
+A・B の結果を見た後に足した計算（conditions.md の追記「B1 の対称版」）。本人の ar3 を倍率 0.03 の基で当て直す。
+
+```bash
+cd <repo>/experiments/20261112-selection-split-and-smoothing
+PYTHON=python JOBS=16 DATA_DIR="C:/Users/SDS02/gse-public-data" \
+bash run_sym.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/selection_split_smoothing_sym_run.log"; echo "exit=${PIPESTATUS[0]}"
+```
+
+- 中身: selftest（6 門）→ 変異 5 個 → sym（pickle と B の値の SHA-256・17 人と単位の数・倍率 1 の共通と本人の当て直しと P-REPRO-SELF・倍率 0.03 の共通と P-REPRO-B1・倍率 0.03 の本人・集計）→ provenance_sym。
+- 「P-REPRO-SELF 通過（n 秒）」の n × 2 が 2 時間を超えると止まる（止まったら報告）。
+- 書く値: `~/gse-public-data/landscape/selection_split_smoothing_sym_values.pkl`（repo の外・開かない）。
+- 終わったら: `results/` に `sym_summary.json`・`sym_tables.md`・`sym_check.json`・`sym_timing.json`・`selftest_sym.json`・`mutations_sym/`・`provenance_sym.json` があること。`sym_check.json` の `p_repro_self`・`p_repro_b1` の真偽と照らした数を報告に写す。コミット（`data(experiments): B1 の対称版の結果（HP Z2） [skip ci]`）して push。
+
 ## 4 終わったら
 
 1. A・B: `results/` に `summary.json`・`tables.md`・`repro_check.json`・`timing.json`・`selftest.json`・`mutations/`・`input_manifest_check.json`・`provenance.json` があり、`summary.json` と `provenance.json` の `run_id` が同じこと。`repro_check.json` の `pkl_sha256`・`p_repro`・`p_repro_r1`・`p_repro_pool` と、`summary.json` の `p_current` を報告に写す（値の中身でなく真偽と照らした数）。

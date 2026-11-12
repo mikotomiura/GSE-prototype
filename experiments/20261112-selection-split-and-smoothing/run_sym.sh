@@ -18,11 +18,11 @@ export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM
 RUN_ID="${RUN_ID:-$(date +%Y%m%dT%H%M%S)-$$}"
 [ "$(cat "$EXP_DIR/SEED")" = 2026110401 ] || { echo "SEED が条件の値と違う" >&2; exit 1; }
 [ -f "$OUT/repro_check.json" ] || { echo "A・B の本計算の repro_check.json が無い" >&2; exit 1; }
-rm -rf "$OUT/mutations_sym" "$OUT/sym_summary.json" "$OUT/sym_tables.md" "$OUT/sym_check.json" "$OUT/sym_timing.json" \
-  "$OUT/selftest_sym.json" "$OUT/provenance_sym.json" "$SVALS"
+# selftest の出力だけを先に消す（本計算の結果は本計算の直前に消す・Codex の指摘 1）
+rm -rf "$OUT/mutations_sym" "$OUT/selftest_sym.json"
 mkdir -p "$OUT/mutations_sym"
 "$PY" -I -X utf8 "$SC/selftest_sym.py" "$OUT/selftest_sym.json" --run-id "$RUN_ID"
-for m in y1 y2 y3; do
+for m in y1 y2 y3 y4 y5; do
   set +e
   "$PY" -I -X utf8 "$SC/selftest_sym.py" "$OUT/mutations_sym/$m.json" --mutate "$m" --run-id "$RUN_ID" > "$OUT/mutations_sym/$m.log" 2>&1
   echo $? > "$OUT/mutations_sym/$m.exit"
@@ -31,7 +31,7 @@ done
 "$PY" -I -X utf8 - "$OUT/mutations_sym" "$RUN_ID" <<'PY'
 import json, os, sys
 d, run_id = sys.argv[1:3]
-want = {"y1": "P-REPLAY", "y2": "P-SYMPRIOR", "y3": "P-SELW"}
+want = {"y1": "P-REPLAY", "y2": "P-SYMPRIOR", "y3": "P-SELW", "y4": "P-REPLAY03", "y5": "P-SYMCELL"}
 bad = []
 for m, ctl in want.items():
     ex = open(os.path.join(d, m + ".exit")).read().strip()
@@ -43,6 +43,13 @@ if bad:
 print("変異の門: すべて名指しの門が赤")
 PY
 if [ "${SELFTEST_ONLY:-0}" = 1 ]; then echo "selftest と変異だけ（SELFTEST_ONLY=1）: $RUN_ID"; exit 0; fi
+# 書く値の場所を確かめてから消す（ディレクトリでない・入力と同じでない・Codex の指摘 2）
+[ ! -d "$SVALS" ] || { echo "SVALS がディレクトリを指している" >&2; exit 1; }
+for p in "$RAW.coauthor.pkl" "$BVALS"; do
+  [ "$("$PY" -I -c 'import os,sys;print(os.path.normcase(os.path.realpath(sys.argv[1])))' "$p")" != \
+    "$("$PY" -I -c 'import os,sys;print(os.path.normcase(os.path.realpath(sys.argv[1])))' "$SVALS")" ] || { echo "SVALS が入力と同じ" >&2; exit 1; }
+done
+rm -f -- "$OUT/sym_summary.json" "$OUT/sym_tables.md" "$OUT/sym_check.json" "$OUT/sym_timing.json" "$OUT/provenance_sym.json" "$SVALS"
 "$PY" -I -X utf8 "$SC/sym.py" "$COA" "$RAW" "$BVALS" "$SVALS" "$OUT" "$JOBS" --run-id "$RUN_ID"
 "$PY" -I -X utf8 - "$(git -C "$REPO_ROOT" rev-parse HEAD)" \
   "$(cd "$REPO_ROOT" && git status --porcelain -- experiments/20261112-selection-split-and-smoothing/scripts experiments/20261112-selection-split-and-smoothing/run_sym.sh experiments/20261112-selection-split-and-smoothing/conditions.md experiments/20261106-tau-mode-candidate/scripts)" \
