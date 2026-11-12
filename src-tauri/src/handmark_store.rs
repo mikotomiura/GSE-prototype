@@ -1060,6 +1060,13 @@ mod tests {
         // 空の状態ファイルは壊れている側
         std::fs::write(&fs.state, b"").unwrap();
         assert_eq!(parse_state(&fs.read_state()), DayLoad::Broken);
+        // visible_ms が shown_ms を超える状態ファイルも壊れている側(評価は閉じたまま)
+        let mut bad = DayRecord::new(ON_DAY);
+        bad.add_shown(10);
+        bad.add_visible(11);
+        std::fs::write(&fs.state, serde_json::to_vec(&bad).unwrap()).unwrap();
+        assert_eq!(parse_state(&fs.read_state()), DayLoad::Broken);
+        assert!(Evaluation::run(&fs, true, ON_DAY, None).record.is_none());
         let _ = std::fs::remove_dir_all(&d);
     }
 

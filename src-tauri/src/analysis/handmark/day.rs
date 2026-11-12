@@ -187,6 +187,8 @@ impl DayRecord {
     /// 読み込んだ中身を検める。
     pub fn is_valid(&self) -> bool {
         self.version == STATE_VERSION
+            // 帯が見えていた量は、窓が出ていた量を超えない(駆動役は shown と一緒にしか足さない)。
+            && self.visible_ms <= self.shown_ms
             && self.toggles.len() <= MAX_PER_DAY
             && self.stage_starts.len() <= MAX_PER_DAY
             && self.input_toggles.len() <= MAX_PER_DAY
@@ -256,6 +258,19 @@ mod tests {
         assert!(!ok.overflow);
         ok.set_off(1, true);
         assert!(ok.is_valid());
+    }
+
+    #[test]
+    fn visible_ms_above_shown_ms_is_invalid() {
+        let mut r = DayRecord::new(1);
+        r.add_shown(5_000);
+        r.add_visible(5_000);
+        assert!(r.is_valid(), "等しいのは正常");
+        r.add_visible(1);
+        assert!(!r.is_valid(), "visible_ms > shown_ms は壊れた状態ファイル");
+        // 往復しても壊れたまま(読み込み側 parse_state が Broken に倒す)
+        let back: DayRecord = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert!(!back.is_valid());
     }
 
     #[test]
