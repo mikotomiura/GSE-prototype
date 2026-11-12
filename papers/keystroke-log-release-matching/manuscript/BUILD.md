@@ -28,3 +28,15 @@ that holds the author block (`\author`, `\orcid`, `\affiliation` with `\institut
 `% # { } ~ \` or a space. This version is written as `main-authors.pdf`, so that it does not replace `main.pdf`:
 
     bash build.sh <path to PoPETS-2027-latex-template> <output directory> <author file>
+
+## The preprint version
+
+`preprint.tex` holds the same sections as `main.tex` in a plain two-column article layout that needs no template of
+a venue and names none (the class `article` and the BibTeX style `abbrvnat` of the TeX distribution). The abstract is
+kept in `sections/abstract.tex` and shared by both versions. The preprint carries the authors' names, which are not
+part of the repository: give a file kept outside the repository that defines `\ppauthor`, `\ppaffiliation`,
+`\ppemail` and `\pporcid`. Its path may not contain the characters `% # { } ~ \` or a space.
+
+    bash build-preprint.sh <output directory> <author file>
+
+The script writes `preprint.pdf` to the output directory, which must lie outside the directory of the article.

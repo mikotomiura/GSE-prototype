@@ -714,3 +714,13 @@ Claude（code-reviewer の役）と Codex（exit 0・`[REDACTED]` なし）。�
 研究者の選択（推奨）: **今の版をすぐ送る**。理由: Dr. Tian に尋ねるのは先方の話を載せてよいかで、6・7 の値に関わらない。6・7 は付録の探索で問い 1〜4 に使わない。約 2.5 週の承認期間と知らせの 2 週の猶予を両方守れる。
 下書き 4 を埋めた: 主な結果の 1 文（集計だけ・抄録の値）、6・7 を付録に足している途中で入ったら差分を送るという 1 文、投稿は 11 月末まで。下書き 6 で「11 月中旬ごろ」と伝えたので遅れの詫びは外した。節の番号 3.3 は著者名入りのビルドで確かめた。
 添付の PDF: 著者名入りの版（533ca624・`build.sh` の 3 つ目の引数・エラー 0・29 頁）を `~/Downloads/keystroke-log-release-matching-draft-20261112.pdf`（SHA-256 `d4c03b1e…0c2f`）に置いた。本文に GSE・内部番号は 0 件。送るのは研究者。送った日付をここに書き、約 1 週返事が無ければ下書き 5 を研究者が送る（判断 73）。
+
+## 判断 90 の追記: Dr. Tian に送る PDF をプレプリントの版にする（研究者の指示・2026-11-12）
+
+研究者の指示: 著者名入りの版が PoPETs のテンプレート（行番号・会議名の柱）のままなので、プレプリント用の純粋な論文の形にする。判断 88 のプレプリントの方針（会議名を書かない・著者名入り・CC BY 4.0）に合わせた。
+- `preprint.tex`（article・2 段・letter・10pt・newtx・natbib の abbrvnat）が `main.tex` と同じ節のファイルを読む。PoPETs の環境 `ethics`・`openscience`・`ai` は無番号の節として定義した。謝辞の仮置き（camera-ready で書く）は載せない。
+- 抄録を `sections/abstract.tex` に切り出して両方で共有した。投稿版の PDF の文字は切り出しの前後で同一（pdftotext の diff 0）。
+- 著者の欄は repo の外の `/Users/johnd/paper-authors/keystroke-log-release-matching-preprint.tex`。`build-preprint.sh` は repo の中のファイルを拒む（README.md で exit 2 を確かめた）。
+- ビルド: エラー 0・未定義 0・overfull 0・33 頁。bibtex の警告 4（年の無いウェブの項目）。頁を画像で見た（題の頁・本文・表 4・参考文献）。文体の門 違反 0。
+- 添付の PDF を差し替えた: `~/Downloads/keystroke-log-release-matching-draft-20261112.pdf` はプレプリントの版になった。
+- 残り: 判断 88 の「投稿版で伏せた所（OSF と repo のリンク・個人的な連絡の日付）を埋める」はまだ（open science の匿名リンクの角括弧と「withheld until acceptance」の文が投稿版のまま残る）。arXiv に出す前に、プレプリントの版だけで差し替える仕組みを作る。
