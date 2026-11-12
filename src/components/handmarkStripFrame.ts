@@ -100,6 +100,24 @@ export interface FrameInput {
 }
 
 /** 次に描くまでの ms。描かない（閉じた・全部覆われた）なら null。 */
+/**
+ * 届いた状態・近さ・見えるようになった知らせで描画を早めるときの待ち（ms）。null は今の予約のままでよい。
+ * 最後に描いてから ACTIVE_FRAME_MS は空ける（近さはカーソルが動くと 16ms ごとに届くので、
+ * 届くたびに描くと 30 回／秒を超える）。今の予約がそれより早ければ動かさない。
+ */
+export function kickDelayMs(
+  lastDrawAt: number | null,
+  pendingAt: number | null,
+  now: number
+): number | null {
+  const earliest = lastDrawAt === null ? now : lastDrawAt + ACTIVE_FRAME_MS;
+  const target = Math.max(now, earliest);
+  if (pendingAt !== null && pendingAt <= target) {
+    return null;
+  }
+  return target - now;
+}
+
 export function nextFrameMs(input: FrameInput): number | null {
   if (!input.open || !input.visible) {
     return null;

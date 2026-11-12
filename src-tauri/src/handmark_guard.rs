@@ -1436,21 +1436,90 @@ fn ts_str_const(src: &str, name: &str) -> Option<String> {
 #[test]
 fn the_strip_probe_judges_visibility_through_strip_seen() {
     let body = strip_test_items(STRIP_RS);
+    let probe = fn_body(&body, "fn probe_loop");
     assert_eq!(
-        body.matches("let visible = strip_seen(occlusion_visible, session, asleep);")
+        probe
+            .matches("let visible = strip_seen(occlusion_visible, session, asleep);")
             .count(),
         1,
         "見張りが strip_seen を通していない"
     );
-    // 窓の読みの値は、受け取りと strip_seen の 2 か所でしか使わない（そのまま記録・送りに回さない）。
+    // 窓の読みの値は、受け取りと strip_seen の呼び出しの 2 か所でしか使わない（そのまま記録・送りに回さない）。
     assert_eq!(
-        body.matches("occlusion_visible").count(),
-        // 受け取り・strip_seen の呼び出し・strip_seen の引数と本体の 2 つ
-        4,
-        "occlusion_visible を strip_seen の外で使っている"
+        probe.matches("occlusion_visible").count(),
+        2,
+        "見張りが occlusion_visible を strip_seen の外で使っている"
     );
-    assert!(body.contains("let session = read_session();"));
-    assert!(body.contains("let asleep = main_display.is_asleep();"));
+    // 判定した値が、印と窓への送りに使われている。
+    assert_eq!(
+        probe
+            .matches("STRIP_VISIBLE.store(visible, Ordering::Release);")
+            .count(),
+        1
+    );
+    assert_eq!(
+        probe
+            .matches("app.emit_to(LABEL, VISIBLE_EVENT, visible);")
+            .count(),
+        1
+    );
+    assert!(probe.contains("let session = read_session();"));
+    assert!(probe.contains("let asleep = main_display.is_asleep();"));
+}
+
+/// `item` の宣言から、同じ字下げで閉じる `}` までの本文（`fn` の検査用）。
+fn fn_body<'a>(src: &'a str, item: &str) -> &'a str {
+    let from = src
+        .find(item)
+        .unwrap_or_else(|| panic!("{item} が見つからない"));
+    let line_start = src[..from].rfind('\n').map_or(0, |i| i + 1);
+    let indent = &src[line_start..from];
+    let close = format!("\n{indent}}}\n");
+    let to = src[from..]
+        .find(&close)
+        .unwrap_or_else(|| panic!("{item} の終わりが見つからない"));
+    &src[from..from + to + close.len()]
+}
+
+/// `read_session` が画面のセッションの辞書から読むのは、ロックの印と前に出ているかの 2 つの鍵だけ。
+/// 利用者の名前などの他の鍵を読む・辞書を回す・値を Debug で出す道を作らない（security-checker L1・判断 13）。
+#[test]
+fn read_session_reads_only_the_two_session_keys() {
+    let body = strip_test_items(STRIP_RS);
+    let f = fn_body(&body, "fn read_session");
+    let keys: Vec<&str> = f
+        .match_indices("truthy(\"")
+        .map(|(i, _)| {
+            let rest = &f[i + "truthy(\"".len()..];
+            &rest[..rest.find('"').expect("閉じない鍵")]
+        })
+        .collect();
+    assert_eq!(
+        keys,
+        ["CGSSessionScreenIsLocked", "kCGSSessionOnConsoleKey"]
+    );
+    assert_eq!(
+        f.matches("dict.find(").count(),
+        1,
+        "鍵の読みは truthy の 1 か所だけ"
+    );
+    // 陽性対照の語は実行時に組み立てる（この検査の本文に検査対象の語を書かない）。
+    let banned = [
+        ["User", "Name"].concat(),
+        ["get_keys", "_and_values"].concat(),
+        [".it", "er("].concat(),
+        ["{", ":?}"].concat(),
+        ["tracing", "::"].concat(),
+    ];
+    for b in &banned {
+        assert!(!f.contains(b.as_str()), "read_session に {b} がある");
+    }
+    // 陽性対照: 他の鍵を読む本文は赤になる。
+    let planted = f.replace(
+        "\"kCGSSessionOnConsoleKey\"",
+        &format!("\"{}\"", ["kCGSSession", "User", "Name", "Key"].concat()),
+    );
+    assert!(planted.contains(&banned[0]));
 }
 
 /// 帯のイベント名（近さ・見えているか）を TS で知ってよいのは帯の 2 ファイルだけ（`target` なしの `listen` で

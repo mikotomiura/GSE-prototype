@@ -83,6 +83,8 @@ mod imp {
     static BUILD_FAILED: AtomicBool = AtomicBool::new(false);
     /// 「作れなかった・出せなかった」警告を出した（1 走行に 1 回）。
     static WARNED: AtomicBool = AtomicBool::new(false);
+    /// 画面のセッションが読めなかったことを 1 回だけ残したか（見えていないのか、読めていないのかを後で分けるため）。
+    static SESSION_WARNED: AtomicBool = AtomicBool::new(false);
     /// 見張りのスレッドが生きている（開け閉めを何度しても 1 本）。
     static PROBE_RUNNING: AtomicBool = AtomicBool::new(false);
     /// 開いた回数（見張りが開き直しに気づいて、最初の読みを必ず送る）。
@@ -91,9 +93,10 @@ mod imp {
     static BOTTOM_BITS: AtomicU64 = AtomicU64::new(0);
     static SCREEN_H_BITS: AtomicU64 = AtomicU64::new(0);
 
-    fn warn_once(reason: &str) {
-        if !WARNED.swap(true, Ordering::AcqRel) {
-            tracing::warn!("handmark: edge strip unavailable: {}", reason);
+    /// 帯の層の警告の唯一の出口（`flag` ごとに 1 回だけ・値や状態を渡さない）。
+    fn warn_once(flag: &AtomicBool, reason: &str) {
+        if !flag.swap(true, Ordering::AcqRel) {
+            tracing::warn!("handmark: edge strip: {}", reason);
         }
     }
 
@@ -154,7 +157,10 @@ mod imp {
             Ok(w) => w,
             Err(e) => {
                 BUILD_FAILED.store(true, Ordering::Release);
-                warn_once(&format!("window could not be built: {e}"));
+                warn_once(
+                    &WARNED,
+                    &format!("unavailable: window could not be built: {e}"),
+                );
                 return;
             }
         };
@@ -168,7 +174,7 @@ mod imp {
         });
         if let Err(e) = make_panel(app.handle(), &window) {
             BUILD_FAILED.store(true, Ordering::Release);
-            warn_once(&e);
+            warn_once(&WARNED, &format!("unavailable: {e}"));
             hide_and_clear(app.handle());
         }
     }
@@ -256,18 +262,20 @@ mod imp {
         let handle = app.clone();
         let dispatched = app.run_on_main_thread(move || match place_and_show(&handle) {
             Ok(()) => {
+                // 前の開きの見張りが閉じた後に書いた古い「見えている」を持ち越さない（最初の読みまで見えていない）。
+                STRIP_VISIBLE.store(false, Ordering::Release);
                 OPEN_GEN.fetch_add(1, Ordering::AcqRel);
                 // SeqCst: 見張りの抜け際(`PROBE_RUNNING` を偽にしてから `SHOWN` を読む)との store→load の相互排他。
                 SHOWN.store(true, Ordering::SeqCst);
                 start_probe(handle);
             }
             Err(e) => {
-                warn_once(&e);
+                warn_once(&WARNED, &format!("unavailable: {e}"));
                 hide_and_clear(&handle);
             }
         });
         if dispatched.is_err() {
-            warn_once("main thread is not available");
+            warn_once(&WARNED, "unavailable: main thread is not available");
         }
     }
 
@@ -310,7 +318,7 @@ mod imp {
             .spawn(move || probe_loop(app));
         if spawned.is_err() {
             PROBE_RUNNING.store(false, Ordering::Release);
-            warn_once("probe thread could not start");
+            warn_once(&WARNED, "unavailable: probe thread could not start");
         }
     }
 
@@ -346,6 +354,9 @@ mod imp {
             let main_display = core_graphics::display::CGDisplay::main();
             let main = main_display.bounds();
             let session = read_session();
+            if session.is_none() {
+                warn_once(&SESSION_WARNED, "session dictionary unavailable");
+            }
             let asleep = main_display.is_asleep();
             let fullscreen = fullscreen_window_shown(main.size.width, main.size.height);
             let (tx, rx) = mpsc::channel();
@@ -402,6 +413,7 @@ mod imp {
         if raw.is_null() {
             return None;
         }
+        // SAFETY: raw は NULL でなく、Copy の規則で所有している（上の注記）。create の規則で包み、Drop で 1 回だけ解放する。
         let dict: CFDictionary<CFString, CFType> =
             unsafe { CFDictionary::wrap_under_create_rule(raw) };
         // 値は CFBoolean のことも CFNumber のこともある（on_console は CFNumber の 1 を実測）。

@@ -90,3 +90,22 @@
 - 開け閉めの繰り返し: 研究者がトレイの「やめる」「描く」を 5 往復（2 秒おき）。`toggles` に 10 件・`stage_starts` に 5 件（起動の 1 件と合わせて 6 件・最後の 1 件は次の書き出しで入った）。スレッドの本数は押す前 38・押した後 38（見張りのスレッドが増えない）。
 - applog: 帯と手跡の警告は無し。`keyboard hook may be dead ... starved_ms=30102` の ERROR が 1 行あった（起動から約 100 秒）。起動直後の既知の偽陽性（memory: claude-code-caffeinate-blocks-sleep-tests の「起動 65 秒後に starved_ms=30074」）と同じ型で、PR 2 の変更の外。
 - 終わった後、開発版を止めた。
+
+## 判断 13: 完了時のレビュー（code-reviewer・security-checker）と、ロックの量が 5 分の行から読めること（2026-11-12）
+
+- security-checker: CRITICAL・HIGH なし。MEDIUM 1・LOW 2。code-reviewer: CRITICAL・HIGH なし。MEDIUM 1・LOW 5。
+- **security-checker M1（研究者が選んだ・AskUserQuestion・推奨どおり）**: 判断 11 の後、`shown_ms − visible_ms` の大半は画面のロック・ユーザーの切り替え・主画面のスリープの時間になり、5 分の行どうしの差から 5 分ごとのその量が、削除した区間の前後の行の差から区間の中の量が読める。受け入れて、schema の説明に書き、gse-dataset もそろえる。
+  - 理由: 入力が無かった時間は、既存の `key` の行（時刻つき）・毎秒の `feat`・ポインタの 1 秒ビンが秒の単位ですでに示しており、新しく分かるのは「ロックしていた」という区別だけ。削除区間の中の量は `shown_ms` が既に同じ性質を持つ（判断 8）。
+  - 採らなかった案: ロックの判定を描画の停止だけに使い、足す量から外す（`visible_ms` がほぼ `shown_ms` に戻る）／日の終わりの行だけに載せる（落ちた日に欠ける）。
+- 裏取り: 指摘の筋書きをコードで確かめ、どれも事実だった（`kick` は予約を 0ms に置き直す・近さは値が変わるたびに 16ms の刻みで届きうる／`open` は `STRIP_VISIBLE` を偽に戻していなかった／`read_session` が None でも何も残らない）。
+- 直したもの:
+  - code-reviewer M（描画の回数）: `kickDelayMs`（純関数）で、最後に描いてから `ACTIVE_FRAME_MS` は空け、今の予約が十分早ければ動かさない。node で縛った（16ms ごとに近さが届いても 1 秒の描画が 31 回以下）。変異（常に 0 を返す）で 3 件赤。
+  - code-reviewer L（古い見えているの持ち越し）: `open` の成功の経路で `STRIP_VISIBLE` を偽にしてから世代を進める。
+  - code-reviewer L（読めないことが残らない）: `read_session` が None のとき、別の印で 1 回だけ警告を残す。`warn_once` は印を引数に取る形にし、tracing の出口は 1 か所のまま。
+  - code-reviewer L（検査の壊れやすさ）: 見張りの検査を `probe_loop` の本体に限り、`STRIP_VISIBLE.store(visible, …)` と `emit_to(…, visible)` を求める形にした。
+  - security-checker L1: `read_session` が読む鍵は 2 つだけ・辞書を回さない・Debug で出さない・tracing しないことを本文検査で縛った（陽性対照の語は実行時に組み立てる）。security-checker L2: 2 つ目の `unsafe` に SAFETY の注記。
+  - security-checker M1: schema の `handmark_day` の説明に、5 分の行と削除区間の前後の行の差から読める量を書いた（判断 8 の「文書に書く」もここで満たす）。gse-dataset の同期の枝に写して parity が通る。
+  - 変異: 鍵を 1 つ足す・送りに `occlusion_visible` を使う・印に `occlusion_visible` を使う → 3 回とも赤。fmt・clippy・`cargo test --workspace`（lib 1309 件）・emit_schema・`tsc --noEmit`・`npm run test:handmark`（36 件）が緑。
+- 直さず残すもの:
+  - code-reviewer L（閉じたら tsx の `visible` を真に戻す）: 偽にすると、窓の listen より先に見張りの最初の読みが届いたとき、見えているのに描かないままになる。開き直しから最初の読みまで（250ms 程度）ロック中でも描くのは害が小さい。意図をコメントに書いた。
+  - code-reviewer L（`DayRecord` の `deny_unknown_fields` と `STATE_VERSION` 1 のまま）: 前の版へ戻すと、新しい状態ファイルは壊れた扱い（fail-closed）になり、手跡は閉じたままになる。手跡のコミットはまだどのタグにも入っていないので、影響は開発版の行き来だけ。配る前にこの性質を覚えておく。

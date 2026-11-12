@@ -17,6 +17,7 @@ import {
   fadeIsSettling,
   fadeReceive,
   initialFade,
+  kickDelayMs,
   nextFrameMs,
   receiveStrip,
 } from "./handmarkStripFrame";
@@ -166,8 +167,12 @@ export default function HandmarkEdgeStrip() {
     };
 
     let timer: number | null = null;
+    // 予約した時刻と最後に描いた時刻（performance.now の時計だけ・Rust の時計と混ぜない）。
+    let pendingAt: number | null = null;
+    let lastDrawAt: number | null = null;
     const frame = (): void => {
       timer = null;
+      pendingAt = null;
       if (!strip.active || !visible) {
         // 閉じた・全部覆われている間は描かない（見えるようになったら kick で戻る）。
         return;
@@ -177,6 +182,7 @@ export default function HandmarkEdgeStrip() {
       shown = strip.shown;
       fade = fadeAt(fadeSt, now);
       draw();
+      lastDrawAt = now;
       const wait = nextFrameMs({
         open: strip.active,
         visible,
@@ -186,13 +192,19 @@ export default function HandmarkEdgeStrip() {
       });
       if (wait !== null) {
         timer = window.setTimeout(frame, wait);
+        pendingAt = now + wait;
       }
     };
     // 状態・近さ・見えるようになったときに、絞っていた描画をすぐ戻す。
+    // 最後に描いてから ACTIVE_FRAME_MS は空ける（kickDelayMs）ので、30 回／秒を超えない。
     const kick = (): void => {
       if (!strip.active || !visible) return;
+      const now = performance.now();
+      const wait = kickDelayMs(lastDrawAt, timer === null ? null : pendingAt, now);
+      if (wait === null) return;
       if (timer !== null) window.clearTimeout(timer);
-      timer = window.setTimeout(frame, 0);
+      timer = window.setTimeout(frame, wait);
+      pendingAt = now + wait;
     };
 
     // 届いた状態を受け取り、今の時刻での見た目の値からその状態へ寄せ始める。null は窓が閉じたこと。
@@ -202,12 +214,15 @@ export default function HandmarkEdgeStrip() {
         strip = closedStrip(t);
         fadeSt = initialFade(t);
         shown = strip.shown;
+        // 閉じたら見えている側に戻す: 開き直したとき、見張りの最初の読み（必ず送られる）が届くまで描く。
+        // 偽に戻すと、窓の listen より先に最初の読みが届いた場合に、見えているのに描かないままになる。
         visible = true;
         fade = 1;
         if (timer !== null) {
           window.clearTimeout(timer);
           timer = null;
         }
+        pendingAt = null;
         ctx.clearRect(0, 0, W, H);
         return;
       }

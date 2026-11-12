@@ -18,6 +18,7 @@ import {
   fadeIsSettling,
   fadeReceive,
   initialFade,
+  kickDelayMs,
   nearTarget,
   nextFrameMs,
   receiveStrip,
@@ -246,4 +247,40 @@ test("濃さ: 描画の時刻に依らず、近さの届いた時刻とそのと
   assert.ok(fadeAt(back, 600) > fadeAt(back, 220));
   // 時刻が戻っても濃さは f0 を超えて戻らない(負の経過は進めない)
   near(fadeAt(st, 50), 1);
+});
+
+test("kickDelayMs: 描いていなければすぐ描く", () => {
+  assert.equal(kickDelayMs(null, null, 1000), 0);
+});
+
+test("kickDelayMs: 最後に描いてから ACTIVE_FRAME_MS は空ける", () => {
+  assert.equal(kickDelayMs(1000, null, 1010), ACTIVE_FRAME_MS - 10);
+  assert.equal(kickDelayMs(1000, null, 1000 + ACTIVE_FRAME_MS + 5), 0);
+});
+
+test("kickDelayMs: 今の予約が十分早ければ動かさない、遅ければ早める", () => {
+  // 風の無い間の 100ms の予約は、33ms まで早める
+  assert.equal(kickDelayMs(1000, 1000 + IDLE_FRAME_MS, 1005), ACTIVE_FRAME_MS - 5);
+  // 既に 33ms で予約していれば動かさない
+  assert.equal(kickDelayMs(1000, 1000 + ACTIVE_FRAME_MS, 1005), null);
+});
+
+test("kickDelayMs: 16ms ごとに近さが届いても、1 秒の描画は 30 回まで", () => {
+  // 描画と予約を時間の上で模す（frame は予約の時刻に描き、次を IDLE_FRAME_MS で予約する最も遅い場合）
+  let lastDrawAt = null;
+  let pendingAt = null;
+  let draws = 0;
+  for (let t = 0; t <= 1000; t += 1) {
+    if (pendingAt !== null && t >= pendingAt) {
+      lastDrawAt = t;
+      draws += 1;
+      pendingAt = t + IDLE_FRAME_MS;
+    }
+    if (t % 16 === 0) {
+      const w = kickDelayMs(lastDrawAt, pendingAt, t);
+      if (w !== null) pendingAt = t + w;
+    }
+  }
+  assert.ok(draws <= Math.ceil(1000 / ACTIVE_FRAME_MS), `draws=${draws}`);
+  assert.ok(draws >= 25, `draws=${draws}`);
 });
