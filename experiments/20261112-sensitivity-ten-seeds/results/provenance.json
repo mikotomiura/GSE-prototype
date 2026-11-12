@@ -1,0 +1,30 @@
+{
+ "run_id": "20261112T032027-5493",
+ "git_head": "4429c19bbe7c19427b984bf44550b6ae2da6cf8d",
+ "git_dirty_paths": [
+  "?? experiments/20261112-sensitivity-ten-seeds/results/"
+ ],
+ "jobs": 16,
+ "python": "3.11.9",
+ "numpy": "2.4.4",
+ "machine": "Windows-10-10.0.26200-SP0",
+ "scripts": {
+  "check_mutations.py": "c7a6acc5f7b87edc098560f90c2503e6debc286175bbc77c62b1229a98433072",
+  "pinned5.py": "7f8674c4fe13befe825bfbacff1309bd58234f13654f3bc8168e2783ab3b8574",
+  "selftest10.py": "c66e70ea62e9c379ffa9a428df091e7f57a6285ee3871676c665ca3d95b67ac9",
+  "ten.py": "0071816b5d12b73e5a6a96641c579a80830116e0a9165bc890a8fe900fea289a"
+ },
+ "run_sh": "a59be8631b70d544b7f82b7e599f672aa4ca510e3cffb71b8f54866acf723e5f",
+ "conditions": "1d7777556918a231ee23db9f7c3af1c35b5764df68f7ba88a475d4422cf8f3e9",
+ "seed_file": "20c54ec65085a18aa01aaf67c8a8703cd4916c341a4c21450497a08b2b8bd37d",
+ "pinned": {
+  "synth.py": "41c60dd5ec954f6d1bd526560c318f96847641533e31f3826f099fb443d64ee3",
+  "run_synth.py": "103ad29bcae6eee2b7c95fa117906a7098399effe494203b00775b7f2d951f5f",
+  "pinned.py": "02317ec7174be93aa60c18a022ba411d5652cc1f97aab7fd1c0408e254ab8006",
+  "analysis.py": "ce20b5855bbe89cbe635f6af40e6f5993f9cb0ff3e47d8771ccd7bbfdfb3f4ef",
+  "results/calibration.json": "d8c8c55f05e03f70e6c44b49789af4b46c95f3d6f99bcd570851a8bb2fe3f18d"
+ },
+ "code_hash": "dfb26d0997552f8c9b39b22b8f9cc60e67c309d19cab60f68c628f5c005edca3",
+ "plan_sha256": "c42e27dc38f37e49d644684bd628e7b76c03f67c7f8ff577e6da354183b2634a",
+ "summary_sha256": "5a1d1989ef4f6c3b5c0abfff3cdf7c16b139168d8ac70e437c2eb34ec8b43d80"
+}

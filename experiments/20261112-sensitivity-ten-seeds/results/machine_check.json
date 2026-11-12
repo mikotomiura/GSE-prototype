@@ -1,0 +1,212 @@
+{
+ "replicates": [
+  {
+   "no": 0,
+   "shape_differs": false,
+   "max_abs_diff": 4.071631920510299e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 1,
+   "shape_differs": false,
+   "max_abs_diff": 2.7834889948508135e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 2,
+   "shape_differs": false,
+   "max_abs_diff": 4.161289091086928e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 3,
+   "shape_differs": false,
+   "max_abs_diff": 1.1268186383972534e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": -2.220446049250313e-16,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 2.220446049250313e-16,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 4,
+   "shape_differs": false,
+   "max_abs_diff": 9.540983558764538e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 5,
+   "shape_differs": false,
+   "max_abs_diff": 1.1441514402577013e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 6,
+   "shape_differs": false,
+   "max_abs_diff": 4.518616592008584e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 7,
+   "shape_differs": false,
+   "max_abs_diff": 1.0031353525619124e-09,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 8,
+   "shape_differs": false,
+   "max_abs_diff": 1.4123191505177601e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 9,
+   "shape_differs": false,
+   "max_abs_diff": 4.8400661256664534e-09,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 10,
+   "shape_differs": false,
+   "max_abs_diff": 1.5889027871196504e-09,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": -2.220446049250313e-16,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": -2.220446049250313e-16,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 11,
+   "shape_differs": false,
+   "max_abs_diff": 3.7931835450422113e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  },
+  {
+   "no": 12,
+   "shape_differs": false,
+   "max_abs_diff": 5.422908788688119e-10,
+   "all_diffs_zero": false,
+   "cells": {
+    "5": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    },
+    "15": {
+     "main_median_diff": 0.0,
+     "same_choice_all_writers": true
+    }
+   }
+  }
+ ]
+}
