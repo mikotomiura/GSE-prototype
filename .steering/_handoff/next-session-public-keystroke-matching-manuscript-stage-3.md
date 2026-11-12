@@ -1,5 +1,7 @@
 # 次のセッション（Mac）: 照合の論文 —— 段 3: 全員の付録（`main_all.json`）を入れる
 
+**済み（2026-11-12・判断 89）。** 残りの分析 6・7 と Dr. Tian の返事は `next-session-public-keystroke-matching-manuscript-exploratory-6-7.md` と `next-session-public-keystroke-matching-tian-reply.md`。
+
 作成 2026-10-29（判断 81 の後）。2026-10-29 に判断 82 の後で書き直した（R-DP の R0 に比べる有用性は済み、残りは `main_all.json` だけ）。この機械は Mac。G-GEAR の作業はこのセッションでしない。
 
 | 段 | 届くもの | 書く所 |

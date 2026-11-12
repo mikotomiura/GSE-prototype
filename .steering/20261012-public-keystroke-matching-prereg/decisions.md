@@ -724,3 +724,7 @@ Claude（code-reviewer の役）と Codex（exit 0・`[REDACTED]` なし）。�
 - ビルド: エラー 0・未定義 0・overfull 0・33 頁。bibtex の警告 4（年の無いウェブの項目）。頁を画像で見た（題の頁・本文・表 4・参考文献）。文体の門 違反 0。
 - 添付の PDF を差し替えた: `~/Downloads/keystroke-log-release-matching-draft-20261112.pdf` はプレプリントの版になった。
 - 残り: 判断 88 の「投稿版で伏せた所（OSF と repo のリンク・個人的な連絡の日付）を埋める」はまだ（open science の匿名リンクの角括弧と「withheld until acceptance」の文が投稿版のまま残る）。arXiv に出す前に、プレプリントの版だけで差し替える仕組みを作る。
+
+## 判断 90 の追記 2: 送った（2026-11-12）
+
+研究者が 2026-11-12 に下書き 4 の簡易版を Dr. Tian に送った（前のスレッドへの返信・宛先は Dr. Tian だけ）。添付はプレプリントの版の PDF（SHA-256 `94d42f05…dc9a`）。返事が約 1 週（11/19 ごろ）無ければ下書き 5 を研究者が送る（判断 73）。引き継ぎを 2 本に分けた: `next-session-public-keystroke-matching-tian-reply.md`（返事・知らせ）と `next-session-public-keystroke-matching-manuscript-exploratory-6-7.md`（分析 6・7）。
