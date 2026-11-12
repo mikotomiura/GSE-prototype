@@ -126,24 +126,26 @@ I hope we can stay in touch, and I would be happy to hear about your work as wel
 Best regards,
 Mikoto
 
-### 4 の短い版（2026-11-12・研究者の指示「超簡易的に」・こちらを送る）
+### 4 の簡易版（2026-11-12・研究者の指示「少し簡易的に」・こちらを送る）
 
-上の長い版から、送るのに要るものだけを残した: 草稿の添付・集計だけで報告していること・6・7 は後で送ること・先方の話を個人的な連絡として載せてよいかの明示の問い（倫理の節の角括弧を埋めるため）・The Learning Agency Lab へ知らせるべきかの問い・投稿の時期と草稿を回さない頼み・お礼。
+長い版から、結果の要約・Kaggle の扱い・問い 2 つ・お礼を短くして残した（最初に作った「超簡易」の版は研究者が止めたので消した）。
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
 
 Hi Yu,
 
-I have finished a full draft of the paper that uses KLiCKe, and I attach it here. All results are reported in aggregate only, as you recommended. I am still adding one exploratory analysis to an appendix and will send the updated version when it is ready.
+I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before submission.
 
-Two short questions:
+In brief, the paper asks how far the processing of publicly released keystroke logs keeps the logs apart from their texts, using KLiCKe because its texts are known. Under the Kaggle competition's masking, an attacker that rebuilds the final draft chose the true essay among 1,000 candidates for every log. All results are reported in aggregate only, as you recommended. I am still adding one exploratory analysis to an appendix and will send the updated version when it is ready.
 
-1. The paper cites, as a personal communication from you, what you told me about the IRB approval and consent, and that the Kaggle competition data were drawn from KLiCKe before its release (Section 3.3 and the ethics section). Is that all right, and is the wording accurate?
-2. I plan to let The Learning Agency Lab know about the paper before submission, without sending them the draft. Would you recommend that?
+The competition data were not used and were not matched against any text. The paper reports, as a personal communication from you, that the competition data were drawn from KLiCKe before its release (Section 3.3, and briefly in the introduction and the ethics section), and describes the IRB approval and consent as you explained them to me. I have two questions:
 
-I plan to submit to PoPETs by the end of November. As it is double-blind, I would appreciate it if you could keep the draft to yourself for now.
+1. May I report these as a personal communication from you, and is the wording accurate? If you know whether all or only some of the competition essays are in the released corpus, I would be glad to add that. If you would prefer anything to be reported differently or not at all, please let me know.
+2. I plan to let The Learning Agency Lab know about the paper before submission, without sending them the draft. Would you recommend doing so?
 
-Thank you again for the corpus and for all your help. It made this study possible.
+I plan to submit to the Proceedings on Privacy Enhancing Technologies by the end of November. As the review is double-blind, I would appreciate it if you could keep the draft to yourself for now.
+
+Thank you again. As an independent researcher, I have had to work through questions of research ethics on my own, and your openly available corpus and your generous answers made this study possible. I hope we can stay in touch.
 
 Best regards,
 Mikoto
