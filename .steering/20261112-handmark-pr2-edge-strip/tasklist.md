@@ -14,14 +14,14 @@
 - [x] 私が走らせ直す（fmt・clippy・test）・変異
 
 ## 実装 B（Sonnet・窓・配線・tsx・検査）
-- [ ] `handmark_edge_strip.rs`（窓・NSPanel・見張り・置き場・`STRIP_VISIBLE`）
-- [ ] `lib.rs` の配線（setup・開け閉め・状態の配り・近さ・`on_strip_visible`）
-- [ ] tsx・`handmarkEdgeStrip.ts`・main.tsx・capabilities
-- [ ] node のテスト・検査の拡張（陽性対照つき）
-- [ ] 私が走らせ直す（fmt・clippy・test・tsc・node・emit_schema）・変異
+- [x] `handmark_edge_strip.rs`（窓・NSPanel・見張り・置き場・`STRIP_VISIBLE`）
+- [x] `lib.rs` の配線（setup・開け閉め・状態の配り・近さ・`on_strip_visible`）
+- [x] tsx・`handmarkEdgeStrip.ts`・main.tsx・capabilities
+- [x] node のテスト・検査の拡張（陽性対照つき）
+- [x] 私が走らせ直す（fmt・clippy・test・tsc・node・emit_schema）・変異
 
 ## 確かめ
-- [ ] 区切りの点検（code-reviewer・security-checker）
+- [x] 区切りの点検（code-reviewer・security-checker）（判断 8・直しは判断 9）
 - [ ] 画面の確かめ（研究者が gse-next を止めた時間に・一時の HOME）
 - [ ] CPU（累積の秒の差・帯の有無）
 - [ ] 完了時のレビュー（code-reviewer・security-checker・/cross-review に Codex）
