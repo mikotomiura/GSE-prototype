@@ -10,12 +10,15 @@ import { useEffect, useRef } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   FULL_WIND_SPEED,
-  approachFade,
-  blendShown,
   clampNear,
+  closedStrip,
+  drawStrip,
+  fadeAt,
   fadeIsSettling,
-  nearTarget,
+  fadeReceive,
+  initialFade,
   nextFrameMs,
+  receiveStrip,
 } from "./handmarkStripFrame";
 import type { Shown } from "./handmarkStripFrame";
 
@@ -93,14 +96,12 @@ export default function HandmarkEdgeStrip() {
     };
     resize();
 
-    // ---- 状態(Rust から届く)。from から to へ STATE_TICK_MS かけて線形に寄せる ----
-    let active = false;
-    let from: Shown = { speed: 0, irreg: 0, phase: 0, drift: 0 };
-    let to: Shown = { speed: 0, irreg: 0, phase: 0, drift: 0 };
-    let shown: Shown = { speed: 0, irreg: 0, phase: 0, drift: 0 };
-    let recvAt = performance.now();
-    // カーソルの近さ(0〜10)と、いま描いている濃さの係数。
-    let near = 0;
+    // ---- 状態(Rust から届く)。遷移は handmarkStripFrame.ts の純関数(届いた列と時刻だけで見た目が決まる) ----
+    let strip = closedStrip(performance.now());
+    // カーソルの近さが届いた時刻とそのときの濃さ。今の濃さは時刻の閉じた式。
+    let fadeSt = initialFade(performance.now());
+    // 直近に描いた値(描くためだけ・寄せの起点には使わない)。
+    let shown: Shown = strip.shown;
     let fade = 1;
     let visible = true;
 
@@ -165,27 +166,23 @@ export default function HandmarkEdgeStrip() {
     };
 
     let timer: number | null = null;
-    let last: number | null = null;
     const frame = (): void => {
       timer = null;
-      if (!active || !visible) {
+      if (!strip.active || !visible) {
         // 閉じた・全部覆われている間は描かない（見えるようになったら kick で戻る）。
-        last = null;
         return;
       }
       const now = performance.now();
-      const dt = last === null ? 0 : Math.min(now - last, 200);
-      last = now;
-      shown = blendShown(from, to, now - recvAt);
-      const target = nearTarget(near);
-      fade = approachFade(fade, target, dt);
+      strip = drawStrip(strip, now);
+      shown = strip.shown;
+      fade = fadeAt(fadeSt, now);
       draw();
       const wait = nextFrameMs({
-        open: active,
+        open: strip.active,
         visible,
         speed: shown.speed,
-        speedTo: to.speed,
-        fadeSettling: fadeIsSettling(fade, target),
+        speedTo: strip.to.speed,
+        fadeSettling: fadeIsSettling(fade, fadeSt.target),
       });
       if (wait !== null) {
         timer = window.setTimeout(frame, wait);
@@ -193,19 +190,20 @@ export default function HandmarkEdgeStrip() {
     };
     // 状態・近さ・見えるようになったときに、絞っていた描画をすぐ戻す。
     const kick = (): void => {
-      if (!active || !visible) return;
+      if (!strip.active || !visible) return;
       if (timer !== null) window.clearTimeout(timer);
       timer = window.setTimeout(frame, 0);
     };
 
-    // 届いた状態を受け取り、いま見せている値からその状態へ寄せ始める。null は窓が閉じたこと。
+    // 届いた状態を受け取り、今の時刻での見た目の値からその状態へ寄せ始める。null は窓が閉じたこと。
     const onState = (msg: StageStateMessage | null): void => {
       if (msg === null) {
-        active = false;
+        const t = performance.now();
+        strip = closedStrip(t);
+        fadeSt = initialFade(t);
+        shown = strip.shown;
         visible = true;
-        near = 0;
         fade = 1;
-        last = null;
         if (timer !== null) {
           window.clearTimeout(timer);
           timer = null;
@@ -224,15 +222,7 @@ export default function HandmarkEdgeStrip() {
       if (seedChanged) {
         buildMotes(msg.layout_seed);
       }
-      if (!active || seedChanged) {
-        from = next;
-        shown = next;
-        active = true;
-      } else {
-        from = shown;
-      }
-      to = next;
-      recvAt = performance.now();
+      strip = receiveStrip(strip, next, performance.now(), seedChanged);
       kick();
     };
 
@@ -262,7 +252,7 @@ export default function HandmarkEdgeStrip() {
     );
     keep(
       win.listen<number>(NEAR_EVENT, (event) => {
-        near = clampNear(event.payload);
+        fadeSt = fadeReceive(fadeSt, clampNear(event.payload), performance.now());
         kick();
       })
     );
@@ -275,7 +265,7 @@ export default function HandmarkEdgeStrip() {
 
     return () => {
       disposed = true;
-      active = false;
+      strip = closedStrip(performance.now());
       if (timer !== null) window.clearTimeout(timer);
       window.removeEventListener("resize", resize);
       unlistenAll();
