@@ -1430,6 +1430,29 @@ fn ts_str_const(src: &str, name: &str) -> Option<String> {
     Some(rest[..rest.find('"')?].to_string())
 }
 
+/// 見張りは、窓の `occlusionState` をそのまま見えているかにせず、画面のロック・ユーザーの切り替え・主画面の
+/// 眠りと合わせた `strip_seen` を通す（2026-11-12: ロック中も見えている扱いで、描画も止まらなかった・判断 11）。
+/// 見張りは AppHandle を要りテストで走らないので、本文で縛る。
+#[test]
+fn the_strip_probe_judges_visibility_through_strip_seen() {
+    let body = strip_test_items(STRIP_RS);
+    assert_eq!(
+        body.matches("let visible = strip_seen(occlusion_visible, session, asleep);")
+            .count(),
+        1,
+        "見張りが strip_seen を通していない"
+    );
+    // 窓の読みの値は、受け取りと strip_seen の 2 か所でしか使わない（そのまま記録・送りに回さない）。
+    assert_eq!(
+        body.matches("occlusion_visible").count(),
+        // 受け取り・strip_seen の呼び出し・strip_seen の引数と本体の 2 つ
+        4,
+        "occlusion_visible を strip_seen の外で使っている"
+    );
+    assert!(body.contains("let session = read_session();"));
+    assert!(body.contains("let asleep = main_display.is_asleep();"));
+}
+
 /// 帯のイベント名（近さ・見えているか）を TS で知ってよいのは帯の 2 ファイルだけ（`target` なしの `listen` で
 /// 他の窓に届かないように）。背景の窓の TS も知らない。帯の窓の TS は場・波紋のイベントを知らない。
 #[test]

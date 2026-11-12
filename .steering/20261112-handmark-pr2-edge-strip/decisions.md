@@ -72,3 +72,12 @@
 - トレイの入れ切り: `toggles` に 4 回（14:02:12 切る・14:06:16 入れる・14:07:20 切る・14:08:03 入れる）。切っていた間は `shown_ms` に入っていない。applog に WARN・ERROR・panic なし（起動時の O1・段 1・プローブの既定の WARN だけ）。
 - 確かめていないこと: 窓で帯を覆ったとき（ロックではなく）の `occlusionState` と描画の停止・見張りのスレッドの本数・開け閉めの繰り返し。
 - ⚠️ 段取りの誤り: 「見えない状態」を作るのに画面のロックを研究者に頼み、VSCode のセッションごと作り直すことになった。以後、画面のロックは頼まない。
+
+## 判断 11: 見えているかに、画面のロックと主画面のスリープを足す（2026-11-12・研究者・AskUserQuestion・推奨どおり）
+
+- 根拠: 帯は浮く層の窓で、`occlusionState` が見えていないになったことは試作から一度も無い（試作の results.md: Dock に隠れても・全画面でも true）。判断 10 で画面のロック中も見えている扱いで、CPU も下がらなかった。このままでは `visible_ms` ≈ `shown_ms` で、覆われたら止めるも効かない。
+- 決めたこと: 見えている = `occlusionState` が Visible かつ画面がロックされていない（`CGSessionCopyCurrentDictionary` の `CGSSessionScreenIsLocked` が真でない）かつ主画面が眠っていない（`CGDisplayIsAsleep` が偽）。見張りのスレッドで 250ms ごとに読む。
+- 限界（文書に書く）: ロックの鍵は Apple の公開ヘッダに名前が無い（広く使われているが文書が薄い）。ロックしないスクリーンセーバーと、Dock に隠れた分は拾えない。
+- 確かめ方: 純関数のテストと変異。ロック中の実機の確かめは、Claude のセッションを走らせていない時間に研究者だけで行う（判断 10 の誤り）。ロックしていない状態で鍵が無く `CGDisplayIsAsleep` = 0 であることは確かめた（swift の小さな読み）。
+- 採らなかった案: 今のまま意味を限って書く（ロック中も描き続け、`visible_ms` が `shown_ms` とほぼ同じ）／`visible_ms` をやめる。
+- 実装（判断 11 の続き）: `strip_seen`（純関数）と `SessionView`、`read_session`（`CGSessionCopyCurrentDictionary` の `#[link]` 宣言・create の規則で包む・読むのは 2 つの鍵だけ）を `handmark_edge_strip.rs` に足し、見張りの読みを通した。ユーザーの切り替え（`kCGSSessionOnConsoleKey` が偽）も同じ辞書から読めるので見えていない側に足した。セッションが読めないときも見えていない側。fmt・clippy・`cargo test --workspace`（lib 1308 件）・emit_schema の byte-equal が緑。変異: 3 つの条件をそれぞれ外す → 3 回とも赤／見張りで `strip_seen` を通さない → 本文検査 `the_strip_probe_judges_visibility_through_strip_seen` が赤。schema の `visible_ms` の説明の文を改めた（gse-dataset の同期が要る）。

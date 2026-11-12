@@ -34,6 +34,26 @@ fn strip_bottom_pt(frame_origin_y: f64, visible_origin_y: f64, fullscreen: bool)
     bottom - frame_origin_y
 }
 
+/// 帯が人に見えうるか。窓の `occlusionState` が見えているだけでは足りない（浮く層の窓は、画面のロック中も
+/// 見えている扱いのまま・2026-11-12 の画面の確かめ）。画面がロックされている・この利用者の画面が前に出ていない
+/// （ユーザーの切り替え）・主画面が眠っているときは、見えていない。読めなかった値は見えていない側に倒す。
+/// 拾えないもの: ロックしないスクリーンセーバー・Dock に隠れた分。
+fn strip_seen(occlusion_visible: bool, session: Option<SessionView>, display_asleep: bool) -> bool {
+    let Some(session) = session else {
+        return false;
+    };
+    occlusion_visible && !session.locked && session.on_console && !display_asleep
+}
+
+/// 画面のセッションの読み（`CGSessionCopyCurrentDictionary`）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SessionView {
+    /// `CGSSessionScreenIsLocked` が真（ロックしていない間は鍵そのものが無い）。
+    locked: bool,
+    /// `kCGSSessionOnConsoleKey` が真（ユーザーの切り替えで裏にいるときは偽）。鍵が無ければ偽。
+    on_console: bool,
+}
+
 /// 見えているかが前回の送りから変わったか（最初の読みは必ず送る）。
 fn visibility_changed(last: Option<bool>, now: bool) -> bool {
     last != Some(now)
@@ -322,8 +342,11 @@ mod imp {
                 seen_gen = gen;
                 last = None;
             }
-            // 窓の一覧はメインスレッドの外で読む（WindowServer とのやりとりで描画を止めない）。
-            let main = core_graphics::display::CGDisplay::main().bounds();
+            // 窓の一覧・セッション・画面の眠りはメインスレッドの外で読む（WindowServer とのやりとりで描画を止めない）。
+            let main_display = core_graphics::display::CGDisplay::main();
+            let main = main_display.bounds();
+            let session = read_session();
+            let asleep = main_display.is_asleep();
             let fullscreen = fullscreen_window_shown(main.size.width, main.size.height);
             let (tx, rx) = mpsc::channel();
             let handle = app.clone();
@@ -344,9 +367,10 @@ mod imp {
             if dispatched.is_err() {
                 continue;
             }
-            let Ok(visible) = rx.recv_timeout(PROBE_EVERY * 4) else {
+            let Ok(occlusion_visible) = rx.recv_timeout(PROBE_EVERY * 4) else {
                 continue;
             };
+            let visible = strip_seen(occlusion_visible, session, asleep);
             // 読んでいる間に閉じられていた・閉じて開き直されていたら捨てる(古い読みを新しい窓の値にしない)。
             if !SHOWN.load(Ordering::Acquire) || OPEN_GEN.load(Ordering::Acquire) != gen {
                 continue;
@@ -357,6 +381,43 @@ mod imp {
                 let _ = app.emit_to(LABEL, VISIBLE_EVENT, visible);
             }
         }
+    }
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGSessionCopyCurrentDictionary() -> core_foundation::dictionary::CFDictionaryRef;
+    }
+
+    /// 画面のセッションを読む。読めなければ None（`strip_seen` は見えていない側に倒す）。
+    /// 読むのはロックの印と前に出ているかの 2 つの真偽値だけで、利用者の名前などの他の鍵は読まない。
+    fn read_session() -> Option<SessionView> {
+        use core_foundation::base::{CFType, TCFType};
+        use core_foundation::boolean::CFBoolean;
+        use core_foundation::dictionary::CFDictionary;
+        use core_foundation::number::CFNumber;
+        use core_foundation::string::CFString;
+        // SAFETY: Copy の規則の関数で、戻り値は呼び出し側が所有する CFDictionary か NULL（Apple の文書）。
+        // NULL を確かめてから create の規則で包み、Drop で解放する。
+        let raw = unsafe { CGSessionCopyCurrentDictionary() };
+        if raw.is_null() {
+            return None;
+        }
+        let dict: CFDictionary<CFString, CFType> =
+            unsafe { CFDictionary::wrap_under_create_rule(raw) };
+        // 値は CFBoolean のことも CFNumber のこともある（on_console は CFNumber の 1 を実測）。
+        let truthy = |key: &'static str| -> Option<bool> {
+            let v = dict.find(CFString::from_static_string(key))?;
+            if let Some(b) = v.downcast::<CFBoolean>() {
+                return Some(bool::from(b));
+            }
+            v.downcast::<CFNumber>()
+                .and_then(|n| n.to_i64())
+                .map(|n| n != 0)
+        };
+        Some(SessionView {
+            locked: truthy("CGSSessionScreenIsLocked").unwrap_or(false),
+            on_console: truthy("kCGSSessionOnConsoleKey").unwrap_or(false),
+        })
     }
 
     /// 主画面に、他のアプリの全画面の窓（層 0・幅いっぱいで下端まで）が出ているか。
@@ -504,6 +565,33 @@ mod tests {
         assert_eq!(strip_bottom_pt(0.0, 70.0, true), 0.0);
         // Dock が引っ込んでいれば、どちらも画面の下端。
         assert_eq!(strip_bottom_pt(0.0, 0.0, false), 0.0);
+    }
+
+    #[test]
+    fn the_strip_is_seen_only_unlocked_on_console_and_awake() {
+        let open = Some(SessionView {
+            locked: false,
+            on_console: true,
+        });
+        assert!(strip_seen(true, open, false));
+        // 窓が覆われている。
+        assert!(!strip_seen(false, open, false));
+        // 画面のロック中（2026-11-12 は occlusionState が見えているのままだった）。
+        let locked = Some(SessionView {
+            locked: true,
+            on_console: true,
+        });
+        assert!(!strip_seen(true, locked, false));
+        // ユーザーの切り替えで裏にいる。
+        let away = Some(SessionView {
+            locked: false,
+            on_console: false,
+        });
+        assert!(!strip_seen(true, away, false));
+        // 主画面が眠っている。
+        assert!(!strip_seen(true, open, true));
+        // セッションが読めない。
+        assert!(!strip_seen(true, None, false));
     }
 
     #[test]
