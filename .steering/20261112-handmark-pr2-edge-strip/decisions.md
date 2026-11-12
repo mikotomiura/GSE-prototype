@@ -48,3 +48,12 @@
   - 採らなかった案: 日の最後の行だけに載せる（終了の行が無い日に欠ける）／5 分の行では粗く丸める（読み方が複雑になる）。
 - 直すもの（実装役へ）: code-reviewer M1（帯の寄せの起点が最後に描いた値で、描いた回数・覆われていた後に見た目が変わる → 今の時刻の寄せた値から寄せ、状態の遷移を純関数にして node で縛る）・M2（見張りの抜け際と開き直しの順序 → `SeqCst` か 1 つのロック）・L1（閉じる要求・出せなかったときも印を偽に）・L2（読みと書きの間の閉じ → 世代で捨てる）・L3（濃さの寄せを閉じた式に）・L4（`is_valid` に `visible_ms ≤ shown_ms`）。security-checker M2（帯の送りの検査の穴: `emit_to` の第 1 引数・`emit_filter`・`EventTarget`・`Emitter::emit`・TS の接頭辞）・L1（帯の層の `tracing` は `warn_once` の 1 か所だけ）・L2（`lib.rs` の `emit_near` は 1 回だけ）・L3（CSP に外の宛先が無いことの検査）。
 - 直さず残すもの: security-checker L4（窓ごとにアプリのコマンドを絞っていない・既存の性質・他の副窓と同じ）。背景の窓の寄せも M1 と同じ型（毎フレーム描くので影響は小さい見込み・PR 2 の範囲外。引き継ぎに書く）。
+
+## 判断 9: 区切りの直しの実装役の報告を確かめる（2026-11-12）
+
+- コミット 1369279e（寄せの起点・濃さの閉じた式）・c626b24c（SeqCst・`hide_and_clear`）・3692b86c（`visible_ms ≤ shown_ms` を `is_valid` に）・856f8d03（検査の強化）。fmt・clippy・`cargo test --workspace`（lib 1306 件）・emit_schema・`tsc --noEmit`・`npm run test:handmark`（32 件）を自分で走らせ直して緑。
+- コードで確かめたこと: `receiveStrip` は開いていない・種が替わったときだけ寄せずに置き、それ以外は `shownAt(st, now)`（今の時刻の寄せた値）から寄せる。
+- 変異: 実装役の 4 つ（寄せの起点を最後に描いた値に戻す → node 2 件赤／`is_valid` の条件を外す → 赤／`emit_to` の宛先を別の窓に → 赤／帯の層に `tracing::debug!` → 赤）に加え、私が 1 つ（`tauri.conf.json` の `img-src` に `https://example.com` を足す → `the_csp_names_no_external_destination` が赤）。戻した後の作業ツリーは空。
+- 状態ファイルで `visible_ms > shown_ms` のときは壊れた扱い（`DayLoad::Broken` → 記録なし → 窓は閉じたまま・fail-closed）になる。既存の壊れた状態ファイルの経路と同じ。
+- 実装役が決めた細部はそのまま採る。L2 の世代の確かめは `SHOWN` を見てから `emit_to` までの短い隙間を塞がないが、次の周回で最初の読みを送り直して戻る。
+- 確かめていないこと（画面で見る）: 見張りの本数・開け閉めの繰り返し・覆った後の戻り・薄くなる動き。
