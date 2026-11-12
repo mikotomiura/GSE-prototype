@@ -128,7 +128,7 @@ Mikoto
 
 ### 4 の簡易版（2026-11-12・研究者の指示「少し簡易的に」・こちらを送る）
 
-長い版から、結果の要約・Kaggle の扱い・問い 2 つ・お礼を短くして残した（最初に作った「超簡易」の版は研究者が止めたので消した）。2026-11-12 研究者の指示で 3 か所直した: 冒頭を「主な解析は終わり、補足の解析を続けているが草稿を送る」の形に（6・7 の文を冒頭へ移した）、「I have two questions」を「I would be grateful for your advice on two points」に、「keep the draft to yourself」を「keep the draft confidential」に。
+長い版から、結果の要約・Kaggle の扱い・問い 2 つ・お礼を短くして残した（最初に作った「超簡易」の版は研究者が止めたので消した）。2026-11-12 研究者の指示で 3 か所直した: 冒頭を「主な解析は終わり、補足の解析を続けているが草稿を送る」の形に（6・7 の文を冒頭へ移した）、「I have two questions」を「I would be grateful for your advice on two points」に、「keep the draft to yourself」を「keep the draft confidential」に。続けて研究者の指示で、草稿の中身への意見と議論を歓迎する段落を問いの後に足した（判断 84 の「意見を求め、踏み込んできたら共著を提案する」の入口・共著には触れない）。
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
 
@@ -142,6 +142,8 @@ The competition data were not used and were not matched against any text. The pa
 
 1. May I report these as a personal communication from you, and is the wording accurate? If you know whether all or only some of the competition essays are in the released corpus, I would be glad to add that. If you would prefer anything to be reported differently or not at all, please let me know.
 2. I plan to let The Learning Agency Lab know about the paper before submission, without sending them the draft. Would you recommend doing so?
+
+Beyond these points, if you have time, I would very much welcome your thoughts on the paper itself, especially from the perspective of writing research, and I would be glad to discuss them with you.
 
 I plan to submit to the Proceedings on Privacy Enhancing Technologies by the end of November. As the review is double-blind, I would appreciate it if you could keep the draft confidential for now.
 
