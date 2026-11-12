@@ -687,28 +687,52 @@ const WINDOW: [(&str, &str); 2] = [
     ),
 ];
 
+/// 帯の窓の側の本文（ADR-051・手跡の下の縁の帯）。背景の窓と同じ検査を受ける。
+/// 帯のイベント（`handmark-strip-near`・`handmark-strip-visible`）を知ってよい TS はこの 2 ファイルだけ。
+const STRIP_WINDOW: [(&str, &str); 2] = [
+    (
+        "HandmarkEdgeStrip.tsx",
+        include_str!("../../src/components/HandmarkEdgeStrip.tsx"),
+    ),
+    (
+        "handmarkStripFrame.ts",
+        include_str!("../../src/components/handmarkStripFrame.ts"),
+    ),
+];
+
+/// 窓の TS に現れてはならない語（保存・送信・返送・ネットワーク）。
+const WINDOW_BANNED: [&str; 14] = [
+    "localStorage",
+    "sessionStorage",
+    "indexedDB",
+    "invoke",
+    "@tauri-apps/api/core",
+    "fetch",
+    "WebSocket",
+    "XMLHttpRequest",
+    "EventSource",
+    "sendBeacon",
+    "postMessage",
+    "cookie",
+    "caches",
+    "console",
+];
+
 /// 窓は何も保存せず、何も返さず、外へ送らない。
 #[test]
 fn the_window_does_not_store_send_back_or_talk_to_the_network() {
+    assert_clean("窓", &WINDOW, &WINDOW_BANNED);
+}
+
+/// 帯の窓も同じ（保存・返送・外への送りが無い。推定の語も受け取らない）。
+#[test]
+fn the_strip_window_does_not_store_send_back_or_talk_to_the_network() {
+    assert_clean("帯の窓", &STRIP_WINDOW, &WINDOW_BANNED);
+    // 推定（engine・invitation・p_stuck・level）の語を窓の TS に持ち込まない。
     assert_clean(
-        "窓",
-        &WINDOW,
-        &[
-            "localStorage",
-            "sessionStorage",
-            "indexedDB",
-            "invoke",
-            "@tauri-apps/api/core",
-            "fetch",
-            "WebSocket",
-            "XMLHttpRequest",
-            "EventSource",
-            "sendBeacon",
-            "postMessage",
-            "cookie",
-            "caches",
-            "console",
-        ],
+        "帯の窓の推定",
+        &STRIP_WINDOW,
+        &["p_stuck", "invitation", "pStuck", "engine"],
     );
 }
 
@@ -752,9 +776,18 @@ fn ts_sources() -> Vec<(String, String)> {
 
 /// イベント名を本文（コメントの行を除く）に含むファイルの名前（手跡の窓の 2 ファイルを除く）。
 fn others_naming(name: &str, files: &[(String, String)]) -> Vec<String> {
+    ts_files_naming_except(name, files, &WINDOW)
+}
+
+/// イベント名を本文に含むファイルの名前（`allowed` の窓のファイルを除く）。
+fn ts_files_naming_except(
+    name: &str,
+    files: &[(String, String)],
+    allowed: &[(&str, &str)],
+) -> Vec<String> {
     files
         .iter()
-        .filter(|(n, _)| !WINDOW.iter().any(|(w, _)| w == n))
+        .filter(|(n, _)| !allowed.iter().any(|(w, _)| w == n))
         .filter(|(n, text)| {
             if n.ends_with(".html") {
                 // HTML は Rust の字句の読みに通さない（アポストロフィで崩れる）。コメントも含めて見る。
@@ -1019,7 +1052,7 @@ fn unnamed_lists(src: &str) -> Vec<String> {
 /// 窓の側の列は、名前を許した枠だけ（位置・押下の列を作らない）。
 #[test]
 fn the_window_lists_only_named_slots() {
-    for (name, src) in WINDOW {
+    for (name, src) in WINDOW.into_iter().chain(STRIP_WINDOW) {
         let bad = unnamed_lists(src);
         assert!(
             bad.is_empty(),
@@ -1362,4 +1395,314 @@ fn the_stage_window_is_not_throttled_when_covered() {
     let gone = src.replace(".background_throttling(", ".no_such_call(");
     assert_ne!(gone, src, "対照の置き換えが当たっていない");
     assert!(!stage_disables_throttling(&gone));
+}
+
+// ---- 帯の窓（PR 2・ADR-051・ADR-050 D3） ----
+
+/// 帯の窓の層の本文。`handmark_edge_strip` は macOS だけのモジュールなので、Windows でも走るこの検査は
+/// 定数を参照せずにソースを読む（2026-11-09 の CI で、macOS だけの定数を参照して Windows のビルドが止まった）。
+const STRIP_RS: &str = include_str!("handmark_edge_strip.rs");
+
+/// `src` の `[pub ]const <name>: &str = "...";` の値（行頭から探す）。
+fn rs_str_const(src: &str, name: &str) -> String {
+    let heads = [
+        format!("pub const {name}: &str = \""),
+        format!("const {name}: &str = \""),
+    ];
+    let line = src
+        .lines()
+        .map(str::trim_start)
+        .find(|l| heads.iter().any(|h| l.starts_with(h.as_str())))
+        .unwrap_or_else(|| panic!("{name} が見つからない"));
+    let head = heads
+        .iter()
+        .find(|h| line.starts_with(h.as_str()))
+        .expect("head");
+    let rest = &line[head.len()..];
+    rest[..rest.find('"').expect("閉じない文字列")].to_string()
+}
+
+/// TS の `const <name> = "...";` の値。
+fn ts_str_const(src: &str, name: &str) -> Option<String> {
+    let head = format!("const {name} = \"");
+    let line = src.lines().find(|l| l.trim_start().starts_with(&head))?;
+    let rest = &line.trim_start()[head.len()..];
+    Some(rest[..rest.find('"')?].to_string())
+}
+
+/// 帯のイベント名（近さ・見えているか）を TS で知ってよいのは帯の 2 ファイルだけ（`target` なしの `listen` で
+/// 他の窓に届かないように）。背景の窓の TS も知らない。帯の窓の TS は場・波紋のイベントを知らない。
+#[test]
+fn only_the_strip_window_knows_the_strip_events() {
+    let files = ts_sources();
+    assert!(files.len() > 5, "src/ の走査が空回り: {}", files.len());
+    for name in [
+        rs_str_const(STRIP_RS, "NEAR_EVENT"),
+        rs_str_const(STRIP_RS, "VISIBLE_EVENT"),
+    ] {
+        let name = name.as_str();
+        assert!(name.starts_with("handmark-strip-"), "想定外の値: {name}");
+        assert!(
+            ts_files_naming_except(name, &files, &STRIP_WINDOW).is_empty(),
+            "{name} を帯の窓の外のコードが知っている: {:?}",
+            ts_files_naming_except(name, &files, &STRIP_WINDOW)
+        );
+        // 帯の窓は実際に聞いている（探し方が空回りしていない）
+        assert!(
+            body(STRIP_WINDOW[0].1).contains(name),
+            "{name} を HandmarkEdgeStrip.tsx が聞いていない"
+        );
+        // 陽性対照: 背景の窓のファイル・他のファイルが名前を書いたら見つかる（拡張子ごと・HTML も）
+        for planted_name in [
+            "HandmarkStage.tsx",
+            "Planted.tsx",
+            "planted.js",
+            "planted.jsx",
+            "planted.mjs",
+            "planted.html",
+        ] {
+            let mut planted = files
+                .iter()
+                .filter(|(n, _)| n != planted_name)
+                .cloned()
+                .collect::<Vec<_>>();
+            planted.push((planted_name.to_string(), format!("listen('{name}')")));
+            assert_eq!(
+                ts_files_naming_except(name, &planted, &STRIP_WINDOW),
+                vec![planted_name.to_string()],
+                "対照が赤にならない（{planted_name}）"
+            );
+        }
+    }
+    // 帯の窓の TS は、場・波紋のイベントを知らない（`others_naming` は帯のファイルを除かない）。
+    for name in [stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT")] {
+        assert!(
+            STRIP_WINDOW.iter().all(|(_, t)| !body(t).contains(&name)),
+            "帯の窓が {name} を知っている"
+        );
+    }
+}
+
+/// 帯のイベント名（定数名と文字列）を Rust で参照してよいのは `handmark_edge_strip.rs` だけ。近さを送る
+/// 関数 `emit_near` を呼べるのは `lib.rs`（ポインタのスレッドの配線）と定義のファイルだけ。
+#[test]
+fn only_the_strip_rs_names_the_strip_events_and_only_lib_calls_emit_near() {
+    let files = rs_sources();
+    assert!(files.len() > 30, "走査が空回り: {}", files.len());
+    let (near, visible) = (
+        rs_str_const(STRIP_RS, "NEAR_EVENT"),
+        rs_str_const(STRIP_RS, "VISIBLE_EVENT"),
+    );
+    let events = [
+        "NEAR_EVENT",
+        "VISIBLE_EVENT",
+        near.as_str(),
+        visible.as_str(),
+    ];
+    assert!(files.iter().any(|(n, _)| n == "handmark_edge_strip.rs"));
+    assert_eq!(
+        rs_files_naming(&events, &["handmark_edge_strip.rs"], &files),
+        Vec::<String>::new()
+    );
+    let names = ["emit_near"];
+    assert_eq!(
+        rs_files_naming(&names, &["lib.rs", "handmark_edge_strip.rs"], &files),
+        Vec::<String>::new()
+    );
+    // 許したファイルは本当に使っている（探し方が空回りしていない）。
+    let strip = files
+        .iter()
+        .find(|(n, _)| n == "handmark_edge_strip.rs")
+        .expect("strip");
+    assert!(events.iter().all(|w| body(&strip.1).contains(w)));
+    let lib = files.iter().find(|(n, _)| n == "lib.rs").expect("lib.rs");
+    assert!(body(&lib.1).contains("emit_near"));
+    // 陽性対照: 他のファイル（背景の窓の層を含む）が書いたら見つかる（拡張子の違う別名も同じ）。
+    for planted_name in ["planted.rs", "handmark_stage.rs"] {
+        for w in events {
+            let mut planted: Vec<_> = files
+                .iter()
+                .filter(|(n, _)| n != planted_name)
+                .cloned()
+                .collect();
+            planted.push((
+                planted_name.to_string(),
+                format!("fn f() {{ let _ = \"{w}\"; {w}; }}"),
+            ));
+            assert_eq!(
+                rs_files_naming(&events, &["handmark_edge_strip.rs"], &planted),
+                vec![planted_name.to_string()],
+                "対照が赤にならない（{planted_name}・{w}）"
+            );
+        }
+        let mut planted: Vec<_> = files
+            .iter()
+            .filter(|(n, _)| n != planted_name)
+            .cloned()
+            .collect();
+        planted.push((
+            planted_name.to_string(),
+            "fn f() { emit_near(); }".to_string(),
+        ));
+        assert_eq!(
+            rs_files_naming(&names, &["lib.rs", "handmark_edge_strip.rs"], &planted),
+            vec![planted_name.to_string()]
+        );
+    }
+}
+
+/// 帯の窓の層は、記録・ログの口・ファイル・ネットワーク・推定を呼ばない。送りは帯の窓だけへ（`emit_to`）。
+#[test]
+fn the_strip_rs_touches_no_recorder_file_network_estimator_and_emits_only_to_its_window() {
+    assert_clean(
+        "帯の窓の層",
+        &[("handmark_edge_strip.rs", STRIP_RS)],
+        &[
+            "LogEntry",
+            "log_tx",
+            "crate::logger",
+            "std::fs",
+            "OpenOptions",
+            "applog",
+            "std::net",
+            "reqwest",
+            "TcpStream",
+            "crate::analysis::engine",
+            "features",
+            "intervention",
+            "invitation",
+            "p_stuck",
+            "handmark_pointer::",
+            "handmark_pointer_macos",
+        ],
+    );
+    let all = [".", "emit", "("].concat();
+    assert!(hits(STRIP_RS, &[all.as_str()]).is_empty());
+    assert!(body(STRIP_RS).contains("emit_to"));
+    assert_eq!(
+        hits(&format!("{all}\n{STRIP_RS}"), &[all.as_str()]).len(),
+        1
+    );
+    // 全窓から聞く口を使わない
+    let listen_any = ["listen", "_any"].concat();
+    assert!(hits(STRIP_RS, &[listen_any.as_str()]).is_empty());
+    // 窓の様子の口（`status`）は背景の窓のもの。帯の窓の層は背景の窓を開け閉めしない。
+    assert!(hits(STRIP_RS, &["handmark_stage::open", "handmark_stage::close"]).is_empty());
+}
+
+/// 帯の窓も、覆われたときに WKWebView の既定（suspend）で絞られない。
+#[test]
+fn the_strip_window_is_not_throttled_when_covered() {
+    assert!(stage_disables_throttling(STRIP_RS));
+    // 陽性対照: 指定を外すと赤になる。
+    let gone = STRIP_RS.replace(".background_throttling(", ".no_such_call(");
+    assert_ne!(gone, STRIP_RS, "対照の置き換えが当たっていない");
+    assert!(!stage_disables_throttling(&gone));
+}
+
+/// 帯の窓の label が Rust・capabilities・`main.tsx` の分岐で食い違わない（食い違うと窓が空のまま・権限が無い）。
+fn label_mismatches(rs: &str, caps: &str, main_tsx: &str) -> Vec<&'static str> {
+    let label = rs_str_const(rs, "LABEL");
+    let mut out = Vec::new();
+    let caps_json: serde_json::Value = serde_json::from_str(caps).expect("capabilities の JSON");
+    let in_caps = caps_json["windows"]
+        .as_array()
+        .is_some_and(|w| w.iter().any(|v| v.as_str() == Some(label.as_str())));
+    if !in_caps {
+        out.push("capabilities");
+    }
+    if !main_tsx.contains(&format!("windowLabel === \"{label}\"")) {
+        out.push("main.tsx");
+    }
+    out
+}
+
+#[test]
+fn the_strip_label_agrees_across_rust_capabilities_and_main_tsx() {
+    let caps = include_str!("../capabilities/handmark-stage.json");
+    let main_tsx = include_str!("../../src/main.tsx");
+    assert_eq!(rs_str_const(STRIP_RS, "LABEL"), "handmark-edge-strip");
+    assert!(label_mismatches(STRIP_RS, caps, main_tsx).is_empty());
+    // 陽性対照: 片方を変えると食い違いが出る。
+    let caps_changed = caps.replace("handmark-edge-strip", "handmark-edge-stripe");
+    assert_ne!(caps_changed, caps);
+    assert_eq!(
+        label_mismatches(STRIP_RS, &caps_changed, main_tsx),
+        vec!["capabilities"]
+    );
+    let main_changed = main_tsx.replace("handmark-edge-strip", "handmark-edge-stripe");
+    assert_ne!(main_changed, main_tsx);
+    assert_eq!(
+        label_mismatches(STRIP_RS, caps, &main_changed),
+        vec!["main.tsx"]
+    );
+}
+
+/// 窓の TS に手で写した値（イベント名・状態の間隔・近さの上限）と Rust の食い違い。
+fn strip_const_mismatches(tsx: &str, frame_ts: &str) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    if ts_str_const(tsx, "STATE_EVENT").as_deref() != Some(stage_event("STATE_EVENT").as_str()) {
+        out.push("STATE_EVENT");
+    }
+    if ts_str_const(tsx, "NEAR_EVENT").as_deref()
+        != Some(rs_str_const(STRIP_RS, "NEAR_EVENT").as_str())
+    {
+        out.push("NEAR_EVENT");
+    }
+    if ts_str_const(tsx, "VISIBLE_EVENT").as_deref()
+        != Some(rs_str_const(STRIP_RS, "VISIBLE_EVENT").as_str())
+    {
+        out.push("VISIBLE_EVENT");
+    }
+    let tick = crate::analysis::handmark::state::TICK_MS as f64;
+    if ts_const(frame_ts, "STATE_TICK_MS").is_none_or(|t| (t - tick).abs() > 1e-6) {
+        out.push("STATE_TICK_MS");
+    }
+    // 近さの上限は、帯の上にいるときの `strip_near` の値
+    let top = f64::from(crate::handmark_pointer_thread::strip_near(true, 5.0, 0.0));
+    if ts_const(frame_ts, "NEAR_MAX").is_none_or(|t| (t - top).abs() > 1e-6) {
+        out.push("NEAR_MAX");
+    }
+    out
+}
+
+#[test]
+fn the_strip_window_copies_the_constants_exactly() {
+    let (tsx, frame_ts) = (STRIP_WINDOW[0].1, STRIP_WINDOW[1].1);
+    assert!(
+        strip_const_mismatches(tsx, frame_ts).is_empty(),
+        "{:?}",
+        strip_const_mismatches(tsx, frame_ts)
+    );
+    // 陽性対照: 片方だけ値を変えると食い違いが出る。
+    let changed = frame_ts.replacen(
+        "export const STATE_TICK_MS = 250;",
+        "export const STATE_TICK_MS = 200;",
+        1,
+    );
+    assert_ne!(changed, frame_ts, "対照の置き換えが当たっていない");
+    assert_eq!(strip_const_mismatches(tsx, &changed), vec!["STATE_TICK_MS"]);
+    let changed = frame_ts.replacen(
+        "export const NEAR_MAX = 10;",
+        "export const NEAR_MAX = 1;",
+        1,
+    );
+    assert_ne!(changed, frame_ts);
+    assert_eq!(strip_const_mismatches(tsx, &changed), vec!["NEAR_MAX"]);
+    let changed = tsx.replacen(
+        "const NEAR_EVENT = \"handmark-strip-near\";",
+        "const NEAR_EVENT = \"handmark-strip-nearby\";",
+        1,
+    );
+    assert_ne!(changed, tsx);
+    assert_eq!(
+        strip_const_mismatches(&changed, frame_ts),
+        vec!["NEAR_EVENT"]
+    );
+    let changed = tsx.replacen("const STATE_EVENT = \"handmark-state\";", "", 1);
+    assert_ne!(changed, tsx);
+    assert_eq!(
+        strip_const_mismatches(&changed, frame_ts),
+        vec!["STATE_EVENT"]
+    );
 }
