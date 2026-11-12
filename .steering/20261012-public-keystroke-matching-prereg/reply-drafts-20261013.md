@@ -126,6 +126,28 @@ I hope we can stay in touch, and I would be happy to hear about your work as wel
 Best regards,
 Mikoto
 
+### 4 の短い版（2026-11-12・研究者の指示「超簡易的に」・こちらを送る）
+
+上の長い版から、送るのに要るものだけを残した: 草稿の添付・集計だけで報告していること・6・7 は後で送ること・先方の話を個人的な連絡として載せてよいかの明示の問い（倫理の節の角括弧を埋めるため）・The Learning Agency Lab へ知らせるべきかの問い・投稿の時期と草稿を回さない頼み・お礼。
+
+**Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
+
+Hi Yu,
+
+I have finished a full draft of the paper that uses KLiCKe, and I attach it here. All results are reported in aggregate only, as you recommended. I am still adding one exploratory analysis to an appendix and will send the updated version when it is ready.
+
+Two short questions:
+
+1. The paper cites, as a personal communication from you, what you told me about the IRB approval and consent, and that the Kaggle competition data were drawn from KLiCKe before its release (Section 3.3 and the ethics section). Is that all right, and is the wording accurate?
+2. I plan to let The Learning Agency Lab know about the paper before submission, without sending them the draft. Would you recommend that?
+
+I plan to submit to PoPETs by the end of November. As it is double-blind, I would appreciate it if you could keep the draft to yourself for now.
+
+Thank you again for the corpus and for all your help. It made this study possible.
+
+Best regards,
+Mikoto
+
 ## 5. The Learning Agency Lab への通知（2026-10-21 に下書き・判断 61・64・68・送るのは研究者）
 
 送る時期: 本計算の結果が出たらすぐ（11/9 ごろの見込み）。投稿（11/30）までの約 2 週を応答の猶予にする（判断 68 の 4）。送った日付・猶予・応答の有無を ethics.tex の空欄に書く。
