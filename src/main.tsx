@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import InvitationSettings from "./components/InvitationSettings";
 import HandmarkStage from "./components/HandmarkStage";
+import HandmarkEdgeStrip from "./components/HandmarkEdgeStrip";
 
 // Layer 2: React マウント前にウィンドウ別の背景制御。
 // overlay ウィンドウでは index.html のインライン背景 (#0f172a) を透過に切り替える。
@@ -12,7 +13,9 @@ import HandmarkStage from "./components/HandmarkStage";
 const windowLabel = getCurrentWindow().label;
 // 手跡の背景の窓(段 1 の後期・ADR-051)も透明にする。
 const isHandmarkStage = windowLabel === "handmark-stage";
-if (windowLabel === "overlay" || isHandmarkStage) {
+// 下の縁の帯の窓(ADR-051)も透明にする。
+const isHandmarkEdgeStrip = windowLabel === "handmark-edge-strip";
+if (windowLabel === "overlay" || isHandmarkStage || isHandmarkEdgeStrip) {
   document.body.style.backgroundColor = "transparent";
 }
 // EH3 の招待の説明と設定の窓は App（メイン窓の処理）を通さずに描く。
@@ -63,6 +66,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <ErrorBoundary>
       {isHandmarkStage ? (
         <HandmarkStage />
+      ) : isHandmarkEdgeStrip ? (
+        <HandmarkEdgeStrip />
       ) : isInvitationSettings ? (
         <InvitationSettings />
       ) : (
