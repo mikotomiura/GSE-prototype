@@ -39,3 +39,12 @@
 - 実装役が決めた細部はそのまま採る: 純粋な部分のファイル名 `handmarkStripFrame.ts`（大文字小文字だけ違う名前で tsc が落ちるため）・近さと状態の送りを `handmark_edge_strip.rs` に置く・検査の一覧 `STRIP_WINDOW` を背景の `WINDOW` と分ける・開くたびに見えているかの最初の読みを必ず送る。
 - 帯に `set_content_protected`（画面共有に写さない）は付けていない（試作にも無い・設計のタスクの判断 5 で「選ばなかったもの」）。
 - 確かめていないこと（画面で見る）: NSPanel の振る舞い・覆ったときの `occlusionState`・描画の停止と CPU・`background_throttling` の効き・見張りのスレッドの数・薄くなる見た目・`visible_ms` の値・`setFrame` の後の webview の幅・起動直後の `State` の順序。Windows のビルドは CI で見る。
+
+## 判断 8: 区切りの点検（code-reviewer・security-checker）の指摘と、`visible_ms` の 5 分の行（2026-11-12）
+
+- security-checker: CRITICAL・HIGH なし。MEDIUM 2・LOW 4。code-reviewer: HIGH なし。MEDIUM 2・LOW 4。筋書きをコードで確かめ、どれも事実だった（tauri 2.10.2 の `match_any_or_filter` は宛先を指定しない JS の listener を `emit_to` の宛先に関わらず通す・`ROW_MS` は 300,000）。
+- **`visible_ms` の 5 分の行（研究者が選んだ・AskUserQuestion・推奨どおり）**: `shown_ms` と同じに扱う。5 分の行に日の累計を載せたままにする。隣り合う行の差から 5 分ごとに帯が見えていた量（全画面のアプリや下まで広げた窓を使っていた時間帯）が読めることと、削除した区間の前後の行の差から区間の中の量が読めることを、文書に書く。
+  - 理由: 落ちたときもその日の量が残る（ADR-051 D4 の「一定の間隔で書き直す」）。中身やアプリ名は含まない。`shown_ms` は同じ性質を PR 1 で受け入れている。
+  - 採らなかった案: 日の最後の行だけに載せる（終了の行が無い日に欠ける）／5 分の行では粗く丸める（読み方が複雑になる）。
+- 直すもの（実装役へ）: code-reviewer M1（帯の寄せの起点が最後に描いた値で、描いた回数・覆われていた後に見た目が変わる → 今の時刻の寄せた値から寄せ、状態の遷移を純関数にして node で縛る）・M2（見張りの抜け際と開き直しの順序 → `SeqCst` か 1 つのロック）・L1（閉じる要求・出せなかったときも印を偽に）・L2（読みと書きの間の閉じ → 世代で捨てる）・L3（濃さの寄せを閉じた式に）・L4（`is_valid` に `visible_ms ≤ shown_ms`）。security-checker M2（帯の送りの検査の穴: `emit_to` の第 1 引数・`emit_filter`・`EventTarget`・`Emitter::emit`・TS の接頭辞）・L1（帯の層の `tracing` は `warn_once` の 1 か所だけ）・L2（`lib.rs` の `emit_near` は 1 回だけ）・L3（CSP に外の宛先が無いことの検査）。
+- 直さず残すもの: security-checker L4（窓ごとにアプリのコマンドを絞っていない・既存の性質・他の副窓と同じ）。背景の窓の寄せも M1 と同じ型（毎フレーム描くので影響は小さい見込み・PR 2 の範囲外。引き継ぎに書く）。
