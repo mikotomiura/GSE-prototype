@@ -252,7 +252,13 @@ mod imp {
             Option::<StageState>::None,
         );
         let handle = app.clone();
-        let _ = app.run_on_main_thread(move || hide_panel(&handle));
+        let _ = app.run_on_main_thread(move || {
+            // 先に送られた `open` の処理がメインスレッドで後から走って `SHOWN` を真に戻していても、
+            // ここ（その後に走る）でもう一度偽にする（隠れた帯の見張りが回り続けないように）。
+            SHOWN.store(false, Ordering::Release);
+            STRIP_VISIBLE.store(false, Ordering::Release);
+            hide_panel(&handle);
+        });
     }
 
     /// 状態を帯の窓へ配る（背景の窓へ配るのと同じ値）。
