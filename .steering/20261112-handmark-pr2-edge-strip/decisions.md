@@ -30,3 +30,12 @@
 - 実装役が決めた細部はそのまま採る: `tick` を包みにした `tick_with_strip`・`StripSpot`（帯の下端と主画面の高さ）・一点が読めない刻みは近さ 0。
 - 行の `visible_ms` は、記録があれば出していない日（`assigned_off` など）でも `Some(0)` になる（既存テストの期待を `None` から `Some(0)` に変えた）。`shown_ms` が同じ日に 0 を出すのと同じ読みで、`null` は「記録が無い（計っていない）」に限る。design 4 節のとおりなので採る。
 - 空き: ビルドで 7.6 GiB（下限 8 GiB を割った）。push の前に `target` を消す（判断 4）。
+
+## 判断 7: 実装 B の実装役の報告を確かめる（2026-11-12）
+
+- コミット 5ec58aca（描画）・5fb7ab89（窓の層と配線）・a1b64b39（検査）。fmt・clippy・`cargo test --workspace`（lib 1300 件）・emit_schema・`tsc --noEmit`・`npm run test:handmark`（28 件）を自分で走らせ直して緑（tsc と node は、メインの `node_modules` を一時的にリンクして走らせ、すぐ消した）。
+- コードで確かめたこと: `lib.rs` の帯の呼び出し 8 か所はすべて `cfg(target_os = "macos")` の下／帯の失敗で背景を閉じない／帯の窓は `phase`・`drift` を積まず届いた状態へ寄せるだけ／`nextFrameMs` は閉じた・見えていない → 止める、風か薄れの途中 → 33ms、他 → 100ms。
+- 直したもの（私・本コミット）: `open` はメインスレッドで後から `SHOWN` を真にするので、開いた直後に `close` が来ると、隠れた帯で `SHOWN` が真のまま残り、見張りが回り続ける筋書きがあった。隠す処理の中でも `SHOWN`・`STRIP_VISIBLE` を偽にした。AppHandle を要るのでテストは無い（画面の確かめで、開け閉めを繰り返して見張りのスレッドが増えないかを見る）。
+- 実装役が決めた細部はそのまま採る: 純粋な部分のファイル名 `handmarkStripFrame.ts`（大文字小文字だけ違う名前で tsc が落ちるため）・近さと状態の送りを `handmark_edge_strip.rs` に置く・検査の一覧 `STRIP_WINDOW` を背景の `WINDOW` と分ける・開くたびに見えているかの最初の読みを必ず送る。
+- 帯に `set_content_protected`（画面共有に写さない）は付けていない（試作にも無い・設計のタスクの判断 5 で「選ばなかったもの」）。
+- 確かめていないこと（画面で見る）: NSPanel の振る舞い・覆ったときの `occlusionState`・描画の停止と CPU・`background_throttling` の効き・見張りのスレッドの数・薄くなる見た目・`visible_ms` の値・`setFrame` の後の webview の幅・起動直後の `State` の順序。Windows のビルドは CI で見る。
