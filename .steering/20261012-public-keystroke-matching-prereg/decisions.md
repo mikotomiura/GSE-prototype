@@ -696,3 +696,14 @@ G-GEAR の集計し直し（コミット `84527b7a`・`9463d81b`・`520e6be5`・
 
 書いたもの: `make_tables.py` に `all_writers_table`（`sections/generated/all-writers.tex`）、付録 E の「Results on all writers」の角括弧を 2 文と表 22（tab:app:all）に替えた。表は形 × N = 10・100・1,000（正答率と区間・選ばれた攻撃者）と 500 人の N = 1,000 の列。
 確かめ: 壊した写し 4 通り（main500 の値・上の段のハッシュ・人数・A0〜A3 の外の攻撃者）でどれも exit 1。既存の生成ファイルは変わらない（`git status` で新しい 1 つだけ）。ビルド エラー 0・未定義 0・overfull 2・29 頁（表 22 は p29 に流れた）・本文の終わりは前と同じ（Ethical Considerations は p12 右段）。文体の門 違反 0。
+
+## 判断 89 の追記: /cross-review（2026-11-12）
+
+Claude（code-reviewer の役）と Codex（exit 0・`[REDACTED]` なし）。両者一致 2 件・Claude のみ 4 件・食い違いなし。採ったもの:
+- 人数の検査が A0 のセルだけ（両者）。候補の攻撃者（`share_selected` の鍵）すべてのセルの `writers` を見るようにした。
+- 「順は同じ」の根拠が「500 人で厳密に上の組が逆にならない」だけで同率を見ていない（両者）。同率を含めた符号の比較で確かめ（3 つの N で違い 0）、`make_tables.py` が毎回比べて違えば止まる。文に「in the table, ties included」を足した（R5・R6 は表に無く、全員では R5 と R6 の順が 500 人と逆なので範囲を限った）。
+- 4,992 と除外 0 が本文の手書きとコードでつながっていない（Claude）。`ALL_WRITERS = 4992` と `excluded` が空であることで止める。
+- 攻撃者の検査が鍵の集合を見ていた（Claude）。`attacker` とシェアが 0 を超える鍵で見る。
+- 「The one difference」の範囲が曖昧（Claude）。「Of the gains over A0 that Section 7 reports, one changes」に替え、下限が 0 を超える組の増減が R4(8) の N = 10 だけであることをコードで止める条件にした。
+- 表の最後の列に区間が無いことを caption に書いた（Claude）。
+確かめ: 壊した写し 9 通り（main500・上の段・A1 のセルの人数・選ばれた攻撃者・除外・順・下限の増えた組の消失・下限の減った組）でどれも exit 1、正しい写しは exit 0、生成ファイルは変わらない。ビルド エラー 0・未定義 0・overfull 2・29 頁・Ethical Considerations は p12 右段のまま。文体の門 違反 0。

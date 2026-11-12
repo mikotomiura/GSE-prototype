@@ -16,6 +16,7 @@ import sys
 MAIN_FORMS = ["R0", "R1", "R2", "R3", "R3-u", "R3-t(10)", "R3-t(100)", "R3-t(1000)",
               "R4(1)", "R4(2)", "R4(4)", "R4(8)", "R7(0.1)", "R7(0.25)", "R7(0.5)"]
 ALL_FORMS = MAIN_FORMS + ["R5", "R6"]
+ALL_WRITERS = 4992  # all writers after exclusion, as stated in Appendix E
 MEASURES = [
     ("p_burst_mean_len", "P-burst length"),
     ("r_burst_mean_len", "R-burst length"),
@@ -352,27 +353,50 @@ def dp_tables(dp, du, m):
 
 def all_writers_table(full, m):
     """The strongest attacker on full texts for all writers after exclusion, beside the 500 writers at N = 1,000.
-    Stops if the 500-writer part of main_all.json differs from main.json (the positive control), if the number of
-    writers differs from sample_sizes, or if an attacker outside A0 to A3 is selected."""
+    Stops if the 500-writer part or the header of main_all.json differs from main.json (the positive control), if
+    the number of writers is not the ALL_WRITERS of the text or a writer was excluded, if a cell of a candidate
+    attacker has another number of writers, if an attacker outside A0 to A3 is selected, and if the statements of
+    the text do not hold: the order of the forms, ties included, is the same as for the 500 writers at every N, and
+    the only form and N whose gain over A0 has a lower bound above zero for all writers but not for the 500 is
+    R4(8) at N = 10."""
     def strip(d):
         return {k: v for k, v in d.items() if k not in ("all", "seconds")}
-    if full["main500"] != m["main500"] or strip(full) != strip(m):
+    if strip(full) != strip(m):
         raise SystemExit("main_all.json: the main500 part or the header differs from main.json")
-    a = full["all"]
+    a, s5 = full["all"], full["main500"]["strongest"]
     everyone = sum(full["writers_after_exclusion"].values())
+    if everyone != ALL_WRITERS or full["excluded"]:
+        raise SystemExit(f"main_all.json: {everyone} writers or exclusions; the text says {ALL_WRITERS} and none")
     allowed = {"A0", "A1", "A1p", "A2", "A2b", "A3"}
+    ns = ("10", "100", "1000")
     rows = []
     for f in MAIN_FORMS:
         cells = []
-        for n in ("10", "100", "1000"):
+        for n in ns:
             v = a["strongest"][f"full|{f}|{n}"]
-            if a["cells"][f"full|{f}|A0|{n}"]["writers"] != everyone or not set(v["share_selected"]) <= allowed:
+            chosen = {k for k, x in v["share_selected"].items() if x > 0} | {v["attacker"]}
+            counts = {a["cells"][f"full|{f}|{k}|{n}"]["writers"] for k in v["share_selected"]}
+            if counts != {everyone} or not chosen <= allowed:
                 raise SystemExit(f"main_all.json: unexpected writers or attacker at {f}|{n}")
             cells.append(f"{pct(v['acc'])} {ci(v['ci'])} & {attacker(v, a, f, n)}")
-        cells.append(pct(full["main500"]["strongest"][f"full|{f}|1000"]["acc"]))
+        cells.append(pct(s5[f"full|{f}|1000"]["acc"]))
         rows.append(" & ".join([form_tex(f)] + cells) + " \\\\")
-    return rows
 
+    def sign(x, y):
+        return (x > y) - (x < y)
+    for n in ns:
+        for i, f in enumerate(MAIN_FORMS):
+            for g in MAIN_FORMS[i + 1:]:
+                if sign(s5[f"full|{f}|{n}"]["acc"], s5[f"full|{g}|{n}"]["acc"]) != \
+                        sign(a["strongest"][f"full|{f}|{n}"]["acc"], a["strongest"][f"full|{g}|{n}"]["acc"]):
+                    raise SystemExit(f"the order of {f} and {g} at N = {n} differs from the 500 writers")
+    new_gain = {(f, n) for f in MAIN_FORMS for n in ns
+                if a["strongest"][f"full|{f}|{n}"]["uplift_ci"][0] > 0 >= s5[f"full|{f}|{n}"]["uplift_ci"][0]}
+    lost_gain = {(f, n) for f in MAIN_FORMS for n in ns
+                 if s5[f"full|{f}|{n}"]["uplift_ci"][0] > 0 >= a["strongest"][f"full|{f}|{n}"]["uplift_ci"][0]}
+    if new_gain != {("R4(8)", "10")} or lost_gain:
+        raise SystemExit(f"gains above zero differ from the text: new {sorted(new_gain)}, lost {sorted(lost_gain)}")
+    return rows
 
 def main():
     res, out = sys.argv[1], sys.argv[2]
