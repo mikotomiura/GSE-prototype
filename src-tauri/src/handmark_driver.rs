@@ -146,6 +146,8 @@ pub struct HandmarkDriver {
     window_open: bool,
     /// 窓の層が「出た」と知らせた(それまでは出ていた時間を積まない)。
     window_confirmed: bool,
+    /// 帯の窓の層が最後に知らせた「帯が見えている」(窓を閉じる・開くたびに偽へ戻す)。
+    strip_visible: bool,
     last_recheck_ms: u64,
     last_row_ms: u64,
     last_tick_ms: u64,
@@ -166,6 +168,7 @@ impl HandmarkDriver {
             pending: Vec::new(),
             window_open: false,
             window_confirmed: false,
+            strip_visible: false,
             last_recheck_ms: now,
             last_row_ms: now,
             last_tick_ms: now,
@@ -279,6 +282,7 @@ impl HandmarkDriver {
         self.new_stage(now);
         self.window_open = true;
         self.window_confirmed = false;
+        self.strip_visible = false;
         self.last_tick_ms = now;
         let layout_seed = self.stage.as_ref().map_or(0, |s| s.state().layout_seed);
         fx.push(Effect::OpenWindow { layout_seed });
@@ -287,6 +291,7 @@ impl HandmarkDriver {
     fn close_window(&mut self, fx: &mut Vec<Effect>) {
         self.window_open = false;
         self.window_confirmed = false;
+        self.strip_visible = false;
         self.stage = None;
         self.pending.clear();
         fx.push(Effect::CloseWindow);
@@ -366,6 +371,9 @@ impl HandmarkDriver {
             let gap = now.saturating_sub(prev_tick);
             if self.window_confirmed && !jumped && !day_changed && gap <= SLEEP_GAP_MS {
                 self.ev.add_shown(gap);
+                if self.strip_visible {
+                    self.ev.add_visible(gap);
+                }
             }
         }
 
@@ -424,6 +432,12 @@ impl HandmarkDriver {
             }
         }
         fx
+    }
+
+    /// 帯の窓の層が知らせた「帯が見えている」を持つ(次の tick より前に呼ぶ。値を持つだけ)。
+    /// 窓を閉じる・開くと偽に戻るので、帯の層が改めて知らせるまで足さない。
+    pub fn on_strip_visible(&mut self, visible: bool) {
+        self.strip_visible = visible;
     }
 
     /// 区間の削除: 状態ファイルと走行中の累計から区間内の時刻を消す。書き直せなければ状態ファイルを消す。
@@ -1091,6 +1105,105 @@ mod tests {
         let _ = d.on_window_status(WindowStatus::Shown, T0 + 1_600);
         let _ = d.tick(&fs, T0 + 1_750, ON_DAY);
         assert_eq!(d.evaluation().record.as_ref().unwrap().shown_ms, 150);
+    }
+
+    fn vis(d: &HandmarkDriver) -> (u64, u64) {
+        let r = d.evaluation().record.as_ref().unwrap();
+        (r.shown_ms, r.visible_ms)
+    }
+
+    /// 帯が見えない間は足さない。見えていれば `shown_ms` と同じだけ足す。
+    #[test]
+    fn visible_time_follows_the_strip_and_never_exceeds_shown() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
+        let _ = d.tick(&fs, T0 + 250, ON_DAY);
+        let _ = d.tick(&fs, T0 + 500, ON_DAY);
+        assert_eq!(vis(&d), (500, 0), "帯が見えない間は足さない");
+        d.on_strip_visible(true);
+        let _ = d.tick(&fs, T0 + 750, ON_DAY);
+        let _ = d.tick(&fs, T0 + 1_000, ON_DAY);
+        assert_eq!(vis(&d), (1_000, 500), "見えていれば shown と同じだけ");
+        d.on_strip_visible(false);
+        let _ = d.tick(&fs, T0 + 1_250, ON_DAY);
+        assert_eq!(vis(&d), (1_250, 500));
+        assert!(vis(&d).1 <= vis(&d).0);
+    }
+
+    /// 窓が出たと分かる前・時計の飛び・2 秒超の間・日の変わり目は足さない。
+    #[test]
+    fn visible_time_is_not_added_where_shown_is_not() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        d.on_strip_visible(true);
+        // 窓が出たと分かる前
+        let _ = d.tick(&fs, T0 + 250, ON_DAY);
+        assert_eq!(vis(&d), (0, 0));
+        let _ = d.on_window_status(WindowStatus::Shown, T0 + 250);
+        let _ = d.tick(&fs, T0 + 500, ON_DAY);
+        assert_eq!(vis(&d), (250, 250));
+        // 1 時間の空白(時計の飛び)
+        let _ = d.tick(&fs, T0 + 500 + 3_600_000, ON_DAY);
+        assert_eq!(vis(&d), (250, 250));
+        // 2 秒ちょうどまでは足す・2 秒を超える間は足さない(飛びの後の最初の刻みは起点の取り直し)
+        let base = T0 + 500 + 3_600_000;
+        let _ = d.tick(&fs, base + 2_000, ON_DAY);
+        assert_eq!(vis(&d), (2_250, 2_250));
+        let _ = d.tick(&fs, base + 2_000 + 2_001, ON_DAY);
+        assert_eq!(vis(&d), (2_250, 2_250), "2 秒を超える間は足さない");
+        // 日の変わり目の刻みは足さず、新しい日は 0 から
+        let _ = d.tick(&fs, base + 2_000 + 2_251, ON_DAY + 3);
+        assert_eq!(vis(&d), (0, 0));
+        assert!(vis(&d).1 <= vis(&d).0);
+    }
+
+    /// 閉じて開き直したら、帯の層が改めて知らせるまで足さない。
+    #[test]
+    fn visible_time_waits_for_a_fresh_report_after_reopening() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
+        d.on_strip_visible(true);
+        let _ = d.tick(&fs, T0 + 250, ON_DAY);
+        assert_eq!(vis(&d), (250, 250));
+        let _ = d.turn_off(&fs, T0 + 300);
+        assert!(!d.is_window_open());
+        let fx = d.turn_on(&fs, T0 + 400);
+        assert!(opened(&fx));
+        let _ = d.on_window_status(WindowStatus::Shown, T0 + 450);
+        let _ = d.tick(&fs, T0 + 700, ON_DAY);
+        assert_eq!(vis(&d), (500, 250), "知らせが来るまで足さない");
+        d.on_strip_visible(true);
+        let _ = d.tick(&fs, T0 + 950, ON_DAY);
+        assert_eq!(vis(&d), (750, 500));
+    }
+
+    /// 行の `visible_ms` は累計があれば `Some`、五分の行にも載る。区間の削除で消えない。
+    #[test]
+    fn visible_time_reaches_the_row_and_survives_a_redact() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
+        d.on_strip_visible(true);
+        let _ = d.tick(&fs, T0 + 250, ON_DAY);
+        assert_eq!(d.evaluation().row(T0 + 250).unwrap().visible_ms, Some(250));
+        let (_, ok) = d.on_redact(&fs, T0, T0 + 10_000, T0 + 300);
+        assert!(ok);
+        assert_eq!(vis(&d), (250, 250), "区間の削除で消さない");
+        let mut now = T0 + 250;
+        let mut last_row = None;
+        while now < T0 + ROW_MS + 1_000 {
+            now += 250;
+            for e in d.tick(&fs, now, ON_DAY) {
+                if let Effect::Row(r) = e {
+                    last_row = Some(r);
+                }
+            }
+        }
+        let r = last_row.expect("5 分の行");
+        // 最初の刻みから帯が見えていたので、五分の行の時点では shown と同じ(行を出した後の刻みは含まない)
+        assert_eq!(r.visible_ms, Some(r.shown_ms));
     }
 
     /// 切っていて、状態ファイルも印も書けない: 状態ファイルを消さず失敗を返し、再起動で切ったまま。

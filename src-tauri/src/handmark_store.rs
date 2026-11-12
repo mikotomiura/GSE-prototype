@@ -381,6 +381,14 @@ impl Evaluation {
         }
     }
 
+    /// 帯が見えていた時間を足す（`add_shown` と同じ条件のときだけ呼ぶ）。
+    pub fn add_visible(&mut self, ms: u64) {
+        let today = self.today;
+        if let Some(r) = self.record.as_mut().filter(|r| r.day == today) {
+            r.add_visible(ms);
+        }
+    }
+
     /// 手跡を出し始めた時刻を足す。
     pub fn note_stage_start(&mut self, t: u64) {
         let today = self.today;
@@ -420,7 +428,7 @@ impl Evaluation {
             late_start_day: self.table.as_ref().map(|t| t.late_start_day),
             first_shown_day: rec.and_then(|r| r.first_shown_day),
             shown_ms: rec.map_or(0, |r| r.shown_ms),
-            visible_ms: None,
+            visible_ms: rec.map(|r| r.visible_ms),
             toggles: rec.map_or_else(Vec::new, |r| {
                 r.toggles.iter().map(|t| (t.t, t.on)).collect()
             }),
@@ -976,12 +984,29 @@ mod tests {
         assert_eq!(row.reason, Some("assigned_off"));
         assert_eq!(row.late_start_day, Some(LATE_FIRST));
         assert!(row.table_sha256.is_some() && row.draw_seed.is_some());
-        assert_eq!(row.visible_ms, None);
+        // 累計(記録)があれば Some(累計)。この日は一度も出ていないので 0。
+        assert_eq!(row.visible_ms, Some(0));
         let fs = MemFs::default();
         let row = Evaluation::run(&fs, true, ON_DAY, None).row(9).unwrap();
         assert_eq!(row.assigned, "unknown");
         assert_eq!(row.reason, Some("table_missing"));
         assert!(row.table_sha256.is_none() && row.draw_seed.is_none());
+        // 累計が無いとき(状態ファイルが壊れている)は null
+        let fs = with_table();
+        *fs.state.borrow_mut() = Some(b"{broken".to_vec());
+        let ev = Evaluation::run(&fs, true, ON_DAY, None);
+        assert!(ev.record.is_none());
+        assert_eq!(ev.row(9).unwrap().visible_ms, None);
+        // 足すと行に載り、状態ファイルの往復で残る
+        let fs = with_table();
+        let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
+        ev.add_shown(900);
+        ev.add_visible(400);
+        assert_eq!(ev.row(9).unwrap().visible_ms, Some(400));
+        ev.save(&fs).unwrap();
+        let back = Evaluation::run(&fs, true, ON_DAY, None);
+        assert_eq!(back.row(9).unwrap().visible_ms, Some(400));
+        assert_eq!(back.row(9).unwrap().shown_ms, 900);
     }
 
     #[test]

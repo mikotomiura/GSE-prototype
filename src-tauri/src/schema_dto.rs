@@ -638,7 +638,7 @@ pub enum LogEntryDto {
         first_shown_day: Option<i64>,
         /// その日に出ていた時間（ms）。
         shown_ms: u64,
-        /// 見えていた時間。1a・1b では常に `null`（計り方は帯と一緒に後で決まる）。
+        /// 帯（下の縁）が出ていて覆われていなかった時間（ms）。背景の層は数えない（透明な部分が多く、覆われていても見えている扱いになりうるため）。記録が無いときは null。
         visible_ms: Option<u64>,
         /// 切った（`on: false`）／戻した（`on: true`）時刻。
         toggles: Vec<HandmarkToggleDto>,
