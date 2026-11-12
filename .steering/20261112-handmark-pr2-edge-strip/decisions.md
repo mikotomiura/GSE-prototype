@@ -81,3 +81,12 @@
 - 確かめ方: 純関数のテストと変異。ロック中の実機の確かめは、Claude のセッションを走らせていない時間に研究者だけで行う（判断 10 の誤り）。ロックしていない状態で鍵が無く `CGDisplayIsAsleep` = 0 であることは確かめた（swift の小さな読み）。
 - 採らなかった案: 今のまま意味を限って書く（ロック中も描き続け、`visible_ms` が `shown_ms` とほぼ同じ）／`visible_ms` をやめる。
 - 実装（判断 11 の続き）: `strip_seen`（純関数）と `SessionView`、`read_session`（`CGSessionCopyCurrentDictionary` の `#[link]` 宣言・create の規則で包む・読むのは 2 つの鍵だけ）を `handmark_edge_strip.rs` に足し、見張りの読みを通した。ユーザーの切り替え（`kCGSSessionOnConsoleKey` が偽）も同じ辞書から読めるので見えていない側に足した。セッションが読めないときも見えていない側。fmt・clippy・`cargo test --workspace`（lib 1308 件）・emit_schema の byte-equal が緑。変異: 3 つの条件をそれぞれ外す → 3 回とも赤／見張りで `strip_seen` を通さない → 本文検査 `the_strip_probe_judges_visibility_through_strip_seen` が赤。schema の `visible_ms` の説明の文を改めた（gse-dataset の同期が要る）。
+
+## 判断 12: 直した版の画面の確かめ（2026-11-12 15:28〜15:32 JST・研究者と）
+
+- 段取り: 判断 10 と同じ表（SHA-256 8060e816…）・新しい一時の HOME で、判断 11 の直しを入れた開発版（bb599f29）を起動した。gse-next は止まっていた。
+- 見たこと（研究者の目）: 帯と背景が出ていて、打鍵で線が揺れる。
+- ロックしていない状態で `visible_ms` = `shown_ms`（93,495／93,495・その後 108,198／108,198）。実機のセッションの読みで `strip_seen` が真になる（`on_console` の読みが効いている）。
+- 開け閉めの繰り返し: 研究者がトレイの「やめる」「描く」を 5 往復（2 秒おき）。`toggles` に 10 件・`stage_starts` に 5 件（起動の 1 件と合わせて 6 件・最後の 1 件は次の書き出しで入った）。スレッドの本数は押す前 38・押した後 38（見張りのスレッドが増えない）。
+- applog: 帯と手跡の警告は無し。`keyboard hook may be dead ... starved_ms=30102` の ERROR が 1 行あった（起動から約 100 秒）。起動直後の既知の偽陽性（memory: claude-code-caffeinate-blocks-sleep-tests の「起動 65 秒後に starved_ms=30074」）と同じ型で、PR 2 の変更の外。
+- 終わった後、開発版を止めた。
