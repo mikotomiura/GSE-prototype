@@ -27,5 +27,5 @@
 - [x] D のコード・selftest と変異（Mac で通る）
 - [x] /cross-review（Codex 込み・wrapper は本線から）と code-reviewer の指摘の採否（判断 18）
 - [x] HP Z2 への引き継ぎを書く（push は研究者に確かめる）
-- [ ] HP Z2 で回す（A・B 約 1.5 時間・D 約 10 時間）
+- [ ] HP Z2 で回す（A・B は済み 38b4be20・D は HP Z2 で実行中）
 - [ ] notes（読みの形の当て）と本文の書き直し・manuscript round 2
