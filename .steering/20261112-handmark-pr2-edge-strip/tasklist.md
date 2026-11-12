@@ -6,12 +6,12 @@
 - [x] requirement・判断 1〜3・design・承認（判断 5）
 
 ## 実装 A（Sonnet・Rust の純粋な部分）
-- [ ] `day.rs` の `visible_ms` の累計（`serde(default)`）・`add_visible`
-- [ ] 駆動役の `on_strip_visible`・刻みの `add_visible`
-- [ ] 行の `visible_ms`・schema の説明の文・`emit_schema`
-- [ ] `strip_near` と `PointerOut::StripNear`
-- [ ] テスト（design のテスト戦略の Rust の分）
-- [ ] 私が走らせ直す（fmt・clippy・test）・変異
+- [x] `day.rs` の `visible_ms` の累計（`serde(default)`）・`add_visible`
+- [x] 駆動役の `on_strip_visible`・刻みの `add_visible`
+- [x] 行の `visible_ms`・schema の説明の文・`emit_schema`
+- [x] `strip_near` と `PointerOut::StripNear`
+- [x] テスト（design のテスト戦略の Rust の分）
+- [x] 私が走らせ直す（fmt・clippy・test）・変異
 
 ## 実装 B（Sonnet・窓・配線・tsx・検査）
 - [ ] `handmark_edge_strip.rs`（窓・NSPanel・見張り・置き場・`STRIP_VISIBLE`）

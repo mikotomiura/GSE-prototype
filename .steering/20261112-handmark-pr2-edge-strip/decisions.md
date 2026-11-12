@@ -21,3 +21,12 @@
 
 - design.md の案（帯は背景と同じ状態を受ける 2 枚目の窓・帯が作れなくても背景は閉じない・近さは帯へだけ・`visible_ms` は状態ファイルの日の累計で `shown_ms` と同じ条件かつ帯が見えている刻みだけ）を承認した。
 - /reimagine は使わない（requirement.md の運用メモ）。
+
+## 判断 6: 実装 A の実装役の報告を確かめる（2026-11-12）
+
+- コミット 529e76b1（`visible_ms`）・49713109（近さ）。fmt・clippy（`-D warnings`）・`cargo test --workspace`（lib 1289 件）・emit_schema の byte-equal を自分で走らせ直して緑。
+- コードで確かめたこと: `add_visible` は `add_shown` と同じ `if` の中だけ／窓を開く・閉じるときに `strip_visible` を偽に戻す／近さの `y_pt = (1 − p.y) × 主画面の高さ` は `to_point`（y は下向き）の逆で、左下が原点の点に戻る／近さは `TraceField` に触れない。
+- 変異: 実装役の 2 つ（帯が見えないときも足す → 2 件赤／近さで場に触れる → 1 件赤）に加え、私が 1 つ（カーソルを切っても近さを 0 に戻さない → `near_is_sent_only_when_it_changes_and_zero_once_when_cut` が赤）。戻した後の作業ツリーは空。
+- 実装役が決めた細部はそのまま採る: `tick` を包みにした `tick_with_strip`・`StripSpot`（帯の下端と主画面の高さ）・一点が読めない刻みは近さ 0。
+- 行の `visible_ms` は、記録があれば出していない日（`assigned_off` など）でも `Some(0)` になる（既存テストの期待を `None` から `Some(0)` に変えた）。`shown_ms` が同じ日に 0 を出すのと同じ読みで、`null` は「記録が無い（計っていない）」に限る。design 4 節のとおりなので採る。
+- 空き: ビルドで 7.6 GiB（下限 8 GiB を割った）。push の前に `target` を消す（判断 4）。
