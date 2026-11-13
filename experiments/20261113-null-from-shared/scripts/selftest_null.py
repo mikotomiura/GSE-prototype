@@ -7,6 +7,7 @@ import json
 import math
 import os
 import sys
+import shutil
 import tempfile
 
 import numpy as np
@@ -15,9 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fit_m0 as FM  # noqa: E402  (PINNED と m0_checks だけを使う。compute は読み込まない)
 import null as NL  # noqa: E402
 import pinned6  # noqa: E402
-from pinned6 import AN, RS, SY, TEN, ml  # noqa: E402
+from pinned6 import AN, DT, RS, SY, TEN, ml  # noqa: E402
 
-NAMES = ["P-HASH", "P-PLAN", "P-M0", "P-M0USE", "P-SPARSE", "P-B", "P-PICK", "P-REAL", "P-READ", "P-SMOKE"]
+NAMES = ["P-HASH", "P-PLAN", "P-M0", "P-M0USE", "P-SPARSE", "P-B", "P-PICK", "P-REAL", "P-READ", "P-SMOKE", "P-RUN"]
 SEED = NL.SEED_WANT
 SY.SHAPES["tiny"] = dict(i=0, ds="coauthor", H=5, P=4, Pu=8, O=2, Ou=5, nseq=1, L=(200, 200), ks=[1, 3])
 ACTIVE = [0, 3, 7, 11, 18, 22]
@@ -25,14 +26,23 @@ JOBS = [4]
 _CACHE = {}
 
 
-def fake_m0():
-    """偽の m0: sens の make_m0(3) を、6 記号に集めた疎な母数にする（他のセルは 1e-9・行の和は 1）。"""
+def fake_m0(variant=0):
+    """偽の m0: sens の make_m0(3) を、6 記号に集めた疎な母数にする（他のセルは 1e-9・行の和は 1）。variant で記号をずらす。"""
     m = SY.make_m0(3, SEED)
     mask = np.full(SY.NSYM, 1e-9)
-    mask[ACTIVE] = 1.0
+    mask[[(a + variant) % SY.NSYM for a in ACTIVE]] = 1.0
     Hh = m["H"] * mask
     C = m["C"] * mask[None, None, :]
     return dict(kind="ar", pi=m["pi"].copy(), A=m["A"].copy(), H=Hh / Hh.sum(1, keepdims=True), C=C / C.sum(2, keepdims=True))
+
+
+def write_fake(d, ms):
+    npz, js = os.path.join(d, "m0.npz"), os.path.join(d, "m0_fit.json")
+    with open(npz, "wb") as f:
+        np.savez(f, **{"a%s_%s" % (a, k): ms[a][k] for a in NL.ALPHAS for k in NL.KEYS})
+    json.dump(dict(alphas=NL.ALPHAS, npz_sha256=FM.sha(npz), seed=FM.SEED_B,
+                   b_code={os.path.relpath(p, FM.EXP): v for p, v in FM.PINNED.items()}), open(js, "w"))
+    return npz, js
 
 
 def p_hash():
@@ -47,7 +57,7 @@ def p_plan():
     seeds = set(NL.gate_seeds())
     nos = {NL.gate_no(ai, si) for ai in range(len(NL.ALPHAS)) for si in range(len(NL.GATE_SEEDS))}
     ok = ok and not (seeds & {r["seed"] for r in rows}) and not (nos & {r["no"] for r in rows})
-    ok = ok and nos == set(range(200, 212)) and NL.ALPHAS == ["1", "0.3", "0.1", "0.03"]
+    ok = ok and nos == set(range(200, 212)) and NL.ALPHAS == ["1", "0.3", "0.1", "0.03"] and NL.gate_seeds() == [100, 101, 102]
     return dict(passed=bool(ok), gate_seeds=sorted(seeds))
 
 
@@ -57,18 +67,18 @@ def p_m0():
     bad = dict(m, C=m["C"] * 1.1)
     ok = ok and not NL.m0_ok(bad) and not NL.m0_ok(dict(m, pi=np.ones(2) / 2))
     with tempfile.TemporaryDirectory() as d:
-        npz, js = os.path.join(d, "m0.npz"), os.path.join(d, "m0.json")
-        with open(npz, "wb") as f:
-            np.savez(f, **{"a%s_%s" % (a, k): m[k] for a in NL.ALPHAS for k in NL.KEYS})
-        json.dump(dict(alphas=NL.ALPHAS, npz_sha256=FM.sha(npz)), open(js, "w"))
+        npz, js = write_fake(d, {a: m for a in NL.ALPHAS})
         got, _ = NL.load_m0(npz, js)
         ok = ok and all(np.array_equal(got[a][k], m[k]) for a in NL.ALPHAS for k in NL.KEYS)
-        json.dump(dict(alphas=NL.ALPHAS, npz_sha256="0" * 64), open(js, "w"))
-        try:
-            NL.load_m0(npz, js)
-            ok = False
-        except SystemExit:
-            pass
+        good = json.load(open(js))
+        for bad_ in (dict(good, npz_sha256="0" * 64), dict(good, seed=1), dict(good, b_code={})):
+            json.dump(bad_, open(js, "w"))
+            try:
+                NL.load_m0(npz, js)
+                ok = False
+            except SystemExit:
+                pass
+    ok = ok and FM.outside_repo("/tmp/x.npz") and not FM.outside_repo(os.path.join(pinned6.EXP, "x.npz"))
     return dict(passed=bool(ok))
 
 
@@ -82,8 +92,11 @@ def p_m0use():
 
 def p_sparse():
     m = fake_m0()
+    C = m["C"].copy()
+    C[0, ACTIVE[0]] = np.where(C[0, ACTIVE[0]] < 1e-6, 1e-12, C[0, ACTIVE[0]])  # 1 行をさらに小さい確率に
+    m["C"] = C / C.sum(2, keepdims=True)
     rng = np.random.default_rng([SEED, 9])
-    ok = (m["C"] < 1e-6).any()
+    ok = (m["C"] < 1e-10).any()
     worst = 0.0
     with np.errstate(all="raise"):
         for _ in range(2000):
@@ -112,19 +125,30 @@ def gate_tiny():
 
 
 def p_b():
+    """独立の側: 書き手の系列だけを gate_b から借り、全員の共通・w を除く共通・評価の単位・最頻値・評価を自前で取り直す。"""
     g = gate_tiny()
+    writers = g["writers"]
+    RS._init("coauthor", writers, [], [])
+    si = ml.STRUCTS.index(("ar", 3))
+    full_m, _ = RS.fit_full(dict(si=si, seed=SEED, no=NL.gate_no(0, 0), H=5))
     compared, bad = 0, []
-    for w, pt in enumerate(g["parts"]):
-        mo = own_mode(pt["sb"])
-        ref, _ = NL.HM.mode_of("ar", pt["sb"])
+    for w in range(len(g["b"])):
+        m, sb, _ = ml.fit_pool_excl(dict(ds="coauthor", w=w, start=full_m))
+        units = writers[w]
+        _, test = DT.split(len(units), 1, 5)
+        ev_units = [units[i] for i in test]
+        ev = ml.Eval(ml.seqs_of(ev_units), ml.pflags_of(ev_units))
+        pool_ind = ev.ll(m)[0]
+        mo = own_mode(sb)
+        ref, _ = NL.HM.mode_of("ar", sb)
         same_mode = all(np.abs(mo[k] - ref[k]).max() <= 1e-15 for k in NL.KEYS)
         with np.errstate(divide="ignore", invalid="ignore"):
-            ind = ml.Eval(pt["ev_seqs"], ml.pflags_of(pt["ev_units"])).ll(mo)[0]
-        if np.isfinite(pt["mode"]):
+            ind = ev.ll(mo)[0]
+        if np.isfinite(ind):
             compared += 1
-            ok_w = same_mode and abs(ind - pt["mode"]) <= 1e-12 and abs(g["b"][w] - (ind - pt["pool"])) <= 1e-12
+            ok_w = same_mode and abs(g["b"][w] - (ind - pool_ind)) <= 1e-12
         else:
-            ok_w = same_mode and not np.isfinite(ind) and np.isneginf(g["b"][w])
+            ok_w = same_mode and np.isneginf(g["b"][w])
         if not ok_w:
             bad.append(w)
     med_ok = NL.b_median([-np.inf, -np.inf, 1.0, 2.0, 3.0]) == 1.0
@@ -184,8 +208,51 @@ def p_smoke():
     return dict(passed=bool(ok), seconds=R["seconds"]["total"])
 
 
+def p_run():
+    """小さな形・短い計画・偽の較正で、門（途中から再開）→ 本計算（中断して再開）→ report を通す。
+    門の選びは、選んだ α の m0 が本計算に渡るかを見えるように、selftest の中でだけ 0.1 に書き換える。"""
+    saved = (SY.SHAPES["coauthor"], SY.calibrate, NL.plan)
+    d = tempfile.mkdtemp(prefix="null_prun_")
+    try:
+        SY.SHAPES["coauthor"] = dict(i=0, ds="coauthor", H=5, P=4, Pu=20, O=2, Ou=5, nseq=1, L=(60, 60), ks=[1, 5, 15])
+        SY.calibrate = lambda m0, g, seed: dict(lam=0.05, g=g, ok=True, target=g)  # noqa: E731
+        sub = [r for r in TEN.plan() if (r["g"] == 0 and r["seed"] < 7) or (r["g"] == 1e-2 and r["seed"] < 2)]
+        NL.plan = lambda: sub  # noqa: E731
+        ms = {a: fake_m0(variant=i) for i, a in enumerate(NL.ALPHAS)}
+        npz, js = write_fake(d, ms)
+        NL.gate(SEED, npz, js, d, JOBS[0], "t")
+        parts = sorted(os.listdir(os.path.join(d, "gate_parts")))
+        os.remove(os.path.join(d, "gate.json"))
+        os.remove(os.path.join(d, "gate_parts", parts[-1]))
+        NL.gate(SEED, npz, js, d, JOBS[0], "t")
+        G = json.load(open(os.path.join(d, "gate.json")))
+        ok = len(parts) == 12 and len(G["reused_parts"]) == 11
+        G["chosen"] = "0.1"
+        NL.write_json(G, os.path.join(d, "gate.json"))
+        NL.run(SEED, npz, js, d, JOBS[0], "t", 24.0)
+        P = json.load(open(os.path.join(d, "plan.json")))
+        ok = ok and P["reused"] == [] and P["alpha"] == "0.1" and P["m0_used_arr_sha256"] == NL.arr_sha(ms["0.1"])
+        last = os.path.join(d, "replicates", "%02d.json" % max(r["no"] for r in sub))
+        before = json.load(open(last))
+        os.remove(last)
+        os.remove(os.path.join(d, "plan.json"))
+        NL.run(SEED, npz, js, d, JOBS[0], "t", 24.0)
+        P2 = json.load(open(os.path.join(d, "plan.json")))
+        after = json.load(open(last))
+        strip = lambda R: [{k: v for k, v in W.items() if k != "sec"} for W in R["writers"]]  # noqa: E731
+        ok = ok and sorted(P2["reused"]) == sorted(r["no"] for r in sub)[:-1] and strip(before) == strip(after)
+        NL.report(d, "t")
+        S = json.load(open(os.path.join(d, "summary.json")))
+        ok = ok and S["reading"]["case"] in ("R1", "R2", "R3") and all("null_above_real_k" in S["cells"][k] for k in NL.MAIN_K)
+        ok = ok and os.path.exists(os.path.join(d, "tables.md")) and not [f for f in os.listdir(d) if f.endswith(".tmp")]
+        return dict(passed=bool(ok))
+    finally:
+        SY.SHAPES["coauthor"], SY.calibrate, NL.plan = saved
+        shutil.rmtree(d, ignore_errors=True)
+
+
 FUNCS = {"P-HASH": p_hash, "P-PLAN": p_plan, "P-M0": p_m0, "P-M0USE": p_m0use, "P-SPARSE": p_sparse, "P-B": p_b,
-         "P-PICK": p_pick, "P-REAL": p_real, "P-READ": p_read, "P-SMOKE": p_smoke}
+         "P-PICK": p_pick, "P-REAL": p_real, "P-READ": p_read, "P-SMOKE": p_smoke, "P-RUN": p_run}
 
 
 def main():
@@ -199,6 +266,7 @@ def main():
         i = argv.index("--jobs"); JOBS[0] = int(argv[i + 1]); argv = argv[:i] + argv[i + 2:]
     NL.MUT.clear()
     NL.MUT.update(mut)
+    NL.GATE_SEEDS[:] = [100, 101, 102]
     S = dict(run_id=run_id, mutate=mut)
     for n in NAMES:
         try:

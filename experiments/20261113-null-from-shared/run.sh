@@ -23,7 +23,7 @@ rm -rf "$OUT/mutations" "$OUT/summary.json" "$OUT/tables.md" "$OUT/provenance.js
   "$OUT/selftest.json" "$OUT/input_manifest_check.json"
 mkdir -p "$OUT/mutations"
 "$PY" -I -X utf8 "$SC/selftest_null.py" "$OUT/selftest.json" --run-id "$RUN_ID" --jobs 4
-for m in n1 n2 n3 n4 n5 n6 n7; do
+for m in n1 n2 n3 n4 n5 n6 n7 n8; do
   set +e
   "$PY" -I -X utf8 "$SC/selftest_null.py" "$OUT/mutations/$m.json" --mutate "$m" --run-id "$RUN_ID" --jobs 4 > "$OUT/mutations/$m.log" 2>&1
   echo $? > "$OUT/mutations/$m.exit"
@@ -35,11 +35,18 @@ if [ "${SELFTEST_ONLY:-0}" = 1 ]; then echo "selftest と変異だけ（SELFTEST
 MANIFEST="${INPUT_MANIFEST:?INPUT_MANIFEST が要る（B と同じ manifest）}"
 [ "$(sha "$MANIFEST")" = "${INPUT_MANIFEST_SHA256:?INPUT_MANIFEST_SHA256 が要る}" ] || { echo "manifest の SHA-256 が違う" >&2; exit 1; }
 [ "$INPUT_MANIFEST_SHA256" = e0163f1b48e94273a9d2e30fe6e6c76de642eae82311a6ca7c125896a3d74406 ] || { echo "manifest が条件の値と違う" >&2; exit 1; }
-"$PY" -I -X utf8 "$EXP_DIR/../20261104-timeseries-tau-extend/scripts/manifest.py" check "$DATA_DIR" "$MANIFEST" > "$OUT/input_manifest_check.json"
+MANI_PY="$EXP_DIR/../20261104-timeseries-tau-extend/scripts/manifest.py"
+[ "$(sha "$MANI_PY")" = 7ac76ebf0887703c65afb44066f395f8df5206395e1224870b5ef26570f1a86b ] || { echo "manifest.py の SHA-256 が条件の値と違う" >&2; exit 1; }
+"$PY" -I -X utf8 "$MANI_PY" check "$DATA_DIR" "$MANIFEST" > "$OUT/input_manifest_check.json"
 # m0（D1）: 既にあれば当て直さない（null.py が npz の SHA-256 を m0_fit.json と照らす）
 if [ ! -f "$OUT/m0_fit.json" ] || [ ! -f "$M0" ]; then
-  rm -f "$OUT/m0_fit.json" "$OUT/gate.json" "$OUT/calibration.json" "$OUT/plan.json"
+  # 確かめてから消す（M0 の取り違えで門と較正を失わない）
+  for f in gate.json calibration.json plan.json; do
+    [ ! -e "$OUT/$f" ] || { echo "m0 を作り直すのに古い $f が残っている（M0 の置き場を確かめ、意図して作り直すなら消してからやり直す）" >&2; exit 1; }
+  done
   [ -z "$(ls -A "$OUT/replicates" 2>/dev/null)" ] || { echo "m0 を作り直すのに古い複製が残っている（消してからやり直す）" >&2; exit 1; }
+  [ -z "$(ls -A "$OUT/gate_parts" 2>/dev/null)" ] || { echo "m0 を作り直すのに古い門の結果が残っている（消してからやり直す）" >&2; exit 1; }
+  rm -f "$OUT/m0_fit.json"
   "$PY" -I -X utf8 "$SC/fit_m0.py" "$COA" "$M0" "$OUT/m0_fit.json" "$JOBS"
 fi
 prov() {
@@ -76,7 +83,11 @@ if [ "$rc" = 5 ]; then
   echo "門で止まった（gate.json）。本計算に入っていない。研究者に聞く: $RUN_ID" >&2
   exit 5
 fi
-[ "$rc" = 0 ] || exit "$rc"
+if [ "$rc" != 0 ]; then
+  prov provenance.json || true
+  echo "null.py run が exit $rc で止まった（provenance.json に来歴を残した）: $RUN_ID" >&2
+  exit "$rc"
+fi
 "$PY" -I -X utf8 "$SC/null.py" report "$OUT" --run-id "$RUN_ID"
 prov provenance.json
 echo "終わり: $RUN_ID"

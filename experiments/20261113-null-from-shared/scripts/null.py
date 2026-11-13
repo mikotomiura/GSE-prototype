@@ -19,11 +19,13 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fit_m0 as FM  # noqa: E402  （PINNED と SEED_B だけを使う。B のコードは読み込まない）
 import pinned6  # noqa: E402
 from pinned6 import AN, DC, DT, HM, RS, SY, TEN, ml  # noqa: E402
 
 MUT = set()  # n1: 符号だけで大きい α から・n2: b = 共通 − 最頻値・n3: 門の種を 0〜2 に・n4: 実データを ar3 固定の行から・
-#              n5: build に sens の make_m0・n6: −∞ を中央値から除く・n7: 規則が使える条件から FA' ≤ 0.2 を外す
+#              n5: build に sens の make_m0・n6: −∞ を中央値から除く・n7: 規則が使える条件から FA' ≤ 0.2 を外す・
+#              n8: 本計算の m0 を門の選びに依らず倍率 1 にする
 HERE = os.path.dirname(os.path.abspath(__file__))
 ALPHAS = ["1", "0.3", "0.1", "0.03"]
 GATE_SEEDS = [100, 101, 102]
@@ -51,6 +53,8 @@ def load_m0(npz, m0_json):
     J = json.load(open(m0_json))
     if sha(npz) != J["npz_sha256"] or J["alphas"] != ALPHAS:
         sys.exit("m0 の npz の SHA-256 か倍率の一覧が m0_fit.json と違う")
+    if J.get("seed") != FM.SEED_B or J.get("b_code") != {os.path.relpath(p, FM.EXP): v for p, v in FM.PINNED.items()}:
+        sys.exit("m0_fit.json の seed か B のコードの SHA-256 が条件と違う（作り直す）")
     Z = np.load(npz)
     return {a: dict(kind="ar", **{k: np.array(Z["a%s_%s" % (a, k)]) for k in KEYS}) for a in ALPHAS}, J["npz_sha256"]
 
@@ -65,6 +69,14 @@ def m0_ok(m):
                     and all(np.abs(m[k].sum(-1) - 1).max() <= 1e-9 for k in KEYS))
     except (KeyError, TypeError, ValueError):
         return False
+
+
+def arr_sha(m):
+    """母数の配列の SHA-256（値を出さずに、本計算が選んだ α の m0 を使ったかを照らす）。"""
+    h = hashlib.sha256()
+    for k in KEYS:
+        h.update(k.encode() + np.ascontiguousarray(m[k], dtype=np.float64).tobytes())
+    return h.hexdigest()
 
 
 def m0_for_build(m0, seed):
@@ -152,8 +164,11 @@ def code_hash():
 
 
 def write_json(obj, path):
-    with open(path, "w", newline="\n") as f:
+    """一時ファイルに書いてから置き換える（途中で落ちても壊れた JSON を残さない）。"""
+    tmp = path + ".tmp"
+    with open(tmp, "w", newline="\n") as f:
         json.dump(obj, f, indent=1)
+    os.replace(tmp, path)
 
 
 def gate(seed, npz, m0_json, out, jobs, run_id):
@@ -169,14 +184,28 @@ def gate(seed, npz, m0_json, out, jobs, run_id):
         if old.get("seed") != seed or old.get("code_hash") != ch or old.get("m0_sha256") != m0_sha:
             sys.exit("gate.json の seed・コード・m0 が今回と違う（消してからやり直す）")
         return old["chosen"]
-    G = dict(run_id=run_id, seed=seed, code_hash=ch, m0_sha256=m0_sha, real_b=REAL_B, seeds=gate_seeds(), alphas={})
+    G = dict(run_id=run_id, seed=seed, code_hash=ch, m0_sha256=m0_sha, real_b=REAL_B, seeds=gate_seeds(), alphas={},
+             reused_parts=[])
     t0 = time.time()
+    pdir = os.path.join(out, "gate_parts")
+    os.makedirs(pdir, exist_ok=True)
     for ai, a in enumerate(ALPHAS):
         G["alphas"][a] = dict(per_seed=[], b_s=[])
         for si, gs in enumerate(gate_seeds()):
+            pp = os.path.join(pdir, "%s_%d.json" % (a, gs))
+            if os.path.exists(pp):  # 門の途中から再開（1 本ずつ書く）
+                r = json.load(open(pp))
+                if (r.get("seed") != seed or r.get("code_hash") != ch or r.get("m0_sha256") != m0_sha
+                        or r.get("gate_seed") != gs or r.get("no") != gate_no(ai, si)):
+                    sys.exit("gate_parts/%s_%d.json の seed・コード・m0・種が今回と違う（消してからやり直す）" % (a, gs))
+                G["reused_parts"].append("%s_%d" % (a, gs))
+                G["alphas"][a]["per_seed"].append(r)
+                G["alphas"][a]["b_s"].append(r["median"])
+                continue
             t1 = time.time()
             r = gate_b(m0s[a], gs, gate_no(ai, si), seed, jobs)
-            r.update(gate_seed=gs, no=gate_no(ai, si), seconds=time.time() - t1)
+            r.update(gate_seed=gs, no=gate_no(ai, si), seconds=time.time() - t1, seed=seed, code_hash=ch, m0_sha256=m0_sha)
+            write_json(r, pp)
             G["alphas"][a]["per_seed"].append(r)
             G["alphas"][a]["b_s"].append(r["median"])
             print("門 α %s・種 %d %.0f 秒" % (a, gs, r["seconds"]), flush=True)
@@ -216,7 +245,9 @@ def run(seed, npz, m0_json, out, jobs, run_id, budget):
         print("門で止まった（3 種とも b > 0 の倍率が無い）。本計算に入らない。研究者に聞く", flush=True)
         sys.exit(EXIT_GATE_STOP)
     m0s, m0_sha = load_m0(npz, m0_json)
-    m0 = m0s[alpha]
+    m0 = m0s["1"] if "n8" in MUT else m0s[alpha]
+    if not all((m0[k] > 0).all() for k in KEYS):  # draw_D の Dirichlet は 0 の濃度を受けない（M 段は擬似度数を足すので起きない）
+        sys.exit("選んだ m0 に確率 0 のセルがある。止めて研究者に聞く")
     ch = code_hash()
     cal = calibrate(m0, seed, os.path.join(out, "calibration.json"), ch, m0_sha, alpha)
     bad = [g for g, c in cal[3].items() if not c["ok"]]
@@ -224,9 +255,9 @@ def run(seed, npz, m0_json, out, jobs, run_id, budget):
         sys.exit("較正が目標の ±10% に入らない（止めて逸脱として書く）: %r" % bad)
     os.makedirs(os.path.join(out, "replicates"), exist_ok=True)
     rows = plan()
-    P = dict(run_id=run_id, seed=seed, code_hash=ch, m0_sha256=m0_sha, alpha=alpha, budget_hours=budget, rows=rows,
-             reused=[], seconds={})
     m0s_run = m0s_for_run(m0, seed)
+    P = dict(run_id=run_id, seed=seed, code_hash=ch, m0_sha256=m0_sha, alpha=alpha, m0_used_arr_sha256=arr_sha(m0s_run[3]),
+             budget_hours=budget, rows=rows, reused=[], seconds={})
 
     def do(r):
         p = os.path.join(out, "replicates", "%02d.json" % r["no"])
@@ -320,6 +351,8 @@ def report(out, run_id):
     G = json.load(open(os.path.join(out, "gate.json")))
     if G.get("chosen") != plan_.get("alpha") or G.get("m0_sha256") != plan_.get("m0_sha256"):
         sys.exit("gate.json と plan.json の α か m0 が違う")
+    if G.get("code_hash") != plan_.get("code_hash"):
+        sys.exit("gate.json のコードのハッシュが plan.json と違う")
     reps, extra = TEN.load_reps(out, plan_)
     if {(R.get("m0_sha256"), R.get("alpha")) for R in reps} != {(plan_["m0_sha256"], plan_["alpha"])}:
         sys.exit("複製の m0 か α が計画と揃っていない")
@@ -338,6 +371,8 @@ def report(out, run_id):
                            vs_r1=c["vs_r1"]["median"], chosen_tau_region=c["chosen_tau_region"]))
         S["cells"][k] = dict(replicates=cs, rule=TEN.rule(cs) if k in MAIN_K else None,
                              d_pair=d_pair(reps, k) if k in MAIN_K else None)
+        if k in MAIN_K:  # D4: 実データの残り（この k の値）を超えた陰性対照の数（ten.rule の above_real は D の帯 4.1e-4・7.2e-4）
+            S["cells"][k]["null_above_real_k"] = int(sum(c["median"] > real[k]["median"] for c in cs if c["g"] == 0))
     S["reading"] = reading({k: S["cells"][k]["rule"] for k in MAIN_K}, real)
     write_json(S, os.path.join(out, "summary.json"))
     L = ["# 共通のモデルそのものから作った帰無の表（合成の値だけ・実データの値は残りの中央値と良い側の割合だけ）", "",
@@ -355,17 +390,20 @@ def report(out, run_id):
               "U' = %.3e・FA' = %s（%d 種）・L80' = %s・規則が使える %s・実データ %.3e（良 %.2f）の検出 %s" % (
                   r["U"], "—" if r["FA"] is None else "%.2f" % r["FA"], r["fa_n"], r["L80"], pk["usable"],
                   pk["real_median"], pk["real_share"], pk["detected"]),
-              "陰性対照 %d 種の中央値 [%.2e, %.2e, %.2e]・実データの残りの下端を超える %d 種・上端を超える %d 種" % (
-                  r["null"]["n"], r["null"]["min"], r["null"]["median"], r["null"]["max"], r["null"]["above_real_low"],
-                  r["null"]["above_real_high"]),
+              "陰性対照 %d 種の中央値 [%.2e, %.2e, %.2e]・この k の実データの残りを超える %d 種"
+              "（D の帯 4.1e-4・7.2e-4 を超える %d・%d 種）" % (
+                  r["null"]["n"], r["null"]["min"], r["null"]["median"], r["null"]["max"], S["cells"][k]["null_above_real_k"],
+                  r["null"]["above_real_low"], r["null"]["above_real_high"]),
               "D の同じ番号の複製との差（新 − D）: %s" % ("—" if dp is None else "中央値 %.2e [%.2e, %.2e]（%d 本）" % (
                   dp["median"], dp["min"], dp["max"], dp["n"])), "",
               "| 段 | 種の数 | DR' | 中央値の平均 [最小, 最大] |", "|---|---|---|---|"]
         for g, v in r["levels"].items():
             L.append("| %s | %d | %.2f | %.2e [%.2e, %.2e] |" % (g, v["n"], v["DR"], v["median_mean"], v["median_min"], v["median_max"]))
         L.append("")
-    with open(os.path.join(out, "tables.md"), "w", newline="\n") as f:
+    tmp = os.path.join(out, "tables.md.tmp")
+    with open(tmp, "w", newline="\n") as f:
         f.write("\n".join(L) + "\n")
+    os.replace(tmp, os.path.join(out, "tables.md"))
 
 
 def main():

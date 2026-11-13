@@ -32,6 +32,9 @@
 - [x] 本文の書き直し（判断 21・22・c9140726・9a4c1d34）・manuscript round 2（major・判断 23・0e5818b5）・round 2 の直し（7ac5bbb9）
 
 ## manuscript round 2 の後の計算 (f)（2026-11-13〜）
-- [ ] 共通のモデルそのものから合成の書き手を作る帰無の条件とコード（引き継ぎ next-session-gse-paper3-null-from-shared.md）
+- [x] 設計を研究者に問う（6 問・判断 24）→ 条件と SEED をコードより前にコミット（1d82e941）
+- [x] コード・selftest・変異（Mac・889ba260）
+- [x] /cross-review（Codex 込み）と採否（判断 25）→ 直して selftest 11 門・変異 8 を Mac で通す
+- [x] HP Z2 への引き継ぎ（next-session-gse-paper3-null-from-shared-run-on-hp-z2.md）・push は研究者に確かめる
 - [ ] HP Z2 で回す・notes・本文の 4.4 ほかを直す
 - [ ] manuscript round 3
