@@ -27,5 +27,6 @@
 - [x] D のコード・selftest と変異（Mac で通る）
 - [x] /cross-review（Codex 込み・wrapper は本線から）と code-reviewer の指摘の採否（判断 18）
 - [x] HP Z2 への引き継ぎを書く（push は研究者に確かめる）
-- [ ] HP Z2 で回す（A・B は済み 38b4be20・D は HP Z2 で実行中）
-- [ ] notes（読みの形の当て）と本文の書き直し・manuscript round 2
+- [x] HP Z2 で回す（A・B 38b4be20・D 57c902d6・B1 の対称版 de97bce5）
+- [x] notes（読みの形の当て）: A・B 1e1ba8d7・D ff81c823・対称版 cffe96f3・判断 20
+- [ ] 本文の書き直し・manuscript round 2（引き継ぎ next-session-gse-paper3-manuscript-r2.md）
