@@ -106,4 +106,12 @@ bash run_sym.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/selection_split_smoot
 - `plan.json`: `estimate_hours` 9.40・`cuts_applied` 0（削っていない）・`first_rep_seconds` 615.6。`replicates/` は 55 本。
 - `machine_check.json`（照らした複製 13）: `shape_differs` 0。`all_diffs_zero` は 13 本とも偽で、`max_abs_diff` の最大は 4.84e-09（門ではなく記録・run.sh は止めていない。Mac との機械の差と見られるが、読みは Mac のセッションに任せる）。
 - `provenance.json` の `git_dirty_paths` は `?? experiments/20261112-sensitivity-ten-seeds/results/` だけ。
-- 結果はオフラインの間にローカルでコミット（`b3c1bed8`・`results/` の下だけ）し、2026-11-13 にオンラインに戻ってから push した。`summary.json`・`tables.md` の値は読んでいない。
+- 結果はオフラインの間にローカルでコミット（`results/` の下だけ）し、2026-11-13 にオンラインに戻ってから、Mac の 4 コミットの上に載せ直して push した（`57c902d6`）。`summary.json`・`tables.md` の値は読んでいない。
+
+### B1 の対称版（§3.3）
+
+- 記入: 2026-11-13（HP Z2 のセッション）。機械と版は A・B と同じ。コードは `5e622852`（Mac の `38cc97c4` を含む）。回す前に、A・B の `results/` の JSON 15 個が作業ツリーで CRLF になっていたので、repo の中身（LF）のまま取り出し直した（作業ツリーの変更は 0）。
+- 時刻: 開始 13:07:06 → selftest 6 門（P-HASH・P-REPLAY・P-REPLAY03・P-SYMPRIOR・P-SELW・P-SYMCELL）緑 → 変異 5 個（y1〜y5）すべて名指しの門が赤 → sym（P-REPRO-SELF 通過 906 秒・n × 2 は 2 時間以下）→ provenance_sym → 終わり 13:44:15。終了コード 0。`run_id` `20261113T130706-637`（`sym_summary.json` と `provenance_sym.json` で同じ）。
+- `sym_check.json`: `p_repro_self` true（照らした 969・最大の差 0.0）、`p_repro_b1` true（照らした 17・最大の差 0.0）。`pkl_sha256` `a0d3627e…`・`bvals_sha256` `8026fea11c04ecc4222f37f9b8de5f1c8ecffbcac3d24cb53c7d6eeb6a6b86c2`・`sym_values_sha256` `8596a3c79c16377ba6239f5e79ef094b7b636e0755402ab6df1a7eae366fa32b`。
+- `provenance_sym.json` の `git_dirty_paths` は空。
+- 結果は `de97bce5` で push。`sym_summary.json`・`sym_tables.md` の値は読んでいない。`selection_split_smoothing_sym_values.pkl` は開いていない。
