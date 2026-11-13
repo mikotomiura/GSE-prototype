@@ -29,4 +29,9 @@
 - [x] HP Z2 への引き継ぎを書く（push は研究者に確かめる）
 - [x] HP Z2 で回す（A・B 38b4be20・D 57c902d6・B1 の対称版 de97bce5）
 - [x] notes（読みの形の当て）: A・B 1e1ba8d7・D ff81c823・対称版 cffe96f3・判断 20
-- [ ] 本文の書き直し・manuscript round 2（引き継ぎ next-session-gse-paper3-manuscript-r2.md）
+- [x] 本文の書き直し（判断 21・22・c9140726・9a4c1d34）・manuscript round 2（major・判断 23・0e5818b5）・round 2 の直し（7ac5bbb9）
+
+## manuscript round 2 の後の計算 (f)（2026-11-13〜）
+- [ ] 共通のモデルそのものから合成の書き手を作る帰無の条件とコード（引き継ぎ next-session-gse-paper3-null-from-shared.md）
+- [ ] HP Z2 で回す・notes・本文の 4.4 ほかを直す
+- [ ] manuscript round 3
