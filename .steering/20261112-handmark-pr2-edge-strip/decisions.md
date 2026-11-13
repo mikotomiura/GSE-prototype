@@ -126,3 +126,9 @@
   - 2 回目の 4（削除区間の前後の行の差から量が読める）: 判断 13 で研究者が受け入れ、schema の説明に書いた。
 - 直しのコミットのレビューの LOW: JSDoc の付け先を `nextFrameMs` へ戻した／`read_session` の検査で辞書に触れる箇所を `dict.` の数で縛り、`GetValue` を禁止語に足し、陽性対照で鍵の一覧が変わることを確かめた／design.md の警告の文言を新しい形（`handmark: edge strip: unavailable: …`）に合わせた／`strip_seen` の本体の検査は足さない（純関数のテストが 4 方向を縛る）。
 - 確かめ: fmt・clippy・`cargo test --workspace`（lib 1310 件）・emit_schema・`tsc --noEmit`・`npm run test:handmark`（36 件）が緑。
+
+## 判断 15: PR #408 の Windows の CI が赤（CRLF）と直し（2026-11-14）
+
+- CI の Windows の check（hosted）で `the_strip_probe_judges_visibility_through_strip_seen` と `read_session_reads_only_the_two_session_keys` が `fn_body` の「終わりが見つからない」で panic した。Windows のチェックアウトはソースが CRLF で、判断 14 で足した `fn_body` が `"\n    }\n"` を探していた。既存の検査は `body()`（行で読み直して `\n` で結ぶ）を通していて無事だった。
+- 直した: 2 つの検査を `body()` を通す形にし、CRLF に置き換えた本文でも同じ範囲を切り出せることを macOS でも確かめる陽性対照を足した（元の形に戻すと macOS でも同じ panic で赤）。memory: windows-only-code-needs-ci の「検査がファイルを比べるなら区切りをそろえる」の同型を、改行で踏んだ。
+- fmt・clippy・`cargo test --workspace`（lib 1310 件）が緑。

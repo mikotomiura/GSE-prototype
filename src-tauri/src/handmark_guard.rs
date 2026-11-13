@@ -1435,8 +1435,12 @@ fn ts_str_const(src: &str, name: &str) -> Option<String> {
 /// 見張りは AppHandle を要りテストで走らないので、本文で縛る。
 #[test]
 fn the_strip_probe_judges_visibility_through_strip_seen() {
-    let body = strip_test_items(STRIP_RS);
-    let probe = fn_body(&body, "fn probe_loop");
+    // body() は行で読み直すので、Windows の CRLF のチェックアウトでも同じ本文になる（2026-11-12 の CI で赤）。
+    let src = body(STRIP_RS);
+    let probe = fn_body(&src, "fn probe_loop");
+    // CRLF の本文でも同じ範囲を切り出せる（macOS でも Windows の形を確かめる）。
+    let crlf = body(&STRIP_RS.replace('\n', "\r\n"));
+    assert_eq!(fn_body(&crlf, "fn probe_loop"), probe);
     assert_eq!(
         probe
             .matches("let visible = strip_seen(occlusion_visible, session, asleep);")
@@ -1482,8 +1486,8 @@ fn fn_body<'a>(src: &'a str, item: &str) -> &'a str {
 /// 利用者の名前などの他の鍵を読む・辞書を回す・値を Debug で出す道を作らない（security-checker L1・判断 13）。
 #[test]
 fn read_session_reads_only_the_two_session_keys() {
-    let body = strip_test_items(STRIP_RS);
-    let f = fn_body(&body, "fn read_session");
+    let src = body(STRIP_RS);
+    let f = fn_body(&src, "fn read_session");
     let keys: Vec<&str> = f
         .match_indices("truthy(\"")
         .map(|(i, _)| {
