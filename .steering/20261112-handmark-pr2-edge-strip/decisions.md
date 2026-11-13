@@ -132,3 +132,5 @@
 - CI の Windows の check（hosted）で `the_strip_probe_judges_visibility_through_strip_seen` と `read_session_reads_only_the_two_session_keys` が `fn_body` の「終わりが見つからない」で panic した。Windows のチェックアウトはソースが CRLF で、判断 14 で足した `fn_body` が `"\n    }\n"` を探していた。既存の検査は `body()`（行で読み直して `\n` で結ぶ）を通していて無事だった。
 - 直した: 2 つの検査を `body()` を通す形にし、CRLF に置き換えた本文でも同じ範囲を切り出せることを macOS でも確かめる陽性対照を足した（元の形に戻すと macOS でも同じ panic で赤）。memory: windows-only-code-needs-ci の「検査がファイルを比べるなら区切りをそろえる」の同型を、改行で踏んだ。
 - fmt・clippy・`cargo test --workspace`（lib 1310 件）が緑。
+- 追記（同日）: cbde5b1a の CI でも Windows が赤だった。足した CRLF の陽性対照そのものが、もともと CRLF の Windows で `\r\r\n` を作って壊れていた。LF にそろえてから CRLF に置き換える形に直した。確かめは macOS で `handmark_edge_strip.rs` を一時的に CRLF にして行った（直した版は緑・直す前の版は CI と同じ `handmark_guard.rs:1481` で panic）。ファイルは戻した。
+- 同じ CI の audit の赤は `quinn-udp 0.5.15` の新しい勧告 RUSTSEC-2026-0538 で、この PR は `Cargo.lock` を変えていない（main でも赤になる見込み・別の chore で上げる）。

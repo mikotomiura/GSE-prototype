@@ -1439,7 +1439,7 @@ fn the_strip_probe_judges_visibility_through_strip_seen() {
     let src = body(STRIP_RS);
     let probe = fn_body(&src, "fn probe_loop");
     // CRLF の本文でも同じ範囲を切り出せる（macOS でも Windows の形を確かめる）。
-    let crlf = body(&STRIP_RS.replace('\n', "\r\n"));
+    let crlf = body(&STRIP_RS.replace("\r\n", "\n").replace('\n', "\r\n"));
     assert_eq!(fn_body(&crlf, "fn probe_loop"), probe);
     assert_eq!(
         probe
