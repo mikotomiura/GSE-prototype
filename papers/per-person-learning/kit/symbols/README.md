@@ -72,7 +72,7 @@ implementation. One row is produced for every second from `t0` to the last event
   `conformance/generate_inputs.py`) and compares every row, with x and y bit for bit, with
   the expected traces (`conformance/data/expected.json.gz`) produced by the original
   implementation used in the paper. The synthetic sequences contain no human data.
-- In the authors' own check on the raw datasets, the symbols of every CoAuthor session
+- In the author's own check on the raw datasets, the symbols of every CoAuthor session
   (1,157 sessions, 775,907 rows) and of every CS1 2021 assignment with at least two key
   presses (177 assignments, 2,794,277 rows) were identical to those of the original
   implementation, including the bits of x and y. That check used the raw datasets, is not
