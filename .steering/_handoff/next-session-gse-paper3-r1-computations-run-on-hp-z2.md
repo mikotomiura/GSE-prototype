@@ -101,4 +101,9 @@ bash run_sym.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/selection_split_smoot
 
 ### D
 
-- 03:20:27 に開始（A・B の push の後、裏のスクリプトが続けて起動。04:00 から HP Z2 がオフラインになるため、D のコミットはローカルに残し、オンラインに戻ってから push する）。記録はその後で追記する。
+- 機械と版は A・B と同じ。A・B の push の後、裏のスクリプト（scratchpad の chain_ab_d.sh）が続けて起動した（04:00 から HP Z2 がオフラインになったため）。
+- 時刻: 開始 2026-11-12 03:20:27 → selftest 4 門（P-HASH・P-PLAN・P-RULE・P-PAIR）緑 → 変異 8 個（e1〜e8）すべて名指しの門が赤 → 本計算 55 本（1 本 約 610〜850 秒）→ report → provenance → 終わり 15:08:10。終了コード 0。`run_id` `20261112T032027-5493`（`summary.json` と `provenance.json` で同じ）。
+- `plan.json`: `estimate_hours` 9.40・`cuts_applied` 0（削っていない）・`first_rep_seconds` 615.6。`replicates/` は 55 本。
+- `machine_check.json`（照らした複製 13）: `shape_differs` 0。`all_diffs_zero` は 13 本とも偽で、`max_abs_diff` の最大は 4.84e-09（門ではなく記録・run.sh は止めていない。Mac との機械の差と見られるが、読みは Mac のセッションに任せる）。
+- `provenance.json` の `git_dirty_paths` は `?? experiments/20261112-sensitivity-ten-seeds/results/` だけ。
+- 結果はオフラインの間にローカルでコミット（`b3c1bed8`・`results/` の下だけ）し、2026-11-13 にオンラインに戻ってから push した。`summary.json`・`tables.md` の値は読んでいない。
