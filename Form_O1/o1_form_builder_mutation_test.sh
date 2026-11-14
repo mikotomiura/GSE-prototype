@@ -412,6 +412,13 @@ mutate "段 1: 登録の型が無ければ O1 に倒す" \
 mutate "段 1: 回答があっても作り直す" \
   's/  if \(n !== 0\) \{\n    throw new Error\(\n      "S1-C には既に回答が/  if (false) {\n    throw new Error(\n      "S1-C には既に回答が/'
 
+mutate "段 1: Drive の ID をホストを見ずに取る" \
+  's/  if \(host === "drive\.google\.com" \|\| host === "docs\.google\.com"\) \{/  if (true) {/'
+mutate "段 1: トリガの設置で選択肢を見ない" \
+  's/      if \(cs\.length !== 1 \|\| cs\[0\]\.getValue\(\) !== S1_CONSENT_CHOICE\) out\.push/      if (false) out.push/'
+mutate "段 1: 古いトリガを先に外す" \
+  's/  ScriptApp\.newTrigger\("onS1ConsentSubmit"\)\.forForm\(form\)\.onFormSubmit\(\)\.create\(\);\n  old\.forEach/  old.forEach(function (t) { ScriptApp.deleteTrigger(t); });\n  ScriptApp.newTrigger("onS1ConsentSubmit").forForm(form).onFormSubmit().create();\n  [].forEach/'
+
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"
 if [ "$FAIL" -eq 0 ]; then

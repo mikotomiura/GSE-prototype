@@ -3515,6 +3515,11 @@ function s1FormText(form) {
   push("§20 Drive の同じフォルダ ID なら設定の問いになる", drive.s1ConfigProblems_().length > 0, {});
   const other = makeS1Ctx({ s1Url: "https://drive.google.com/drive/folders/S1_FOLDER" });
   other.__props.O1_APP_DOWNLOAD_URL = "https://drive.google.com/drive/folders/O1_FOLDER";
+  const hosts = makeS1Ctx({ s1Url: "https://b.example/get?id=SAME" });
+  hosts.__props.O1_APP_DOWNLOAD_URL = "https://a.example/get?id=SAME";
+  push("§20 陽性対照: Drive でない別のホストは同じ id でも別の配布先", hosts.s1ConfigProblems_().length === 0, {
+    p: hosts.s1ConfigProblems_(),
+  });
   push("§20 陽性対照: 違う Drive のフォルダなら問いは 0 件", other.s1ConfigProblems_().length === 0, {
     p: other.s1ConfigProblems_(),
   });
@@ -3549,6 +3554,25 @@ function s1FormText(form) {
     rb.threw && bad.__triggers.length === 1,
     { n: bad.__triggers.length }
   );
+  const chg = makeS1Ctx();
+  chg.buildS1ConsentForm();
+  chg.__forms[S1_C].__items.filter((i) => i.__type === "CHECKBOX")[3].__choices = ["はい"];
+  const rc = attempt(() => chg.installS1ConsentTrigger());
+  push("§20 同意の選択肢が書き換わったフォームにはトリガを張らない", rc.threw && chg.__triggers.length === 0, rc);
+  const failCreate = makeS1Ctx();
+  failCreate.buildS1ConsentForm();
+  failCreate.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
+  failCreate.ScriptApp.newTrigger = () => ({ forForm: () => ({ onFormSubmit: () => ({ create: () => { throw new Error("stub: create failed"); } }) }) });
+  const rcf = attempt(() => failCreate.installS1ConsentTrigger());
+  push("§20 トリガを作れなかったときは既存の段 1 のトリガを残す", rcf.threw && failCreate.__triggers.length === 1, {
+    n: failCreate.__triggers.length,
+  });
+  const rm = makeS1Ctx();
+  rm.__triggers.push({ getHandlerFunction: () => "onO1ConsentSubmit" });
+  rm.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
+  rm.removeS1ConsentTriggers();
+  const rmf = rm.__triggers.map((t) => t.getHandlerFunction());
+  push("§20 removeS1ConsentTriggers は段 1 のトリガだけを外す", JSON.stringify(rmf) === '["onO1ConsentSubmit"]', { rmf });
   // 未構築のフォーム・開けないフォームでは、既存の段 1 のトリガを消さずに止まる。
   const unbuilt = makeS1Ctx();
   unbuilt.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
@@ -3670,9 +3694,9 @@ cases.forEach((c) => {
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
 // 2026-10-08: §19 を足して 277 件、§6 に 5 件を足して 282 件なので下限 277。
 // 2026-11-14: §20（段 1 の同意フォーム）を足した。下限は実数に合わせて直す。
-if (cases.length < 345) {
+if (cases.length < 348) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（345 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（348 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

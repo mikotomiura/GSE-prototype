@@ -18,7 +18,8 @@
 ## レビュー（場面ごとの道具）
 - [ ] 文面: attack-me か /cross-review（Codex を含む・記録の本文と集計は送らない）
 - [x] フォームのコード: security-checker ＋ /cross-review（Codex）。指摘の処理は decisions.md「レビューの処理」
-- [ ] 直した後の /cross-review 2 巡目 ← 今ここ
+- [x] 直した後の /cross-review 2 巡目（指摘 3 件を採用・decisions.md）
+- [ ] 研究者が文面を承認する ← 今ここ
 
 ## 承認の後
 - [ ] 承認の印を md の行頭に 1 回

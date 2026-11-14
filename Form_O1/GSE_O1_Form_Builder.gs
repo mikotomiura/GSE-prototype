@@ -3185,6 +3185,8 @@ var S1_PERIOD_TEXT = "長くても 8 週間";
 var S1_MAX_PROBES_PER_HOUR = 9;
 /** 登録ログの種別。O1 の `register` と分ける。 */
 var S1_MGMT_KIND = "s1-register";
+/** 同意の項目の選択肢（トリガの設置の前の照合も使う）。 */
+var S1_CONSENT_CHOICE = "同意する / 理解した";
 
 /** 段 1 の設定。ロスターと登録ログは O1 と共有する（採番元は 1 か所）。 */
 function s1Config_() {
@@ -3303,18 +3305,21 @@ function s1AssertSafeToRebuild_(form) {
 }
 
 /**
- * URL を比べる形に直す。Drive のフォルダ・ファイルの ID が取れればその ID、
- * 取れなければ小文字にしてクエリ・断片・末尾の / と `/u/<n>/` を落とした形。
+ * URL を比べる形に直す。Google Drive（drive.google.com / docs.google.com）でフォルダ・ファイルの ID が
+ * 取れればその ID。それ以外は、ホストを小文字にし、クエリ・断片・末尾の / を落とした形（パスの大小は保つ）。
  */
 function s1UrlKey_(url) {
   var u = String(url || "").trim();
-  var m = u.match(/\/folders\/([A-Za-z0-9_-]+)/) || u.match(/\/d\/([A-Za-z0-9_-]+)/) || u.match(/[?&]id=([A-Za-z0-9_-]+)/);
-  if (m) return "drive:" + m[1];
-  return u
-    .toLowerCase()
-    .replace(/[?#].*$/, "")
-    .replace(/\/u\/\d+\//, "/")
-    .replace(/\/+$/, "");
+  var hm = u.match(/^https?:\/\/([^\/?#]+)(.*)$/i);
+  if (!hm) return u;
+  var host = hm[1].toLowerCase();
+  var rest = hm[2];
+  if (host === "drive.google.com" || host === "docs.google.com") {
+    var m = rest.match(/\/folders\/([A-Za-z0-9_-]+)/) || rest.match(/\/d\/([A-Za-z0-9_-]+)/) || rest.match(/[?&]id=([A-Za-z0-9_-]+)/);
+    if (m) return "drive:" + m[1];
+    rest = rest.replace(/\/u\/\d+\//, "/");
+  }
+  return host + rest.replace(/[?#].*$/, "").replace(/\/+$/, "");
 }
 
 /** ID の検証 → 開く。順序を入れ替えない（検証が先）。 */
@@ -3582,7 +3587,7 @@ function buildS1ConsentForm() {
   s1ConsentItemTitles_().forEach(function (title) {
     var q = form.addCheckboxItem();
     q.setTitle(title);
-    q.setChoices([q.createChoice("同意する / 理解した")]);
+    q.setChoices([q.createChoice(S1_CONSENT_CHOICE)]);
     q.setRequired(true);
   });
 
@@ -3718,8 +3723,15 @@ function installS1ConsentTrigger() {
         "\n既存のトリガは消していません。"
     );
   }
-  removeS1ConsentTriggers();
+  // 新しいトリガを作ってから古いものを外す（作れなかったときに今のトリガを失わない）。
+  var old = ScriptApp.getProjectTriggers().filter(function (t) {
+    return t.getHandlerFunction() === "onS1ConsentSubmit";
+  });
   ScriptApp.newTrigger("onS1ConsentSubmit").forForm(form).onFormSubmit().create();
+  old.forEach(function (t) {
+    ScriptApp.deleteTrigger(t);
+  });
+  if (old.length) Logger.log("既存の onS1ConsentSubmit トリガを " + old.length + " 件削除しました");
   Logger.log("onS1ConsentSubmit トリガを S1-C に設定しました");
   Logger.log("O1_AUTO_SEND=" + O1_AUTO_SEND + "（false=ログに出すだけ / true=自動送信）");
 }
@@ -3743,6 +3755,10 @@ function s1ConsentFormShapeProblems_(form) {
   for (var k = 0; k < Math.min(boxes.length, want.length); k++) {
     if (boxes[k].getTitle() !== want[k]) out.push("同意の項目 " + (k + 1) + " の文がコードと違う");
     else if (!boxes[k].asCheckboxItem().isRequired()) out.push("同意の項目 " + (k + 1) + " が必須でない");
+    else {
+      var cs = boxes[k].asCheckboxItem().getChoices();
+      if (cs.length !== 1 || cs[0].getValue() !== S1_CONSENT_CHOICE) out.push("同意の項目 " + (k + 1) + " の選択肢がコードと違う");
+    }
   }
   O1_REGISTRATION_TITLES.forEach(function (r) {
     if (titles.indexOf(r) < 0) out.push("登録の設問「" + r + "」が無い");
