@@ -35,5 +35,5 @@
 
 ## 完了処理
 - [x] 承認の後の変更の /cross-review（指摘 2 件を採用・decisions.md）
-- [ ] design.md の最終化
+- [x] design.md の最終化
 - [ ] /finish-task
