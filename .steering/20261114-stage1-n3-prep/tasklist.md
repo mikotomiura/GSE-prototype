@@ -10,21 +10,21 @@
 - [x] 引き継ぎ・ADR-043・ADR-014 判断 3・ADR-039 D1 を読む
 - [x] grill（判断 1〜9）
 - [x] worktree（`/Users/johnd/GSE-prototype-stage1-n3`・枝 `docs/gse-stage1-n3-prep`）
-- [ ] ADR-039 D1・ADR-047・ADR-050・ADR-051 を全文で読む（ルール 7）
-- [ ] ADR-014 判断 3 の 4 根拠を段 1 の構成（問い・手跡・提出・募集）に当てる材料を集める
+- [x] ADR-039 D1・ADR-047・ADR-050・ADR-051 を全文で読む（ルール 7）
+- [x] ADR-014 判断 3 の 4 根拠を段 1 の構成（問い・手跡・提出・募集）に当てる材料を集める
 
 ## 実装（文書）
-- [ ] ADR-052 の草案（Context・D1〜D9・上書きの範囲・Alternatives・Consequences・Migration・参照した書誌）
-- [ ] README の一覧と読み替えの注記
-- [ ] preregistration-stage1.md に ADR-052 への参照
+- [x] ADR-052 の草案（Context・D1〜D9・上書きの範囲・Alternatives・Consequences・Migration・参照した書誌）
+- [x] README の一覧と読み替えの注記
+- [x] preregistration-stage1.md に ADR-052 への参照
 - [x] glossary の用語
 
 ## レビュー
-- [ ] /cross-review
-- [ ] 指摘の採否を decisions に記す
+- [x] /cross-review
+- [x] 指摘の採否を decisions に記す
 
 ## 完了処理
-- [ ] 研究者が ADR-052 を読み、ステータスを決める
-- [ ] 引き継ぎ（事前登録の値・同意文書と配布物・手跡の macOS と Windows）
-- [ ] design.md の最終化
-- [ ] git commit（push と PR は研究者に確かめる）
+- [x] 研究者が ADR-052 を読み、ステータスを決める
+- [x] 引き継ぎ（事前登録の値・同意文書と配布物・手跡の macOS と Windows）
+- [x] design.md の最終化
+- [x] git commit（push と PR は研究者に確かめる）
