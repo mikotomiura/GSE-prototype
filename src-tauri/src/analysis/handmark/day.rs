@@ -52,6 +52,10 @@ pub struct DayRecord {
     pub day: i64,
     /// その日に出ていた時間（ms）。
     pub shown_ms: u64,
+    /// その日に帯（下の縁）が出ていて覆われていなかった時間（ms）。常に `shown_ms` 以下。
+    /// 古い状態ファイルには無い（0 として読む）。
+    #[serde(default)]
+    pub visible_ms: u64,
     pub toggles: Vec<Toggle>,
     /// 切っている。
     pub off: bool,
@@ -77,6 +81,7 @@ impl DayRecord {
             version: STATE_VERSION,
             day,
             shown_ms: 0,
+            visible_ms: 0,
             toggles: Vec::new(),
             off: false,
             first_shown_day: None,
@@ -119,6 +124,12 @@ impl DayRecord {
         if self.first_shown_day.is_none() {
             self.first_shown_day = Some(self.day);
         }
+    }
+
+    /// 帯が見えていた時間を足す（呼び出し側が `add_shown` と同じ条件のときだけ呼ぶ）。
+    /// `first_shown_day` は `add_shown` の仕事なので触れない。
+    pub fn add_visible(&mut self, ms: u64) {
+        self.visible_ms = self.visible_ms.saturating_add(ms);
     }
 
     /// 切った／戻した（`off` が切った）。上限を超えたら記録は足さず `overflow` を立てる。
@@ -176,6 +187,8 @@ impl DayRecord {
     /// 読み込んだ中身を検める。
     pub fn is_valid(&self) -> bool {
         self.version == STATE_VERSION
+            // 帯が見えていた量は、窓が出ていた量を超えない(駆動役は shown と一緒にしか足さない)。
+            && self.visible_ms <= self.shown_ms
             && self.toggles.len() <= MAX_PER_DAY
             && self.stage_starts.len() <= MAX_PER_DAY
             && self.input_toggles.len() <= MAX_PER_DAY
@@ -190,6 +203,7 @@ mod tests {
     fn roll_resets_the_day_but_keeps_first_shown_day() {
         let mut r = DayRecord::new(10);
         r.add_shown(5_000);
+        r.add_visible(3_000);
         r.set_off(1, true);
         r.note_stage_start(2);
         assert_eq!(r.first_shown_day, Some(10));
@@ -198,6 +212,7 @@ mod tests {
         assert!(r.roll_to(11));
         assert_eq!(r.day, 11);
         assert_eq!(r.shown_ms, 0);
+        assert_eq!(r.visible_ms, 0, "日の変わり目で 0 に戻る");
         assert!(r.toggles.is_empty() && r.stage_starts.is_empty());
         assert!(!r.off && !r.overflow);
         assert_eq!(r.first_shown_day, Some(10));
@@ -246,6 +261,19 @@ mod tests {
     }
 
     #[test]
+    fn visible_ms_above_shown_ms_is_invalid() {
+        let mut r = DayRecord::new(1);
+        r.add_shown(5_000);
+        r.add_visible(5_000);
+        assert!(r.is_valid(), "等しいのは正常");
+        r.add_visible(1);
+        assert!(!r.is_valid(), "visible_ms > shown_ms は壊れた状態ファイル");
+        // 往復しても壊れたまま(読み込み側 parse_state が Broken に倒す)
+        let back: DayRecord = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert!(!back.is_valid());
+    }
+
+    #[test]
     fn scrub_range_removes_only_inner_times_inclusive() {
         let mut r = DayRecord::new(1);
         for t in [10u64, 20, 30] {
@@ -262,7 +290,13 @@ mod tests {
         );
         assert_eq!(r.stage_starts, vec![11, 31]);
         assert_eq!(r.shown_ms, 7);
+        r.add_visible(5);
         assert!(r.scrub_range(0, u64::MAX));
+        assert_eq!(
+            (r.shown_ms, r.visible_ms),
+            (7, 5),
+            "日の量は時刻でないので残る"
+        );
         assert!(r.toggles.is_empty() && r.stage_starts.is_empty());
     }
 
@@ -272,6 +306,7 @@ mod tests {
         let old = r#"{"version":1,"day":20410,"shown_ms":0,"toggles":[{"t":5,"on":false}],"off":true,"first_shown_day":null,"stage_starts":[],"overflow":false}"#;
         let r: DayRecord = serde_json::from_str(old).unwrap();
         assert!(r.is_valid() && r.off);
+        assert_eq!(r.visible_ms, 0, "visible_ms の無い古いファイルは 0");
         assert!(r.input_toggles.is_empty() && !r.cursor_off && !r.click_off);
         assert_eq!(r.toggles, vec![Toggle { t: 5, on: false }]);
     }
@@ -286,7 +321,7 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&r).unwrap(),
             concat!(
-                r#"{"version":1,"day":20410,"shown_ms":0,"toggles":[{"t":5,"on":false}],"off":true,"#,
+                r#"{"version":1,"day":20410,"shown_ms":0,"visible_ms":0,"toggles":[{"t":5,"on":false}],"off":true,"#,
                 r#""first_shown_day":null,"stage_starts":[],"overflow":false,"#,
                 r#""input_toggles":[{"t":6,"input":"cursor","on":false},{"t":7,"input":"click","on":false},{"t":8,"input":"cursor","on":true}],"#,
                 r#""cursor_off":false,"click_off":true}"#
@@ -329,5 +364,16 @@ mod tests {
         let m = r.minimal_keeping_off();
         assert!(m.off && m.cursor_off && !m.click_off);
         assert!(m.toggles.is_empty() && m.input_toggles.is_empty());
+    }
+
+    #[test]
+    fn visible_ms_round_trips_and_adds_without_touching_first_shown_day() {
+        let mut r = DayRecord::new(5);
+        r.add_visible(40);
+        r.add_visible(2);
+        assert_eq!(r.first_shown_day, None);
+        let back: DayRecord = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert_eq!(back.visible_ms, 42);
+        assert_eq!(back, r);
     }
 }

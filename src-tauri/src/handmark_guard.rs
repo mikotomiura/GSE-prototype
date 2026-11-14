@@ -687,28 +687,52 @@ const WINDOW: [(&str, &str); 2] = [
     ),
 ];
 
+/// 帯の窓の側の本文（ADR-051・手跡の下の縁の帯）。背景の窓と同じ検査を受ける。
+/// 帯のイベント（`handmark-strip-near`・`handmark-strip-visible`）を知ってよい TS はこの 2 ファイルだけ。
+const STRIP_WINDOW: [(&str, &str); 2] = [
+    (
+        "HandmarkEdgeStrip.tsx",
+        include_str!("../../src/components/HandmarkEdgeStrip.tsx"),
+    ),
+    (
+        "handmarkStripFrame.ts",
+        include_str!("../../src/components/handmarkStripFrame.ts"),
+    ),
+];
+
+/// 窓の TS に現れてはならない語（保存・送信・返送・ネットワーク）。
+const WINDOW_BANNED: [&str; 14] = [
+    "localStorage",
+    "sessionStorage",
+    "indexedDB",
+    "invoke",
+    "@tauri-apps/api/core",
+    "fetch",
+    "WebSocket",
+    "XMLHttpRequest",
+    "EventSource",
+    "sendBeacon",
+    "postMessage",
+    "cookie",
+    "caches",
+    "console",
+];
+
 /// 窓は何も保存せず、何も返さず、外へ送らない。
 #[test]
 fn the_window_does_not_store_send_back_or_talk_to_the_network() {
+    assert_clean("窓", &WINDOW, &WINDOW_BANNED);
+}
+
+/// 帯の窓も同じ（保存・返送・外への送りが無い。推定の語も受け取らない）。
+#[test]
+fn the_strip_window_does_not_store_send_back_or_talk_to_the_network() {
+    assert_clean("帯の窓", &STRIP_WINDOW, &WINDOW_BANNED);
+    // 推定（engine・invitation・p_stuck・level）の語を窓の TS に持ち込まない。
     assert_clean(
-        "窓",
-        &WINDOW,
-        &[
-            "localStorage",
-            "sessionStorage",
-            "indexedDB",
-            "invoke",
-            "@tauri-apps/api/core",
-            "fetch",
-            "WebSocket",
-            "XMLHttpRequest",
-            "EventSource",
-            "sendBeacon",
-            "postMessage",
-            "cookie",
-            "caches",
-            "console",
-        ],
+        "帯の窓の推定",
+        &STRIP_WINDOW,
+        &["p_stuck", "invitation", "pStuck", "engine"],
     );
 }
 
@@ -752,9 +776,18 @@ fn ts_sources() -> Vec<(String, String)> {
 
 /// イベント名を本文（コメントの行を除く）に含むファイルの名前（手跡の窓の 2 ファイルを除く）。
 fn others_naming(name: &str, files: &[(String, String)]) -> Vec<String> {
+    ts_files_naming_except(name, files, &WINDOW)
+}
+
+/// イベント名を本文に含むファイルの名前（`allowed` の窓のファイルを除く）。
+fn ts_files_naming_except(
+    name: &str,
+    files: &[(String, String)],
+    allowed: &[(&str, &str)],
+) -> Vec<String> {
     files
         .iter()
-        .filter(|(n, _)| !WINDOW.iter().any(|(w, _)| w == n))
+        .filter(|(n, _)| !allowed.iter().any(|(w, _)| w == n))
         .filter(|(n, text)| {
             if n.ends_with(".html") {
                 // HTML は Rust の字句の読みに通さない（アポストロフィで崩れる）。コメントも含めて見る。
@@ -1019,7 +1052,7 @@ fn unnamed_lists(src: &str) -> Vec<String> {
 /// 窓の側の列は、名前を許した枠だけ（位置・押下の列を作らない）。
 #[test]
 fn the_window_lists_only_named_slots() {
-    for (name, src) in WINDOW {
+    for (name, src) in WINDOW.into_iter().chain(STRIP_WINDOW) {
         let bad = unnamed_lists(src);
         assert!(
             bad.is_empty(),
@@ -1144,6 +1177,7 @@ fn pointer_out_goes_to_the_log(o: &PointerOut) -> bool {
     match o {
         PointerOut::Trace(_) => false,
         PointerOut::Ripple(_) => false,
+        PointerOut::StripNear(_) => false,
     }
 }
 
@@ -1207,6 +1241,7 @@ fn a_day_of_typing_and_pointer_toggles_produces_only_handmark_day_rows() {
             match o {
                 PointerOut::Trace(_) => traces += 1,
                 PointerOut::Ripple(_) => ripples += 1,
+                PointerOut::StripNear(_) => {}
             }
         }
         if i.is_multiple_of(16) {
@@ -1360,4 +1395,625 @@ fn the_stage_window_is_not_throttled_when_covered() {
     let gone = src.replace(".background_throttling(", ".no_such_call(");
     assert_ne!(gone, src, "対照の置き換えが当たっていない");
     assert!(!stage_disables_throttling(&gone));
+}
+
+// ---- 帯の窓（PR 2・ADR-051・ADR-050 D3） ----
+
+/// 帯の窓の層の本文。`handmark_edge_strip` は macOS だけのモジュールなので、Windows でも走るこの検査は
+/// 定数を参照せずにソースを読む（2026-11-09 の CI で、macOS だけの定数を参照して Windows のビルドが止まった）。
+const STRIP_RS: &str = include_str!("handmark_edge_strip.rs");
+
+/// `src` の `[pub ]const <name>: &str = "...";` の値（行頭から探す）。
+fn rs_str_const(src: &str, name: &str) -> String {
+    let heads = [
+        format!("pub const {name}: &str = \""),
+        format!("const {name}: &str = \""),
+    ];
+    let line = src
+        .lines()
+        .map(str::trim_start)
+        .find(|l| heads.iter().any(|h| l.starts_with(h.as_str())))
+        .unwrap_or_else(|| panic!("{name} が見つからない"));
+    let head = heads
+        .iter()
+        .find(|h| line.starts_with(h.as_str()))
+        .expect("head");
+    let rest = &line[head.len()..];
+    rest[..rest.find('"').expect("閉じない文字列")].to_string()
+}
+
+/// TS の `const <name> = "...";` の値。
+fn ts_str_const(src: &str, name: &str) -> Option<String> {
+    let head = format!("const {name} = \"");
+    let line = src.lines().find(|l| l.trim_start().starts_with(&head))?;
+    let rest = &line.trim_start()[head.len()..];
+    Some(rest[..rest.find('"')?].to_string())
+}
+
+/// 見張りは、窓の `occlusionState` をそのまま見えているかにせず、画面のロック・ユーザーの切り替え・主画面の
+/// 眠りと合わせた `strip_seen` を通す（2026-11-12: ロック中も見えている扱いで、描画も止まらなかった・判断 11）。
+/// 見張りは AppHandle を要りテストで走らないので、本文で縛る。
+#[test]
+fn the_strip_probe_judges_visibility_through_strip_seen() {
+    // body() は行で読み直すので、Windows の CRLF のチェックアウトでも同じ本文になる（2026-11-12 の CI で赤）。
+    let src = body(STRIP_RS);
+    let probe = fn_body(&src, "fn probe_loop");
+    // CRLF の本文でも同じ範囲を切り出せる（macOS でも Windows の形を確かめる）。
+    let crlf = body(&STRIP_RS.replace("\r\n", "\n").replace('\n', "\r\n"));
+    assert_eq!(fn_body(&crlf, "fn probe_loop"), probe);
+    assert_eq!(
+        probe
+            .matches("let visible = strip_seen(occlusion_visible, session, asleep);")
+            .count(),
+        1,
+        "見張りが strip_seen を通していない"
+    );
+    // 窓の読みの値は、受け取りと strip_seen の呼び出しの 2 か所でしか使わない（そのまま記録・送りに回さない）。
+    assert_eq!(
+        probe.matches("occlusion_visible").count(),
+        2,
+        "見張りが occlusion_visible を strip_seen の外で使っている"
+    );
+    // 判定した値が、印と窓への送りに使われている。
+    assert_eq!(probe.matches("|| !set_seen_for(gen, visible)").count(), 1);
+    assert_eq!(
+        probe
+            .matches("app.emit_to(LABEL, VISIBLE_EVENT, visible);")
+            .count(),
+        1
+    );
+    // 読めなかった刻み（メインスレッドへ投げられない・返事が来ない）は見えていない側に倒す（Codex の指摘・判断 14）。
+    assert_eq!(probe.matches("set_seen_for(gen, false);").count(), 2);
+    assert!(probe.contains("let session = read_session();"));
+    assert!(probe.contains("let asleep = main_display.is_asleep();"));
+}
+
+/// `item` の宣言から、同じ字下げで閉じる `}` までの本文（`fn` の検査用）。
+fn fn_body<'a>(src: &'a str, item: &str) -> &'a str {
+    let from = src
+        .find(item)
+        .unwrap_or_else(|| panic!("{item} が見つからない"));
+    let line_start = src[..from].rfind('\n').map_or(0, |i| i + 1);
+    let indent = &src[line_start..from];
+    let close = format!("\n{indent}}}\n");
+    let to = src[from..]
+        .find(&close)
+        .unwrap_or_else(|| panic!("{item} の終わりが見つからない"));
+    &src[from..from + to + close.len()]
+}
+
+/// `read_session` が画面のセッションの辞書から読むのは、ロックの印と前に出ているかの 2 つの鍵だけ。
+/// 利用者の名前などの他の鍵を読む・辞書を回す・値を Debug で出す道を作らない（security-checker L1・判断 13）。
+#[test]
+fn read_session_reads_only_the_two_session_keys() {
+    let src = body(STRIP_RS);
+    let f = fn_body(&src, "fn read_session");
+    let keys: Vec<&str> = f
+        .match_indices("truthy(\"")
+        .map(|(i, _)| {
+            let rest = &f[i + "truthy(\"".len()..];
+            &rest[..rest.find('"').expect("閉じない鍵")]
+        })
+        .collect();
+    assert_eq!(
+        keys,
+        ["CGSSessionScreenIsLocked", "kCGSSessionOnConsoleKey"]
+    );
+    // 辞書に触れるのは truthy の中の 1 か所だけ（find 以外の読み方・直の CF 呼び出しも数える）。
+    assert_eq!(
+        f.matches("dict.").count(),
+        1,
+        "辞書の読みは truthy の 1 か所だけ"
+    );
+    // 陽性対照の語は実行時に組み立てる（この検査の本文に検査対象の語を書かない）。
+    let banned = [
+        ["User", "Name"].concat(),
+        ["get_keys", "_and_values"].concat(),
+        [".it", "er("].concat(),
+        ["{", ":?}"].concat(),
+        ["tracing", "::"].concat(),
+        ["Get", "Value"].concat(),
+    ];
+    for b in &banned {
+        assert!(!f.contains(b.as_str()), "read_session に {b} がある");
+    }
+    // 陽性対照: 他の鍵を読む本文は赤になる。
+    let planted = f.replace(
+        "\"kCGSSessionOnConsoleKey\"",
+        &format!("\"{}\"", ["kCGSSession", "User", "Name", "Key"].concat()),
+    );
+    assert!(planted.contains(&banned[0]));
+    let planted_keys: Vec<&str> = planted
+        .match_indices("truthy(\"")
+        .map(|(i, _)| {
+            let rest = &planted[i + "truthy(\"".len()..];
+            &rest[..rest.find('"').expect("閉じない鍵")]
+        })
+        .collect();
+    assert_ne!(
+        planted_keys,
+        ["CGSSessionScreenIsLocked", "kCGSSessionOnConsoleKey"]
+    );
+}
+
+/// 帯のイベント名（近さ・見えているか）を TS で知ってよいのは帯の 2 ファイルだけ（`target` なしの `listen` で
+/// 他の窓に届かないように）。背景の窓の TS も知らない。帯の窓の TS は場・波紋のイベントを知らない。
+#[test]
+fn only_the_strip_window_knows_the_strip_events() {
+    let files = ts_sources();
+    assert!(files.len() > 5, "src/ の走査が空回り: {}", files.len());
+    for name in [
+        rs_str_const(STRIP_RS, "NEAR_EVENT"),
+        rs_str_const(STRIP_RS, "VISIBLE_EVENT"),
+    ] {
+        let name = name.as_str();
+        assert!(name.starts_with("handmark-strip-"), "想定外の値: {name}");
+        assert!(
+            ts_files_naming_except(name, &files, &STRIP_WINDOW).is_empty(),
+            "{name} を帯の窓の外のコードが知っている: {:?}",
+            ts_files_naming_except(name, &files, &STRIP_WINDOW)
+        );
+        // 帯の窓は実際に聞いている（探し方が空回りしていない）
+        assert!(
+            body(STRIP_WINDOW[0].1).contains(name),
+            "{name} を HandmarkEdgeStrip.tsx が聞いていない"
+        );
+        // 陽性対照: 背景の窓のファイル・他のファイルが名前を書いたら見つかる（拡張子ごと・HTML も）
+        for planted_name in [
+            "HandmarkStage.tsx",
+            "Planted.tsx",
+            "planted.js",
+            "planted.jsx",
+            "planted.mjs",
+            "planted.html",
+        ] {
+            let mut planted = files
+                .iter()
+                .filter(|(n, _)| n != planted_name)
+                .cloned()
+                .collect::<Vec<_>>();
+            planted.push((planted_name.to_string(), format!("listen('{name}')")));
+            assert_eq!(
+                ts_files_naming_except(name, &planted, &STRIP_WINDOW),
+                vec![planted_name.to_string()],
+                "対照が赤にならない（{planted_name}）"
+            );
+        }
+    }
+    // 帯の窓の TS は、場・波紋のイベントを知らない（`others_naming` は帯のファイルを除かない）。
+    for name in [stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT")] {
+        assert!(
+            STRIP_WINDOW.iter().all(|(_, t)| !body(t).contains(&name)),
+            "帯の窓が {name} を知っている"
+        );
+    }
+}
+
+/// 帯のイベント名（定数名と文字列）を Rust で参照してよいのは `handmark_edge_strip.rs` だけ。近さを送る
+/// 関数 `emit_near` を呼べるのは `lib.rs`（ポインタのスレッドの配線）と定義のファイルだけ。
+#[test]
+fn only_the_strip_rs_names_the_strip_events_and_only_lib_calls_emit_near() {
+    let files = rs_sources();
+    assert!(files.len() > 30, "走査が空回り: {}", files.len());
+    let (near, visible) = (
+        rs_str_const(STRIP_RS, "NEAR_EVENT"),
+        rs_str_const(STRIP_RS, "VISIBLE_EVENT"),
+    );
+    let events = [
+        "NEAR_EVENT",
+        "VISIBLE_EVENT",
+        near.as_str(),
+        visible.as_str(),
+    ];
+    assert!(files.iter().any(|(n, _)| n == "handmark_edge_strip.rs"));
+    assert_eq!(
+        rs_files_naming(&events, &["handmark_edge_strip.rs"], &files),
+        Vec::<String>::new()
+    );
+    let names = ["emit_near"];
+    assert_eq!(
+        rs_files_naming(&names, &["lib.rs", "handmark_edge_strip.rs"], &files),
+        Vec::<String>::new()
+    );
+    // 許したファイルは本当に使っている（探し方が空回りしていない）。
+    let strip = files
+        .iter()
+        .find(|(n, _)| n == "handmark_edge_strip.rs")
+        .expect("strip");
+    assert!(events.iter().all(|w| body(&strip.1).contains(w)));
+    let lib = files.iter().find(|(n, _)| n == "lib.rs").expect("lib.rs");
+    assert!(body(&lib.1).contains("emit_near"));
+    // 陽性対照: 他のファイル（背景の窓の層を含む）が書いたら見つかる（拡張子の違う別名も同じ）。
+    for planted_name in ["planted.rs", "handmark_stage.rs"] {
+        for w in events {
+            let mut planted: Vec<_> = files
+                .iter()
+                .filter(|(n, _)| n != planted_name)
+                .cloned()
+                .collect();
+            planted.push((
+                planted_name.to_string(),
+                format!("fn f() {{ let _ = \"{w}\"; {w}; }}"),
+            ));
+            assert_eq!(
+                rs_files_naming(&events, &["handmark_edge_strip.rs"], &planted),
+                vec![planted_name.to_string()],
+                "対照が赤にならない（{planted_name}・{w}）"
+            );
+        }
+        let mut planted: Vec<_> = files
+            .iter()
+            .filter(|(n, _)| n != planted_name)
+            .cloned()
+            .collect();
+        planted.push((
+            planted_name.to_string(),
+            "fn f() { emit_near(); }".to_string(),
+        ));
+        assert_eq!(
+            rs_files_naming(&names, &["lib.rs", "handmark_edge_strip.rs"], &planted),
+            vec![planted_name.to_string()]
+        );
+    }
+}
+
+/// 帯の窓の層は、記録・ログの口・ファイル・ネットワーク・推定を呼ばない。送りは帯の窓だけへ（`emit_to`）。
+#[test]
+fn the_strip_rs_touches_no_recorder_file_network_estimator_and_emits_only_to_its_window() {
+    assert_clean(
+        "帯の窓の層",
+        &[("handmark_edge_strip.rs", STRIP_RS)],
+        &[
+            "LogEntry",
+            "log_tx",
+            "crate::logger",
+            "std::fs",
+            "OpenOptions",
+            "applog",
+            "std::net",
+            "reqwest",
+            "TcpStream",
+            "crate::analysis::engine",
+            "features",
+            "intervention",
+            "invitation",
+            "p_stuck",
+            "handmark_pointer::",
+            "handmark_pointer_macos",
+            // 宛先の絞りを迂回する口(`emit_to` の第 1 引数の検査と対にする)
+            "emit_filter",
+            "EventTarget",
+            "Emitter::emit",
+        ],
+    );
+    let all = [".", "emit", "("].concat();
+    assert!(hits(STRIP_RS, &[all.as_str()]).is_empty());
+    assert!(body(STRIP_RS).contains("emit_to"));
+    assert_eq!(
+        hits(&format!("{all}\n{STRIP_RS}"), &[all.as_str()]).len(),
+        1
+    );
+    // 全窓から聞く口を使わない
+    let listen_any = ["listen", "_any"].concat();
+    assert!(hits(STRIP_RS, &[listen_any.as_str()]).is_empty());
+    // 窓の様子の口（`status`）は背景の窓のもの。帯の窓の層は背景の窓を開け閉めしない。
+    assert!(hits(STRIP_RS, &["handmark_stage::open", "handmark_stage::close"]).is_empty());
+}
+
+/// 帯の窓も、覆われたときに WKWebView の既定（suspend）で絞られない。
+#[test]
+fn the_strip_window_is_not_throttled_when_covered() {
+    assert!(stage_disables_throttling(STRIP_RS));
+    // 陽性対照: 指定を外すと赤になる。
+    let gone = STRIP_RS.replace(".background_throttling(", ".no_such_call(");
+    assert_ne!(gone, STRIP_RS, "対照の置き換えが当たっていない");
+    assert!(!stage_disables_throttling(&gone));
+}
+
+/// 帯の窓の label が Rust・capabilities・`main.tsx` の分岐で食い違わない（食い違うと窓が空のまま・権限が無い）。
+fn label_mismatches(rs: &str, caps: &str, main_tsx: &str) -> Vec<&'static str> {
+    let label = rs_str_const(rs, "LABEL");
+    let mut out = Vec::new();
+    let caps_json: serde_json::Value = serde_json::from_str(caps).expect("capabilities の JSON");
+    let in_caps = caps_json["windows"]
+        .as_array()
+        .is_some_and(|w| w.iter().any(|v| v.as_str() == Some(label.as_str())));
+    if !in_caps {
+        out.push("capabilities");
+    }
+    if !main_tsx.contains(&format!("windowLabel === \"{label}\"")) {
+        out.push("main.tsx");
+    }
+    out
+}
+
+#[test]
+fn the_strip_label_agrees_across_rust_capabilities_and_main_tsx() {
+    let caps = include_str!("../capabilities/handmark-stage.json");
+    let main_tsx = include_str!("../../src/main.tsx");
+    assert_eq!(rs_str_const(STRIP_RS, "LABEL"), "handmark-edge-strip");
+    assert!(label_mismatches(STRIP_RS, caps, main_tsx).is_empty());
+    // 陽性対照: 片方を変えると食い違いが出る。
+    let caps_changed = caps.replace("handmark-edge-strip", "handmark-edge-stripe");
+    assert_ne!(caps_changed, caps);
+    assert_eq!(
+        label_mismatches(STRIP_RS, &caps_changed, main_tsx),
+        vec!["capabilities"]
+    );
+    let main_changed = main_tsx.replace("handmark-edge-strip", "handmark-edge-stripe");
+    assert_ne!(main_changed, main_tsx);
+    assert_eq!(
+        label_mismatches(STRIP_RS, caps, &main_changed),
+        vec!["main.tsx"]
+    );
+}
+
+/// 窓の TS に手で写した値（イベント名・状態の間隔・近さの上限）と Rust の食い違い。
+fn strip_const_mismatches(tsx: &str, frame_ts: &str) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    if ts_str_const(tsx, "STATE_EVENT").as_deref() != Some(stage_event("STATE_EVENT").as_str()) {
+        out.push("STATE_EVENT");
+    }
+    if ts_str_const(tsx, "NEAR_EVENT").as_deref()
+        != Some(rs_str_const(STRIP_RS, "NEAR_EVENT").as_str())
+    {
+        out.push("NEAR_EVENT");
+    }
+    if ts_str_const(tsx, "VISIBLE_EVENT").as_deref()
+        != Some(rs_str_const(STRIP_RS, "VISIBLE_EVENT").as_str())
+    {
+        out.push("VISIBLE_EVENT");
+    }
+    let tick = crate::analysis::handmark::state::TICK_MS as f64;
+    if ts_const(frame_ts, "STATE_TICK_MS").is_none_or(|t| (t - tick).abs() > 1e-6) {
+        out.push("STATE_TICK_MS");
+    }
+    // 近さの上限は、帯の上にいるときの `strip_near` の値
+    let top = f64::from(crate::handmark_pointer_thread::strip_near(true, 5.0, 0.0));
+    if ts_const(frame_ts, "NEAR_MAX").is_none_or(|t| (t - top).abs() > 1e-6) {
+        out.push("NEAR_MAX");
+    }
+    out
+}
+
+#[test]
+fn the_strip_window_copies_the_constants_exactly() {
+    let (tsx, frame_ts) = (STRIP_WINDOW[0].1, STRIP_WINDOW[1].1);
+    assert!(
+        strip_const_mismatches(tsx, frame_ts).is_empty(),
+        "{:?}",
+        strip_const_mismatches(tsx, frame_ts)
+    );
+    // 陽性対照: 片方だけ値を変えると食い違いが出る。
+    let changed = frame_ts.replacen(
+        "export const STATE_TICK_MS = 250;",
+        "export const STATE_TICK_MS = 200;",
+        1,
+    );
+    assert_ne!(changed, frame_ts, "対照の置き換えが当たっていない");
+    assert_eq!(strip_const_mismatches(tsx, &changed), vec!["STATE_TICK_MS"]);
+    let changed = frame_ts.replacen(
+        "export const NEAR_MAX = 10;",
+        "export const NEAR_MAX = 1;",
+        1,
+    );
+    assert_ne!(changed, frame_ts);
+    assert_eq!(strip_const_mismatches(tsx, &changed), vec!["NEAR_MAX"]);
+    let changed = tsx.replacen(
+        "const NEAR_EVENT = \"handmark-strip-near\";",
+        "const NEAR_EVENT = \"handmark-strip-nearby\";",
+        1,
+    );
+    assert_ne!(changed, tsx);
+    assert_eq!(
+        strip_const_mismatches(&changed, frame_ts),
+        vec!["NEAR_EVENT"]
+    );
+    let changed = tsx.replacen("const STATE_EVENT = \"handmark-state\";", "", 1);
+    assert_ne!(changed, tsx);
+    assert_eq!(
+        strip_const_mismatches(&changed, frame_ts),
+        vec!["STATE_EVENT"]
+    );
+}
+
+/// `emit_to(` の呼び出しごとの第 1 引数（空白を除いた文字列）。本文（コメント・テストを除く）から読む。
+fn emit_to_targets(src: &str) -> Vec<String> {
+    let b = body(src);
+    let mut out = Vec::new();
+    let mut rest = b.as_str();
+    let head = ["emit", "_to("].concat();
+    while let Some(i) = rest.find(&head) {
+        let after = &rest[i + head.len()..];
+        let end = after.find(',').unwrap_or(after.len());
+        out.push(after[..end].split_whitespace().collect::<String>());
+        rest = after;
+    }
+    out
+}
+
+/// 帯の層の送りは、宛先がすべて帯の窓の `LABEL`（宛先を変数・別の窓・全窓にすると赤）。
+#[test]
+fn every_emit_to_in_the_strip_rs_targets_label() {
+    let targets = emit_to_targets(STRIP_RS);
+    assert!(
+        targets.len() >= 4,
+        "送りの数が想定より少ない（空回り）: {targets:?}"
+    );
+    assert!(
+        targets.iter().all(|t| t == "LABEL"),
+        "emit_to の第 1 引数が LABEL でない: {targets:?}"
+    );
+    // 陽性対照: 別の宛先（文字列・別の定数・改行を挟む形）を足すと見つかる。
+    for planted_target in ["\"main\"", "OTHER", "self.target"] {
+        for call in [
+            format!("fn f() {{ app.emit_to({planted_target}, X, 1); }}"),
+            format!("fn f() {{ app.emit_to(\n    {planted_target},\n    X, 1); }}"),
+        ] {
+            let planted = format!("{call}\n{STRIP_RS}");
+            let t = emit_to_targets(&planted);
+            assert_eq!(t.len(), targets.len() + 1);
+            assert!(
+                t.iter().any(|x| x != "LABEL"),
+                "対照が赤にならない: {planted_target}"
+            );
+        }
+    }
+}
+
+/// 帯の層の `tracing` は `warn_once` の 1 か所だけ（値・状態をログに出さない）。
+#[test]
+fn the_strip_rs_has_exactly_one_tracing_call_in_warn_once() {
+    let needle = ["tracing", "::"].concat();
+    let count = |src: &str| body(src).matches(needle.as_str()).count();
+    assert_eq!(count(STRIP_RS), 1, "tracing:: は warn_once の 1 か所だけ");
+    let b = body(STRIP_RS);
+    let from = b.find("fn warn_once").expect("warn_once");
+    let end = b[from..].find("\n    }\n").expect("warn_once の終わり");
+    assert!(
+        b[from..from + end].contains(needle.as_str()),
+        "tracing:: が warn_once の外にある"
+    );
+    // 陽性対照: 1 行足すと数が増える。
+    let planted = format!("{STRIP_RS}\nfn x() {{ {needle}debug!(\"x\"); }}");
+    assert_eq!(count(&planted), 2);
+}
+
+/// `emit_near` を `lib.rs` が呼ぶのは 1 か所だけ（ポインタのスレッドの配線）。
+#[test]
+fn lib_rs_calls_emit_near_exactly_once() {
+    let files = rs_sources();
+    let lib = files.iter().find(|(n, _)| n == "lib.rs").expect("lib.rs");
+    let count = |src: &str| body(src).matches("emit_near").count();
+    assert_eq!(count(&lib.1), 1, "lib.rs の emit_near は 1 か所だけ");
+    let planted = format!("{}\nfn x() {{ emit_near(); }}", lib.1);
+    assert_eq!(count(&planted), 2, "対照が赤にならない");
+}
+
+const CONF: &str = include_str!("../tauri.conf.json");
+
+/// CSP の指令ごとの値（文字列でもオブジェクトでも読む）。
+fn csp_directives(conf: &str) -> Vec<(String, Vec<String>)> {
+    let v: serde_json::Value = serde_json::from_str(conf).expect("tauri.conf.json");
+    let csp = &v["app"]["security"]["csp"];
+    match csp {
+        serde_json::Value::String(s) => s
+            .split(';')
+            .filter_map(|d| {
+                let mut it = d.split_whitespace();
+                let name = it.next()?.to_string();
+                Some((name, it.map(str::to_string).collect()))
+            })
+            .collect(),
+        serde_json::Value::Object(m) => m
+            .iter()
+            .map(|(k, val)| {
+                let toks = match val {
+                    serde_json::Value::String(s) => {
+                        s.split_whitespace().map(str::to_string).collect()
+                    }
+                    serde_json::Value::Array(a) => a
+                        .iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                (k.clone(), toks)
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// 外の宛先を許す指令(`connect-src`・`img-src`・`default-src`)の値。
+fn csp_external(conf: &str) -> Vec<String> {
+    // 許す source expression の一覧（これ以外は外の宛先になりうるとみなす。スキームを省いたホスト名も赤）。
+    let allowed = ["'self'", "data:", "'none'"];
+    csp_directives(conf)
+        .into_iter()
+        .filter(|(n, _)| ["connect-src", "img-src", "default-src"].contains(&n.as_str()))
+        .flat_map(|(n, toks)| toks.into_iter().map(move |t| (n.clone(), t)))
+        .filter(|(_, t)| !allowed.contains(&t.as_str()))
+        .map(|(n, t)| format!("{n} {t}"))
+        .collect()
+}
+
+/// CSP に外の宛先が無い(窓が外へ送れない)。`default-src` が `connect-src` の既定になるので、これも要る。
+#[test]
+fn the_csp_names_no_external_destination() {
+    let dirs = csp_directives(CONF);
+    assert!(
+        dirs.iter()
+            .any(|(n, t)| n == "default-src" && t.iter().any(|x| x == "'self'")),
+        "default-src 'self' が無い: {dirs:?}"
+    );
+    assert_eq!(csp_external(CONF), Vec::<String>::new());
+    // 陽性対照: 外の宛先を足すと赤になる(文字列の形・オブジェクトの形、どちらの指令でも)。
+    for (find, put) in [
+        (
+            "default-src 'self'",
+            "default-src 'self' https://example.invalid",
+        ),
+        (
+            "img-src 'self' data:",
+            "img-src 'self' data: http://example.invalid",
+        ),
+        ("default-src 'self'", "default-src *"),
+        (
+            "default-src 'self'",
+            "default-src 'self'; connect-src ws://example.invalid",
+        ),
+        (
+            "default-src 'self'",
+            "default-src 'self'; connect-src wss://example.invalid",
+        ),
+        // スキームを省いたホスト名（2026-11-12 の Codex の指摘・旧い検査は通していた）。
+        (
+            "default-src 'self'",
+            "default-src 'self'; connect-src example.invalid",
+        ),
+    ] {
+        let planted = CONF.replacen(find, put, 1);
+        assert_ne!(planted, CONF, "対照の置き換えが当たっていない: {find}");
+        assert!(
+            !csp_external(&planted).is_empty(),
+            "対照が赤にならない: {put}"
+        );
+    }
+    let object_form = r#"{"app":{"security":{"csp":{"default-src":"'self'","connect-src":["'self'","https://example.invalid"]}}}}"#;
+    assert_eq!(csp_external(object_form).len(), 1);
+}
+
+/// 帯のイベント名の接頭辞(連結の片割れ: `"handmark-strip-" + x`)も、帯の 2 ファイルの外に現れない。
+#[test]
+fn the_strip_event_prefix_appears_only_in_the_strip_window() {
+    let files = ts_sources();
+    assert!(files.len() > 5, "src/ の走査が空回り: {}", files.len());
+    let prefix = ["handmark", "-strip-"].concat();
+    assert_eq!(
+        ts_files_naming_except(&prefix, &files, &STRIP_WINDOW),
+        Vec::<String>::new(),
+        "帯の窓の外のコードが接頭辞を書いている"
+    );
+    // 帯の窓は実際に書いている(探し方が空回りしていない)
+    assert!(body(STRIP_WINDOW[0].1).contains(prefix.as_str()));
+    // 陽性対照: 連結の片割れだけでも、拡張子ごと・HTML も見つかる。
+    for planted_name in [
+        "Planted.tsx",
+        "planted.ts",
+        "planted.js",
+        "planted.mjs",
+        "planted.html",
+    ] {
+        let mut planted = files.clone();
+        planted.push((
+            planted_name.to_string(),
+            format!("const n = \"{prefix}\" + kind;"),
+        ));
+        assert_eq!(
+            ts_files_naming_except(&prefix, &planted, &STRIP_WINDOW),
+            vec![planted_name.to_string()],
+            "対照が赤にならない（{planted_name}）"
+        );
+    }
 }

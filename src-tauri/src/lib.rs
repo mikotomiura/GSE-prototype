@@ -58,6 +58,9 @@ pub mod handmark_pointer_thread;
 // 手跡の背景の窓(macOS だけ・ADR-051)。駆動役の出来事だけが開け閉めする。
 #[cfg(target_os = "macos")]
 pub mod handmark_stage;
+// 手跡の下の縁の帯の窓(macOS だけ・ADR-051)。背景の窓と一緒に開け閉めする(帯は従)。
+#[cfg(target_os = "macos")]
+pub mod handmark_edge_strip;
 pub mod handmark_store;
 // 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
 pub mod s1_day_state;
@@ -2358,11 +2361,21 @@ fn run_handmark_effects(
                 }
             }
             #[cfg(target_os = "macos")]
-            Effect::OpenWindow { .. } => crate::handmark_stage::open(app),
+            Effect::OpenWindow { .. } => {
+                crate::handmark_stage::open(app);
+                // 帯は従: 出せなくても背景は閉じない(帯の側が理由を 1 行残す)。
+                crate::handmark_edge_strip::open(app);
+            }
             #[cfg(target_os = "macos")]
-            Effect::CloseWindow => crate::handmark_stage::close(app),
+            Effect::CloseWindow => {
+                crate::handmark_stage::close(app);
+                crate::handmark_edge_strip::close(app);
+            }
             #[cfg(target_os = "macos")]
-            Effect::State(s) => crate::handmark_stage::emit_state(app, &s),
+            Effect::State(s) => {
+                crate::handmark_stage::emit_state(app, &s);
+                crate::handmark_edge_strip::emit_state(app, &s);
+            }
             #[cfg(not(target_os = "macos"))]
             Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
@@ -2527,6 +2540,7 @@ impl Drop for HandmarkWindowGuard {
         // トレイの項目を開け直し、駆動役が居ないので誰も閉じない。
         handmark_clear_driver();
         crate::handmark_stage::close(&self.app);
+        crate::handmark_edge_strip::close(&self.app);
         crate::tray::set_handmark_item(crate::handmark_driver::TrayItem::Hidden);
         crate::tray::set_handmark_inputs(None);
         // ポインタのスレッドも読むのをやめる(閉じた門)
@@ -2560,6 +2574,9 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
                 },
                 |s, now| crate::handmark_stage::emit_trace(&app, s, now),
                 |r, now| crate::handmark_stage::emit_ripple(&app, r, now),
+                // 帯の置き場(帯が出ていなければ None・近さは 0)と、近さを帯の窓だけへ送る口。
+                crate::handmark_edge_strip::spot,
+                |n, _| crate::handmark_edge_strip::emit_near(&app, n),
                 |ms| thread::sleep(Duration::from_millis(ms)),
                 is_shutting_down,
             );
@@ -2631,6 +2648,8 @@ fn spawn_handmark_driver(
             }
             // 窓の層の様子(作れなかった・出せなかった)を、この刻みの前に駆動役へ渡す
             let mut fx = d.on_window_status(handmark_window_status(), wall);
+            // 帯が出ていて見えているか(見えていた時間 `visible_ms` の足し込み用)
+            d.on_strip_visible(crate::handmark_edge_strip::visible());
             fx.extend(d.tick(fs, wall, today));
             run_handmark_effects(&app, &log_tx, fx);
         }
@@ -7268,6 +7287,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             if crate::s1::is_s1() {
                 crate::handmark_stage::setup(app);
+                crate::handmark_edge_strip::setup(app);
             }
 
             // ★★ 常駐トレイ。⚠️ **窓を閉じると UI ごと消えるのに計測は生きている**という穴を塞ぐ
