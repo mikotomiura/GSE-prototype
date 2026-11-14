@@ -3448,6 +3448,28 @@ function s1FormText(form) {
   const ctx = makeS1Ctx();
   const r = attempt(() => ctx.s1OpenFixed_(O1_C));
   push("§20 s1OpenFixed_ も O1 の ID を開かない", r.threw && ctx.__openedFormIds.indexOf(O1_C) < 0, r);
+  const flag = makeS1Ctx({ s1Responses: 1 });
+  flag.O1_ALLOW_REBUILD_WITH_RESPONSES = true;
+  const rf = attempt(() => flag.buildS1ConsentForm());
+  push("§20 O1 の作り直しのフラグが立っていても回答のある段 1 のフォームは作り直さない", rf.threw && flag.__forms[S1_C].__deleted === 0, rf);
+  // 逆向き: O1 の構築とトリガは段 1 のフォームに触れない。
+  const rev = makeS1Ctx();
+  rev.__props.FORM_ID_O1_CONSENT = S1_C;
+  push(
+    "§20 FORM_ID_O1_CONSENT が段 1 のフォームなら O1 の設定の問いになる",
+    rev.o1ConfigProblems_().some((p) => p.indexOf("FORM_ID_S1_CONSENT") >= 0),
+    { p: rev.o1ConfigProblems_() }
+  );
+  const rb2 = attempt(() => rev.buildO1ConsentForm());
+  push("§20 O1 の構築は段 1 のフォームを開かない", rb2.threw && rev.__openedFormIds.indexOf(S1_C) < 0, rb2);
+  const rev2 = makeS1Ctx();
+  rev2.o1ConfigProblems_ = () => [];
+  rev2.__props.FORM_ID_O1_CONSENT = S1_C;
+  const rt = attempt(() => rev2.installO1ConsentTrigger());
+  push("§20 O1 のトリガは段 1 のフォームに張らない（設定の検査を外しても）", rt.threw && rev2.__triggers.length === 0, rt);
+  const np = makeS1Ctx();
+  const rn = attempt(() => np.o1FinishO1Registration_({ email: "a@example.com", os: "Mac" }, "P001", "https://x", { reason: "new-pid", note: "" }));
+  push("§20 登録の型を渡し忘れたら O1 に倒さず止まる", rn.threw && np.__mails.length === 0, rn);
   const withResp = makeS1Ctx({ s1Responses: 2 });
   const rr = attempt(() => withResp.buildS1ConsentForm());
   push("§20 回答のある段 1 のフォームは作り直さない", rr.threw && withResp.__forms[S1_C].__deleted === 0, rr);
@@ -3480,6 +3502,22 @@ function s1FormText(form) {
     rb.threw && noUrl.__openedFormIds.length === 0 && noUrl.__forms[S1_C].__items.length === 0,
     { threw: rb.threw, opened: noUrl.__openedFormIds }
   );
+  [
+    "https://drive.example/o1?usp=sharing",
+    "https://drive.example/o1/",
+    "HTTPS://DRIVE.EXAMPLE/o1#x",
+  ].forEach((u) => {
+    const c = makeS1Ctx({ s1Url: u });
+    push(`§20 O1 と同じ URL の書き換え（${u}）も設定の問いになる`, c.s1ConfigProblems_().length > 0, {});
+  });
+  const drive = makeS1Ctx({ s1Url: "https://drive.google.com/drive/u/0/folders/ABC_123?usp=sharing" });
+  drive.__props.O1_APP_DOWNLOAD_URL = "https://drive.google.com/drive/folders/ABC_123";
+  push("§20 Drive の同じフォルダ ID なら設定の問いになる", drive.s1ConfigProblems_().length > 0, {});
+  const other = makeS1Ctx({ s1Url: "https://drive.google.com/drive/folders/S1_FOLDER" });
+  other.__props.O1_APP_DOWNLOAD_URL = "https://drive.google.com/drive/folders/O1_FOLDER";
+  push("§20 陽性対照: 違う Drive のフォルダなら問いは 0 件", other.s1ConfigProblems_().length === 0, {
+    p: other.s1ConfigProblems_(),
+  });
   const r = attempt(() => same.s1RegisterAckBody_("P001"));
   push("§20 受付メールの本文も O1 と同じ URL なら作らない（最後の砦）", r.threw, r);
 }
@@ -3487,6 +3525,7 @@ function s1FormText(form) {
 {
   // トリガ: 段 1 の付け外しは O1 のトリガに触らない。
   const ctx = makeS1Ctx();
+  ctx.buildS1ConsentForm();
   ctx.__triggers.push({ getHandlerFunction: () => "onO1ConsentSubmit" });
   const r = attempt(() => ctx.installS1ConsentTrigger());
   const fns = ctx.__triggers.map((t) => t.getHandlerFunction());
@@ -3510,6 +3549,21 @@ function s1FormText(form) {
     rb.threw && bad.__triggers.length === 1,
     { n: bad.__triggers.length }
   );
+  // 未構築のフォーム・開けないフォームでは、既存の段 1 のトリガを消さずに止まる。
+  const unbuilt = makeS1Ctx();
+  unbuilt.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
+  const ru = attempt(() => unbuilt.installS1ConsentTrigger());
+  push("§20 未構築のフォームにはトリガを張らず、既存の段 1 のトリガも消さない", ru.threw && unbuilt.__triggers.length === 1, {
+    n: unbuilt.__triggers.length,
+  });
+  const gone = makeS1Ctx();
+  gone.buildS1ConsentForm();
+  delete gone.__forms[S1_C];
+  gone.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
+  const rg = attempt(() => gone.installS1ConsentTrigger());
+  push("§20 フォームを開けないときも既存の段 1 のトリガを消さない", rg.threw && gone.__triggers.length === 1, {
+    n: gone.__triggers.length,
+  });
   const o1 = makeS1Ctx();
   o1.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
   o1.removeO1ConsentTriggers();
@@ -3616,9 +3670,9 @@ cases.forEach((c) => {
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
 // 2026-10-08: §19 を足して 277 件、§6 に 5 件を足して 282 件なので下限 277。
 // 2026-11-14: §20（段 1 の同意フォーム）を足した。下限は実数に合わせて直す。
-if (cases.length < 330) {
+if (cases.length < 345) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（330 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（345 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

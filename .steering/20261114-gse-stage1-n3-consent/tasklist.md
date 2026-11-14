@@ -17,16 +17,18 @@
 
 ## レビュー（場面ごとの道具）
 - [ ] 文面: attack-me か /cross-review（Codex を含む・記録の本文と集計は送らない）
-- [ ] フォームのコード: code-reviewer ＋ security-checker ＋ /cross-review ← 今ここ
+- [x] フォームのコード: security-checker ＋ /cross-review（Codex）。指摘の処理は decisions.md「レビューの処理」
+- [ ] 直した後の /cross-review 2 巡目 ← 今ここ
 
 ## 承認の後
 - [ ] 承認の印を md の行頭に 1 回
 - [ ] ADR-031・ADR-032 を Accepted（ADR-032 は段 1 の系統に計器を入れないと状態の行に・判断 11）、README を更新
-- [ ] `docs/o1-deletion-ledger.md` に段 1 の同意の正本と取り消し（判断 8）の行
+- [ ] `docs/o1-deletion-ledger.md` に段 1 の同意の正本と取り消し（判断 8）の行、同じ P-ID は `s1_mode` で分ける（判断 19）
 
 ## 引き継ぎ（他のタスクへ渡す）
 - [ ] 手跡の PR: 消した時間帯の累計を後の行から引く（判断 13）・どけた回数（判断 3）・一時停止中の表示（配る前の条件 12）
 - [ ] 3 名向けの配布のタスク: `S1ConsentPanel.tsx` の取り消しの文（判断 8）・トレイの場所の書き方（条件 10）・終了後の説明（判断 6）
+- [ ] O1 の後始末: `installO1ConsentTrigger` も外してから開く順（Codex・O1 の進行中は触らない）
 - [ ] 事前登録のタスク: 最長の期間は 8 週間以内（判断 9）・取り消しはやめた扱い（判断 8）・頻度を変えたら同意を直す（条件 9）
 
 ## 完了処理

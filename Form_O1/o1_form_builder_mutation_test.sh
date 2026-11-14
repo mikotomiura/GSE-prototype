@@ -388,7 +388,7 @@ mutate "段 1: s1OpenFixed_ が O1 の ID を拒まない" \
 mutate "段 1: 設定の検査が O1 のフォームと同じ ID を見ない" \
   's/    if \(cfg\.consentFormId === cfg\.o1ConsentFormId \|\| cfg\.consentFormId === cfg\.o1SurveyFormId\) \{/    if (false) {/'
 mutate "段 1: アプリの URL が O1 と同じでも通す" \
-  's/  if \(o1Url && url === o1Url\) \{/  if (false) {/'
+  's/  if \(o1Url && s1UrlKey_\(url\) === s1UrlKey_\(o1Url\)\) \{/  if (false) {/'
 mutate "段 1: 登録ログの種別を O1 と同じにする" \
   's/var S1_MGMT_KIND = "s1-register";/var S1_MGMT_KIND = "register";/'
 mutate "段 1: トリガの外しが O1 のトリガも消す" \
@@ -397,6 +397,20 @@ mutate "段 1: 受付メールに O1 の件名を使う" \
   's/    ackSubject: s1RegisterAckSubject_,/    ackSubject: o1RegisterAckSubject_,/'
 mutate "段 1: 設定が欠けていても構築する" \
   's/function buildS1ConsentForm\(\) \{\n  var problems = s1ConfigProblems_\(\);/function buildS1ConsentForm() {\n  var problems = [];/'
+
+# --- 2026-11-14 レビューの指摘（§20） ---------------------------------------------
+mutate "段 1: URL を書き換えずに比べる" \
+  's/  if \(o1Url && s1UrlKey_\(url\) === s1UrlKey_\(o1Url\)\) \{/  if (o1Url && url === o1Url) {/'
+mutate "逆向き: o1AssertNotS1Form_ を素通りにする" \
+  's/(function o1AssertNotS1Form_\(id, varName\) \{)/$1\n  return;/'
+mutate "逆向き: O1 の設定の検査が段 1 の ID を見ない" \
+  's/  if \(s1Id && \(cfg\.consentFormId === s1Id \|\| cfg\.surveyFormId === s1Id\)\) \{/  if (false) {/'
+mutate "段 1: トリガの設置でフォームの中身を見ない" \
+  's/  var shape = s1ConsentFormShapeProblems_\(form\);/  var shape = [];/'
+mutate "段 1: 登録の型が無ければ O1 に倒す" \
+  's/  if \(!prof \|\| !prof\.kind\) throw new Error\("o1FinishO1Registration_: 登録の型（prof）がありません"\);/  prof = prof || o1RegProfile_();/'
+mutate "段 1: 回答があっても作り直す" \
+  's/  if \(n !== 0\) \{\n    throw new Error\(\n      "S1-C には既に回答が/  if (false) {\n    throw new Error(\n      "S1-C には既に回答が/'
 
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"

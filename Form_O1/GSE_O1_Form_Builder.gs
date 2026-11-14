@@ -344,6 +344,10 @@ function o1ConfigProblems_() {
       );
     }
   });
+  var s1Id = String(PropertiesService.getScriptProperties().getProperty("FORM_ID_S1_CONSENT") || "").trim();
+  if (s1Id && (cfg.consentFormId === s1Id || cfg.surveyFormId === s1Id)) {
+    out.push("FORM_ID_O1_* に段 1 の同意フォームの ID（FORM_ID_S1_CONSENT）が入っています（段 1 の同意の正本を消します）");
+  }
   if (cfg.consentFormId && cfg.consentFormId === cfg.surveyFormId) {
     out.push(
       "⚠️ FORM_ID_O1_CONSENT と FORM_ID_O1_SURVEY が同じ ID です（★ 片方がもう片方を上書きします）"
@@ -485,6 +489,7 @@ function o1OpenFixed_(id, varName) {
         " に貼ってから再実行してください。"
     );
   }
+  o1AssertNotS1Form_(id, varName);
   o1AssertNotG1Form_(id, varName);
   return FormApp.openById(id);
 }
@@ -2670,6 +2675,7 @@ function installO1ConsentTrigger() {
   removeO1ConsentTriggers();
   var consentFormId = o1Config_().consentFormId;
   o1AssertNotG1Form_(consentFormId, "FORM_ID_O1_CONSENT");
+  o1AssertNotS1Form_(consentFormId, "FORM_ID_O1_CONSENT");
   ScriptApp.newTrigger("onO1ConsentSubmit")
     .forForm(FormApp.openById(consentFormId))
     .onFormSubmit()
@@ -3012,8 +3018,9 @@ function o1RegisterUnderLock_(a, outcome) {
 /**
  * ★ 採番の**あと**（⚠️ ロックの外）: 重複の最終検査 → 受付メール → 登録ログ。
  */
-function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome, profOpt) {
-  var prof = profOpt || o1RegProfile_();
+function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome, prof) {
+  // 型を渡し忘れたら O1 に倒さず止める（段 1 の登録に O1 の件名と URL を送らない）。
+  if (!prof || !prof.kind) throw new Error("o1FinishO1Registration_: 登録の型（prof）がありません");
   // ============================================================
   // ⚠️★★★ 採番の排他は**プロジェクトを跨がない** (起票 T-24)
   // ============================================================
@@ -3235,7 +3242,7 @@ function s1AppDownloadUrlProblem_(url, o1Url) {
   if (o1AppDownloadUrlIsBad_(url)) {
     return "スクリプト プロパティ S1_APP_DOWNLOAD_URL が URL ではありません（https:// で始まる配布フォルダの URL を入れる）";
   }
-  if (o1Url && url === o1Url) {
+  if (o1Url && s1UrlKey_(url) === s1UrlKey_(o1Url)) {
     return "S1_APP_DOWNLOAD_URL が O1_APP_DOWNLOAD_URL と同じです（O1 の配布物には s1.mode が無く、問いが出ないまま記録が進みます）";
   }
   return "";
@@ -3264,6 +3271,50 @@ function s1AssertNotO1Form_(id) {
         "段 1 用の空フォームを新しく作り、その ID を貼ってください。"
     );
   }
+}
+
+/** O1 の構築とトリガが段 1 の同意フォームに触れないようにする（逆向きの守り）。 */
+function o1AssertNotS1Form_(id, varName) {
+  var s1Id = String(PropertiesService.getScriptProperties().getProperty("FORM_ID_S1_CONSENT") || "").trim();
+  if (id && s1Id && id === s1Id) {
+    throw new Error(
+      varName + " に段 1 の同意フォームの ID（FORM_ID_S1_CONSENT）が入っています。中止しました（段 1 の同意の正本に触れません）。"
+    );
+  }
+}
+
+/**
+ * 段 1 のフォームは回答があれば作り直さない。O1 の `O1_ALLOW_REBUILD_WITH_RESPONSES` は見ない
+ * （O1 の作業で立てたフラグで段 1 の同意の記録を消さない）。回答数を読めないときも止める。
+ */
+function s1AssertSafeToRebuild_(form) {
+  var n;
+  try {
+    n = form.getResponses().length;
+  } catch (e) {
+    throw new Error("S1-C の回答数を確認できませんでした: " + e + "\n確認できない以上、作り直しません（fail-closed）。");
+  }
+  if (n !== 0) {
+    throw new Error(
+      "S1-C には既に回答が " + n + " 件あります。作り直しを中止しました（fail-closed）。\n" +
+        "文面を直すときは、新しい空フォームを作って FORM_ID_S1_CONSENT を付け替え、研究者が同意を取り直してください。"
+    );
+  }
+}
+
+/**
+ * URL を比べる形に直す。Drive のフォルダ・ファイルの ID が取れればその ID、
+ * 取れなければ小文字にしてクエリ・断片・末尾の / と `/u/<n>/` を落とした形。
+ */
+function s1UrlKey_(url) {
+  var u = String(url || "").trim();
+  var m = u.match(/\/folders\/([A-Za-z0-9_-]+)/) || u.match(/\/d\/([A-Za-z0-9_-]+)/) || u.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  if (m) return "drive:" + m[1];
+  return u
+    .toLowerCase()
+    .replace(/[?#].*$/, "")
+    .replace(/\/u\/\d+\//, "/")
+    .replace(/\/+$/, "");
 }
 
 /** ID の検証 → 開く。順序を入れ替えない（検証が先）。 */
@@ -3505,7 +3556,7 @@ function buildS1ConsentForm() {
     );
   }
   var form = s1OpenFixed_(s1Config_().consentFormId);
-  o1AssertSafeToRebuild_(form, "S1-C 説明・同意");
+  s1AssertSafeToRebuild_(form);
   o1ClearForm_(form);
 
   form.setTitle(s1ConsentFormTitle_());
@@ -3657,13 +3708,46 @@ function installS1ConsentTrigger() {
         "\n既存のトリガは消していません。"
     );
   }
-  var id = s1Config_().consentFormId;
-  o1AssertNotG1Form_(id, "FORM_ID_S1_CONSENT");
-  s1AssertNotO1Form_(id);
+  // 先にフォームを開いて中身を確かめる。開けない・未構築なら、既存のトリガを外す前に止める。
+  var form = s1OpenFixed_(s1Config_().consentFormId);
+  var shape = s1ConsentFormShapeProblems_(form);
+  if (shape.length) {
+    throw new Error(
+      "S1-C の中身が同意の項目と合わないのでトリガを張りません（buildS1ConsentForm() を先に）:\n  - " +
+        shape.join("\n  - ") +
+        "\n既存のトリガは消していません。"
+    );
+  }
   removeS1ConsentTriggers();
-  ScriptApp.newTrigger("onS1ConsentSubmit").forForm(FormApp.openById(id)).onFormSubmit().create();
+  ScriptApp.newTrigger("onS1ConsentSubmit").forForm(form).onFormSubmit().create();
   Logger.log("onS1ConsentSubmit トリガを S1-C に設定しました");
   Logger.log("O1_AUTO_SEND=" + O1_AUTO_SEND + "（false=ログに出すだけ / true=自動送信）");
+}
+
+/**
+ * S1-C の中身の問い（無ければ空）。チェックの項目が同意の項目と同じ順・全部必須で、
+ * 登録の設問がそろっているかを見る。
+ */
+function s1ConsentFormShapeProblems_(form) {
+  var out = [];
+  var items = form.getItems();
+  var want = s1ConsentItemTitles_();
+  var boxes = [];
+  var titles = [];
+  for (var i = 0; i < items.length; i++) {
+    var t = items[i].getTitle();
+    titles.push(t);
+    if (items[i].getType() === FormApp.ItemType.CHECKBOX) boxes.push(items[i]);
+  }
+  if (boxes.length !== want.length) out.push("同意のチェックの項目が " + boxes.length + " 件（期待 " + want.length + " 件）");
+  for (var k = 0; k < Math.min(boxes.length, want.length); k++) {
+    if (boxes[k].getTitle() !== want[k]) out.push("同意の項目 " + (k + 1) + " の文がコードと違う");
+    else if (!boxes[k].asCheckboxItem().isRequired()) out.push("同意の項目 " + (k + 1) + " が必須でない");
+  }
+  O1_REGISTRATION_TITLES.forEach(function (r) {
+    if (titles.indexOf(r) < 0) out.push("登録の設問「" + r + "」が無い");
+  });
+  return out;
 }
 
 /** 段 1 のトリガだけを外す（O1 のトリガは残す）。 */
