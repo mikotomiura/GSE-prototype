@@ -21,7 +21,7 @@
 4. 粗い形の値が上がれば C2 の記述（序論・抄録・§7.3・結論）に響く。直す範囲が抄録や主張に及ぶなら、書く前に研究者に AskUserQuestion で聞く。
 5. 本文は 12 頁（Ethical Considerations が p12 右段）。足す前に頁を測る。足した数値は集計の JSON と機械で照らす。
 6. ビルドは投稿版とプレプリントの版の両方（BUILD.md・`build-preprint.sh`）。文体の門・`length-log.md` に 1 行・decisions.md に判断・tasklist.md・commit・push・`/cross-review`（原稿の diff だけ）。
-7. Dr. Tian に「補足の解析が入ったら新しい版を送る」と約束している（2026-11-12）。プレプリントの版の PDF を作り、短い送り状の下書き（何が足されたか・先方の話に関わる記述は変わっていないこと）を書く。送るのは研究者。Dr. Tian の返事は 2026-11-14 に反映済み（判断 91・`c39bc0c6`）: The Learning Agency Lab へは知らせない（下書き 5 は取り下げ）、倫理の節の personal communication の段落は残し「草稿を読み異議を示さなかった」と書いた、§3.1 に主催者の名を出した。送り状には、11/12 の版からの変更としてこれも書く（personal communication の段落の中身は変えていない）。Dr. Tian は共著に踏み込まなかったので、プレプリントの版と camera-ready に謝辞（Dr. Tian と KLiCKe の著者への礼）を足す。謝辞の節はまだどちらの版にも無い（投稿版は匿名なので足さない）。研究者が 11/14 の返信で personal communication の段落を残すことを伝えていれば、その返事も確かめてから送る。
+7. Dr. Tian に「補足の解析が入ったら新しい版を送る」と約束している（2026-11-12）。プレプリントの版の PDF を作り、短い送り状の下書き（何が足されたか・先方の話に関わる記述は変わっていないこと）を書く。送るのは研究者。Dr. Tian の返事は 2026-11-14 に反映済み（判断 91・`c39bc0c6`）: The Learning Agency Lab へは知らせない（下書き 5 は取り下げ）、倫理の節の personal communication の段落は残し「草稿を読み異議を示さなかった」と書いた、§3.1 に主催者の名を出した。送り状には、11/12 の版からの変更としてこれも書く（personal communication の段落の中身は変えていない。ただし MIT License は personal communication をやめてリポジトリの引用にした・判断 92）。11/14 の返信（研究者が送る）で「personal communication の段落を残すが、望まなければ外す」と伝えている。Dr. Tian は共著に踏み込まなかったので、プレプリントの版と camera-ready に謝辞（Dr. Tian と KLiCKe の著者への礼）を足す。謝辞の節はまだどちらの版にも無い（投稿版は匿名なので足さない）。研究者が 11/14 の返信で personal communication の段落を残すことを伝えていれば、その返事も確かめてから送る。
 
 ## 公開の計画（判断 88）
 

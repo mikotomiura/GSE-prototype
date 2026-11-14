@@ -752,3 +752,15 @@ Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LL
 - Claude のみ: 倫理の節の Stakeholders の段落に、知らせる前提の文が 2 つ残っていた（「the releasing party is informed (above)」と「the party that released the competition data are told of it before submission」）。前者は消し、後者は「the authors of KLiCKe read this account before submission」に（送った版は 11/12 のビルドで、`ethics.tex` の最後の変更 `3fb10784` より後なので、この段落を含んでいた）。`outline.md` の 2 行も直した。
 - Claude のみ: 本文の主催者を書誌の注に合わせて「hosted by Vanderbilt University and The Learning Agency Lab」にした。
 ビルド: 投稿版はエラー 0・未定義 0・overfull 3（同じ 1.624pt の `\vbox`）・29 頁・Ethical Considerations は p12。プレプリントの版はエラー 0・overfull 0。文体の門 違反 0。
+
+## 判断 92: personal communication で残すもの（研究者・AskUserQuestion 1 回・2026-11-14）
+
+研究者の問い「personal communication は本当に必要か」。公開の資料で裏が取れるかを一次で確かめた（文献カード `20261012-public-keystroke-matching-novelty.md` カード 1 と [V264]・[V273]、2026-11-14 に GitHub の LICENSE を取り直した）: IRB の承認と同意の範囲・個人の情報の確認・コンペのデータの出どころは公開の資料に無い。MIT License はリポジトリの LICENSE にある（"MIT License / Copyright (c) 2025 terryyutian"、最新コミット `37b94b72d6ce`・2025-02-11）。
+
+研究者の選択（推奨）: **IRB・同意とコンペのデータの出どころを残す**。MIT License だけはリポジトリの引用（`klicke2025repo`）に替えた（`data.tex`）。他の選択肢は「IRB・同意だけ残す（出どころを外し序論・§3.3・倫理の開示の段落を弱める）」「全部外す」。理由: PoPETs は倫理の基準で却下しうると書いており、公開の論文は審査と公開への同意を書いていない。出どころはコンペのマスクが本文と記録を切り離していない現実の例で、Dr. Tian はこの段落を含む草稿を読んで異議を示さなかった。返信で「望まなければ外す・書き換える」と一言添える（送るのは研究者）。
+
+ビルド: 投稿版はエラー 0・未定義 0・overfull 2（判断 91 の 1.624pt の `\vbox` は消えた）・29 頁・Ethical Considerations は p12。プレプリントの版はエラー 0・overfull 0。文体の門 違反 0。
+
+## 判断 92 の追記: /cross-review（2026-11-14）
+
+範囲は原稿の `data.tex` と `references.bib` の差分。Codex には一時コミット `1b3823e4..447c4217 -- papers` で diff だけを送った。一致した指摘（採った）: personal communication は「コーパスが MIT」とデータの条件として言っていたが、LICENSE はソフトウェアの定型で、データはリポジトリの外（Drive）にある。リポジトリの引用だけで「データが MIT」と読ませるのは根拠より強い。→ 文を「データの利用条件は Inputlog の説明（自由に使える・リポジトリを出典に）。そのリポジトリはデータへのリンクを持ち、MIT License のファイルを置いている」と、リポジトリの状態に限った。判断 92 で「MIT はリポジトリの引用で足りる」とした私の説明は言い過ぎだった（データの条件の根拠は Inputlog の説明が担う）。ほかに採った: 書誌の URL をコミット `37b94b72d6ce` に固定（Codex）、アカウント名を注に、行の折り返し、「repository」の指す先を分けた、付録の「MIT licence」を「MIT License」にそろえた。ビルド: 投稿版エラー 0・未定義 0・overfull 2・29 頁・倫理は p12。プレプリントの版エラー 0・overfull 0。文体の門 違反 0。
