@@ -1,5 +1,7 @@
 # 次のセッション（Mac）: 照合の論文 —— Dr. Tian の返事を受けて原稿と知らせを直す
 
+**使用済み（2026-11-14）**: 返事を受けて原稿を直した（判断 91・`c39bc0c6`）。LAL へは知らせない。残りは `next-session-public-keystroke-matching-manuscript-exploratory-6-7.md` の 7 に移した。
+
 作成 2026-11-12（判断 90 の後）。下書き 4 の簡易版を研究者が 2026-11-12 に送った（前のスレッドへの返信・宛先は Dr. Tian だけ・添付はプレプリントの版の PDF、SHA-256 `94d42f05…dc9a`）。分析 6・7 の段は別の引き継ぎ（`next-session-public-keystroke-matching-manuscript-exploratory-6-7.md`）。
 
 ## 新しいセッションで最初に打ち込む文
