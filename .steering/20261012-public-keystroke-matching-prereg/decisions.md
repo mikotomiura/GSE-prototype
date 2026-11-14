@@ -728,3 +728,27 @@ Claude（code-reviewer の役）と Codex（exit 0・`[REDACTED]` なし）。�
 ## 判断 90 の追記 2: 送った（2026-11-12）
 
 研究者が 2026-11-12 に下書き 4 の簡易版を Dr. Tian に送った（前のスレッドへの返信・宛先は Dr. Tian だけ）。添付はプレプリントの版の PDF（SHA-256 `94d42f05…dc9a`）。返事が約 1 週（11/19 ごろ）無ければ下書き 5 を研究者が送る（判断 73）。引き継ぎを 2 本に分けた: `next-session-public-keystroke-matching-tian-reply.md`（返事・知らせ）と `next-session-public-keystroke-matching-manuscript-exploratory-6-7.md`（分析 6・7）。
+
+## 判断 91: Dr. Tian の返事を受けて、The Learning Agency Lab へは知らせない（研究者・2026-11-14）
+
+Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LLM に送らない）の要旨:
+1. KLiCKe を使ってよい根拠として、やりとりを personal communication で示す必要はない。コーパスと論文の引用で足りる（載せることへの可否や、言い方の直しにははっきり触れていない。全部か一部かにも答えていない）。
+2. 投稿の前に The Learning Agency Lab へ知らせる必要はない。関係する所で LAL と Kaggle のコンペの頁を引用すればよい。
+3. 研究の問いは大事で、書き方は明快、設計は厳密という感想。ただ作文研究からは専門外なので、方法への細かい意見は控えるとのこと。
+
+決めたこと:
+- LAL へ知らせない（研究者の言「普通に知らせないだけで良いのでは」）。判断 68 の 4 と判断 73 の下書き 5 を取り下げる。倫理の節の通知の角括弧は消し、理由の文は足さない（コンペのデータは使っておらず、照合もしていない）。
+- personal communication の段落は残す。角括弧は「投稿の前に、この段落を含む草稿を読み、異議を示さなかった」という 1 文にした（同意したとは書かない）。研究者の問いへの答えは無いので、この形はメインの既定。研究者が変えたい場合は戻す。
+- LAL の名前を §3.1 の本文に入れた（"of The Learning Agency Lab"）。書誌の `kaggle2023lwp` は前から Kaggle が示す引用の形（著者 6 人・Kaggle・2023）で、注に主催者を書いてある。
+- 共著の提案はしない（判断 84: 中身に踏み込んだ意見が無いため）。プレプリントと camera-ready の謝辞で Dr. Tian に礼を述べる。
+- `ethics.tex` の残りの角括弧は 0 になった（`open-science.tex` の匿名リンクの角括弧は投稿の時のもので残る）。
+
+ビルド: 投稿版はエラー 0・未定義 0・overfull 3・29 頁（Ethical Considerations は p12）。増えた 1 つは付録の頁の出力で起きる 1.624pt の `\vbox` で、倫理の節が 4 行縮んで浮動体の並びがずれたため（倫理の節だけを直した版でも出る）。目に見える害は無いので残す。プレプリントの版はエラー 0・未定義 0・overfull 0・33 頁。文体の門 違反 0。
+
+## 判断 91 の追記: /cross-review（2026-11-14）
+
+範囲は原稿の 2 ファイルの未コミットの差分（+3/−8）。Codex には参照の無い一時コミット `7ba93528..6303cd4f -- papers` で diff だけを送った（`.steering/`・`.codex/` は送っていない）。Claude 側は cross-reviewer 自身。一次で確かめ、全部採った:
+- 一致: 角括弧を替えた文の時制の混在（receive … raised）と、何に異議が無かったかが曖昧 → 「read a draft … and raised no objection to them」。Dr. Tian は返事で草稿を読んだと書いているので「read」は事実。
+- Claude のみ: 倫理の節の Stakeholders の段落に、知らせる前提の文が 2 つ残っていた（「the releasing party is informed (above)」と「the party that released the competition data are told of it before submission」）。前者は消し、後者は「the authors of KLiCKe read this account before submission」に（送った版は 11/12 のビルドで、`ethics.tex` の最後の変更 `3fb10784` より後なので、この段落を含んでいた）。`outline.md` の 2 行も直した。
+- Claude のみ: 本文の主催者を書誌の注に合わせて「hosted by Vanderbilt University and The Learning Agency Lab」にした。
+ビルド: 投稿版はエラー 0・未定義 0・overfull 3（同じ 1.624pt の `\vbox`）・29 頁・Ethical Considerations は p12。プレプリントの版はエラー 0・overfull 0。文体の門 違反 0。

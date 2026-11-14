@@ -200,16 +200,15 @@ are chosen with the results in view.
   disclosure (the records of the two releases can be put in correspondence without the procedures), weighed against
   the reasons to report it; the reason not to match is that the competition data are another party's release with the
   stated goal of preventing reproduction of the texts, not a lack of consent.
-- The releasing party of the competition data is informed before submission that this evaluation will be published
-  and that its data were not matched (after the results; the date is reported).
+- The releasing party of the competition data is not informed before submission: its data were not used or matched,
+  and the KLiCKe authors advised that citing the competition and its host is enough.
 - The scope in which the attack code is published (the preregistration's three options), and the reasons.
-- The KLiCKe authors receive the paper when it is complete.
+- The KLiCKe authors received the draft before submission.
 - Submitted version: the personal communication is undated and the registration link is withheld (anonymised copy of the study repository instead); both are restored in the camera-ready version.
 - Code: published only for the two corpora evaluated; no code reads other released logs.
 - The benefit is stated as the measurement on two corpora, not as a means for releasing parties to measure their own
   logs (the code covers the two corpora only).
-- The releasing party of the competition data is informed as soon as the results are known, about two weeks before
-  submission, with time to respond; the date, the time given and the response are reported.
+- The KLiCKe authors read the draft, including what they told us, before submission and raised no objection.
 - Submitted version: "the authors", and "no institutional ethics committee was available to the authors", with the
   no reason for not seeking a board outside an institution; a statement of interests (the recording software, the
   plan to release logs collected with it, no financial interest, no funding; decided 21 October 2026).
