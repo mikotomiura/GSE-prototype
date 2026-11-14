@@ -43,6 +43,14 @@ pub struct InputToggle {
     pub on: bool,
 }
 
+/// 累計 `(shown, visible)` から `(sub_shown, sub_visible)` を引く（飽和・visible ≤ shown を保つ）。
+/// 区間の削除で、行（`redaction.rs`）と走行中の累計（[`DayRecord::subtract`]）の両方がこの 1 つの式を使う
+/// （片方だけ変わると、行と走行中の累計の差から区間の量が読める）。
+pub fn subtract_totals(shown: u64, visible: u64, sub_shown: u64, sub_visible: u64) -> (u64, u64) {
+    let s = shown.saturating_sub(sub_shown);
+    (s, visible.saturating_sub(sub_visible).min(s))
+}
+
 /// その日の累計。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -182,6 +190,12 @@ impl DayRecord {
         self.input_toggles.retain(|x| !inside(x.t));
         self.stage_starts.retain(|t| !inside(*t));
         a != self.toggles.len() || b != self.stage_starts.len() || c != self.input_toggles.len()
+    }
+
+    /// 区間の削除: 累計から区間の中の量を引く（呼び出し側が前後の行の差で求めた量・visible ≤ shown を保つ）。
+    pub fn subtract(&mut self, shown_ms: u64, visible_ms: u64) {
+        (self.shown_ms, self.visible_ms) =
+            subtract_totals(self.shown_ms, self.visible_ms, shown_ms, visible_ms);
     }
 
     /// 読み込んだ中身を検める。
