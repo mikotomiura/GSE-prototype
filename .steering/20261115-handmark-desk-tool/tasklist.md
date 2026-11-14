@@ -19,9 +19,9 @@
 - [x] テスト（§7 の Rust の一覧）・clippy・cargo test --workspace
 
 ## 2. 描画の切り出し
-- [ ] handmarkStageDraw.ts（buildWorld・drawFrame）
-- [ ] HandmarkStage.tsx を呼ぶだけに
-- [ ] scripts/handmark-stage-draw.test.mjs・tsc
+- [x] handmarkStageDraw.ts（buildWorld・drawFrame）
+- [x] HandmarkStage.tsx を呼ぶだけに（切り出す前のコードと 12 組で命令の列が一致・対照で 0/12）
+- [x] scripts/handmark-stage-draw.test.mjs・tsc
 - [ ] 実機で前後を見比べる
 
 ## 3. 実験 experiments/20261115-handmark-leak-desk/

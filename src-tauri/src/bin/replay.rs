@@ -2179,7 +2179,8 @@ fn inject_stuck(
 }
 
 /// コマ 1 枚をバイナリで書く（little endian）。
-/// `id u32・t u64・speed irreg phase drift f64・layout_seed u32・場の有無 u8・[480 × f32]・波紋の数 u8・(x f32, y f32, 経過 u16)…`
+/// `id u32・t u64・speed irreg phase drift f64・layout_seed u32・場の有無 u8・[480 × i8]・波紋の数 u8・(x f32, y f32, 経過 u16)…`
+/// 場は窓へ送るのと同じ `trace::encode_cells`（i8）で書く（node は画面と同じ `decodeCells` で戻す）。
 fn write_frame(out: &mut Vec<u8>, id: u32, s: &gse_next_lib::analysis::handmark::desk::Sample) {
     out.extend_from_slice(&id.to_le_bytes());
     out.extend_from_slice(&s.t.to_le_bytes());
@@ -2190,10 +2191,8 @@ fn write_frame(out: &mut Vec<u8>, id: u32, s: &gse_next_lib::analysis::handmark:
     match &s.field {
         Some(cells) => {
             out.push(1);
-            for c in cells {
-                for v in c {
-                    out.extend_from_slice(&v.to_le_bytes());
-                }
+            for v in gse_next_lib::analysis::handmark::trace::encode_cells(cells) {
+                out.push(v as u8);
             }
         }
         None => out.push(0),
@@ -5258,7 +5257,7 @@ mod tests {
                 ripples: vec![(0.1, 0.2, 300)],
             },
         );
-        assert_eq!(buf.len(), 4 + 8 + 32 + 4 + 1 + 480 * 4 + 1 + 10);
+        assert_eq!(buf.len(), 4 + 8 + 32 + 4 + 1 + 480 + 1 + 10);
     }
 
     #[test]
