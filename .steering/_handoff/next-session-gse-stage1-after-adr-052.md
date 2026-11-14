@@ -38,7 +38,8 @@
 
 ### 3. 手跡の macOS（本人の後期のため）
 
-- 入口は既存の引き継ぎ（どちらも本線のチェックアウトに未追跡で置いてある）: `/Users/johnd/GSE-prototype/.steering/_handoff/next-session-gse-handmark-pr2.md`（PR #408 の帯・gse-dataset#8 と一緒にマージ）・`/Users/johnd/GSE-prototype/.steering/_handoff/next-session-gse-handmark-pr2-lock-check.md`（ロックの確かめ）。段 1 の新しいタグは研究者に確かめる。
+- PR #408（帯）は 2026-11-14 に main へマージ済み（fd1e87f1）。gse-dataset#8 の状態は確かめる。
+- 残りの入口は既存の引き継ぎ（本線のチェックアウトに未追跡で置いてある）: `/Users/johnd/GSE-prototype/.steering/_handoff/next-session-gse-handmark-pr2-lock-check.md`（ロックの確かめ）。段 1 の新しいタグは研究者に確かめる。
 - PR 4（記録から描き直して漏れを確かめる・ADR-051 D3）は、3 名の記録を開く前までに。
 
 ### 4. 手跡の Windows 版（3 名の開始の条件）
