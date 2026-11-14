@@ -2315,8 +2315,10 @@ fn show_s1_overlay(app: &tauri::AppHandle) {
 // 手跡（段 1 の後期・ADR-051・1b）の配線。★ 段 1 のモードかつ macOS のときだけ駆動スレッドを起こす。
 //   純粋な部分は `handmark_driver`（出来事 `Effect` を返す）。ここは出来事を行・窓・トレイに変えるだけ。
 //   ロックの順: `LogState` のロックは `log_tx` を複製する間だけ取り、放してから `HANDMARK_DRIVER` を取る
-//   （`handmark_log_tx`）。`HANDMARK_DRIVER` を持っている間は `LogState` を取らない（出来事の実行は
-//   `try_send`・窓への依頼・トレイの印だけ）。つまり 2 つを同時には持たない。
+//   （`handmark_log_tx`）。ふだんは `HANDMARK_DRIVER` を持っている間は `LogState` を取らない（出来事の実行は
+//   `try_send`・窓への依頼・トレイの印だけ）。例外は区間の削除（`delete_time_range`）で、`HANDMARK_DRIVER` →
+//   `O1_ROTATE` → `LogState` → `DECLARED_TASK_KIND` の順に持つ（手跡の削除の判断 6）。⚠️ 逆向き（これらの
+//   どれかを持ったまま `handmark_lock()` を取る）は書かない。
 // ===========================================================================
 
 /// 手跡の駆動役。`None` = 段 1 でない・macOS でない・まだ起きていない。
@@ -2481,7 +2483,8 @@ pub(crate) fn handmark_set_input_from_tray(
 ///
 /// 戻り値の 2 つ目は、ファイルの `handmark_day` の行の累計から引く量（判断 13）。`snaps` はファイルの行の
 /// 累計の写しで、走行中の累計（駆動役か状態ファイル）と合わせて、駆動役のロックの中で求める。
-/// `g` は呼び出し側が取った駆動役のロック（ローテートの前から持つ）。
+/// `g` は呼び出し側が取った駆動役のロック（ローテートの前から持つ）。`subtract` が偽なら量は引かず時刻だけ消す
+/// （ローテートが成り立たなかった削除・判断 8）。
 fn handmark_on_redact(
     app: &tauri::AppHandle,
     log_tx: &Sender<LogEntry>,
@@ -2489,23 +2492,29 @@ fn handmark_on_redact(
     from_ms: u64,
     to_ms: u64,
     snaps: &[crate::redaction::HandmarkSnap],
+    subtract: bool,
 ) -> (bool, crate::redaction::HandmarkSubs) {
     let now = epoch_ms();
     if let Some(d) = g.as_mut() {
         if let Some(fs) = HANDMARK_FS.get() {
-            let (fx, ok, subs) = d.on_redact(fs, from_ms, to_ms, snaps, now);
+            let (fx, ok, subs) = d.on_redact(fs, from_ms, to_ms, snaps, subtract, now);
             run_handmark_effects(app, log_tx, fx);
             return (ok, subs);
         }
     }
     let (result, subs) = match HANDMARK_FS.get() {
-        Some(fs) => crate::handmark_store::scrub_state_file(fs, from_ms, to_ms, snaps, now),
+        Some(fs) => {
+            crate::handmark_store::scrub_state_file(fs, from_ms, to_ms, snaps, subtract, now)
+        }
         None => match crate::handmark_store::DiskFs::state_only() {
-            Some(fs) => crate::handmark_store::scrub_state_file(&fs, from_ms, to_ms, snaps, now),
-            None => (
+            Some(fs) => {
+                crate::handmark_store::scrub_state_file(&fs, from_ms, to_ms, snaps, subtract, now)
+            }
+            None if subtract => (
                 Ok(()),
                 crate::redaction::handmark_subtractions(snaps, None, from_ms, to_ms),
             ),
+            None => (Ok(()), crate::redaction::HandmarkSubs::new()),
         },
     };
     (result.is_ok(), subs)
@@ -3463,6 +3472,9 @@ fn delete_time_range(
     //   持つ行が入らない。⚠️ ログの状態のロックはこの後で取る（ログの状態 → 手跡の順に持つ経路は無い）。
     let handmark_tx = handmark_log_tx(&app);
     let mut handmark_guard = handmark_lock();
+    // ローテートが成り立った（新しいファイルに替わった）か。成り立たなければ（一時停止中・失敗・時間切れ）、
+    //   いま書いているファイルを書き換えられず、書き込み待ちの行も見えないので、手跡の量は引かない（判断 8）。
+    let mut rotated = false;
 
     if crate::o1::is_o1() && !crate::recording::is_paused() {
         // ⚠️★★★ **ローテートの *完了* を待つ** (cross-review / Codex MEDIUM・2026-08-27)。
@@ -3492,6 +3504,7 @@ fn delete_time_range(
                 loop {
                     let now_path = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
                     if now_path != before {
+                        rotated = true;
                         break;
                     }
                     if std::time::Instant::now() >= deadline {
@@ -3531,6 +3544,7 @@ fn delete_time_range(
         from_ms,
         to_ms,
         &snaps,
+        rotated,
     );
     drop(handmark_guard);
 

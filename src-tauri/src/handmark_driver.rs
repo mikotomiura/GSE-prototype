@@ -579,10 +579,16 @@ impl HandmarkDriver {
         from_ms: u64,
         to_ms: u64,
         snaps: &[HandmarkSnap],
+        subtract: bool,
         now: u64,
     ) -> (Vec<Effect>, bool, HandmarkSubs) {
         let mut fx = Vec::new();
-        let subs = handmark_subtractions(snaps, self.ev.live_snap(now), from_ms, to_ms);
+        // ローテートが成り立たなかった削除では量を引かない(時刻だけ消す・判断 8)
+        let subs = if subtract {
+            handmark_subtractions(snaps, self.ev.live_snap(now), from_ms, to_ms)
+        } else {
+            HandmarkSubs::new()
+        };
         let ok = if self.ev.record.is_some() {
             if self.ev.scrub_state(fs, from_ms, to_ms, &subs).is_ok() {
                 true
@@ -596,7 +602,7 @@ impl HandmarkDriver {
         } else {
             // 状態ファイルが壊れていて累計が無い: ファイルを直接直す(壊れていれば消す)。
             // 走行中の累計が無いので、引く量は状態ファイルが読めればその累計も入れて求め直したものを使う。
-            let (r, file_subs) = scrub_state_file(fs, from_ms, to_ms, snaps, now);
+            let (r, file_subs) = scrub_state_file(fs, from_ms, to_ms, snaps, subtract, now);
             return self.finish_redact(fx, r.is_ok(), file_subs, now);
         };
         self.finish_redact(fx, ok, subs, now)
@@ -613,6 +619,10 @@ impl HandmarkDriver {
             // 区間の後の起点を取り直す(消した起点を再生が必要としないように)
             self.new_stage(now);
         }
+        // 引いた後の累計の行をすぐ書く。区間より後の行が無く走行中の累計を next に使ったとき、次の行の前に
+        // 同じ区間を消し直すと、その間に増えた量まで引いてしまうため(この行がいま書いているファイルに入り、
+        // 消し直しではその日を引かない側に倒れる・判断 6)。
+        self.push_row(now, &mut fx);
         self.sync_gate(false, &mut fx);
         (fx, ok, subs)
     }
@@ -857,7 +867,7 @@ mod tests {
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         let _ = d.turn_off(&fs, T0 + 1_000);
         let _ = d.turn_on(&fs, T0 + 2_000);
-        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 5_000, &[], T0 + 6_000);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 5_000, &[], true, T0 + 6_000);
         assert!(ok);
         let rec = d.evaluation().record.as_ref().unwrap();
         assert!(rec.toggles.is_empty());
@@ -951,7 +961,7 @@ mod tests {
         all.extend(d.set_input(&fs, PointerInput::Cursor, false, T0 + 101_200));
         all.extend(d.set_input(&fs, PointerInput::Click, false, T0 + 101_300));
         all.extend(d.set_input(&fs, PointerInput::Cursor, true, T0 + 101_400));
-        all.extend(d.on_redact(&fs, T0, T0 + 10, &[], T0 + 101_500).0);
+        all.extend(d.on_redact(&fs, T0, T0 + 10, &[], true, T0 + 101_500).0);
         all.extend(d.on_quit(&fs, T0 + 102_000));
         assert!(all
             .iter()
@@ -1044,7 +1054,7 @@ mod tests {
         let _ = d.set_input(&fs, PointerInput::Cursor, false, T0 + 500);
         // 区間の削除で、書き直し（全体）だけ失敗する
         fs.fail_state_writes_left.set(1);
-        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 10_000, &[], T0 + 20_000);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 10_000, &[], true, T0 + 20_000);
         assert!(ok);
         let (d2, _) = HandmarkDriver::new(&fs, true, T0 + 60_000, ON_DAY);
         assert_eq!(
@@ -1179,7 +1189,7 @@ mod tests {
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         let _ = d.turn_off(&fs, T0 + 100);
         fs.fail_state_write.set(true);
-        let (fx, ok, _) = d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000);
+        let (fx, ok, _) = d.on_redact(&fs, T0, T0 + 1_000, &[], true, T0 + 2_000);
         assert!(ok, "書けなくても消せたので成功");
         assert!(closed(&fx) || !d.is_window_open());
         assert_eq!(fs.read_state(), crate::handmark_store::ReadResult::Missing);
@@ -1188,13 +1198,13 @@ mod tests {
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         fs.fail_state_write.set(true);
         fs.fail_state_remove.set(true);
-        assert!(!d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000).1);
+        assert!(!d.on_redact(&fs, T0, T0 + 1_000, &[], true, T0 + 2_000).1);
         // 状態ファイルが壊れていて累計が無い起動でも、直接消す
         let fs = with_table();
         *fs.state.borrow_mut() = Some(b"{broken".to_vec());
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         assert!(d.evaluation().record.is_none());
-        assert!(d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000).1);
+        assert!(d.on_redact(&fs, T0, T0 + 1_000, &[], true, T0 + 2_000).1);
         assert_eq!(fs.read_state(), crate::handmark_store::ReadResult::Missing);
     }
 
@@ -1202,7 +1212,7 @@ mod tests {
     fn redact_takes_the_origin_again_while_the_window_is_open() {
         let fs = with_table();
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
-        let _ = d.on_redact(&fs, T0, T0 + 500, &[], T0 + 1_000);
+        let _ = d.on_redact(&fs, T0, T0 + 500, &[], true, T0 + 1_000);
         let starts = &d.evaluation().record.as_ref().unwrap().stage_starts;
         assert_eq!(starts, &vec![T0 + 1_000]);
     }
@@ -1338,7 +1348,7 @@ mod tests {
         d.on_strip_visible(true);
         let _ = d.tick(&fs, T0 + 250, ON_DAY);
         assert_eq!(d.evaluation().row(T0 + 250).unwrap().visible_ms, Some(250));
-        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 10_000, &[], T0 + 300);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 10_000, &[], true, T0 + 300);
         assert!(ok);
         // 区間の前の行が無いので、走行中の累計(区間の中の 250ms)がそのまま引かれる
         assert_eq!(vis(&d), (0, 0), "区間の中の量が累計に残った");
@@ -1365,7 +1375,7 @@ mod tests {
         let _ = d.turn_off(&fs, T0 + 100);
         fs.fail_state_write.set(true);
         fs.fail_mark_write.set(true);
-        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 1_000, &[], true, T0 + 2_000);
         assert!(!ok);
         fs.fail_state_write.set(false);
         fs.fail_mark_write.set(false);
@@ -1555,8 +1565,15 @@ mod tests {
                 skipped: false,
             },
         ];
-        let (_, ok, subs) = d.on_redact(&fs, T0 + 15_000, T0 + 25_000, &snaps, now);
+        let (fx, ok, subs) = d.on_redact(&fs, T0 + 15_000, T0 + 25_000, &snaps, true, now);
         assert!(ok);
+        // 引いた後の累計の行をすぐ書く(消し直しで、その後に増えた量まで引かないため・Codex P3)
+        let row = fx.iter().find_map(|e| match e {
+            Effect::Row(r) => Some(r.clone()),
+            _ => None,
+        });
+        let row = row.expect("削除の直後の行");
+        assert_eq!((row.shown_ms, row.visible_ms), (10_000, Some(9_000)));
         // 引く量 = 走行中の累計 − 区間の前の行
         assert_eq!(subs[&ON_DAY].shown_ms, s - 10_000);
         assert_eq!(subs[&ON_DAY].visible_ms, v - 9_000);
@@ -1601,5 +1618,27 @@ mod tests {
         );
         assert!(rec.stage_starts.iter().all(|t| *t < p || *t >= r));
         assert_eq!(rec.toggles.last().map(|t| (t.t, t.on)), Some((r, true)));
+    }
+
+    /// ローテートが成り立たなかった削除(一時停止中など)では、量は引かず、区間の時刻だけ消す(判断 8)。
+    #[test]
+    fn a_redact_without_rotation_scrubs_times_but_subtracts_nothing() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
+        let _ = d.turn_off(&fs, T0 + 1_000);
+        let _ = d.turn_on(&fs, T0 + 2_000);
+        let _ = d.on_window_status(WindowStatus::Shown, T0 + 2_000);
+        let now = run(&mut d, &fs, T0 + 2_000, T0 + 20_000);
+        let before = vis(&d);
+        assert!(before.0 > 0);
+        let (_, ok, subs) = d.on_redact(&fs, T0, T0 + 5_000, &[], false, now);
+        assert!(ok);
+        assert!(subs.is_empty());
+        assert_eq!(vis(&d), before, "量を引いた");
+        assert!(saved(&fs).toggles.is_empty(), "区間の時刻が残った");
+        // 対照: ローテートが成り立てば引く
+        let (_, _, subs) = d.on_redact(&fs, T0, T0 + 5_000, &[], true, now);
+        assert!(!subs.is_empty());
     }
 }
