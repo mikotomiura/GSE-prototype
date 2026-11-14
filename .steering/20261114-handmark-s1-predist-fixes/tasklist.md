@@ -6,9 +6,10 @@
 - [x] 走行中の累計と状態ファイルへの適用・`delete_time_range` の順序
 - [x] 一時停止の扱い（設計 2・判断 4）
 - [x] schema の doc（`HandmarkDay`）と `emit_schema` の一致（説明の文だけ）
-- [ ] gse-dataset の schema の同期（説明の文が変わったため）
+- [x] gse-dataset の schema の同期のコミット（`/Users/johnd/gse-dataset-hm-predist`・枝 `chore/schema-handmark-redaction`・a19cbf2・push 前）
 - [x] 同意の md・フォームの §4 の 2 番・受付メール・`participant-setup-guide.md`・承認の印を外す・`docs/o1-deletion-ledger.md`
 - [x] 変異で赤を見る（8 件すべて赤・ファイルは元どおり）
 - [x] `cargo test --workspace`・clippy・fmt・フォームのテスト 358 件・変異 119 件・readiness の selftest 85 件
-- [ ] code-reviewer・security-checker・/cross-review（Codex 込み）
+- [x] code-reviewer・security-checker（処理は decisions.md の表・判断 6・7）
+- [ ] /cross-review（Codex 込み）
 - [ ] 研究者の承認の取り直し → push・PR（研究者に確かめる）

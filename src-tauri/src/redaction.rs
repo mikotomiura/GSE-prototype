@@ -338,6 +338,8 @@ pub struct HandmarkSnap {
     pub t: u64,
     pub shown_ms: u64,
     pub visible_ms: u64,
+    /// いま書いているファイル（削除で書き換えないファイル）の行。
+    pub skipped: bool,
 }
 
 /// ある日の累計から引く量。
@@ -363,11 +365,13 @@ pub fn handmark_snap(line: &str) -> Option<HandmarkSnap> {
         t: obj.get("t")?.as_u64()?,
         shown_ms: obj.get("shown_ms")?.as_u64()?,
         visible_ms: obj.get("visible_ms")?.as_u64()?,
+        skipped: false,
     })
 }
 
-/// 削除の対象のディレクトリの全ファイル（いま書いているファイルも読むだけ）から累計の写しを集める。
-pub fn collect_handmark_snaps(dir: &Path) -> Vec<HandmarkSnap> {
+/// 削除の対象のディレクトリの全ファイルから累計の写しを集める。いま書いているファイル `skip` も読むだけ読み、
+/// その行には `skipped` を立てる（[`handmark_subtractions`] がその日を引かない判断に使う）。
+pub fn collect_handmark_snaps(dir: &Path, skip: Option<&Path>) -> Vec<HandmarkSnap> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -377,6 +381,7 @@ pub fn collect_handmark_snaps(dir: &Path) -> Vec<HandmarkSnap> {
         if !is_redactable_session_file(&path) {
             continue;
         }
+        let skipped = skip.is_some_and(|s| same_file(s, &path));
         let Ok(content) = fs::read_to_string(&path) else {
             continue;
         };
@@ -384,7 +389,8 @@ pub fn collect_handmark_snaps(dir: &Path) -> Vec<HandmarkSnap> {
             content
                 .lines()
                 .filter(|l| l.contains("\"handmark_day\""))
-                .filter_map(handmark_snap),
+                .filter_map(handmark_snap)
+                .map(|s| HandmarkSnap { skipped, ..s }),
         );
     }
     out
@@ -396,8 +402,12 @@ pub fn collect_handmark_snaps(dir: &Path) -> Vec<HandmarkSnap> {
 /// 前の行の差から区間の中の量が読める。日 d ごとに:
 ///
 /// - next = d の写しで `t > to_ms` の最初のもの。無く、走行中の累計 `live` が d なら `live`。どちらも無ければ引かない。
-/// - prev = d の写しで `t < from_ms` の最後のもの。無ければ 0（日の始まり）。
+/// - prev = d の写しで `t < from_ms` の最後のもの。無ければ 0（日の始まり）。累計が日の途中で 0 から始め直して
+///   いれば（状態ファイルが消えた後の起動）、next と同じ区切りの中だけで探す（区切りの始まりは 0）。
 /// - 引く量 = next − prev。区間の端の 5 分ほどまで（行の間隔）も含めて引く（消す側に倒す）。
+/// - ⚠️ いま書いているファイル（`skipped`）に d の `t > to_ms` の行があれば、d は引かない。その行は書き換えられず、
+///   走行中の累計と他のファイルの行だけを引くと、その行との差で区間の量が読め、再開してから消し直すと二重に引く
+///   （本タスクの判断 6）。消し残りは `files_skipped` で画面に出て、消し直しで 1 回だけ引かれる。
 ///
 /// 区間が d より前に終わっていても、d の最初の行（日付の変わり目か起動の行）の累計は小さいので、
 /// 引き過ぎは行の間隔ほどまで。`from_ms > to_ms` なら空。
@@ -416,17 +426,39 @@ pub fn handmark_subtractions(
     days.sort_unstable();
     days.dedup();
     for day in days {
-        let of_day = || snaps.iter().filter(move |s| s.day == day);
-        let next = of_day()
-            .filter(|s| s.t > to_ms)
-            .min_by_key(|s| s.t)
-            .copied()
-            .or(live.filter(|l| l.day == day));
-        let Some(next) = next else { continue };
-        let (ps, pv) = of_day()
-            .filter(|s| s.t < from_ms)
-            .max_by_key(|s| s.t)
-            .map_or((0, 0), |p| (p.shown_ms, p.visible_ms));
+        if snaps
+            .iter()
+            .any(|s| s.day == day && s.skipped && s.t > to_ms)
+        {
+            continue;
+        }
+        // その日の写しを時刻の順に並べ、累計が減ったところで区切る（区切りの番号を付ける）
+        let mut of_day: Vec<HandmarkSnap> =
+            snaps.iter().filter(|s| s.day == day).copied().collect();
+        of_day.sort_by_key(|s| s.t);
+        let mut seg = Vec::with_capacity(of_day.len());
+        let mut cur = 0usize;
+        for (i, s) in of_day.iter().enumerate() {
+            if i > 0 && s.shown_ms < of_day[i - 1].shown_ms {
+                cur += 1;
+            }
+            seg.push(cur);
+        }
+        let next = match of_day.iter().position(|s| s.t > to_ms) {
+            Some(i) => Some((of_day[i], seg[i])),
+            None => live.filter(|l| l.day == day).map(|l| match of_day.last() {
+                Some(p) if l.shown_ms < p.shown_ms => (l, cur + 1),
+                _ => (l, cur),
+            }),
+        };
+        let Some((next, next_seg)) = next else {
+            continue;
+        };
+        let (ps, pv) = of_day
+            .iter()
+            .zip(&seg)
+            .rfind(|(s, g)| s.t < from_ms && **g == next_seg)
+            .map_or((0, 0), |(p, _)| (p.shown_ms, p.visible_ms));
         let sub = HandmarkSub {
             shown_ms: next.shown_ms.saturating_sub(ps),
             visible_ms: next.visible_ms.saturating_sub(pv),
@@ -440,8 +472,12 @@ pub fn handmark_subtractions(
 
 /// 累計から引く（visible ≤ shown を保つ）。
 pub fn subtract_handmark(shown_ms: u64, visible_ms: u64, sub: HandmarkSub) -> (u64, u64) {
-    let shown = shown_ms.saturating_sub(sub.shown_ms);
-    (shown, visible_ms.saturating_sub(sub.visible_ms).min(shown))
+    crate::analysis::handmark::day::subtract_totals(
+        shown_ms,
+        visible_ms,
+        sub.shown_ms,
+        sub.visible_ms,
+    )
 }
 
 /// 区間より後（`t > to_ms`）の `handmark_day` の行の累計から、その日の引く量を引く。変えたら新しい行。
@@ -1810,6 +1846,7 @@ mod tests {
             t,
             shown_ms: s,
             visible_ms: v,
+            skipped: false,
         }
     }
 
@@ -1920,12 +1957,12 @@ mod tests {
             ),
         )
         .unwrap();
-        let snaps = collect_handmark_snaps(&d);
+        let snaps = collect_handmark_snaps(&d, None);
         assert_eq!(snaps.len(), 4, "累計の無い行は写しにしない");
         let subs = handmark_subtractions(&snaps, None, 1_500, 2_500);
         let s = redact_dir(&d, 1_500, 2_500, None, &subs).unwrap();
         assert_eq!(s.lines_removed, 3, "区間の中の 1 行 + 引いた 2 行");
-        let rows: Vec<HandmarkSnap> = collect_handmark_snaps(&d)
+        let rows: Vec<HandmarkSnap> = collect_handmark_snaps(&d, None)
             .into_iter()
             .collect::<std::collections::BTreeSet<_>>()
             .into_iter()
@@ -1945,7 +1982,7 @@ mod tests {
             .unwrap()
             .contains(&hm_line(D, 4_500, 0, None)));
         // 引く量の無い削除では書き換えない(対照)
-        let none = handmark_subtractions(&collect_handmark_snaps(&d), None, 10_000, 20_000);
+        let none = handmark_subtractions(&collect_handmark_snaps(&d, None), None, 10_000, 20_000);
         assert_eq!(
             redact_dir(&d, 10_000, 20_000, None, &none)
                 .unwrap()
@@ -1953,5 +1990,77 @@ mod tests {
             0
         );
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// いま書いているファイル（書き換えない）に区間より後の行がある日は引かない。再開の後の消し直しで 1 回だけ引く
+    /// （本タスクの判断 6・レビューの H1）。
+    #[test]
+    fn a_day_with_later_rows_in_the_skipped_file_is_not_subtracted_and_a_retry_subtracts_once() {
+        let d = tmp_dir("handmark-skip");
+        let closed = d.join("gse_o1_a.ndjson");
+        let cur = d.join("gse_o1_b.ndjson");
+        std::fs::write(
+            &closed,
+            format!(
+                "{}\n{}\n",
+                hm_line(D, 1_000, 100, Some(100)),
+                hm_line(D, 2_000, 120, Some(120))
+            ),
+        )
+        .unwrap();
+        std::fs::write(&cur, format!("{}\n", hm_line(D, 3_000, 130, Some(130)))).unwrap();
+        // 一時停止中の削除: いま書いているファイルに区間より後の行がある → 引かない(走行中の累計からも)
+        let snaps = collect_handmark_snaps(&d, Some(&cur));
+        let live = snap(D, 9_000, 131, 131);
+        let subs = handmark_subtractions(&snaps, Some(live), 1_500, 2_500);
+        assert!(subs.is_empty(), "{subs:?}");
+        redact_dir(&d, 1_500, 2_500, Some(&cur), &subs).unwrap();
+        // 対照: 飛ばさなければ引く
+        assert_eq!(
+            handmark_subtractions(&collect_handmark_snaps(&d, None), Some(live), 1_500, 2_500)
+                .get(&D),
+            Some(&sub(30, 30))
+        );
+        // 再開して消し直す(いまのファイルは閉じた): 1 回だけ引く
+        let snaps = collect_handmark_snaps(&d, None);
+        let subs = handmark_subtractions(&snaps, Some(live), 1_500, 2_500);
+        assert_eq!(subs.get(&D), Some(&sub(30, 30)));
+        redact_dir(&d, 1_500, 2_500, None, &subs).unwrap();
+        let got: Vec<u64> = {
+            let mut v = collect_handmark_snaps(&d, None);
+            v.sort();
+            v.iter().map(|s| s.shown_ms).collect()
+        };
+        assert_eq!(got, vec![100, 100]);
+        // 3 回目: 何も引かない(冪等)
+        let subs = handmark_subtractions(
+            &collect_handmark_snaps(&d, None),
+            Some(snap(D, 9_000, 101, 101)),
+            1_500,
+            2_500,
+        );
+        assert!(subs.is_empty(), "{subs:?}");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// 累計が日の途中で 0 から始め直していれば（状態ファイルが消えた後の起動）、next と同じ区切りの中で prev を探す。
+    #[test]
+    fn a_running_total_that_restarts_from_zero_is_split() {
+        let snaps = vec![
+            snap(D, 1_000, 500, 500),
+            snap(D, 2_000, 600, 600),
+            // ここで状態ファイルが消えて 0 から
+            snap(D, 3_000, 10, 10),
+            snap(D, 4_000, 70, 60),
+        ];
+        // 区間 [2_500, 3_500]: next = 4_000 の行(70)、prev は同じ区切りに区間の前の行が無いので 0
+        let subs = handmark_subtractions(&snaps, None, 2_500, 3_500);
+        assert_eq!(subs.get(&D), Some(&sub(70, 60)));
+        // 区間 [1_500, 1_800]: next = 2_000(600)、prev = 1_000(500)
+        let subs = handmark_subtractions(&snaps, None, 1_500, 1_800);
+        assert_eq!(subs.get(&D), Some(&sub(100, 100)));
+        // 走行中の累計が最後の行より小さい(0 から始め直した)なら、走行中の累計そのものを引く
+        let subs = handmark_subtractions(&snaps, Some(snap(D, 9_000, 5, 5)), 4_500, 5_000);
+        assert_eq!(subs.get(&D), Some(&sub(5, 5)));
     }
 }

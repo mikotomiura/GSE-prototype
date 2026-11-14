@@ -515,6 +515,7 @@ fn snap_of(r: &DayRecord, now: u64) -> HandmarkSnap {
         t: now,
         shown_ms: r.shown_ms,
         visible_ms: r.visible_ms,
+        skipped: false,
     }
 }
 
@@ -1632,6 +1633,7 @@ mod tests {
             t: 1_000,
             shown_ms: 100,
             visible_ms: 90,
+            skipped: false,
         }];
         let (r, subs) = scrub_state_file(&fs, 1_500, 2_500, &snaps, 9_000);
         r.unwrap();

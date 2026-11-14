@@ -167,6 +167,9 @@ struct PauseMark {
     off: bool,
     cursor_off: bool,
     click_off: bool,
+    /// 一時停止中に起点を取り直した（窓を開いた・スリープ明け・日の変わり目・削除）。起点の時刻は記録に入れず、
+    /// 再開のときに窓が開いていれば再開の時刻で取り直す。
+    stage_restarted: bool,
 }
 
 impl HandmarkDriver {
@@ -302,6 +305,7 @@ impl HandmarkDriver {
                     off: r.is_some_and(|r| r.off),
                     cursor_off: r.is_some_and(|r| r.cursor_off),
                     click_off: r.is_some_and(|r| r.click_off),
+                    stage_restarted: false,
                 });
             }
             (false, Some(m)) => {
@@ -354,7 +358,7 @@ impl HandmarkDriver {
         } else {
             (false, false, false)
         };
-        let restart_stage = window_open && r.stage_starts.iter().any(|&t| m.from <= t && t <= now);
+        let restart_stage = window_open && m.stage_restarted;
         let mut dirty = r.scrub_range(m.from, now);
         if r.off != base.0 {
             let off = r.off;
@@ -386,7 +390,11 @@ impl HandmarkDriver {
         self.stage = Some(Stage::new(seed, now));
         self.stage_t0 = now;
         self.pending.clear();
-        self.ev.note_stage_start(now);
+        // 記録の一時停止中は起点の時刻を記録に入れない（判断 2・判断 7）。再開のときに取り直す。
+        match self.paused.as_mut() {
+            Some(m) => m.stage_restarted = true,
+            None => self.ev.note_stage_start(now),
+        }
     }
 
     fn open_window(&mut self, now: u64, fx: &mut Vec<Effect>) {
@@ -1537,12 +1545,14 @@ mod tests {
                 t: T0 + 10_000,
                 shown_ms: 10_000,
                 visible_ms: 9_000,
+                skipped: false,
             },
             HandmarkSnap {
                 day: ON_DAY,
                 t: T0 + 20_000,
                 shown_ms: 20_000,
                 visible_ms: 19_000,
+                skipped: false,
             },
         ];
         let (_, ok, subs) = d.on_redact(&fs, T0 + 15_000, T0 + 25_000, &snaps, now);
@@ -1553,5 +1563,43 @@ mod tests {
         assert_eq!(vis(&d), (10_000, 9_000));
         let rec = saved(&fs);
         assert_eq!((rec.shown_ms, rec.visible_ms), (10_000, 9_000));
+    }
+
+    /// 一時停止中に窓を開いた起点は、検め直し(60 秒)や 5 分の保存で状態ファイルに書かれず、5 分を超えて
+    /// 再開しても、再開の時刻で取り直す(レビューの H2・M1・本タスクの判断 7)。
+    #[test]
+    fn a_stage_started_while_paused_is_never_saved_and_is_retaken_at_resume() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.turn_off(&fs, T0 + 500);
+        let p = T0 + 1_000;
+        let _ = d.on_paused(&fs, true, p);
+        let _ = d.turn_on(&fs, p + 1_000);
+        assert!(d.is_window_open());
+        // 6 分ぶん刻む(検め直しと 5 分の保存を何度も通る)。途中の状態ファイルに一時停止中の時刻が無い
+        let mut now = p + 1_000;
+        while now < p + 6 * 60_000 {
+            now += 250;
+            let _ = d.tick(&fs, now, ON_DAY);
+            if now.is_multiple_of(30_000) {
+                let mid = saved(&fs);
+                assert!(
+                    mid.stage_starts.iter().all(|t| *t < p),
+                    "{:?}",
+                    mid.stage_starts
+                );
+                assert!(mid.toggles.iter().all(|t| t.t < p), "{:?}", mid.toggles);
+            }
+        }
+        let r = now + 250;
+        let _ = d.on_paused(&fs, false, r);
+        let rec = saved(&fs);
+        assert!(
+            rec.stage_starts.contains(&r),
+            "再開で取り直していない: {:?}",
+            rec.stage_starts
+        );
+        assert!(rec.stage_starts.iter().all(|t| *t < p || *t >= r));
+        assert_eq!(rec.toggles.last().map(|t| (t.t, t.on)), Some((r, true)));
     }
 }

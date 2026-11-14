@@ -2481,23 +2481,23 @@ pub(crate) fn handmark_set_input_from_tray(
 ///
 /// 戻り値の 2 つ目は、ファイルの `handmark_day` の行の累計から引く量（判断 13）。`snaps` はファイルの行の
 /// 累計の写しで、走行中の累計（駆動役か状態ファイル）と合わせて、駆動役のロックの中で求める。
+/// `g` は呼び出し側が取った駆動役のロック（ローテートの前から持つ）。
 fn handmark_on_redact(
     app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    g: &mut std::sync::MutexGuard<'static, Option<crate::handmark_driver::HandmarkDriver>>,
     from_ms: u64,
     to_ms: u64,
     snaps: &[crate::redaction::HandmarkSnap],
 ) -> (bool, crate::redaction::HandmarkSubs) {
-    let log_tx = handmark_log_tx(app);
     let now = epoch_ms();
-    let mut g = handmark_lock();
     if let Some(d) = g.as_mut() {
         if let Some(fs) = HANDMARK_FS.get() {
             let (fx, ok, subs) = d.on_redact(fs, from_ms, to_ms, snaps, now);
-            run_handmark_effects(app, &log_tx, fx);
+            run_handmark_effects(app, log_tx, fx);
             return (ok, subs);
         }
     }
-    drop(g);
     let (result, subs) = match HANDMARK_FS.get() {
         Some(fs) => crate::handmark_store::scrub_state_file(fs, from_ms, to_ms, snaps, now),
         None => match crate::handmark_store::DiskFs::state_only() {
@@ -3458,6 +3458,12 @@ fn delete_time_range(
     //   ★ 停止中に「いまの区間」を消したい場合は、⚠️ そもそも停止後の記録が無いので
     //   失うものは停止前の分だけであり、**再開すれば次の削除で必ず届く**。
     //   ⚠️ 画面は `files_skipped` をそのまま出すので、黙って取りこぼすことはない。
+    // 手跡: 駆動役のロックをローテートの前に取り、累計に区間の量を当て終えるまで持つ（手跡の削除の判断 6）。
+    //   持っている間は駆動役が行を出せないので、ローテートの後の新しいファイル（書き換えない）に、引く前の累計を
+    //   持つ行が入らない。⚠️ ログの状態のロックはこの後で取る（ログの状態 → 手跡の順に持つ経路は無い）。
+    let handmark_tx = handmark_log_tx(&app);
+    let mut handmark_guard = handmark_lock();
+
     if crate::o1::is_o1() && !crate::recording::is_paused() {
         // ⚠️★★★ **ローテートの *完了* を待つ** (cross-review / Codex MEDIUM・2026-08-27)。
         //
@@ -3508,10 +3514,8 @@ fn delete_time_range(
     // 手跡: 状態ファイルと走行中の累計からも、区間に入る切った／戻した時刻と起点を消す。
     //   ★ `redact_dir` の失敗の分岐で状態ファイルに時刻が残らないよう、先に行う。
     //   累計から区間の中の量も引く（判断 13）。引く量はファイルの行と走行中の累計から求め、同じ量をファイルに当てる。
+    //   いま書いているファイル（書き換えない）に区間より後の行がある日は引かない（`handmark_subtractions`）。
     let (dir, _participant_id) = crate::logger::session_log_dir();
-    let snaps = crate::redaction::collect_handmark_snaps(&dir);
-    let (handmark_ok, handmark_subs) = handmark_on_redact(&app, from_ms, to_ms, &snaps);
-
     let current = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
     let current_path = PathBuf::from(&current);
     let skip = if current.is_empty() {
@@ -3519,6 +3523,16 @@ fn delete_time_range(
     } else {
         Some(current_path.as_path())
     };
+    let snaps = crate::redaction::collect_handmark_snaps(&dir, skip);
+    let (handmark_ok, handmark_subs) = handmark_on_redact(
+        &app,
+        &handmark_tx,
+        &mut handmark_guard,
+        from_ms,
+        to_ms,
+        &snaps,
+    );
+    drop(handmark_guard);
 
     let summary = crate::redaction::redact_dir(&dir, from_ms, to_ms, skip, &handmark_subs)
         .map_err(|e| {
