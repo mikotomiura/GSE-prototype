@@ -20,6 +20,7 @@ use crate::handmark_store::{
     Evaluation, HandmarkFs,
 };
 use crate::logger::HandmarkDayRow;
+use crate::redaction::{handmark_subtractions, HandmarkSnap, HandmarkSubs};
 
 /// 行を書く間隔（その日の累計の写し）。
 pub const ROW_MS: u64 = 300_000;
@@ -154,6 +155,18 @@ pub struct HandmarkDriver {
     last_tray: TrayItem,
     /// 最後に出した `(open, cursor, click)`（閉じた初期の値から始める。変わらなければ出さない）。
     last_gate: (bool, bool, bool),
+    /// 記録の一時停止中（本タスクの判断 2）。量を足さず、時刻の要素を状態に残さない。
+    paused: Option<PauseMark>,
+}
+
+/// 一時停止を始めた時刻と、そのときの日と切っていた状態（再開のときに違いを 1 件ずつ足すため）。
+#[derive(Debug, Clone, Copy)]
+struct PauseMark {
+    from: u64,
+    day: Option<i64>,
+    off: bool,
+    cursor_off: bool,
+    click_off: bool,
 }
 
 impl HandmarkDriver {
@@ -174,6 +187,7 @@ impl HandmarkDriver {
             last_tick_ms: now,
             last_tray: TrayItem::Hidden,
             last_gate: (false, true, true),
+            paused: None,
         };
         let mut fx = Vec::new();
         d.push_row(now, &mut fx);
@@ -264,10 +278,107 @@ impl HandmarkDriver {
             true
         };
         if applied {
+            self.hide_pause_times(fs, now, &mut fx);
             self.push_row(now, &mut fx);
             self.sync_gate(false, &mut fx);
         }
         fx
+    }
+
+    /// 記録の一時停止の始まり・終わり（`set_recording_paused` と駆動の刻みの両方から呼ぶ・同じ値なら何もしない）。
+    ///
+    /// 一時停止中は出ていた量を足さず（`tick`）、切った／戻した・入力ごとの入れ切り・起点の時刻を状態に残さない
+    /// （書くたびに一時停止の始まりからの要素を消す）。再開のとき、切っていた状態が始まりと違えば、再開の時刻で
+    /// 1 件ずつ足す。一時停止中に起点を取ったなら、窓が開いていれば再開の時刻で取り直す。再開の時刻は
+    /// `recording_pause` の行で記録に出るので、新しく分かることはない。
+    pub fn on_paused(&mut self, fs: &dyn HandmarkFs, paused: bool, now: u64) -> Vec<Effect> {
+        let mut fx = Vec::new();
+        match (paused, self.paused) {
+            (true, None) => {
+                let r = self.ev.record.as_ref();
+                self.paused = Some(PauseMark {
+                    from: now,
+                    day: r.map(|r| r.day),
+                    off: r.is_some_and(|r| r.off),
+                    cursor_off: r.is_some_and(|r| r.cursor_off),
+                    click_off: r.is_some_and(|r| r.click_off),
+                });
+            }
+            (false, Some(m)) => {
+                self.paused = None;
+                self.end_pause(fs, m, now, &mut fx);
+            }
+            _ => {}
+        }
+        fx
+    }
+
+    /// 一時停止中なら、走行中の累計から一時停止の始まりからの時刻の要素を消す。消したら真。
+    fn drop_pause_times(&mut self, now: u64) -> bool {
+        let Some(m) = self.paused else { return false };
+        self.ev
+            .record
+            .as_mut()
+            .is_some_and(|r| r.scrub_range(m.from, now))
+    }
+
+    /// 一時停止中に状態ファイルへ書いた後: 時刻の要素を消して書き直す。書けなければ書いたものを始末する。
+    fn hide_pause_times(&mut self, fs: &dyn HandmarkFs, now: u64, fx: &mut Vec<Effect>) {
+        if self.drop_pause_times(now) {
+            self.save_or_clean_up(fs, now, fx);
+        }
+    }
+
+    /// 保存する。書けなければ閉じて、状態ファイルを時刻の無い形に書き直すか消す（区間の削除の失敗と同じ始末）。
+    fn save_or_clean_up(&mut self, fs: &dyn HandmarkFs, now: u64, fx: &mut Vec<Effect>) {
+        if self.ev.record.is_none() || self.ev.save(fs).is_ok() {
+            return;
+        }
+        let snapshot = self.ev.record.clone();
+        self.ev.note_save_failed();
+        self.reconcile(now, fx);
+        if let Some(r) = snapshot {
+            let _ = rewrite_or_remove(fs, &r);
+        }
+    }
+
+    /// 一時停止の終わり（再開・一時停止のままの終了）。
+    fn end_pause(&mut self, fs: &dyn HandmarkFs, m: PauseMark, now: u64, fx: &mut Vec<Effect>) {
+        let window_open = self.window_open;
+        let Some(r) = self.ev.record.as_mut() else {
+            return;
+        };
+        // 一時停止の間に日が変わっていたら、新しい日の記録は切っていない状態から始まっている
+        let base = if m.day == Some(r.day) {
+            (m.off, m.cursor_off, m.click_off)
+        } else {
+            (false, false, false)
+        };
+        let restart_stage = window_open && r.stage_starts.iter().any(|&t| m.from <= t && t <= now);
+        let mut dirty = r.scrub_range(m.from, now);
+        if r.off != base.0 {
+            let off = r.off;
+            r.set_off(now, off);
+            dirty = true;
+        }
+        if r.cursor_off != base.1 {
+            let on = !r.cursor_off;
+            r.set_input(now, PointerInput::Cursor, on);
+            dirty = true;
+        }
+        if r.click_off != base.2 {
+            let on = !r.click_off;
+            r.set_input(now, PointerInput::Click, on);
+            dirty = true;
+        }
+        if restart_stage {
+            self.new_stage(now);
+            dirty = true;
+        }
+        if dirty {
+            self.save_or_clean_up(fs, now, fx);
+        }
+        self.sync_gate(false, fx);
     }
 
     fn new_stage(&mut self, now: u64) {
@@ -369,7 +480,13 @@ impl HandmarkDriver {
             }
             // 窓が出たと分かってから、かつ 1 刻みの間が 2 秒以内のときだけ(スリープの間は足さない)
             let gap = now.saturating_sub(prev_tick);
-            if self.window_confirmed && !jumped && !day_changed && gap <= SLEEP_GAP_MS {
+            // 記録の一時停止中は足さない(判断 2: 一時停止中の在席とロックの量を再開の後の行に残さない)
+            if self.window_confirmed
+                && !jumped
+                && !day_changed
+                && gap <= SLEEP_GAP_MS
+                && self.paused.is_none()
+            {
                 self.ev.add_shown(gap);
                 if self.strip_visible {
                     self.ev.add_visible(gap);
@@ -379,6 +496,7 @@ impl HandmarkDriver {
 
         if now.saturating_sub(self.last_row_ms) >= ROW_MS || now < self.last_row_ms {
             self.last_row_ms = now;
+            self.drop_pause_times(now);
             if self.ev.record.is_some() && self.ev.save(fs).is_err() {
                 self.ev.note_save_failed();
                 self.reconcile(now, &mut fx);
@@ -393,6 +511,7 @@ impl HandmarkDriver {
     pub fn turn_off(&mut self, fs: &dyn HandmarkFs, now: u64) -> Vec<Effect> {
         let mut fx = Vec::new();
         turn_off(fs, &mut self.ev, now);
+        self.hide_pause_times(fs, now, &mut fx);
         self.reconcile(now, &mut fx);
         self.push_row(now, &mut fx);
         self.sync_gate(false, &mut fx);
@@ -403,6 +522,7 @@ impl HandmarkDriver {
     pub fn turn_on(&mut self, fs: &dyn HandmarkFs, now: u64) -> Vec<Effect> {
         let mut fx = Vec::new();
         if turn_on(fs, &mut self.ev, now).is_ok() {
+            self.hide_pause_times(fs, now, &mut fx);
             self.reconcile(now, &mut fx);
             self.push_row(now, &mut fx);
             self.sync_gate(false, &mut fx);
@@ -442,16 +562,21 @@ impl HandmarkDriver {
 
     /// 区間の削除: 状態ファイルと走行中の累計から区間内の時刻を消す。書き直せなければ状態ファイルを消す。
     /// 消せなかったら `false`(呼び出し側が削除の結果に失敗を載せる)。後で `Stage` を取り直す。
+    ///
+    /// 累計からも区間の中の量を引く（判断 13）。引く量は `snaps`（ファイルの行）と走行中の累計から求め、
+    /// ファイルの行に当てるために返す。
     pub fn on_redact(
         &mut self,
         fs: &dyn HandmarkFs,
         from_ms: u64,
         to_ms: u64,
+        snaps: &[HandmarkSnap],
         now: u64,
-    ) -> (Vec<Effect>, bool) {
+    ) -> (Vec<Effect>, bool, HandmarkSubs) {
         let mut fx = Vec::new();
+        let subs = handmark_subtractions(snaps, self.ev.live_snap(now), from_ms, to_ms);
         let ok = if self.ev.record.is_some() {
-            if self.ev.scrub_state(fs, from_ms, to_ms).is_ok() {
+            if self.ev.scrub_state(fs, from_ms, to_ms, &subs).is_ok() {
                 true
             } else {
                 // 書けない: 始末は `scrub_state_file` と共通（`rewrite_or_remove`・入力ごとの切りも保つ）。
@@ -461,20 +586,36 @@ impl HandmarkDriver {
                 snapshot.is_some_and(|r| rewrite_or_remove(fs, &r).is_ok())
             }
         } else {
-            // 状態ファイルが壊れていて累計が無い: ファイルを直接直す(壊れていれば消す)
-            scrub_state_file(fs, from_ms, to_ms).is_ok()
+            // 状態ファイルが壊れていて累計が無い: ファイルを直接直す(壊れていれば消す)。
+            // 走行中の累計が無いので、引く量は状態ファイルが読めればその累計も入れて求め直したものを使う。
+            let (r, file_subs) = scrub_state_file(fs, from_ms, to_ms, snaps, now);
+            return self.finish_redact(fx, r.is_ok(), file_subs, now);
         };
+        self.finish_redact(fx, ok, subs, now)
+    }
+
+    fn finish_redact(
+        &mut self,
+        mut fx: Vec<Effect>,
+        ok: bool,
+        subs: HandmarkSubs,
+        now: u64,
+    ) -> (Vec<Effect>, bool, HandmarkSubs) {
         if self.window_open {
             // 区間の後の起点を取り直す(消した起点を再生が必要としないように)
             self.new_stage(now);
         }
         self.sync_gate(false, &mut fx);
-        (fx, ok)
+        (fx, ok, subs)
     }
 
     /// 終了: 保存して最後の行。
     pub fn on_quit(&mut self, fs: &dyn HandmarkFs, now: u64) -> Vec<Effect> {
         let mut fx = Vec::new();
+        // 一時停止のまま終わる: 再開と同じに時刻を片づけてから保存する(次の起動の行に一時停止中の時刻を残さない)
+        if let Some(m) = self.paused.take() {
+            self.end_pause(fs, m, now, &mut fx);
+        }
         if self.ev.record.is_some() && self.ev.save(fs).is_err() {
             self.ev.note_save_failed();
         }
@@ -708,7 +849,7 @@ mod tests {
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         let _ = d.turn_off(&fs, T0 + 1_000);
         let _ = d.turn_on(&fs, T0 + 2_000);
-        let (_, ok) = d.on_redact(&fs, T0, T0 + 5_000, T0 + 6_000);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 5_000, &[], T0 + 6_000);
         assert!(ok);
         let rec = d.evaluation().record.as_ref().unwrap();
         assert!(rec.toggles.is_empty());
@@ -802,7 +943,7 @@ mod tests {
         all.extend(d.set_input(&fs, PointerInput::Cursor, false, T0 + 101_200));
         all.extend(d.set_input(&fs, PointerInput::Click, false, T0 + 101_300));
         all.extend(d.set_input(&fs, PointerInput::Cursor, true, T0 + 101_400));
-        all.extend(d.on_redact(&fs, T0, T0 + 10, T0 + 101_500).0);
+        all.extend(d.on_redact(&fs, T0, T0 + 10, &[], T0 + 101_500).0);
         all.extend(d.on_quit(&fs, T0 + 102_000));
         assert!(all
             .iter()
@@ -895,7 +1036,7 @@ mod tests {
         let _ = d.set_input(&fs, PointerInput::Cursor, false, T0 + 500);
         // 区間の削除で、書き直し（全体）だけ失敗する
         fs.fail_state_writes_left.set(1);
-        let (_, ok) = d.on_redact(&fs, T0, T0 + 10_000, T0 + 20_000);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 10_000, &[], T0 + 20_000);
         assert!(ok);
         let (d2, _) = HandmarkDriver::new(&fs, true, T0 + 60_000, ON_DAY);
         assert_eq!(
@@ -1030,7 +1171,7 @@ mod tests {
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         let _ = d.turn_off(&fs, T0 + 100);
         fs.fail_state_write.set(true);
-        let (fx, ok) = d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000);
+        let (fx, ok, _) = d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000);
         assert!(ok, "書けなくても消せたので成功");
         assert!(closed(&fx) || !d.is_window_open());
         assert_eq!(fs.read_state(), crate::handmark_store::ReadResult::Missing);
@@ -1039,13 +1180,13 @@ mod tests {
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         fs.fail_state_write.set(true);
         fs.fail_state_remove.set(true);
-        assert!(!d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000).1);
+        assert!(!d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000).1);
         // 状態ファイルが壊れていて累計が無い起動でも、直接消す
         let fs = with_table();
         *fs.state.borrow_mut() = Some(b"{broken".to_vec());
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
         assert!(d.evaluation().record.is_none());
-        assert!(d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000).1);
+        assert!(d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000).1);
         assert_eq!(fs.read_state(), crate::handmark_store::ReadResult::Missing);
     }
 
@@ -1053,7 +1194,7 @@ mod tests {
     fn redact_takes_the_origin_again_while_the_window_is_open() {
         let fs = with_table();
         let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
-        let _ = d.on_redact(&fs, T0, T0 + 500, T0 + 1_000);
+        let _ = d.on_redact(&fs, T0, T0 + 500, &[], T0 + 1_000);
         let starts = &d.evaluation().record.as_ref().unwrap().stage_starts;
         assert_eq!(starts, &vec![T0 + 1_000]);
     }
@@ -1179,7 +1320,8 @@ mod tests {
         assert_eq!(vis(&d), (750, 500));
     }
 
-    /// 行の `visible_ms` は累計があれば `Some`、五分の行にも載る。区間の削除で消えない。
+    /// 行の `visible_ms` は累計があれば `Some`、五分の行にも載る。区間の削除では、区間の中の量が累計から
+    /// 引かれる（判断 13 で「消えない」から改めた・本タスクの判断 3）。
     #[test]
     fn visible_time_reaches_the_row_and_survives_a_redact() {
         let fs = with_table();
@@ -1188,9 +1330,10 @@ mod tests {
         d.on_strip_visible(true);
         let _ = d.tick(&fs, T0 + 250, ON_DAY);
         assert_eq!(d.evaluation().row(T0 + 250).unwrap().visible_ms, Some(250));
-        let (_, ok) = d.on_redact(&fs, T0, T0 + 10_000, T0 + 300);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 10_000, &[], T0 + 300);
         assert!(ok);
-        assert_eq!(vis(&d), (250, 250), "区間の削除で消さない");
+        // 区間の前の行が無いので、走行中の累計(区間の中の 250ms)がそのまま引かれる
+        assert_eq!(vis(&d), (0, 0), "区間の中の量が累計に残った");
         let mut now = T0 + 250;
         let mut last_row = None;
         while now < T0 + ROW_MS + 1_000 {
@@ -1214,7 +1357,7 @@ mod tests {
         let _ = d.turn_off(&fs, T0 + 100);
         fs.fail_state_write.set(true);
         fs.fail_mark_write.set(true);
-        let (_, ok) = d.on_redact(&fs, T0, T0 + 1_000, T0 + 2_000);
+        let (_, ok, _) = d.on_redact(&fs, T0, T0 + 1_000, &[], T0 + 2_000);
         assert!(!ok);
         fs.fail_state_write.set(false);
         fs.fail_mark_write.set(false);
@@ -1222,5 +1365,193 @@ mod tests {
         let (d2, fx) = HandmarkDriver::new(&fs, true, T0 + 3_000, ON_DAY);
         assert!(!d2.is_window_open());
         assert_eq!(row_reason(&fx), Some(Some("off_today")));
+    }
+
+    // ---- 記録の一時停止（判断 2）と、削除で累計から引く（判断 1）----
+
+    fn saved(fs: &MemFs) -> crate::analysis::handmark::day::DayRecord {
+        match crate::handmark_store::parse_state(&fs.read_state()) {
+            crate::handmark_store::DayLoad::Loaded(r) => r,
+            _ => panic!("状態ファイルが読めない"),
+        }
+    }
+
+    /// 窓を出して `until` まで 250ms ごとに進める。
+    fn run(d: &mut HandmarkDriver, fs: &MemFs, from: u64, until: u64) -> u64 {
+        let mut now = from;
+        while now < until {
+            now += 250;
+            let _ = d.tick(fs, now, ON_DAY);
+        }
+        now
+    }
+
+    #[test]
+    fn shown_time_is_not_added_while_recording_is_paused() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
+        d.on_strip_visible(true);
+        let now = run(&mut d, &fs, T0, T0 + 10_000);
+        let before = vis(&d);
+        let _ = d.on_paused(&fs, true, now);
+        let now = run(&mut d, &fs, now, now + 60_000);
+        assert_eq!(vis(&d), before, "一時停止中に足された");
+        let _ = d.on_paused(&fs, false, now);
+        let _ = run(&mut d, &fs, now, now + 10_000);
+        let after = vis(&d);
+        assert!(
+            after.0 >= before.0 + 9_000 && after.1 >= before.1 + 9_000,
+            "{after:?}"
+        );
+        // 対照: 一時停止しなければ 1 分ぶん足される
+        let fs2 = with_table();
+        let (mut d2, _) = HandmarkDriver::new(&fs2, true, T0, ON_DAY);
+        let _ = d2.on_window_status(WindowStatus::Shown, T0);
+        let _ = run(&mut d2, &fs2, T0, T0 + 70_000);
+        assert!(vis(&d2).0 >= 69_000);
+    }
+
+    #[test]
+    fn toggles_made_while_paused_leave_no_time_and_the_change_is_dated_at_resume() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let p = T0 + 1_000;
+        let _ = d.on_paused(&fs, true, p);
+        let _ = d.turn_off(&fs, p + 1_000);
+        let _ = d.set_input(&fs, PointerInput::Cursor, false, p + 1_500);
+        let _ = d.turn_on(&fs, p + 2_000);
+        let _ = d.set_input(&fs, PointerInput::Cursor, false, p + 2_500);
+        let _ = d.turn_off(&fs, p + 3_000);
+        // 一時停止中の状態ファイルに、始まりの後の時刻が無い
+        let mid = saved(&fs);
+        assert!(mid.off);
+        assert!(mid.toggles.iter().all(|t| t.t < p), "{:?}", mid.toggles);
+        assert!(mid.input_toggles.iter().all(|t| t.t < p));
+        assert!(mid.stage_starts.iter().all(|t| *t < p));
+        // 再開: 違いだけが再開の時刻で 1 件ずつ
+        let r = p + 10_000;
+        let _ = d.on_paused(&fs, false, r);
+        let rec = saved(&fs);
+        assert_eq!(
+            rec.toggles.iter().map(|t| (t.t, t.on)).collect::<Vec<_>>(),
+            vec![(r, false)]
+        );
+        assert_eq!(rec.input_toggles.len(), 1);
+        assert_eq!(
+            (rec.input_toggles[0].t, rec.input_toggles[0].on),
+            (r, false)
+        );
+        assert!(rec.cursor_off);
+        assert!(
+            rec.stage_starts.iter().all(|t| *t < p || *t >= r),
+            "{:?}",
+            rec.stage_starts
+        );
+        let row = d.evaluation().row(r + 1).unwrap();
+        assert!(row.toggles.iter().all(|t| t.0 < p || t.0 >= r));
+    }
+
+    #[test]
+    fn toggling_back_while_paused_leaves_nothing() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let p = T0 + 1_000;
+        let _ = d.on_paused(&fs, true, p);
+        let _ = d.turn_off(&fs, p + 1_000);
+        let _ = d.turn_on(&fs, p + 2_000);
+        let _ = d.on_paused(&fs, false, p + 3_000);
+        let rec = saved(&fs);
+        assert!(rec.toggles.is_empty(), "{:?}", rec.toggles);
+        assert!(!rec.off);
+        // 窓を開け直した起点は再開の時刻で取り直す(一時停止中の時刻は残らない)
+        assert!(
+            rec.stage_starts.iter().all(|t| *t < p || *t >= p + 3_000),
+            "{:?}",
+            rec.stage_starts
+        );
+        assert!(rec.stage_starts.contains(&(p + 3_000)));
+    }
+
+    #[test]
+    fn quitting_while_paused_leaves_no_pause_time_for_the_next_start() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let p = T0 + 1_000;
+        let _ = d.on_paused(&fs, true, p);
+        let _ = d.turn_off(&fs, p + 1_000);
+        let q = p + 5_000;
+        let _ = d.on_quit(&fs, q);
+        let rec = saved(&fs);
+        assert_eq!(
+            rec.toggles.iter().map(|t| (t.t, t.on)).collect::<Vec<_>>(),
+            vec![(q, false)]
+        );
+        // 次の起動の最初の行にも一時停止中の時刻が無い
+        let (_, fx) = HandmarkDriver::new(&fs, true, q + 1_000, ON_DAY);
+        let row = fx.iter().find_map(|e| match e {
+            Effect::Row(r) => Some(r.clone()),
+            _ => None,
+        });
+        assert!(row.unwrap().toggles.iter().all(|t| t.0 < p || t.0 >= q));
+    }
+
+    #[test]
+    fn the_same_pause_value_twice_changes_nothing() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_paused(&fs, true, T0 + 1_000);
+        let _ = d.turn_off(&fs, T0 + 1_500);
+        // 刻みの経路が遅れて同じ値を渡しても、始まりの時刻は動かない
+        let _ = d.on_paused(&fs, true, T0 + 2_000);
+        assert!(d
+            .evaluation()
+            .record
+            .as_ref()
+            .unwrap()
+            .toggles
+            .iter()
+            .all(|t| t.t < T0 + 1_000));
+        let _ = d.on_paused(&fs, false, T0 + 3_000);
+        let _ = d.on_paused(&fs, false, T0 + 4_000);
+        let rec = saved(&fs);
+        assert_eq!(
+            rec.toggles.iter().map(|t| t.t).collect::<Vec<_>>(),
+            vec![T0 + 3_000]
+        );
+    }
+
+    #[test]
+    fn redact_subtracts_the_deleted_interval_from_the_running_total() {
+        use crate::redaction::HandmarkSnap;
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_window_status(WindowStatus::Shown, T0);
+        d.on_strip_visible(true);
+        let now = run(&mut d, &fs, T0, T0 + 40_000);
+        let (s, v) = vis(&d);
+        // ファイルの行: 区間の前の行(累計 10 秒)と区間の中の行(20 秒)。区間の後の行は無い
+        let snaps = [
+            HandmarkSnap {
+                day: ON_DAY,
+                t: T0 + 10_000,
+                shown_ms: 10_000,
+                visible_ms: 9_000,
+            },
+            HandmarkSnap {
+                day: ON_DAY,
+                t: T0 + 20_000,
+                shown_ms: 20_000,
+                visible_ms: 19_000,
+            },
+        ];
+        let (_, ok, subs) = d.on_redact(&fs, T0 + 15_000, T0 + 25_000, &snaps, now);
+        assert!(ok);
+        // 引く量 = 走行中の累計 − 区間の前の行
+        assert_eq!(subs[&ON_DAY].shown_ms, s - 10_000);
+        assert_eq!(subs[&ON_DAY].visible_ms, v - 9_000);
+        assert_eq!(vis(&d), (10_000, 9_000));
+        let rec = saved(&fs);
+        assert_eq!((rec.shown_ms, rec.visible_ms), (10_000, 9_000));
     }
 }

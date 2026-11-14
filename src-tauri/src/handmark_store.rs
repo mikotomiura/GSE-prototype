@@ -19,6 +19,7 @@ use crate::analysis::handmark::assignment::{
 use crate::analysis::handmark::day::{DayRecord, PointerInput};
 use crate::analysis::handmark::gate::{decide, CloseReason, Decision, StateStatus};
 use crate::logger::HandmarkDayRow;
+use crate::redaction::{handmark_subtractions, HandmarkSnap, HandmarkSubs};
 
 pub const TABLE_FILE_NAME: &str = "handmark_assignment.json";
 pub const SHA_FILE_NAME: &str = "handmark_assignment.sha256";
@@ -352,12 +353,24 @@ impl Evaluation {
 
     /// 区間の削除: 走行中の累計から区間内の切った／戻した時刻と起点を消し、状態ファイルへ書く。
     /// 書けなかったら `Err`（累計は消えた後の形でメモリに残る）。lib.rs の削除の経路への配線は 1b。
-    pub fn scrub_state(&mut self, fs: &dyn HandmarkFs, from_ms: u64, to_ms: u64) -> io::Result<()> {
+    /// `subs` の今日の記録の日の分を累計から引く（判断 13・[`crate::redaction::handmark_subtractions`]）。
+    pub fn scrub_state(
+        &mut self,
+        fs: &dyn HandmarkFs,
+        from_ms: u64,
+        to_ms: u64,
+        subs: &HandmarkSubs,
+    ) -> io::Result<()> {
         let Some(r) = self.record.as_mut() else {
             return Ok(());
         };
-        r.scrub_range(from_ms, to_ms);
+        scrub_record(r, from_ms, to_ms, subs);
         write_record(fs, r)
+    }
+
+    /// 走行中の累計の写し（削除で引く量を求める入力・`t` は今）。
+    pub fn live_snap(&self, now: u64) -> Option<HandmarkSnap> {
+        self.record.as_ref().map(|r| snap_of(r, now))
     }
 
     pub fn is_open(&self) -> bool {
@@ -462,18 +475,46 @@ pub struct ScrubFailed;
 ///
 /// 消した後の起動は 1a の `Fresh`(その日の累計 0・切っていない・`first_shown_day` 無し)になり、
 /// 日の割付は表だけから決まるので、翌日以降の割付どおりの動きは変わらない。
-pub fn scrub_state_file(fs: &dyn HandmarkFs, from_ms: u64, to_ms: u64) -> Result<(), ScrubFailed> {
+///
+/// 累計からも区間の中の量を引く（判断 13）。引く量は `snaps`（ファイルの行）と状態ファイルの累計から求め、
+/// ファイルの行に当てるためにそのまま返す。
+pub fn scrub_state_file(
+    fs: &dyn HandmarkFs,
+    from_ms: u64,
+    to_ms: u64,
+    snaps: &[HandmarkSnap],
+    now: u64,
+) -> (Result<(), ScrubFailed>, HandmarkSubs) {
     let remove = |fs: &dyn HandmarkFs| fs.remove_state().map_err(|_| ScrubFailed);
+    let rows_only = || handmark_subtractions(snaps, None, from_ms, to_ms);
     match parse_state(&fs.read_state()) {
-        DayLoad::Fresh => Ok(()),
-        DayLoad::Broken => remove(fs),
+        DayLoad::Fresh => (Ok(()), rows_only()),
+        DayLoad::Broken => (remove(fs), rows_only()),
         DayLoad::Loaded(mut r) => {
-            r.scrub_range(from_ms, to_ms);
+            let subs = handmark_subtractions(snaps, Some(snap_of(&r, now)), from_ms, to_ms);
+            scrub_record(&mut r, from_ms, to_ms, &subs);
             if write_record(fs, &r).is_ok() {
-                return Ok(());
+                return (Ok(()), subs);
             }
-            rewrite_or_remove(fs, &r)
+            (rewrite_or_remove(fs, &r), subs)
         }
+    }
+}
+
+/// 区間の削除を累計に当てる: 区間の時刻の要素を消し、記録の日の分の量を引く。
+pub(crate) fn scrub_record(r: &mut DayRecord, from_ms: u64, to_ms: u64, subs: &HandmarkSubs) {
+    r.scrub_range(from_ms, to_ms);
+    if let Some(sub) = subs.get(&r.day) {
+        r.subtract(sub.shown_ms, sub.visible_ms);
+    }
+}
+
+fn snap_of(r: &DayRecord, now: u64) -> HandmarkSnap {
+    HandmarkSnap {
+        day: r.day,
+        t: now,
+        shown_ms: r.shown_ms,
+        visible_ms: r.visible_ms,
     }
 }
 
@@ -1113,7 +1154,8 @@ mod tests {
         assert!(turn_on(&fs, &mut ev, 3_000).is_ok());
         ev.add_shown(77);
         ev.save(&fs).unwrap();
-        ev.scrub_state(&fs, 900, 3_500).unwrap();
+        ev.scrub_state(&fs, 900, 3_500, &crate::redaction::HandmarkSubs::new())
+            .unwrap();
         let row = ev.row(9).unwrap();
         assert_eq!(row.stage_starts, vec![5_000]);
         assert!(row.toggles.is_empty());
@@ -1129,7 +1171,9 @@ mod tests {
         assert!(again.row(10).unwrap().toggles.is_empty());
         // 書けないときは Err
         fs.fail_state_write.set(true);
-        assert!(ev.scrub_state(&fs, 0, u64::MAX).is_err());
+        assert!(ev
+            .scrub_state(&fs, 0, u64::MAX, &crate::redaction::HandmarkSubs::new())
+            .is_err());
     }
 
     /// 日 D に切って保存 → 時計が D-1 に戻って検め直し → D に戻って検め直し → 切ったまま。
@@ -1257,7 +1301,7 @@ mod tests {
         let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
         ev.note_stage_start(1_000);
         ev.save(&fs).unwrap();
-        scrub_state_file(&fs, 0, 2_000).unwrap();
+        scrub_state_file(&fs, 0, 2_000, &[], 0).0.unwrap();
         let DayLoad::Loaded(r) = parse_state(&fs.read_state()) else {
             panic!("loaded");
         };
@@ -1266,7 +1310,7 @@ mod tests {
         let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
         assert_eq!(turn_off(&fs, &mut ev, 5), ToggleOutcome::State);
         fs.fail_state_write.set(true);
-        scrub_state_file(&fs, 0, 10).unwrap();
+        scrub_state_file(&fs, 0, 10, &[], 0).0.unwrap();
         fs.fail_state_write.set(false);
         assert_eq!(fs.read_state(), ReadResult::Missing);
         assert!(fs.mark_exists(ON_DAY));
@@ -1279,19 +1323,19 @@ mod tests {
         // 壊れている: 消す・消せなければ Err
         *fs.state.borrow_mut() = Some(b"{broken".to_vec());
         fs.fail_state_remove.set(true);
-        assert_eq!(scrub_state_file(&fs, 0, 10), Err(ScrubFailed));
+        assert_eq!(scrub_state_file(&fs, 0, 10, &[], 0).0, Err(ScrubFailed));
         fs.fail_state_remove.set(false);
-        scrub_state_file(&fs, 0, 10).unwrap();
+        scrub_state_file(&fs, 0, 10, &[], 0).0.unwrap();
         assert_eq!(fs.read_state(), ReadResult::Missing);
         // 無ければ何もしない
-        scrub_state_file(&fs, 0, 10).unwrap();
+        scrub_state_file(&fs, 0, 10, &[], 0).0.unwrap();
         // 切っていなかった日は Fresh で、割付どおり開く(累計は 0 に戻る)
         let fs2 = with_table();
         let mut ev2 = Evaluation::run(&fs2, true, ON_DAY, None);
         ev2.add_shown(5_000);
         ev2.save(&fs2).unwrap();
         fs2.fail_state_write.set(true);
-        scrub_state_file(&fs2, 0, u64::MAX).unwrap();
+        scrub_state_file(&fs2, 0, u64::MAX, &[], 0).0.unwrap();
         fs2.fail_state_write.set(false);
         let again = Evaluation::run(&fs2, true, ON_DAY, None);
         assert!(again.is_open());
@@ -1307,7 +1351,7 @@ mod tests {
         assert_eq!(turn_off(&fs, &mut ev, 5), ToggleOutcome::State);
         fs.fail_state_write.set(true);
         fs.fail_mark_write.set(true);
-        assert_eq!(scrub_state_file(&fs, 0, 10_000), Err(ScrubFailed));
+        assert_eq!(scrub_state_file(&fs, 0, 10_000, &[], 0).0, Err(ScrubFailed));
         fs.fail_state_write.set(false);
         fs.fail_mark_write.set(false);
         // 状態ファイルは消されず、off を保っている(区間の時刻は残りうる)
@@ -1483,7 +1527,7 @@ mod tests {
         );
         // 最初の書き込み（区間を落とした全体）だけ失敗し、最小の形は書ける。
         fs.fail_state_writes_left.set(1);
-        assert!(scrub_state_file(&fs, 0, 10_000).is_ok());
+        assert!(scrub_state_file(&fs, 0, 10_000, &[], 0).0.is_ok());
         let ev2 = Evaluation::run(&fs, true, ON_DAY, None);
         assert_eq!(ev2.inputs_on(), (false, true), "カーソルは切れたまま");
         assert!(
@@ -1495,7 +1539,7 @@ mod tests {
         let mut ev = Evaluation::run(&fs, true, ON_DAY, None);
         let _ = turn_input_off(&fs, &mut ev, PI::Click, 1_000);
         fs.fail_state_write.set(true);
-        assert!(scrub_state_file(&fs, 0, 10_000).is_ok());
+        assert!(scrub_state_file(&fs, 0, 10_000, &[], 0).0.is_ok());
         assert!(fs.state.borrow().is_none());
         assert!(
             fs.marks.borrow().contains(&ON_DAY),
@@ -1506,7 +1550,7 @@ mod tests {
         let ev = Evaluation::run(&fs, true, ON_DAY, None);
         let _ = ev.save(&fs);
         fs.fail_state_write.set(true);
-        assert!(scrub_state_file(&fs, 0, 10_000).is_ok());
+        assert!(scrub_state_file(&fs, 0, 10_000, &[], 0).0.is_ok());
         assert!(fs.marks.borrow().is_empty());
     }
 
@@ -1534,7 +1578,8 @@ mod tests {
         turn_input_off(&fs, &mut ev, PI::Click, 2_000);
         assert!(turn_input_on(&fs, &mut ev, PI::Cursor, 3_000).is_ok());
         // 走行中の累計（と、そこから作る行）
-        ev.scrub_state(&fs, 1_500, 2_500).unwrap();
+        ev.scrub_state(&fs, 1_500, 2_500, &crate::redaction::HandmarkSubs::new())
+            .unwrap();
         let row = ev.row(9).unwrap();
         assert_eq!(
             row.input_toggles,
@@ -1548,7 +1593,7 @@ mod tests {
         };
         assert_eq!(disk.input_toggles.len(), 2);
         // 駆動役が無いときの状態ファイルの直接の削除
-        scrub_state_file(&fs, 0, 1_000).unwrap();
+        scrub_state_file(&fs, 0, 1_000, &[], 0).0.unwrap();
         let DayLoad::Loaded(disk) = parse_state(&fs.read_state()) else {
             panic!("state must load");
         };
@@ -1572,5 +1617,39 @@ mod tests {
         assert!(ev.record.is_some());
         assert_eq!(ev.inputs_on(), (true, true));
         assert_eq!(ev.row(1).unwrap().shown_ms, 5);
+    }
+
+    /// 駆動役が無いときの状態ファイルの直接の削除でも、累計から区間の量を引き、同じ量をファイル用に返す
+    /// （段 1 の同意の判断 13）。
+    #[test]
+    fn state_file_redact_subtracts_the_interval_and_returns_the_amount() {
+        use crate::redaction::{HandmarkSnap, HandmarkSub};
+        let fs = with_table();
+        let st = r#"{"version":1,"day":20411,"shown_ms":500,"visible_ms":400,"toggles":[],"off":false,"first_shown_day":20411,"stage_starts":[],"overflow":false}"#;
+        *fs.state.borrow_mut() = Some(st.as_bytes().to_vec());
+        let snaps = [HandmarkSnap {
+            day: ON_DAY,
+            t: 1_000,
+            shown_ms: 100,
+            visible_ms: 90,
+        }];
+        let (r, subs) = scrub_state_file(&fs, 1_500, 2_500, &snaps, 9_000);
+        r.unwrap();
+        assert_eq!(
+            subs.get(&ON_DAY),
+            Some(&HandmarkSub {
+                shown_ms: 400,
+                visible_ms: 310
+            })
+        );
+        let DayLoad::Loaded(disk) = parse_state(&fs.read_state()) else {
+            panic!("state must load");
+        };
+        assert_eq!((disk.shown_ms, disk.visible_ms), (100, 90));
+        // 状態ファイルが無ければ、ファイルの行だけから求める(後の行が無いので引かない)
+        *fs.state.borrow_mut() = None;
+        let (r, subs) = scrub_state_file(&fs, 1_500, 2_500, &snaps, 9_000);
+        r.unwrap();
+        assert!(subs.is_empty());
     }
 }

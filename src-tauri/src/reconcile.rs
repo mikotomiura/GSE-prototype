@@ -1969,7 +1969,14 @@ mod tests {
         assert!(closed_o1_sessions(&d, end + 1000, GRACE).is_empty());
 
         // ② 被験者が「この時間帯を消して」を実行する (★ `key` 行の t=1200 を含む区間)
-        let outcome = crate::redaction::redact_dir(&d, 1_100, 1_300, None).unwrap();
+        let outcome = crate::redaction::redact_dir(
+            &d,
+            1_100,
+            1_300,
+            None,
+            &crate::redaction::HandmarkSubs::new(),
+        )
+        .unwrap();
         assert_eq!(
             outcome.lines_removed, 1,
             "★ 区間指定削除が O1 のファイルに効かなければ削除保証が崩れる"

@@ -184,6 +184,15 @@ impl DayRecord {
         a != self.toggles.len() || b != self.stage_starts.len() || c != self.input_toggles.len()
     }
 
+    /// 区間の削除: 累計から区間の中の量を引く（呼び出し側が前後の行の差で求めた量・visible ≤ shown を保つ）。
+    pub fn subtract(&mut self, shown_ms: u64, visible_ms: u64) {
+        self.shown_ms = self.shown_ms.saturating_sub(shown_ms);
+        self.visible_ms = self
+            .visible_ms
+            .saturating_sub(visible_ms)
+            .min(self.shown_ms);
+    }
+
     /// 読み込んだ中身を検める。
     pub fn is_valid(&self) -> bool {
         self.version == STATE_VERSION

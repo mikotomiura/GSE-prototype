@@ -164,19 +164,30 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
     //   ★ `handmark_day`（手跡のその日の累計の写し）は `t` で消える（判断 4: 区間の中の写しが残ると
     //   その時間帯にアプリが動いていたことと `shown_ms` の差が読める）。区間の外の行に残る `toggles` /
     //   `stage_starts` のうち区間に入る要素は [`scrub_handmark_day`] が消す。
-    if matches!(
-        line_type,
-        Some("meta") | Some("session_meta") | Some("invitation_condition") | Some("probe_frame")
-    ) {
+    if line_type.is_some_and(|t| NEVER_REDACTED.contains(&t)) {
         return None;
     }
-    // ★ 既定は `"t"`。⚠️ 別名を書く行種だけを**明示列挙**する（ADR-031 D6）。
-    let key = match line_type {
-        Some("realtime_label") | Some("vignette_response") => "ts",
-        Some("probe_assignment") => "scheduled_ts",
+    // 行種の無い行（古い形）は `"t"` を読む（従来どおり）。
+    obj.get(time_key(line_type.unwrap_or("")))
+        .and_then(serde_json::Value::as_u64)
+}
+
+/// 区間の削除で消さない行種（セッションの境界・条件・系の設定の行。理由は [`line_timestamp`] の doc とコメント）。
+/// ★ 全行種の鍵のテスト（`every_line_type_in_the_schema_has_a_redaction_key`）もこの表を読む。
+pub const NEVER_REDACTED: &[&str] = &[
+    "meta",
+    "session_meta",
+    "invitation_condition",
+    "probe_frame",
+];
+
+/// 区間の削除で読む時刻の鍵。★ 既定は `"t"`。⚠️ 別名を書く行種だけを**明示列挙**する（ADR-031 D6）。
+pub fn time_key(line_type: &str) -> &'static str {
+    match line_type {
+        "realtime_label" | "vignette_response" => "ts",
+        "probe_assignment" => "scheduled_ts",
         _ => "t",
-    };
-    obj.get(key).and_then(serde_json::Value::as_u64)
+    }
 }
 
 /// 行が**占める時間の区間** `[start, end]`（★ 点しか持たない行は `start == end`）。
@@ -320,6 +331,137 @@ pub fn scrub_handmark_day(line: &str, from_ms: u64, to_ms: u64) -> Option<String
     }
 }
 
+/// 手跡の日の累計の写し（`handmark_day` の行か走行中の累計）。削除で引く量を求める入力。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HandmarkSnap {
+    pub day: i64,
+    pub t: u64,
+    pub shown_ms: u64,
+    pub visible_ms: u64,
+}
+
+/// ある日の累計から引く量。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct HandmarkSub {
+    pub shown_ms: u64,
+    pub visible_ms: u64,
+}
+
+/// 日（現地の日の番号）ごとの引く量。
+pub type HandmarkSubs = std::collections::BTreeMap<i64, HandmarkSub>;
+
+/// `handmark_day` の行から累計の写しを読む。`visible_ms` が数でない行（出せなかった理由の行・古い行）は
+/// 累計を持たないので `None`。
+pub fn handmark_snap(line: &str) -> Option<HandmarkSnap> {
+    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+    let obj = v.as_object()?;
+    if obj.get("type").and_then(serde_json::Value::as_str) != Some("handmark_day") {
+        return None;
+    }
+    Some(HandmarkSnap {
+        day: obj.get("day")?.as_i64()?,
+        t: obj.get("t")?.as_u64()?,
+        shown_ms: obj.get("shown_ms")?.as_u64()?,
+        visible_ms: obj.get("visible_ms")?.as_u64()?,
+    })
+}
+
+/// 削除の対象のディレクトリの全ファイル（いま書いているファイルも読むだけ）から累計の写しを集める。
+pub fn collect_handmark_snaps(dir: &Path) -> Vec<HandmarkSnap> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !is_redactable_session_file(&path) {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(&path) else {
+            continue;
+        };
+        out.extend(
+            content
+                .lines()
+                .filter(|l| l.contains("\"handmark_day\""))
+                .filter_map(handmark_snap),
+        );
+    }
+    out
+}
+
+/// 区間 `[from_ms, to_ms]` の手跡の量を、日ごとに求める（段 1 の同意の判断 13・本タスクの判断 1）。
+///
+/// 行はその日の累計（`shown_ms`・`visible_ms`）を持つので、区間の中の行を落としても、後の行の累計と
+/// 前の行の差から区間の中の量が読める。日 d ごとに:
+///
+/// - next = d の写しで `t > to_ms` の最初のもの。無く、走行中の累計 `live` が d なら `live`。どちらも無ければ引かない。
+/// - prev = d の写しで `t < from_ms` の最後のもの。無ければ 0（日の始まり）。
+/// - 引く量 = next − prev。区間の端の 5 分ほどまで（行の間隔）も含めて引く（消す側に倒す）。
+///
+/// 区間が d より前に終わっていても、d の最初の行（日付の変わり目か起動の行）の累計は小さいので、
+/// 引き過ぎは行の間隔ほどまで。`from_ms > to_ms` なら空。
+pub fn handmark_subtractions(
+    snaps: &[HandmarkSnap],
+    live: Option<HandmarkSnap>,
+    from_ms: u64,
+    to_ms: u64,
+) -> HandmarkSubs {
+    let mut subs = HandmarkSubs::new();
+    if from_ms > to_ms {
+        return subs;
+    }
+    let mut days: Vec<i64> = snaps.iter().map(|s| s.day).collect();
+    days.extend(live.map(|l| l.day));
+    days.sort_unstable();
+    days.dedup();
+    for day in days {
+        let of_day = || snaps.iter().filter(move |s| s.day == day);
+        let next = of_day()
+            .filter(|s| s.t > to_ms)
+            .min_by_key(|s| s.t)
+            .copied()
+            .or(live.filter(|l| l.day == day));
+        let Some(next) = next else { continue };
+        let (ps, pv) = of_day()
+            .filter(|s| s.t < from_ms)
+            .max_by_key(|s| s.t)
+            .map_or((0, 0), |p| (p.shown_ms, p.visible_ms));
+        let sub = HandmarkSub {
+            shown_ms: next.shown_ms.saturating_sub(ps),
+            visible_ms: next.visible_ms.saturating_sub(pv),
+        };
+        if sub != HandmarkSub::default() {
+            subs.insert(day, sub);
+        }
+    }
+    subs
+}
+
+/// 累計から引く（visible ≤ shown を保つ）。
+pub fn subtract_handmark(shown_ms: u64, visible_ms: u64, sub: HandmarkSub) -> (u64, u64) {
+    let shown = shown_ms.saturating_sub(sub.shown_ms);
+    (shown, visible_ms.saturating_sub(sub.visible_ms).min(shown))
+}
+
+/// 区間より後（`t > to_ms`）の `handmark_day` の行の累計から、その日の引く量を引く。変えたら新しい行。
+pub fn subtract_handmark_day(line: &str, to_ms: u64, subs: &HandmarkSubs) -> Option<String> {
+    let snap = handmark_snap(line)?;
+    if snap.t <= to_ms {
+        return None;
+    }
+    let sub = subs.get(&snap.day)?;
+    let (shown, visible) = subtract_handmark(snap.shown_ms, snap.visible_ms, *sub);
+    if (shown, visible) == (snap.shown_ms, snap.visible_ms) {
+        return None;
+    }
+    let mut v: serde_json::Value = serde_json::from_str(line).ok()?;
+    let obj = v.as_object_mut()?;
+    obj.insert("shown_ms".into(), shown.into());
+    obj.insert("visible_ms".into(), visible.into());
+    serde_json::to_string(&v).ok()
+}
+
 /// 1 ファイルから区間内の行を落とす。★ 落ちた行数を返す。
 ///
 /// ⚠️ **書き換えは一時ファイル → `rename`** で行う。★ 途中で電源が落ちても原本が残る。
@@ -345,21 +487,30 @@ pub fn scrub_handmark_day(line: &str, from_ms: u64, to_ms: u64) -> Option<String
 /// ⚠️ **プライバシー機能そのものがプライバシーを緩めていた。**
 /// ★ 同意文書 §7（削除の申し出）に応じる経路が、応じるたびに保護を落としていたことになる。
 ///
-/// 戻り値は、落とした行と、区間の中の時刻を消して書き換えた `handmark_day` の行の数の和。
-pub fn redact_file(path: &Path, from_ms: u64, to_ms: u64) -> Result<usize> {
+/// 戻り値は、落とした行と、区間の中の時刻を消した・累計から区間の量を引いた `handmark_day` の行の数の和。
+/// `subs` は [`handmark_subtractions`] で、削除の前に全ファイルと走行中の累計から求めたもの。
+pub fn redact_file(path: &Path, from_ms: u64, to_ms: u64, subs: &HandmarkSubs) -> Result<usize> {
     let content = fs::read_to_string(path)
         .map_err(|e| format!("failed to read session log {}: {e}", path.display()))?;
     let (kept, removed) = retain_outside_range(content.lines(), from_ms, to_ms);
-    // ★ `handmark_day` の行は残し、削除区間に入る要素だけを消す。
+    // ★ `handmark_day` の行は残し、削除区間に入る要素だけを消し、後の行の累計から区間の量を引く。
     let mut scrubbed = 0usize;
     let kept: Vec<std::borrow::Cow<str>> = kept
         .into_iter()
-        .map(|l| match scrub_handmark_day(l, from_ms, to_ms) {
-            Some(new) => {
+        .map(|l| {
+            let line = match scrub_handmark_day(l, from_ms, to_ms) {
+                Some(new) => std::borrow::Cow::Owned(new),
+                None => std::borrow::Cow::Borrowed(l),
+            };
+            // 区間より後の行の累計から、区間の中の量を引く（判断 13）
+            let line = match subtract_handmark_day(&line, to_ms, subs) {
+                Some(new) => std::borrow::Cow::Owned(new),
+                None => line,
+            };
+            if matches!(line, std::borrow::Cow::Owned(_)) {
                 scrubbed += 1;
-                std::borrow::Cow::Owned(new)
             }
-            None => std::borrow::Cow::Borrowed(l),
+            line
         })
         .collect();
     if removed == 0 && scrubbed == 0 {
@@ -505,6 +656,7 @@ pub fn redact_dir(
     from_ms: u64,
     to_ms: u64,
     skip: Option<&Path>,
+    subs: &HandmarkSubs,
 ) -> Result<RedactionSummary> {
     let mut summary = RedactionSummary::default();
     let entries = match fs::read_dir(dir) {
@@ -522,7 +674,7 @@ pub fn redact_dir(
             summary.files_skipped += 1;
             continue;
         }
-        let removed = redact_file(&path, from_ms, to_ms)?;
+        let removed = redact_file(&path, from_ms, to_ms, subs)?;
         if removed > 0 {
             summary.files_touched += 1;
             summary.lines_removed += removed;
@@ -695,10 +847,7 @@ mod tests {
             let line_type = &rest[..q];
 
             // ★ `meta` / `session_meta` は**常に残す**側である (D6 決定 3)。
-            if matches!(
-                line_type,
-                "meta" | "session_meta" | "invitation_condition" | "probe_frame"
-            ) {
+            if NEVER_REDACTED.contains(&line_type) {
                 continue;
             }
 
@@ -978,10 +1127,16 @@ mod tests {
         let d = tmp_dir("handmark-input-scrub");
         let path = d.join("gse_20261109_000000.ndjson");
         std::fs::write(&path, format!("{row}\n")).unwrap();
-        assert_eq!(redact_file(&path, 2_000, 5_000).unwrap(), 1);
+        assert_eq!(
+            redact_file(&path, 2_000, 5_000, &HandmarkSubs::new()).unwrap(),
+            1
+        );
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(!text.contains(r#""t":3000"#) && text.contains(r#""t":1000"#));
-        assert_eq!(redact_file(&path, 200_000, 300_000).unwrap(), 0);
+        assert_eq!(
+            redact_file(&path, 200_000, 300_000, &HandmarkSubs::new()).unwrap(),
+            0
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -992,7 +1147,7 @@ mod tests {
         let path = d.join("gse_20261108_000000.ndjson");
         let key = r#"{"type":"key","t":99000,"category":"alphabetic","press":true}"#;
         std::fs::write(&path, format!("{}\n{key}\n", handmark_row())).unwrap();
-        let removed = redact_file(&path, 2_000, 5_000).unwrap();
+        let removed = redact_file(&path, 2_000, 5_000, &HandmarkSubs::new()).unwrap();
         assert_eq!(
             removed, 1,
             "落ちた行は無いが、書き換えた行を 1 件と数える（画面に 0 件と出さない）"
@@ -1008,10 +1163,16 @@ mod tests {
         assert_eq!(lines[1], key);
         // 当たらない区間なら触らない
         let before = std::fs::read(&path).unwrap();
-        assert_eq!(redact_file(&path, 200_000, 300_000).unwrap(), 0);
+        assert_eq!(
+            redact_file(&path, 200_000, 300_000, &HandmarkSubs::new()).unwrap(),
+            0
+        );
         assert_eq!(std::fs::read(&path).unwrap(), before);
         // t（9000）が区間に入れば行ごと消える
-        assert_eq!(redact_file(&path, 8_000, 10_000).unwrap(), 1);
+        assert_eq!(
+            redact_file(&path, 8_000, 10_000, &HandmarkSubs::new()).unwrap(),
+            1
+        );
         let text = std::fs::read_to_string(&path).unwrap();
         assert_eq!(text.lines().collect::<Vec<_>>(), vec![key]);
         let _ = std::fs::remove_dir_all(&d);
@@ -1116,7 +1277,7 @@ mod tests {
         let d = tmp_dir("file");
         let p = d.join("gse_20260823_120000.ndjson");
         fs::write(&p, "{\"t\":1}\n{\"t\":50}\n{\"t\":100}\n").unwrap();
-        let removed = redact_file(&p, 40, 60).unwrap();
+        let removed = redact_file(&p, 40, 60, &HandmarkSubs::new()).unwrap();
         assert_eq!(removed, 1);
         assert_eq!(fs::read_to_string(&p).unwrap(), "{\"t\":1}\n{\"t\":100}\n");
         assert!(!d.join("gse_20260823_120000.ndjson.redact-tmp").exists());
@@ -1142,7 +1303,7 @@ mod tests {
             "前提が崩れている: 書き換え前から 0600 ではない"
         );
 
-        assert_eq!(redact_file(&p, 40, 60).unwrap(), 1);
+        assert_eq!(redact_file(&p, 40, 60, &HandmarkSubs::new()).unwrap(), 1);
 
         let mode = fs::metadata(&p).unwrap().permissions().mode() & 0o777;
         assert_eq!(
@@ -1181,7 +1342,7 @@ mod tests {
         let q = d.join("gse_20260830_140000.ndjson");
         fs::write(&q, "{\"t\":1}\n{\"t\":50}\n").unwrap();
         fs::set_permissions(&q, fs::Permissions::from_mode(0o600)).unwrap();
-        redact_file(&q, 40, 60).unwrap();
+        redact_file(&q, 40, 60, &HandmarkSubs::new()).unwrap();
         let fixed = fs::metadata(&q).unwrap().permissions().mode() & 0o777;
 
         // ⚠️★★ **環境依存で赤にしない** (2026-08-31・code-reviewer MEDIUM)。
@@ -1223,7 +1384,7 @@ mod tests {
         fs::write(&tmp, "stale\n").unwrap();
         fs::set_permissions(&tmp, fs::Permissions::from_mode(0o644)).unwrap();
 
-        assert_eq!(redact_file(&p, 40, 60).unwrap(), 1);
+        assert_eq!(redact_file(&p, 40, 60, &HandmarkSubs::new()).unwrap(), 1);
 
         let mode = fs::metadata(&p).unwrap().permissions().mode() & 0o777;
         assert_eq!(
@@ -1338,7 +1499,10 @@ mod tests {
         let p = d.join("gse_20260823_130000.ndjson");
         let original = "{\"t\":1}\n{\"t\":2}\n";
         fs::write(&p, original).unwrap();
-        assert_eq!(redact_file(&p, 1000, 2000).unwrap(), 0);
+        assert_eq!(
+            redact_file(&p, 1000, 2000, &HandmarkSubs::new()).unwrap(),
+            0
+        );
         assert_eq!(fs::read_to_string(&p).unwrap(), original);
     }
 
@@ -1350,7 +1514,7 @@ mod tests {
         let closed = d.join("gse_20260823_130000.ndjson");
         fs::write(&active, "{\"t\":150}\n").unwrap();
         fs::write(&closed, "{\"t\":150}\n").unwrap();
-        let s = redact_dir(&d, 100, 200, Some(&active)).unwrap();
+        let s = redact_dir(&d, 100, 200, Some(&active), &HandmarkSubs::new()).unwrap();
         assert_eq!(s.files_skipped, 1);
         assert_eq!(s.files_touched, 1);
         assert_eq!(s.lines_removed, 1);
@@ -1364,7 +1528,7 @@ mod tests {
         fs::write(d.join("gse_20260823_150000.anon.ndjson"), "{\"t\":150}\n").unwrap();
         fs::write(d.join(LEDGER_FILE_NAME), "{\"from\":1}\n").unwrap();
         fs::write(d.join("gse-app.log"), "log\n").unwrap();
-        let s = redact_dir(&d, 0, u64::MAX, None).unwrap();
+        let s = redact_dir(&d, 0, u64::MAX, None, &HandmarkSubs::new()).unwrap();
         assert_eq!(s, RedactionSummary::default());
     }
 
@@ -1374,7 +1538,7 @@ mod tests {
         let d = std::env::temp_dir().join(format!("gse_redaction_absent_{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         assert_eq!(
-            redact_dir(&d, 0, 100, None).unwrap(),
+            redact_dir(&d, 0, 100, None, &HandmarkSubs::new()).unwrap(),
             RedactionSummary::default()
         );
     }
@@ -1578,5 +1742,216 @@ mod tests {
             vec![(0, 30_000), (91_000, 120_000)],
             "広げた区間 [{from}, {to}] が穴として区間を切っていない"
         );
+    }
+
+    /// 全行種が区間の削除の鍵を持つ（ADR-052 D2・段 1 の同意の配る前の条件 5）。
+    ///
+    /// 行種と必須の欄を `schema/current.json`（`schema_dto.rs` から機械生成）から読むので、行種を足すと
+    /// 自動でこの検査に入る。除外は [`NEVER_REDACTED`] の 4 行種だけ。
+    #[test]
+    fn every_line_type_in_the_schema_has_a_redaction_key() {
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/current.json")).unwrap();
+        let variants = schema["oneOf"].as_array().expect("oneOf");
+        let mut seen = std::collections::BTreeSet::new();
+        let mut checked = 0usize;
+        for v in variants {
+            let ty = v["properties"]["type"]["enum"][0]
+                .as_str()
+                .or_else(|| v["properties"]["type"]["const"].as_str())
+                .expect("type");
+            seen.insert(ty);
+            if NEVER_REDACTED.contains(&ty) {
+                continue;
+            }
+            let key = time_key(ty);
+            let required: Vec<&str> = v["required"]
+                .as_array()
+                .expect("required")
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .collect();
+            assert!(
+                required.contains(&key),
+                "{ty:?} は削除の鍵 {key:?} を必須の欄に持たない（別名なら time_key に足す）"
+            );
+            let line = format!(r#"{{"type":"{ty}","{key}":1500}}"#);
+            let (kept, removed) = retain_outside_range([line.as_str()], 1_000, 2_000);
+            assert_eq!((kept.len(), removed), (0, 1), "{ty:?} が区間で消えない");
+            checked += 1;
+        }
+        let known: std::collections::BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
+            .iter()
+            .copied()
+            .collect();
+        assert_eq!(seen, known, "schema の行種と KNOWN_LINE_TYPES が食い違う");
+        assert_eq!(checked, known.len() - NEVER_REDACTED.len());
+        // 除外の行種は区間の中でも残る
+        for ty in NEVER_REDACTED {
+            let line = format!(r#"{{"type":"{ty}","t":1500}}"#);
+            assert_eq!(retain_outside_range([line.as_str()], 1_000, 2_000).1, 0);
+        }
+    }
+
+    // ---- 手跡の累計から区間の量を引く（段 1 の同意の判断 13・本タスクの判断 1）----
+
+    const D: i64 = 20_411;
+
+    fn hm_line(day: i64, t: u64, shown: u64, visible: Option<u64>) -> String {
+        let v = visible.map_or("null".to_string(), |v| v.to_string());
+        format!(
+            r#"{{"type":"handmark_day","t":{t},"day":{day},"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":{shown},"visible_ms":{v},"toggles":[],"input_toggles":[],"stage_starts":[],"overflow":false,"table_sha256":null,"draw_seed":null,"reason":null}}"#
+        )
+    }
+
+    fn snap(day: i64, t: u64, s: u64, v: u64) -> HandmarkSnap {
+        HandmarkSnap {
+            day,
+            t,
+            shown_ms: s,
+            visible_ms: v,
+        }
+    }
+
+    fn sub(s: u64, v: u64) -> HandmarkSub {
+        HandmarkSub {
+            shown_ms: s,
+            visible_ms: v,
+        }
+    }
+
+    fn day_snaps() -> Vec<HandmarkSnap> {
+        vec![
+            snap(D, 1_000, 100, 80),
+            snap(D, 2_000, 200, 150),
+            snap(D, 3_000, 300, 250),
+            snap(D, 4_000, 400, 300),
+        ]
+    }
+
+    #[test]
+    fn the_subtraction_is_the_next_row_minus_the_previous_row() {
+        let subs = handmark_subtractions(&day_snaps(), None, 1_500, 2_500);
+        assert_eq!(subs.get(&D), Some(&sub(200, 170)));
+        // 区間の端が行の時刻ちょうど(両端を含む)なら、その行は区間の中で、前後は外の行
+        let subs = handmark_subtractions(&day_snaps(), None, 2_000, 3_000);
+        assert_eq!(subs.get(&D), Some(&sub(300, 220)));
+    }
+
+    #[test]
+    fn without_a_later_row_the_running_total_is_the_next() {
+        let live = snap(D, 9_999, 500, 400);
+        let subs = handmark_subtractions(&day_snaps(), Some(live), 3_500, 5_000);
+        assert_eq!(subs.get(&D), Some(&sub(200, 150)));
+        // 走行中の累計も無ければ、後の行が無いので引かない(区間の中の行は消える)
+        assert!(handmark_subtractions(&day_snaps(), None, 3_500, 5_000).is_empty());
+    }
+
+    #[test]
+    fn without_an_earlier_row_the_day_starts_at_zero() {
+        let subs = handmark_subtractions(&day_snaps(), None, 0, 1_500);
+        assert_eq!(subs.get(&D), Some(&sub(200, 150)));
+    }
+
+    #[test]
+    fn only_the_days_that_have_a_later_row_are_subtracted() {
+        // 前の日の行は区間より前にしか無い → 前の日は引かない。今日は最初の行(小さい累計)を引く
+        let snaps = vec![
+            snap(D - 1, 500, 50, 40),
+            snap(D - 1, 900, 90, 80),
+            snap(D, 3_000, 30, 20),
+            snap(D, 4_000, 130, 120),
+        ];
+        let subs = handmark_subtractions(&snaps, None, 950, 2_000);
+        assert_eq!(subs.get(&(D - 1)), None);
+        assert_eq!(subs.get(&D), Some(&sub(30, 20)));
+        // 区間が 2 日にまたがる: 両方の日を引く
+        let subs = handmark_subtractions(&snaps, None, 600, 3_500);
+        assert_eq!(subs.get(&(D - 1)), None, "前の日は区間より後の行が無い");
+        assert_eq!(subs.get(&D), Some(&sub(130, 120)));
+        let subs = handmark_subtractions(&snaps, Some(snap(D - 1, 0, 95, 85)), 600, 3_500);
+        assert_eq!(subs.get(&(D - 1)), Some(&sub(45, 45)));
+    }
+
+    #[test]
+    fn a_reversed_range_subtracts_nothing() {
+        assert!(handmark_subtractions(&day_snaps(), None, 2_500, 1_500).is_empty());
+    }
+
+    #[test]
+    fn rows_without_a_visible_total_are_not_snapshots() {
+        assert_eq!(handmark_snap(&hm_line(D, 1_000, 0, None)), None);
+        assert_eq!(
+            handmark_snap(&hm_line(D, 1_000, 5, Some(4))),
+            Some(snap(D, 1_000, 5, 4))
+        );
+        assert_eq!(handmark_snap(r#"{"type":"key","t":1}"#), None);
+    }
+
+    #[test]
+    fn subtracting_keeps_visible_within_shown_and_never_goes_below_zero() {
+        assert_eq!(subtract_handmark(100, 90, sub(30, 10)), (70, 70));
+        assert_eq!(subtract_handmark(10, 5, sub(30, 30)), (0, 0));
+    }
+
+    /// 区間の量が、区間の前後の行の差からも、後の行の累計からも読めない（ファイルをまたいでも）。
+    #[test]
+    fn after_redaction_the_deleted_amount_cannot_be_read_from_any_row() {
+        let d = tmp_dir("handmark-sub");
+        // 再起動をまたぐ: 前のファイルと後のファイル
+        let a = d.join("gse_o1_a.ndjson");
+        let b = d.join("gse_o1_b.ndjson");
+        std::fs::write(
+            &a,
+            format!(
+                "{}\n{}\n",
+                hm_line(D, 1_000, 100, Some(80)),
+                hm_line(D, 2_000, 200, Some(150))
+            ),
+        )
+        .unwrap();
+        std::fs::write(
+            &b,
+            format!(
+                "{}\n{}\n{}\n",
+                hm_line(D, 3_000, 300, Some(250)),
+                hm_line(D, 4_000, 400, Some(300)),
+                hm_line(D, 4_500, 0, None)
+            ),
+        )
+        .unwrap();
+        let snaps = collect_handmark_snaps(&d);
+        assert_eq!(snaps.len(), 4, "累計の無い行は写しにしない");
+        let subs = handmark_subtractions(&snaps, None, 1_500, 2_500);
+        let s = redact_dir(&d, 1_500, 2_500, None, &subs).unwrap();
+        assert_eq!(s.lines_removed, 3, "区間の中の 1 行 + 引いた 2 行");
+        let rows: Vec<HandmarkSnap> = collect_handmark_snaps(&d)
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let got: Vec<(u64, u64, u64)> = rows
+            .iter()
+            .map(|r| (r.t, r.shown_ms, r.visible_ms))
+            .collect();
+        assert_eq!(
+            got,
+            vec![(1_000, 100, 80), (3_000, 100, 80), (4_000, 200, 130)]
+        );
+        // 区間の前後の行の差が 0（区間の中の量が読めない）
+        assert_eq!((got[1].1 - got[0].1, got[1].2 - got[0].2), (0, 0));
+        // 累計の無い行には触らない
+        assert!(std::fs::read_to_string(&b)
+            .unwrap()
+            .contains(&hm_line(D, 4_500, 0, None)));
+        // 引く量の無い削除では書き換えない(対照)
+        let none = handmark_subtractions(&collect_handmark_snaps(&d), None, 10_000, 20_000);
+        assert_eq!(
+            redact_dir(&d, 10_000, 20_000, None, &none)
+                .unwrap()
+                .lines_removed,
+            0
+        );
+        let _ = std::fs::remove_dir_all(&d);
     }
 }
