@@ -2177,4 +2177,46 @@ mod tests {
         assert!(subs.is_empty(), "{subs:?}");
         let _ = std::fs::remove_dir_all(&d);
     }
+
+    /// 削除の直後に書いた行 P（区間の前の行と同じ累計）が、消し直しで next になり、引く量が 0 になる（判断 9・Codex P3）。
+    #[test]
+    fn the_row_written_right_after_a_redaction_makes_a_retry_subtract_nothing() {
+        let snaps = vec![
+            snap(D, 10_000, 10_000, 9_000),
+            snap(D, 40_000, 10_000, 9_000),
+        ];
+        let subs = handmark_subtractions(
+            &snaps,
+            Some(snap(D, 60_000, 12_000, 11_000)),
+            15_000,
+            25_000,
+        );
+        assert!(subs.is_empty(), "{subs:?}");
+        // 対照: P が無ければ、走行中の累計が next になり、その後に増えた量まで引いてしまう
+        let subs = handmark_subtractions(
+            &snaps[..1],
+            Some(snap(D, 60_000, 12_000, 11_000)),
+            15_000,
+            25_000,
+        );
+        assert_eq!(subs.get(&D), Some(&sub(2_000, 2_000)));
+    }
+
+    /// 書き換えないファイルの行が区間の始まりちょうど（両端を含む）でも、その日を飛ばす。
+    #[test]
+    fn a_skipped_row_exactly_at_the_start_of_the_range_defers_the_day() {
+        let mut at_from = snap(D, 1_500, 120, 120);
+        at_from.skipped = true;
+        let snaps = vec![snap(D, 1_000, 100, 100), at_from];
+        assert!(
+            handmark_subtractions(&snaps, Some(snap(D, 9_000, 125, 125)), 1_500, 3_000).is_empty()
+        );
+        // 対照: 区間の前なら飛ばさない
+        let mut before = snap(D, 1_499, 120, 120);
+        before.skipped = true;
+        let snaps = vec![snap(D, 1_000, 100, 100), before];
+        assert!(
+            !handmark_subtractions(&snaps, Some(snap(D, 9_000, 125, 125)), 1_500, 3_000).is_empty()
+        );
+    }
 }

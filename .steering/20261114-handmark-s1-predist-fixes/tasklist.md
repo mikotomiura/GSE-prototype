@@ -11,5 +11,5 @@
 - [x] 変異で赤を見る（8 件すべて赤・ファイルは元どおり）
 - [x] `cargo test --workspace`・clippy・fmt・フォームのテスト 358 件・変異 119 件・readiness の selftest 85 件
 - [x] code-reviewer・security-checker（処理は decisions.md の表・判断 6・7）
-- [ ] /cross-review（Codex 込み）
+- [x] /cross-review（Codex 込み）2 巡（処理は decisions.md の表・判断 8〜10）
 - [ ] 研究者の承認の取り直し → push・PR（研究者に確かめる）

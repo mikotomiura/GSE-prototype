@@ -2483,8 +2483,8 @@ pub(crate) fn handmark_set_input_from_tray(
 ///
 /// 戻り値の 2 つ目は、ファイルの `handmark_day` の行の累計から引く量（判断 13）。`snaps` はファイルの行の
 /// 累計の写しで、走行中の累計（駆動役か状態ファイル）と合わせて、駆動役のロックの中で求める。
-/// `g` は呼び出し側が取った駆動役のロック（ローテートの前から持つ）。`subtract` が偽なら量は引かず時刻だけ消す
-/// （ローテートが成り立たなかった削除・判断 8）。
+/// `g` は呼び出し側が取った駆動役のロック（ローテートの前から持つ）。`subtract` が偽なら（ローテートが成り立たな
+/// かった削除）、書き込み待ちの行がありうる走行中の累計の日は量を引かず時刻だけ消す（判断 8・判断 10）。
 fn handmark_on_redact(
     app: &tauri::AppHandle,
     log_tx: &Sender<LogEntry>,
@@ -2510,11 +2510,10 @@ fn handmark_on_redact(
             Some(fs) => {
                 crate::handmark_store::scrub_state_file(&fs, from_ms, to_ms, snaps, subtract, now)
             }
-            None if subtract => (
+            None => (
                 Ok(()),
                 crate::redaction::handmark_subtractions(snaps, None, from_ms, to_ms),
             ),
-            None => (Ok(()), crate::redaction::HandmarkSubs::new()),
         },
     };
     (result.is_ok(), subs)
@@ -3473,7 +3472,7 @@ fn delete_time_range(
     let handmark_tx = handmark_log_tx(&app);
     let mut handmark_guard = handmark_lock();
     // ローテートが成り立った（新しいファイルに替わった）か。成り立たなければ（一時停止中・失敗・時間切れ）、
-    //   いま書いているファイルを書き換えられず、書き込み待ちの行も見えないので、手跡の量は引かない（判断 8）。
+    //   いま書いているファイルを書き換えられず、書き込み待ちの行も見えないので、走行中の累計の日は引かない（判断 8・10）。
     let mut rotated = false;
 
     if crate::o1::is_o1() && !crate::recording::is_paused() {

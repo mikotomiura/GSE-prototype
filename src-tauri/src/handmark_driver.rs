@@ -583,12 +583,15 @@ impl HandmarkDriver {
         now: u64,
     ) -> (Vec<Effect>, bool, HandmarkSubs) {
         let mut fx = Vec::new();
-        // ローテートが成り立たなかった削除では量を引かない(時刻だけ消す・判断 8)
-        let subs = if subtract {
-            handmark_subtractions(snaps, self.ev.live_snap(now), from_ms, to_ms)
-        } else {
-            HandmarkSubs::new()
-        };
+        // ローテートが成り立たなかった削除では、書き込み待ちの行がありうる走行中の累計の日は引かない
+        // (時刻だけ消す・判断 8・判断 10)。ほかの日は閉じたファイルの行だけで決まるので引く。
+        let live = self.ev.live_snap(now);
+        let mut subs = handmark_subtractions(snaps, live, from_ms, to_ms);
+        if !subtract {
+            if let Some(l) = live {
+                subs.remove(&l.day);
+            }
+        }
         let ok = if self.ev.record.is_some() {
             if self.ev.scrub_state(fs, from_ms, to_ms, &subs).is_ok() {
                 true
@@ -620,8 +623,9 @@ impl HandmarkDriver {
             self.new_stage(now);
         }
         // 引いた後の累計の行をすぐ書く。区間より後の行が無く走行中の累計を next に使ったとき、次の行の前に
-        // 同じ区間を消し直すと、その間に増えた量まで引いてしまうため(この行がいま書いているファイルに入り、
-        // 消し直しではその日を引かない側に倒れる・判断 6)。
+        // 同じ区間を消し直すと、その間に増えた量まで引いてしまうため。この行は区間の前の行と同じ累計を持ち、
+        // 消し直しでは区間の後の最初の行(next)になるので、引く量が 0 になる(判断 9)。キューが詰まって
+        // 落ちたときは守れない(残る穴)。
         self.push_row(now, &mut fx);
         self.sync_gate(false, &mut fx);
         (fx, ok, subs)
@@ -1640,5 +1644,24 @@ mod tests {
         // 対照: ローテートが成り立てば引く
         let (_, _, subs) = d.on_redact(&fs, T0, T0 + 5_000, &[], true, now);
         assert!(!subs.is_empty());
+    }
+
+    /// ローテートが成り立たなくても、走行中の累計と違う日(閉じたファイルの行だけで決まる日)は引く(判断 10)。
+    #[test]
+    fn a_redact_without_rotation_still_subtracts_other_days() {
+        use crate::redaction::HandmarkSnap;
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let snap = |t, s| HandmarkSnap {
+            day: ON_DAY - 1,
+            t,
+            shown_ms: s,
+            visible_ms: s,
+            skipped: false,
+        };
+        let snaps = [snap(T0 - 50_000, 100), snap(T0 - 10_000, 300)];
+        let (_, _, subs) = d.on_redact(&fs, T0 - 40_000, T0 - 20_000, &snaps, false, T0 + 1_000);
+        assert_eq!(subs.get(&(ON_DAY - 1)).map(|s| s.shown_ms), Some(200));
+        assert!(!subs.contains_key(&ON_DAY));
     }
 }

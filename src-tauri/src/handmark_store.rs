@@ -487,23 +487,17 @@ pub fn scrub_state_file(
     now: u64,
 ) -> (Result<(), ScrubFailed>, HandmarkSubs) {
     let remove = |fs: &dyn HandmarkFs| fs.remove_state().map_err(|_| ScrubFailed);
-    // `subtract` が偽なら量は引かない（ローテートが成り立たなかった削除・判断 8）
-    let rows_only = || {
-        if subtract {
-            handmark_subtractions(snaps, None, from_ms, to_ms)
-        } else {
-            HandmarkSubs::new()
-        }
-    };
+    // `subtract` が偽なら（ローテートが成り立たなかった削除）、走行中の累計の日は引かない（判断 8・判断 10）。
+    //   累計が読めないときは、写しだけで求める（書き換えないファイルの行は `skipped` で飛ばす）。
+    let rows_only = || handmark_subtractions(snaps, None, from_ms, to_ms);
     match parse_state(&fs.read_state()) {
         DayLoad::Fresh => (Ok(()), rows_only()),
         DayLoad::Broken => (remove(fs), rows_only()),
         DayLoad::Loaded(mut r) => {
-            let subs = if subtract {
-                handmark_subtractions(snaps, Some(snap_of(&r, now)), from_ms, to_ms)
-            } else {
-                HandmarkSubs::new()
-            };
+            let mut subs = handmark_subtractions(snaps, Some(snap_of(&r, now)), from_ms, to_ms);
+            if !subtract {
+                subs.remove(&r.day);
+            }
             scrub_record(&mut r, from_ms, to_ms, &subs);
             if write_record(fs, &r).is_ok() {
                 return (Ok(()), subs);
