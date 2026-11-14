@@ -12,4 +12,6 @@
 - [x] `cargo test --workspace`・clippy・fmt・フォームのテスト 358 件・変異 119 件・readiness の selftest 85 件
 - [x] code-reviewer・security-checker（処理は decisions.md の表・判断 6・7）
 - [x] /cross-review（Codex 込み）2 巡（処理は decisions.md の表・判断 8〜10）
-- [ ] 研究者の承認の取り直し → push・PR（研究者に確かめる）
+- [x] 研究者の承認の取り直し（2026-11-14・文面どおり）・承認の印を戻し readiness の [3] が緑
+- [x] 残る穴は記録して進む（研究者・判断 9・10・削除台帳 §8）
+- [ ] push・PR（研究者が選んだ）→ CI → マージは研究者に聞く
