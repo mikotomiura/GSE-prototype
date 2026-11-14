@@ -34,6 +34,6 @@
 - [x] 引き継ぎに書いた（`.steering/_handoff/next-session-gse-stage1-consent-approval.md`）—— 事前登録のタスク: 最長の期間は 8 週間以内（判断 9）・取り消しはやめた扱い（判断 8）・頻度を変えたら同意を直す（条件 9）
 
 ## 完了処理
-- [ ] 承認の後の変更の /cross-review ← 今ここ
+- [x] 承認の後の変更の /cross-review（指摘 2 件を採用・decisions.md）
 - [ ] design.md の最終化
 - [ ] /finish-task
