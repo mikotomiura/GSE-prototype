@@ -6,18 +6,18 @@
 
 ## 文面
 - [x] 草稿 `consent-draft-s1.md`（b7d68371）
-- [ ] 研究者が草稿を読み、直しを入れる ← 今ここ
-- [ ] `docs/participant-setup-guide.md` に段 1 の節
+- [x] 判断の要る箇所を研究者に聞いて反映（判断 14〜17・bcc42a4a）
+- [x] `docs/participant-setup-guide.md` に段 1 の節（§7）
 
 ## フォーム
-- [ ] `Form_O1/GSE_O1_Form_Builder.gs` に段 1 の同意フォーム（`FORM_ID_S1_CONSENT`・同意項目・受付メール）
-- [ ] `o1_form_builder_test.cjs` に md との 1 対 1 の照合、変異のテスト
-- [ ] `node Form_O1/o1_form_builder_test.cjs` と変異のテストが緑
-- [ ] `bash scripts/check-s1-release-readiness.sh --selftest` が緑
+- [x] `Form_O1/GSE_O1_Form_Builder.gs` に段 1 の同意フォーム（`FORM_ID_S1_CONSENT`・同意項目・受付メール・提出の自動処理・判断 18）
+- [x] `o1_form_builder_test.cjs` の §20 と変異 10 件
+- [x] `node Form_O1/o1_form_builder_test.cjs`（336 件）と変異のテスト（110 件すべて赤）が緑
+- [x] `bash scripts/check-s1-release-readiness.sh --selftest` が緑（85 件）
 
 ## レビュー（場面ごとの道具）
 - [ ] 文面: attack-me か /cross-review（Codex を含む・記録の本文と集計は送らない）
-- [ ] フォームのコード: code-reviewer ＋ security-checker ＋ /cross-review
+- [ ] フォームのコード: code-reviewer ＋ security-checker ＋ /cross-review ← 今ここ
 
 ## 承認の後
 - [ ] 承認の印を md の行頭に 1 回

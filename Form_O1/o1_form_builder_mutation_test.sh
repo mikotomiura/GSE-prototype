@@ -200,9 +200,9 @@ mutate "★ P-ID 列が空の行で appendRow に落とす（1 人に 2 つの I
       if (false) {/'
 
 mutate "★ 受付メールを作れない設定でも先に採番する"   's/  try \{
-    o1RegisterAckBody_\("P000", ackUrlSnapshot\);
+    prof\.ackBody\("P000", ackUrlSnapshot\);
   \} catch \(cfgErr\) \{/  try {
-    if (false) o1RegisterAckBody_("P000", ackUrlSnapshot);
+    if (false) prof.ackBody("P000", ackUrlSnapshot);
   } catch (cfgErr) {/'
 
 mutate "★ 設定が欠けていてもトリガを張る"   's/  var problems = o1ConfigProblems_\(\);
@@ -288,13 +288,13 @@ mutate "★ 却下ログ満杯を消えない側に残さない（★ 黙らさ�
   's/      if \(rejected\) o1NoteRejectLogFull_\(\);/      if (false) o1NoteRejectLogFull_();/'
 
 mutate "★ 送信ログを try の内側へ戻す（★ 送信済みなのに mail-failed と記録しうる）" \
-  's/  o1LogMgmt_\("register", pid, logResult, logReason, outcome\.note\);/  \/* moved *\//'
+  's/  o1LogMgmt_\(prof\.kind, pid, logResult, logReason, outcome\.note\);/  \/* moved *\//'
 
 mutate "★ 空 P-ID 行の採番で例外を捕まえない（★ 中途半端な P-ID が残る）" \
   's/        \} catch \(blankErr\) \{/        } catch (blankErrIgnored) { throw blankErrIgnored; } if (false) { try {} catch (blankErr) {/'
 
 mutate "★ 登録経路のログ呼び出しだけ消す（★ 定義は残す = 件数ガードの単独検証）" \
-  's/o1LogMgmt_\("register"/o1SkipLog_("register"/g'
+  's/o1LogMgmt_\(prof\.kind/o1SkipLog_(prof.kind/g'
 
 # ★ 2026-09-28 見た目（登録ログ・却下ログ）
 mutate "見た目: 書式を毎回付け直す（研究者の列幅を戻す）" \
@@ -375,6 +375,28 @@ mutate "公表の同意項目を消す" \
   's/    "研究の結果が論文などで公表され（1 人ずつの数値を記号で示すことを含む）、公表した数値は後から取り除けないこと、" \+\n      "加工した記録を公開する場合は、あらためて尋ねられ、同意した記録だけが公開されることの説明を受けました。",\n//'
 mutate "構築: 登録用の設問を足す順を入れ替える" \
   's/var O1_REGISTRATION_TITLES = \[Q_O1_PID, Q_O1_NAME, Q_O1_EMAIL, Q_O1_OS\];/var O1_REGISTRATION_TITLES = [Q_O1_PID, Q_O1_EMAIL, Q_O1_NAME, Q_O1_OS];/'
+
+# --- 2026-11-14 段 1 の同意フォーム（§20） --------------------------------------
+mutate "段 1: 同意の項目を 1 つ消す" \
+  's/    "問いで「会話」を選ぶと、その時刻に会話していたことが記録に残ることの説明を受けました。",\n//'
+mutate "段 1: 倫理審査の文を説明から消す" \
+  's/    "この研究は、大学などの倫理審査委員会の審査を受けていません。/    "この研究は、/'
+mutate "段 1: 問いの上限の数を変える" \
+  's/var S1_MAX_PROBES_PER_HOUR = 9;/var S1_MAX_PROBES_PER_HOUR = 6;/'
+mutate "段 1: s1OpenFixed_ が O1 の ID を拒まない" \
+  's/(function s1AssertNotO1Form_\(id\) \{)/$1\n  return;/'
+mutate "段 1: 設定の検査が O1 のフォームと同じ ID を見ない" \
+  's/    if \(cfg\.consentFormId === cfg\.o1ConsentFormId \|\| cfg\.consentFormId === cfg\.o1SurveyFormId\) \{/    if (false) {/'
+mutate "段 1: アプリの URL が O1 と同じでも通す" \
+  's/  if \(o1Url && url === o1Url\) \{/  if (false) {/'
+mutate "段 1: 登録ログの種別を O1 と同じにする" \
+  's/var S1_MGMT_KIND = "s1-register";/var S1_MGMT_KIND = "register";/'
+mutate "段 1: トリガの外しが O1 のトリガも消す" \
+  's/    if \(triggers\[i\]\.getHandlerFunction\(\) === "onS1ConsentSubmit"\) \{/    if (\/Consent\/.test(triggers[i].getHandlerFunction())) {/'
+mutate "段 1: 受付メールに O1 の件名を使う" \
+  's/    ackSubject: s1RegisterAckSubject_,/    ackSubject: o1RegisterAckSubject_,/'
+mutate "段 1: 設定が欠けていても構築する" \
+  's/function buildS1ConsentForm\(\) \{\n  var problems = s1ConfigProblems_\(\);/function buildS1ConsentForm() {\n  var problems = [];/'
 
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"

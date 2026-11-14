@@ -2775,14 +2775,37 @@ function o1ConflictMessage_(found, a) {
  *   ★ 1 人の人間に 2 つの識別子を作らない。
  */
 function onO1ConsentSubmit(e) {
+  o1HandleConsentSubmit_(e, o1RegProfile_());
+}
+
+/**
+ * 登録の型。O1 と段 1（判断 18・`.steering/20261114-gse-stage1-n3-consent/decisions.md`）で違うところだけを持つ。
+ * 採番・重複の検査・登録ログの流れは共有する。
+ */
+function o1RegProfile_() {
+  return {
+    label: "O1-C",
+    handler: "onO1ConsentSubmit",
+    kind: "register",
+    checkFn: "checkO1FormConfig()",
+    appUrl: function () {
+      return o1Config_().appDownloadUrl;
+    },
+    ackSubject: o1RegisterAckSubject_,
+    ackBody: o1RegisterAckBody_,
+  };
+}
+
+/** 同意フォームの提出の本体。`prof` は `o1RegProfile_()` か `s1RegProfile_()`。 */
+function o1HandleConsentSubmit_(e, prof) {
   if (!e || !e.response) {
-    Logger.log("❌ onO1ConsentSubmit: response が取得できません（トリガ経由で呼んでください）");
+    Logger.log("❌ " + prof.handler + ": response が取得できません（トリガ経由で呼んでください）");
     return;
   }
   var a = o1ConsentAnswers_(e.response);
   if (!a.email) {
-    Logger.log("⛔ O1-C 提出: メールアドレスが空のため発番しません");
-    o1LogMgmt_("register", "", "blocked", "no-email", "");
+    Logger.log("⛔ " + prof.label + " 提出: メールアドレスが空のため発番しません");
+    o1LogMgmt_(prof.kind, "", "blocked", "no-email", "");
     return;
   }
 
@@ -2807,7 +2830,7 @@ function onO1ConsentSubmit(e) {
         "   提出者: " + o1MaskEmail_(a.email)
     );
     // ⚠️ 申告値そのもの（`a.pid`）は**書かない** —— ★ 自由記入欄なので何が入るか分からない。
-    o1LogMgmt_("register", "", "blocked", "bad-pid-format", "OS: " + a.os);
+    o1LogMgmt_(prof.kind, "", "blocked", "bad-pid-format", "OS: " + a.os);
     return;
   }
 
@@ -2816,15 +2839,15 @@ function onO1ConsentSubmit(e) {
   //     **設定ミスだけで量産される**（★ ロスターは埋まるのに被験者は何も受け取らない）。
   //   ★ ダミー ID で「作れるか」だけを確かめる（⚠️ 送信はしない）。
   // ★ 設定は **ここで 1 回だけ**読む（⚠️ 下の本送信にも同じ値を渡す）。
-  var ackUrlSnapshot = o1Config_().appDownloadUrl;
+  var ackUrlSnapshot = prof.appUrl();
   try {
-    o1RegisterAckBody_("P000", ackUrlSnapshot);
+    prof.ackBody("P000", ackUrlSnapshot);
   } catch (cfgErr) {
     Logger.log(
       "⛔ 受付メールを作れない設定なので**発番しません**（★ P-ID を焼かない）: " + cfgErr + "\n" +
-        "   ★ checkO1FormConfig() を実行して直したあと、被験者に**もう一度提出**してもらってください。"
+        "   ★ " + prof.checkFn + " を実行して直したあと、被験者に**もう一度提出**してもらってください。"
     );
-    o1LogMgmt_("register", "", "blocked", "config-error", "OS: " + a.os);
+    o1LogMgmt_(prof.kind, "", "blocked", "config-error", "OS: " + a.os);
     return;
   }
 
@@ -2852,16 +2875,16 @@ function onO1ConsentSubmit(e) {
         "   提出者: " + o1MaskEmail_(a.email)
     );
     // ★ 結果は "error"（⚠️ ok でも blocked でもない ——「分からない」を正直に書く）。
-    o1LogMgmt_("register", "", "error", "unexpected-exception", "OS: " + a.os);
+    o1LogMgmt_(prof.kind, "", "error", "unexpected-exception", "OS: " + a.os);
     return;
   }
 
   if (!pid) {
     Logger.log("❌ 発番できませんでした（★ 回答は失われていません）。上のログの理由を見てください。");
-    o1LogMgmt_("register", "", "blocked", outcome.reason, outcome.note);
+    o1LogMgmt_(prof.kind, "", "blocked", outcome.reason, outcome.note);
     return;
   }
-  o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome);
+  o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome, prof);
 }
 
 /**
@@ -2989,7 +3012,8 @@ function o1RegisterUnderLock_(a, outcome) {
 /**
  * ★ 採番の**あと**（⚠️ ロックの外）: 重複の最終検査 → 受付メール → 登録ログ。
  */
-function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome) {
+function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome, profOpt) {
+  var prof = profOpt || o1RegProfile_();
   // ============================================================
   // ⚠️★★★ 採番の排他は**プロジェクトを跨がない** (起票 T-24)
   // ============================================================
@@ -3051,7 +3075,7 @@ function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome) {
           "   提出者: " + o1MaskEmail_(a.email) + "（OS: " + a.os + "）"
       );
       o1LogMgmt_(
-        "register", pid, "blocked", "roster-pid-format-drift",
+        prof.kind, pid, "blocked", "roster-pid-format-drift",
         "行 " + labels.join("/") + " / OS: " + a.os
       );
       return;
@@ -3066,7 +3090,7 @@ function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome) {
         "   ★ 直したあと、提出者にもう一度提出してもらえば同じ経路で受付メールが送られます。\n" +
         "   提出者: " + o1MaskEmail_(a.email) + "（OS: " + a.os + "）"
     );
-    o1LogMgmt_("register", pid, "blocked", "dup-pid", "行 " + labels.join("/") + " / OS: " + a.os);
+    o1LogMgmt_(prof.kind, pid, "blocked", "dup-pid", "行 " + labels.join("/") + " / OS: " + a.os);
     return;
   }
 
@@ -3080,8 +3104,8 @@ function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome) {
   var logResult = "";
   var logReason = "";
   try {
-    var subject = o1RegisterAckSubject_();
-    var body = o1RegisterAckBody_(pid, ackUrlSnapshot);
+    var subject = prof.ackSubject();
+    var body = prof.ackBody(pid, ackUrlSnapshot);
     if (O1_AUTO_SEND) {
       MailApp.sendEmail(a.email, subject, body);
       Logger.log("📧 受付メールを送信しました → " + o1MaskEmail_(a.email) + "（OS: " + a.os + "）");
@@ -3128,5 +3152,529 @@ function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome) {
     logReason = "mail-failed/" + outcome.reason;
   }
   // ★ 追記は **1 回だけ・try の外**（⚠️ 上のコメント参照）。
-  o1LogMgmt_("register", pid, logResult, logReason, outcome.note);
+  o1LogMgmt_(prof.kind, pid, logResult, logReason, outcome.note);
+}
+
+// ============================================================
+// 段 1 の同意フォーム（S1-C・3 名の確認・ADR-052）
+// ============================================================
+// このフォームの回答が段 1 の同意の正本である。文面の上流は
+// `.steering/20261114-gse-stage1-n3-consent/consent-draft-s1.md`。先に md を直してからここへ写す。
+// 同意の項目は md の「同意の項目」と 1 対 1（`o1_form_builder_test.cjs` の §20 が照合する）。
+//
+// 提出後の処理は O1 と同じ（判断 18）: P-ID の採番（Phase1 のロスター）・登録ログ（種別 `s1-register`）・
+// 受付メール。O1 と違うのは、フォームの ID（`FORM_ID_S1_CONSENT`）・アプリの URL
+// （`S1_APP_DOWNLOAD_URL`）・受付メールの文面・トリガの関数（`onS1ConsentSubmit`）だけ。
+//
+// 守り:
+//   - 構築は G1 と O1 のフォームの ID を拒む（O1 の同意の正本を段 1 の構築で消さない）。
+//   - 段 1 のアプリの URL が O1 のものと同じなら止める。O1 の配布物には `s1.mode` が無く、
+//     問いが出ないまま素の O1 として記録が進むため。
+//   - 段 1 のトリガの付け外しは O1 のトリガに触らない。
+
+/** 期間（md §2 と同意項目 3 の逐語）。 */
+var S1_PERIOD_TEXT = "長くても 8 週間";
+/** 1 時間あたりの問いの上限（`probe_arbiter.rs` の `S1_MAX_PROBES_PER_HOUR` と一致させる。§20 が照合する）。 */
+var S1_MAX_PROBES_PER_HOUR = 9;
+/** 登録ログの種別。O1 の `register` と分ける。 */
+var S1_MGMT_KIND = "s1-register";
+
+/** 段 1 の設定。ロスターと登録ログは O1 と共有する（採番元は 1 か所）。 */
+function s1Config_() {
+  var props = PropertiesService.getScriptProperties();
+  var o1 = o1Config_();
+  return {
+    consentFormId: String(props.getProperty("FORM_ID_S1_CONSENT") || "").trim(),
+    appDownloadUrl: String(props.getProperty("S1_APP_DOWNLOAD_URL") || "").trim(),
+    o1ConsentFormId: o1.consentFormId,
+    o1SurveyFormId: o1.surveyFormId,
+    o1AppDownloadUrl: o1.appDownloadUrl,
+    rosterSheetId: o1.rosterSheetId,
+    mgmtSheetId: o1.mgmtSheetId,
+  };
+}
+
+/** 段 1 の設定の問いを配列で返す（構築とトリガの設置が共有する）。 */
+function s1ConfigProblems_() {
+  var cfg = s1Config_();
+  var out = [];
+  if (!cfg.consentFormId) {
+    out.push("スクリプト プロパティ FORM_ID_S1_CONSENT が空です（空フォームを作って編集 URL の ID を入れる）");
+  } else {
+    var g1Label = o1G1FormLabel_(cfg.consentFormId);
+    if (g1Label) {
+      out.push("FORM_ID_S1_CONSENT に G1 のフォーム ID が入っています（" + g1Label + "）。段 1 用の空フォームを別に作ってください。");
+    }
+    if (cfg.consentFormId === cfg.o1ConsentFormId || cfg.consentFormId === cfg.o1SurveyFormId) {
+      out.push("FORM_ID_S1_CONSENT が O1 のフォームと同じ ID です（O1 の同意の正本を消します）。段 1 用の空フォームを別に作ってください。");
+    }
+  }
+  if (!cfg.rosterSheetId) {
+    out.push("スクリプト プロパティ PHASE1_MGMT_SHEET_ID が空です（P-ID の採番元。空だと登録しても発番できません）");
+  } else if (o1IsKnownWrongRoster_(cfg.rosterSheetId)) {
+    out.push("PHASE1_MGMT_SHEET_ID が古いほうの管理シートを指しています（実在の P-ID と衝突します）");
+  }
+  var mgmtProblem = o1MgmtConfigProblem_(cfg);
+  if (mgmtProblem) out.push(mgmtProblem);
+  var urlProblem = s1AppDownloadUrlProblem_(cfg.appDownloadUrl, cfg.o1AppDownloadUrl);
+  if (urlProblem) out.push(urlProblem);
+  if (!O1_CONTACT_EMAIL || O1_CONTACT_EMAIL.indexOf("@") < 0) {
+    out.push("O1_CONTACT_EMAIL が不正です（削除の申し出先が無いと同意文書 §6 が嘘になります）");
+  }
+  return out;
+}
+
+/**
+ * 段 1 のアプリの URL の問い（無ければ空文字）。値そのものは返さない。
+ * 構築・トリガの設置・受付メールの本文の 3 か所が同じ判定を使う。
+ */
+function s1AppDownloadUrlProblem_(url, o1Url) {
+  if (!url) {
+    return "スクリプト プロパティ S1_APP_DOWNLOAD_URL が空です（受付メールが止まります。段 1 用の配布フォルダを指すこと）";
+  }
+  if (o1AppDownloadUrlIsBad_(url)) {
+    return "スクリプト プロパティ S1_APP_DOWNLOAD_URL が URL ではありません（https:// で始まる配布フォルダの URL を入れる）";
+  }
+  if (o1Url && url === o1Url) {
+    return "S1_APP_DOWNLOAD_URL が O1_APP_DOWNLOAD_URL と同じです（O1 の配布物には s1.mode が無く、問いが出ないまま記録が進みます）";
+  }
+  return "";
+}
+
+/** 読み取り専用の設定チェック。フォームを変更しない。 */
+function checkS1FormConfig() {
+  var problems = s1ConfigProblems_();
+  if (!problems.length) {
+    Logger.log("設定は揃っています。buildS1ConsentForm() を実行できます。");
+    return true;
+  }
+  Logger.log("設定に問題があります（" + problems.length + " 件）:");
+  problems.forEach(function (p) {
+    Logger.log("  - " + p);
+  });
+  return false;
+}
+
+/** O1 のフォームの ID を拒む。`FormApp.openById` より前に呼ぶ。 */
+function s1AssertNotO1Form_(id) {
+  var cfg = o1Config_();
+  if (id && (id === cfg.consentFormId || id === cfg.surveyFormId)) {
+    throw new Error(
+      "FORM_ID_S1_CONSENT に O1 のフォーム ID が入っています。中止しました（O1 の同意の正本に触れません）。\n" +
+        "段 1 用の空フォームを新しく作り、その ID を貼ってください。"
+    );
+  }
+}
+
+/** ID の検証 → 開く。順序を入れ替えない（検証が先）。 */
+function s1OpenFixed_(id) {
+  if (!id) {
+    throw new Error(
+      "FORM_ID_S1_CONSENT が空です。フォームを量産しないため停止しました。\n" +
+        "先に Google Forms で空フォームを作り、編集 URL の ID を FORM_ID_S1_CONSENT に貼ってください。"
+    );
+  }
+  o1AssertNotG1Form_(id, "FORM_ID_S1_CONSENT");
+  s1AssertNotO1Form_(id);
+  return FormApp.openById(id);
+}
+
+function s1ConsentFormTitle_() {
+  return "GSE ふだんの作業と短い問いの記録 — 説明・同意（参加登録）";
+}
+
+/** フォームの冒頭の説明（md の前書きと §1）。 */
+function s1ConsentFormDescription_() {
+  return (
+    "ご検討ありがとうございます。以下をお読みのうえ、ご回答ください。\n" +
+    "説明を聞いたうえで決めていただくもので、断っても不利益は一切ありません。\n\n" +
+    "【何をする研究か】\n" +
+    "この研究は、ふだんのパソコン作業のあいだ、キーボードやマウスの「操作のしかた」を記録し、" +
+    "作業中にときどき画面に出る短い問いへのお答えと合わせて、作業の進み方と手が止まる時間を調べるものです。\n" +
+    "文章の中身・画面の内容は記録しません。記録するのは「いつ・どの種類の操作をしたか」と、問いへのお答えです。\n" +
+    "G1（課題の実験）や O1（ふだんの作業の長期記録）とは別の研究です。\n\n" +
+    "この研究は、大学などの倫理審査委員会の審査を受けていません。研究者が、記録の中身（文章の中身や画面の内容を取らない）・" +
+    "保管・削除のしかた・お願いする相手の範囲を限り、問いの数に上限を置き、問いに答えなくてよく、画面の表示を切れて、" +
+    "いつでも止めたりやめたりできるようにしたうえで、進めてよいと判断しました。"
+  );
+}
+
+/**
+ * 説明の節（md §2〜§6）。[見出し, 本文] の配列。フォームでは見出しの項目として並べる。
+ * 1 つの説明欄に全部を入れず、節に分けて読みやすくする。
+ */
+function s1ConsentSections_() {
+  return [
+    [
+      "お願いすること",
+      "・ふだんどおりに作業していただくだけです。特別な課題はありません。\n" +
+        "・期間は前半と後半をあわせて数週間で、" + S1_PERIOD_TEXT + "です。始める日と終わる日は、研究者からお知らせします。\n" +
+        "・記録用のアプリを起動しておいていただきます。参加の確認を済ませると、パソコンにログインしたときに自動で起動するよう設定されます" +
+        "（設定でいつでも切れます。切り方は配布フォルダの説明書にあります）。いつでも止められます。\n" +
+        "・作業中、ときどき画面のすみに短い問いが出ます。1 日の終わりにも 1 つ問いが出ます。\n" +
+        "・後半の期間には、日によって画面に表示が出ます。\n" +
+        "・いま何の作業をしているかを、画面の表示から 5 つの選択肢で選んでいただきます" +
+        "（論述 / 通信文 / デザイン・映像・制作作業 / vibe coding / その他・細切れの作業）。" +
+        "メールを読む・調べものなど、どれとも決めづらいときは「その他・細切れの作業」を選んでください（メールを書くのは「通信文」です）。" +
+        "選ばなくてもかまいません。何を選んでも、記録する内容は変わりません。\n" +
+        "・謝礼はありません。\n\n" +
+        "問いへのご同意は、この研究に参加していただく条件です。問いに同意いただけない場合は、参加をお断りいただくことになります。" +
+        "個々の問いには答えなくてかまいません。",
+    ],
+    [
+      "記録するもの",
+      "・キーを押した時刻（ミリ秒）と、キーの種類（文字キー / 数字 / 記号 / 句読点 / 空白 / 改行 / Tab / バックスペース / Delete / " +
+        "修飾キー / ファンクションキー / Esc / 矢印キー、Windows ではさらにテンキー）。文字キーは 26 種類がすべて同じ「文字キー」として" +
+        "記録されるので、打った言葉を復元することはできません。お使いの OS によって、記録されるキーの種類がすこし違います" +
+        "（テンキーは Windows でのみ。Mac のノート型では PageUp / PageDown / Home / End は矢印キーとして記録されます）\n" +
+        "・日本語入力の変換にかかった時間\n" +
+        "・貼り付けの回数と文字数（中身は取得しません）\n" +
+        "・画面の切り替えが起きた時刻（どのアプリへ切り替えたかは記録しません）\n" +
+        "・マウスの「動いた量・ホイールの回数」（Windows ではさらに「押した回数」）を 1 秒ごとに数えた値\n" +
+        "・キーボードの配列の種類（開始時に 1 回だけ）／アプリの版／記録がうまくいっていたかの状態\n" +
+        "・この端末の導入ごとに作った乱数の識別子（16 桁・開始時に 1 回だけ）。端末や個人を特定する情報ではありません。" +
+        "複数の端末で使うときに、記録を端末ごとに分けるためだけに使います（機体番号・ホスト名などは使いません）\n" +
+        "・（macOS のみ）パスワード入力中だった区間の印（中身は取得しません）\n" +
+        "・上の記録から計算した「作業の状態」の推定値。この推定値をもとに助言や通知が出ることはありません。" +
+        "推定は研究のための目安であり、あなたの能力や成果を評価するものではありません\n" +
+        "・短い問いへのお答え・答えなかったこと・答えるまでにかかった時間\n" +
+        "・1 日の終わりの問いへのお答え・答えなかったこと\n" +
+        "・後半の表示について、日ごとの記録",
+    ],
+    [
+      "記録しないもの",
+      "・どの文字を打ったか（本文）／画面の内容・スクリーンショット\n" +
+        "・アプリの名前・ウィンドウのタイトル・URL・ファイル名・プロジェクト名／どのアプリへ切り替えたか\n" +
+        "・マウスの位置・軌跡・画面の解像度・モニタの配置／クリップボードの中身\n" +
+        "・端末を特定できる情報（機体番号・ホスト名など）／位置情報・端末の中の他のファイル／音声・映像\n" +
+        "・問いへのお答えの理由・自由に書いた文・お相手のお名前（入力欄をつくりません）\n" +
+        "・表示の見た目そのもの（画面の写し）",
+    ],
+    [
+      "短い問いについて",
+      "作業中、ときどき画面のすみに小さなカードが出ます。作業を止めたり、画面を覆ったりはしません。\n" +
+        "カードは「直前の30秒について教えてください」と尋ね、3 つの問いがあります。\n" +
+        "1. どれだけ詰まっていた感覚ですか（1〜5 の目盛り）\n" +
+        "2. どれだけ前に進んでいる感覚ですか（1〜5 の目盛り）\n" +
+        "3. 直前の30秒、何をしていましたか（熟考 / 詰まり / 外部資料 / 会話 / 離席 / 回答不能 から 1 つ）\n\n" +
+        "どれくらい出るか（アプリが守る上限です）:\n" +
+        "・記録を動かしている 1 時間あたり、多くても " + S1_MAX_PROBES_PER_HOUR + " 回です" +
+        "（ランダムな時刻に出るものが多くても 6 回、操作が止まったあとに出るものが多くても 3 回）。\n" +
+        "・20 分のあいだでは、多くても 3 回です。\n" +
+        "・間隔はふつう 6 分以上ですが、2 種類の問いが近づいたときは、2 分ほどの間隔で続けて出ることがあります。\n" +
+        "・1 日じゅう動かしていれば、その日は数十回になります。\n\n" +
+        "主にランダムな時刻に出ます。そのほかに、しばらく操作が止まっていたあとや、ほかの画面から戻ってきたあとの最初の操作で出ることがあります。" +
+        "どの時刻に出すかはアプリが決め、すべての参加者で同じ決め方にしています。そのため、出る回数を人ごとに変えることはしません。" +
+        "多いと感じたときは、答えずに閉じていただくか、一時停止していただくか、参加をやめていただけます。\n\n" +
+        "・答えなくてかまいません。閉じていただいても、参加にもそのほかのことにも影響しません。\n" +
+        "・理由はお聞きしません。自由に書いていただく欄もつくりません。\n" +
+        "・記録に残るのは、問いを出した時刻、目盛りの値、6 つのうちどれを選んだか、答えなかったこと、答えるまでにかかった時間です。\n\n" +
+        "正直に書いておきたいこと:\n" +
+        "1. 「会話」をお選びになると、「その時刻に会話していた」ことが記録に残ります。お相手が誰かは残りません。" +
+        "それでも気になるときは、「この時間帯を消して」をお使いください。お答えもいっしょに消えます。" +
+        "ご同席の方が気にされる場合も、あなたからお申し出いただければ同じように消せます。\n" +
+        "2. 問いが出ること自体が、ふだんの作業を少し変えてしまう可能性があります。私たちはそれを隠さずに、どれくらい変わるのかも含めて調べます。\n\n" +
+        "記録は 48 時間おいて自動的に送られます。送られたあとは、あなたの端末の操作だけでは消えません。" +
+        "気になるお答えは、送られる前（その日と、その次の 2 日ほど）に消していただけます。",
+    ],
+    [
+      "1 日の終わりの問いについて",
+      "夕方から夜（17 時〜23 時）のあいだに、その日の作業について 1 つ尋ねるカードが出ます。" +
+        "出るのは、そのあいだに操作が 20 分ほど止まったとき、アプリを終了するとき、一時停止から戻ったときのどれかで、1 日に 1 回です。\n" +
+        "・問いは「今日の作業にどのくらい熱意を持てましたか」で、1〜5 の目盛りで答えます。\n" +
+        "・その日に問いが出なかったときは、翌日の最初に「昨日の作業」について 1 回だけ尋ねます。\n" +
+        "・答えなくてかまいません（「今日は答えない」で閉じられます）。理由はお聞きしません。\n" +
+        "・記録に残るのは、尋ねた日、目盛りの値か答えなかったこと、答えるまでにかかった時間です。",
+    ],
+    [
+      "後半の画面の表示について",
+      "後半の期間には、日によって、画面の背景と画面の下の縁に、線の表示が出ます。表示は、あなたのキーボードとマウスの操作に合わせて動きます。\n" +
+        "・後半の初日は、必ず表示が出ます。2 日目からは、前もって作った無作為の表で、表示が出る日と出ない日が決まります。" +
+        "どの日が出る日かは、前もってはお知らせしません。\n" +
+        "・表示はマウスの位置とクリックにも合わせて動きますが、マウスの位置やクリックの場所は記録しません。\n" +
+        "・表示が邪魔なときは、画面上部（Windows では画面右下）のアプリのアイコンのメニューから「やめる」を選ぶと、" +
+        "その日のあいだは表示が出なくなります。「描く」を選ぶと戻ります。翌日は表のとおりに戻ります。" +
+        "カーソル・クリックに合わせた動きも、同じメニューから個別に切れます。\n" +
+        "・表示を見るために、ほかのアプリの窓をいったんどけることができます（もう一度操作すると戻ります）。\n" +
+        "・表示は作業の妨げにならないように作っていますが、気になるときは上のとおり切っていただいてかまいません。切っても不利益はありません。\n\n" +
+        "この表示について記録するもの（日ごとに 1 行と、その日の途中の 5 分ごとの写し）:\n" +
+        "・その日が表示の出る日だったか（無作為の表での割り当て）\n" +
+        "・その日に表示が出ていた時間と、画面の下の縁の表示が見えていた時間（画面のロック中・スリープ中などで見えなかった時間を除いたもの）\n" +
+        "・「やめる」「描く」を選んだ時刻と、カーソル・クリックの動きを切った・戻した時刻\n" +
+        "・表示を始めた時刻、ほかの窓をどけた回数\n" +
+        "・表示の描き方を決める乱数の値と、無作為の表の照合用の値\n" +
+        "表示の見た目そのもの（画面の写し）は記録しません。打ったキーの内容も、この表示の記録には入りません。",
+    ],
+    [
+      "あなたがいつでもできること（3 点）",
+      "1. 記録中だと分かる … 記録している間はずっと画面に印が出ます（印が出ていないときは記録していません）。\n" +
+        "2. すぐ止める … ワンクリックで一時停止できます。理由を聞きません。一時停止中は問いが出ません。\n" +
+        "3. あとから「この時間帯を消して」と言える … 時間帯を指定して削除できます（例:「昨日の 14:00〜15:00」）。理由を説明する必要はありません。\n\n" +
+        "3 番で消える範囲:\n" +
+        "・その時間帯の操作の記録、問いへのお答え（1 日の終わりの問いを含む）、後半の表示について記録した時刻と量が消えます。\n" +
+        "・その日が表示の出る日だったかどうか（無作為の表での割り当て）は残ります。研究の計算の土台になるためで、" +
+        "あなたがその時間に何をしていたかは含みません。\n\n" +
+        "記録は 1 日ごとにひとまとまりにして、そこから 48 時間おいてから研究者へ送られます。\n" +
+        "・送られる前（その日と、その次の 2 日ほど）… あなたの端末の上で消えます。研究者に届きません。\n" +
+        "・送られたあと … 研究者に「消してください」とお伝えください。研究者側で削除し、削除したことを記録に残します" +
+        "（あなたの端末の操作だけでは消えません）。\n" +
+        "どちらの場合も、理由を説明する必要はありません。",
+    ],
+    [
+      "参加をやめる",
+      "・参加はいつでもやめられます。やめても不利益はありません。\n" +
+        "・アプリの画面で「問いへの同意を取り消す」を押すと、問いは出なくなり、参加をやめたことになります。" +
+        "そのあとはアプリを終了し、研究者にお知らせください（自動で起動する設定の切り方は配布フォルダの説明書にあります）。" +
+        "取り消したあとの記録は研究に使いません。\n" +
+        "・やめるときに、それまでの記録を研究に使ってよいか、すべて削除するかを選べます。" +
+        "削除を選んだときは、上の手順で、送られる前の分も送られたあとの分も削除します。",
+    ],
+    [
+      "記録の保管",
+      "・記録はまず、あなたの端末の中だけに保存します。クラウド同期フォルダ（OneDrive 等）には置きません。\n" +
+        "・そのうえで、1 日ごとにひとまとまりにした記録を、48 時間おいてから暗号化して自動的に研究者へ送ります。\n" +
+        "  なぜ自動なのか: 手作業でまとめて送っていただく形だと手順が多く、続けていただくのが難しいためです。\n" +
+        "  なぜ 48 時間おくのか: 送る前なら、あなたが「この時間帯を消して」と言えば端末の上で消えるからです。\n" +
+        "  送るのは上に書いた記録だけです。本文・画面の内容・アプリ名は入っていません。\n" +
+        "  送信を止めたいときは、いつでもお申し出ください。\n" +
+        "・記録は P0xx のような記号で管理し、氏名・連絡先とは別に保管します。\n" +
+        "・保管の上限: 暗号化した記録は" + O1_RETENTION_ENCRYPTED + "、研究者が復号したものは" + O1_RETENTION_PLAINTEXT +
+        "、個人が特定できない集計値は" + O1_RETENTION_METRICS + "。上限に達したものは、お申し出が無くてもこちらで削除します。",
+    ],
+    [
+      "結果の公表について",
+      "・記録と、記録から計算した値は、この研究（今回の確認と、のちに同じ手順で別の参加者に行う確認との比べ）にだけ使います。ほかの研究には使いません。\n" +
+        "・研究の結果は、論文や研究の応募書類などで公表します。公表するのは、記録から計算した数値と図、その計算のプログラムです。\n" +
+        "・参加者が少ないため、1 人ずつの数値と図を P0xx のような記号で示します。\n" +
+        "・お名前・連絡先・記録した日付と時刻は入れません。お使いのパソコンの種類（Windows / Mac）や作業の種類は、" +
+        "それを示すと誰の結果か分かるおそれがあるときは示しません。公表の前に、研究者が数値と図からあなたが分からないことを点検します。\n" +
+        "・論文に載せた数値は、上の保管の上限が来ても消えません（削除するのは研究者の手元の記録と集計値です）。" +
+        "公表する前であれば、削除のお申し出で公表の対象から外します。公表した後は、公表済みの数値からあなたの分だけを取り除くことはできません。\n" +
+        "・記録そのもの（加工したものを含む）は公開しません。",
+    ],
+    [
+      "お問い合わせ",
+      "研究責任者: " + O1_CONTACT_NAME + "（" + O1_AFFILIATION + "）\n" +
+        "連絡先: " + O1_CONTACT_EMAIL + "\n" +
+        "記録の削除をご希望のときも、上の連絡先へお申し出ください。理由をお聞きすることはありません。\n\n" +
+        "説明を聞いたうえで、参加するかどうかを決めてください。断っても不利益は一切ありません。" +
+        "この研究は、研究者が直接存じ上げている方にお願いしています。断っても、途中でやめても、研究者とのお付き合いには影響しません。",
+    ],
+  ];
+}
+
+/** 同意項目。md の「同意の項目」と 1 対 1・同じ文（§20 が照合する）。 */
+function s1ConsentItemTitles_() {
+  return [
+    "上の説明を読み、質問する機会がありました。",
+    "この研究が倫理審査委員会の審査を受けておらず、研究者の判断で進めていることの説明を受けました。",
+    "ふだんの作業のあいだ、キーやマウスの操作のしかたが、" + S1_PERIOD_TEXT + "にわたって記録されることを理解しました。",
+    "文章の中身・画面の内容・アプリ名・URL・ファイル名は記録されないことを理解しました。",
+    "この記録から「いつ作業していて、いつ離れていたか」の時間の並びが残ることの説明を受けました。",
+    "作業中にときどき短い問いが出ること（1 時間に多くても " + S1_MAX_PROBES_PER_HOUR +
+      " 回）と、1 日の終わりに 1 つ問いが出ることを理解し、問いに同意します。個々の問いには答えなくてよく、理由を聞かれないことを理解しました。",
+    "問いで「会話」を選ぶと、その時刻に会話していたことが記録に残ることの説明を受けました。",
+    "後半の期間には、日によって画面の背景と下の縁に操作に合わせて動く表示が出ること、その日が出る日かは無作為の表で決まること、" +
+      "表示はいつでも切れること、表示について上の説明のとおりの記録が残ることを理解しました。",
+    "記録している間は画面に印が出ること、ワンクリックでいつでも一時停止でき、理由を聞かれないことを理解しました。",
+    "1 日ごとにまとめた記録が、48 時間おいてから暗号化されて自動的に研究者へ送られることの説明を受けました。",
+    "送られる前なら端末の上で消せること、送られたあとは研究者に申し出れば削除され、その削除が記録に残ること、" +
+      "時間帯を消しても表示の割り当てだけは残ることを理解しました。",
+    "保管の上限（暗号化した記録は" + O1_RETENTION_ENCRYPTED + "、復号したものは" + O1_RETENTION_PLAINTEXT +
+      "、集計値は" + O1_RETENTION_METRICS + "）の説明を受けました。",
+    "研究の結果が 1 人ずつの数値と図として記号で公表されること、誰の結果か分かるおそれがある属性は示されないこと、" +
+      "公表した数値は後から取り除けないこと、記録そのものは公開されないこと、" +
+      "記録と計算した値はこの研究（今回の確認と、のちに同じ手順で行う確認との比べ）にだけ使われることの説明を受けました。",
+    "参加はいつでもやめられ、問いへの同意を取り消すと参加をやめたことになること、やめるときにそれまでの記録の削除も求められることを理解しました。" +
+      "謝礼が無いことを理解しました。",
+    "上記すべてに同意し、この記録と研究利用に同意します。",
+  ];
+}
+
+/**
+ * 段 1 の同意フォームを構築する。設定に問いがあれば何も開かずに止まる（fail-closed）。
+ * 回答があるフォームは作り直さない（`o1AssertSafeToRebuild_`）。
+ */
+function buildS1ConsentForm() {
+  var problems = s1ConfigProblems_();
+  if (problems.length) {
+    throw new Error(
+      "設定に問題があるので構築しません（fail-closed）:\n  - " +
+        problems.join("\n  - ") +
+        "\n\ncheckS1FormConfig() で同じ内容を読み取り専用で確認できます。"
+    );
+  }
+  var form = s1OpenFixed_(s1Config_().consentFormId);
+  o1AssertSafeToRebuild_(form, "S1-C 説明・同意");
+  o1ClearForm_(form);
+
+  form.setTitle(s1ConsentFormTitle_());
+  form.setDescription(s1ConsentFormDescription_());
+  form.setCollectEmail(false); // 下の設問で明示的に取る（何を取るかを本人に見せる）
+  form.setShowLinkToRespondAgain(false);
+  form.setConfirmationMessage(
+    "ご回答ありがとうございます。\n" +
+      "参加者ID とアプリの入手方法を、ご記入のメールアドレスへお送りします。\n" +
+      "届かない場合は " + O1_CONTACT_EMAIL + " へお知らせください。"
+  );
+
+  s1ConsentSections_().forEach(function (sec) {
+    o1AddSectionHeader_(form, sec[0], sec[1]);
+  });
+
+  o1AddSectionHeader_(
+    form,
+    "同意の確認",
+    "以下のすべてに同意いただける場合のみ、参加をお願いします。\n" +
+      "1 つでも同意いただけない項目があれば、このまま閉じてください（不利益はありません）。"
+  );
+  s1ConsentItemTitles_().forEach(function (title) {
+    var q = form.addCheckboxItem();
+    q.setTitle(title);
+    q.setChoices([q.createChoice("同意する / 理解した")]);
+    q.setRequired(true);
+  });
+
+  o1AddSectionHeader_(
+    form,
+    O1_REGISTRATION_HEADER,
+    "参加者ID をお送りするため、また削除のお申し出を受け付けるために必要です。\n" +
+      "記録（操作のログ）とは別に保管し、P0xx とのみ結び付けます。"
+  );
+  O1_REGISTRATION_TITLES.forEach(function (title) {
+    o1AddRegistrationItem_(form, title);
+  });
+
+  o1RecordFormUrl_("S1_CONSENT", form, "S1-C 説明・同意（段 1 の同意の正本）");
+  Logger.log("S1-C 説明・同意を構築した: " + form.getPublishedUrl());
+  Logger.log("次にやること: previewS1RegisterAckEmail() で文面を確認 → installS1ConsentTrigger()");
+}
+
+function s1RegisterAckSubject_() {
+  return "【GSE 研究】ご登録ありがとうございます（参加者IDとアプリのご案内・ふだんの作業と短い問いの記録）";
+}
+
+/**
+ * 段 1 の受付メールの本文。`appDownloadUrlOpt` を渡すとその値を使う（O1 の `o1RegisterAckBody_` と同じ理由:
+ * 事前確認と本送信で同じスナップショットを使う）。URL に問いがあれば投げる（最後の砦）。
+ */
+function s1RegisterAckBody_(pid, appDownloadUrlOpt) {
+  var cfg = s1Config_();
+  var appDownloadUrl = appDownloadUrlOpt === undefined ? cfg.appDownloadUrl : appDownloadUrlOpt;
+  var problem = s1AppDownloadUrlProblem_(appDownloadUrl, cfg.o1AppDownloadUrl);
+  if (problem) {
+    throw new Error(problem + "（受付メールを作りません・fail-closed）");
+  }
+  return [
+    "ご登録ありがとうございます。",
+    "",
+    "【あなたの参加者ID】",
+    "    " + pid,
+    "アプリの最初の画面でこの記号を入力していただきます。",
+    "この記号は氏名とは別に保管され、記録には氏名もメールアドレスも入りません。",
+    "",
+    "【アプリの入手】",
+    "    " + appDownloadUrl,
+    "お使いの OS 用の zip ファイルをダウンロードし、展開したフォルダをそのままデスクトップなどに置いてください。",
+    "フォルダの中のファイルは 1 つも消したり動かしたりしないでください。",
+    "同じフォルダにある目印のファイルを見て、アプリが動作を決めています。",
+    "同梱の説明書に、最初の 1 回だけ必要な手順が書いてあります。",
+    "",
+    "【始める日について】",
+    "始める日と終わる日は、研究者からお知らせします（" + S1_PERIOD_TEXT + "）。",
+    "アプリは、パソコンにログインしたときに自動で起動するよう設定されます（設定でいつでも切れます）。",
+    "",
+    "【いつでもできること】",
+    "1. 記録中は画面に印が出ます。印が出ていないときは記録していません。",
+    "2. ワンクリックで一時停止できます。理由をお聞きすることはありません。一時停止中は問いが出ません。",
+    "3. あとから「昨日の 14:00〜15:00 を消して」のように時間帯を指定して削除できます。",
+    "   記録が研究者へ送られるのは 1 日ぶんをまとめてから 48 時間後です。それより前なら、あなたの端末の上で消えます。",
+    "   送られたあとの削除は、下の連絡先へお申し出ください（研究者側で削除し、記録に残します）。",
+    "",
+    "【問いと画面の表示】",
+    "作業中にときどき出る問いには、答えなくてかまいません（1 時間に多くても " + S1_MAX_PROBES_PER_HOUR + " 回）。",
+    "後半の期間に出る画面の表示は、アプリのアイコンのメニューの「やめる」でその日のあいだ消せます。",
+    "",
+    "【参加をやめたくなったら】",
+    "いつでもやめられます。不利益は一切ありません。",
+    "アプリの画面で「問いへの同意を取り消す」を押すと、参加をやめたことになります。そのあとはアプリを終了し、研究者にお知らせください。",
+    "やめるときに、それまでの記録をすべて削除するようお求めいただけます。",
+    "",
+    "【お問い合わせ】",
+    "  " + O1_CONTACT_NAME + "（" + O1_AFFILIATION + "）",
+    "  " + O1_CONTACT_EMAIL,
+    "",
+    "どうぞよろしくお願いいたします。",
+  ].join("\n");
+}
+
+/** 受付メールの文面を Logger に出すだけ（送信しない）。 */
+function previewS1RegisterAckEmail() {
+  var body;
+  try {
+    body = s1RegisterAckBody_("P999");
+  } catch (e) {
+    Logger.log("文面を作れません: " + e);
+    return "";
+  }
+  Logger.log("件名: " + s1RegisterAckSubject_());
+  Logger.log("--------");
+  Logger.log(body);
+  Logger.log("--------");
+  Logger.log("これは preview です。送信していません。");
+  return body;
+}
+
+function s1RegProfile_() {
+  return {
+    label: "S1-C",
+    handler: "onS1ConsentSubmit",
+    kind: S1_MGMT_KIND,
+    checkFn: "checkS1FormConfig()",
+    appUrl: function () {
+      return s1Config_().appDownloadUrl;
+    },
+    ackSubject: s1RegisterAckSubject_,
+    ackBody: s1RegisterAckBody_,
+  };
+}
+
+/** 段 1 の同意フォームの提出で走る。流れは O1 と同じ（`o1HandleConsentSubmit_`）。 */
+function onS1ConsentSubmit(e) {
+  o1HandleConsentSubmit_(e, s1RegProfile_());
+}
+
+/**
+ * 段 1 のトリガを張る。設定に問いがあれば、既存のトリガを消す前に止める。
+ * O1 のトリガ（`onO1ConsentSubmit`）には触らない。
+ */
+function installS1ConsentTrigger() {
+  var problems = s1ConfigProblems_();
+  if (problems.length) {
+    throw new Error(
+      "設定に問題があるのでトリガを張りません（fail-closed）:\n  - " +
+        problems.join("\n  - ") +
+        "\n既存のトリガは消していません。"
+    );
+  }
+  var id = s1Config_().consentFormId;
+  o1AssertNotG1Form_(id, "FORM_ID_S1_CONSENT");
+  s1AssertNotO1Form_(id);
+  removeS1ConsentTriggers();
+  ScriptApp.newTrigger("onS1ConsentSubmit").forForm(FormApp.openById(id)).onFormSubmit().create();
+  Logger.log("onS1ConsentSubmit トリガを S1-C に設定しました");
+  Logger.log("O1_AUTO_SEND=" + O1_AUTO_SEND + "（false=ログに出すだけ / true=自動送信）");
+}
+
+/** 段 1 のトリガだけを外す（O1 のトリガは残す）。 */
+function removeS1ConsentTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var n = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "onS1ConsentSubmit") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      n++;
+    }
+  }
+  if (n) Logger.log("既存の onS1ConsentSubmit トリガを " + n + " 件削除しました");
 }

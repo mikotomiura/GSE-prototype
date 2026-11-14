@@ -3307,6 +3307,302 @@ const shapeProblems = (ctx, form) => {
   );
 }
 
+// ============================================================
+// §20 段 1 の同意フォーム（S1-C・判断 1・18）
+// ============================================================
+// 同意の項目が md と 1 対 1・同じ文であること、O1 と G1 のフォームを消さないこと、
+// 段 1 の提出が段 1 の受付メールと種別で記録されること、O1 のトリガに触らないこと。
+const S1_CONSENT_DOC = path.join(REPO, ".steering/20261114-gse-stage1-n3-consent/consent-draft-s1.md");
+const S1_C = "S1FORMCONSENT";
+const S1_URL = "https://drive.example/s1";
+
+/** md の「同意の項目」の番号つきの行を順に返す。 */
+function s1DocItems() {
+  const doc = fs.readFileSync(S1_CONSENT_DOC, "utf8");
+  const start = doc.indexOf("## 同意の項目");
+  const end = doc.indexOf("\n---", start);
+  if (start < 0 || end < 0) return [];
+  return doc
+    .slice(start, end)
+    .split("\n")
+    .map((l) => l.match(/^(\d+)\. (.*)$/))
+    .filter(Boolean)
+    .map((m) => m[2]);
+}
+
+/** O1 の準備に段 1 のフォームとプロパティを足した文脈。 */
+function makeS1Ctx(extra) {
+  const o = extra || {};
+  const ctx = makeReadyCtx(o);
+  ctx.__forms[S1_C] = makeForm(S1_C, { responses: o.s1Responses || 0 });
+  ctx.__props.FORM_ID_S1_CONSENT = o.s1FormId === undefined ? S1_C : o.s1FormId;
+  ctx.__props.S1_APP_DOWNLOAD_URL = o.s1Url === undefined ? S1_URL : o.s1Url;
+  return ctx;
+}
+
+/** フォームの本文（説明と見出しの本文）を 1 つの文字列にする。 */
+function s1FormText(form) {
+  return [form.__title, form.__description]
+    .concat(form.__items.map((i) => i.__title + "\n" + i.__help))
+    .join("\n");
+}
+
+{
+  const ctx = makeS1Ctx();
+  const items = ctx.s1ConsentItemTitles_();
+  const doc = s1DocItems();
+  push("§20 md の同意の項目を読めた（15 件）", doc.length === 15, { n: doc.length });
+  push("§20 同意の項目の数が md と同じ", items.length === doc.length, { form: items.length, md: doc.length });
+  const diff = items.map((t, i) => (t === doc[i] ? null : { i: i + 1, form: t, md: doc[i] })).filter(Boolean);
+  push("§20 同意の項目が md と 1 対 1 で同じ文", diff.length === 0 && items.length === doc.length, { diff });
+}
+
+{
+  // 構築の陽性対照: 項目が順に並び、全部必須で、登録の設問が末尾に並ぶ。
+  const ctx = makeS1Ctx();
+  const r = attempt(() => ctx.buildS1ConsentForm());
+  const form = ctx.__forms[S1_C];
+  const boxes = form.__items.filter((i) => i.__type === "CHECKBOX");
+  push("§20 陽性対照: 設定が揃えば構築できる", !r.threw, r);
+  push(
+    "§20 チェックの項目が同意の項目と同じ順・全部必須",
+    boxes.length === 15 &&
+      boxes.every((b, i) => b.__title === ctx.s1ConsentItemTitles_()[i] && b.__required),
+    { n: boxes.length }
+  );
+  const tail = form.__items.slice(-4).map((i) => i.__title);
+  push("§20 登録の設問が末尾に O1 と同じ順で並ぶ", JSON.stringify(tail) === JSON.stringify(ctx.O1_REGISTRATION_TITLES), { tail });
+  push("§20 O1 のフォームには触れない", ctx.__forms[O1_C].__items.length === 0 && ctx.__forms[O1_C].__deleted === 0, {});
+  push("§20 フォームの URL を S1_CONSENT として残す", !!ctx.__props.FORMURL_S1_CONSENT, {});
+}
+
+{
+  // 本文の約束が md とフォームの両方にある。
+  const ctx = makeS1Ctx();
+  ctx.buildS1ConsentForm();
+  const text = s1FormText(ctx.__forms[S1_C]);
+  const doc = fs.readFileSync(S1_CONSENT_DOC, "utf8");
+  [
+    "倫理審査委員会の審査を受けていません",
+    "多くても 9 回",
+    "20 分のあいだでは、多くても 3 回です",
+    "長くても 8 週間",
+    "謝礼はありません",
+    "熟考",
+    "回答不能",
+    "「会話」をお選びになると",
+    "今日の作業にどのくらい熱意を持てましたか",
+    "後半の初日は、必ず表示が出ます",
+    "ほかの窓をどけた回数",
+    "「問いへの同意を取り消す」を押すと",
+    "無作為の表での割り当て）は残ります",
+    "ほかの研究には使いません",
+    "誰の結果か分かるおそれがあるときは示しません",
+    "記録そのもの（加工したものを含む）は公開しません",
+    "研究者とのお付き合いには影響しません",
+    "48 時間",
+    ctx.O1_CONTACT_EMAIL,
+    ctx.O1_CONTACT_NAME,
+    ctx.O1_AFFILIATION,
+  ].forEach((s) => {
+    push(`§20 「${s}」が md とフォームの両方にある`, doc.indexOf(s) >= 0 && text.indexOf(s) >= 0, {
+      md: doc.indexOf(s) >= 0,
+      form: text.indexOf(s) >= 0,
+    });
+  });
+  push(
+    "§20 日の終わりの問いに手跡の日の項目を足すとは書かない（判断 17）",
+    text.indexOf("項目が 1 つ足される") < 0 && doc.indexOf("項目が 1 つ足される") < 0,
+    {}
+  );
+}
+
+{
+  // 問いの上限の数がアプリの調停器と一致する（配る前の条件 9）。
+  const arb = fs.readFileSync(path.join(REPO, "src-tauri/src/analysis/probe_arbiter.rs"), "utf8");
+  const m = arb.match(/pub const S1_MAX_PROBES_PER_HOUR: u64 = (\d+);/);
+  const ctx = makeS1Ctx();
+  push(
+    "§20 1 時間の上限が probe_arbiter.rs の S1_MAX_PROBES_PER_HOUR と一致する",
+    !!m && Number(m[1]) === ctx.S1_MAX_PROBES_PER_HOUR,
+    { rs: m && m[1], gs: ctx.S1_MAX_PROBES_PER_HOUR }
+  );
+}
+
+{
+  // 守り: G1・O1 の ID、空の ID、回答のあるフォーム。
+  [
+    ["G1-C", G1_CONSENT_ID],
+    ["O1-C", O1_C],
+    ["O1-S", O1_S],
+    ["空", ""],
+  ].forEach(([label, id]) => {
+    const ctx = makeS1Ctx({ s1FormId: id });
+    if (id === G1_CONSENT_ID) ctx.__forms[id] = makeForm(id);
+    const r = attempt(() => ctx.buildS1ConsentForm());
+    push(`§20 ${label} の ID では構築しない（開かない）`, r.threw && ctx.__openedFormIds.indexOf(id) < 0, {
+      threw: r.threw,
+      opened: ctx.__openedFormIds,
+    });
+  });
+  const ctx = makeS1Ctx();
+  const r = attempt(() => ctx.s1OpenFixed_(O1_C));
+  push("§20 s1OpenFixed_ も O1 の ID を開かない", r.threw && ctx.__openedFormIds.indexOf(O1_C) < 0, r);
+  const withResp = makeS1Ctx({ s1Responses: 2 });
+  const rr = attempt(() => withResp.buildS1ConsentForm());
+  push("§20 回答のある段 1 のフォームは作り直さない", rr.threw && withResp.__forms[S1_C].__deleted === 0, rr);
+}
+
+{
+  // 設定: アプリの URL。
+  const same = makeS1Ctx({ s1Url: "https://drive.example/o1" });
+  push(
+    "§20 段 1 の URL が O1 と同じなら設定の問いになる",
+    same.s1ConfigProblems_().some((p) => p.indexOf("O1_APP_DOWNLOAD_URL と同じ") >= 0),
+    { p: same.s1ConfigProblems_() }
+  );
+  const empty = makeS1Ctx({ s1Url: "" });
+  push("§20 段 1 の URL が空なら設定の問いになる", empty.s1ConfigProblems_().length > 0, {});
+  const bad = makeS1Ctx({ s1Url: "folder-id-only" });
+  push("§20 段 1 の URL が https でなければ設定の問いになる", bad.s1ConfigProblems_().length > 0, {});
+  const ok = makeS1Ctx();
+  push("§20 陽性対照: 揃っていれば問いは 0 件", ok.s1ConfigProblems_().length === 0, { p: ok.s1ConfigProblems_() });
+  const o1id = makeS1Ctx({ s1FormId: O1_C });
+  push(
+    "§20 段 1 のフォームが O1 と同じ ID なら設定の問いになる",
+    o1id.s1ConfigProblems_().some((p) => p.indexOf("O1 のフォームと同じ ID") >= 0),
+    { p: o1id.s1ConfigProblems_() }
+  );
+  const noUrl = makeS1Ctx({ s1Url: "" });
+  const rb = attempt(() => noUrl.buildS1ConsentForm());
+  push(
+    "§20 アプリの URL が欠けていれば構築せず、フォームを開かない",
+    rb.threw && noUrl.__openedFormIds.length === 0 && noUrl.__forms[S1_C].__items.length === 0,
+    { threw: rb.threw, opened: noUrl.__openedFormIds }
+  );
+  const r = attempt(() => same.s1RegisterAckBody_("P001"));
+  push("§20 受付メールの本文も O1 と同じ URL なら作らない（最後の砦）", r.threw, r);
+}
+
+{
+  // トリガ: 段 1 の付け外しは O1 のトリガに触らない。
+  const ctx = makeS1Ctx();
+  ctx.__triggers.push({ getHandlerFunction: () => "onO1ConsentSubmit" });
+  const r = attempt(() => ctx.installS1ConsentTrigger());
+  const fns = ctx.__triggers.map((t) => t.getHandlerFunction());
+  push(
+    "§20 段 1 のトリガを張っても O1 のトリガは残る",
+    !r.threw && fns.indexOf("onO1ConsentSubmit") >= 0 && fns.indexOf("onS1ConsentSubmit") >= 0,
+    { fns, r }
+  );
+  ctx.installS1ConsentTrigger();
+  const fns2 = ctx.__triggers.map((t) => t.getHandlerFunction());
+  push(
+    "§20 張り直しても段 1 のトリガは 1 本・O1 は残る",
+    fns2.filter((f) => f === "onS1ConsentSubmit").length === 1 && fns2.indexOf("onO1ConsentSubmit") >= 0,
+    { fns2 }
+  );
+  const bad = makeS1Ctx({ s1Url: "" });
+  bad.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
+  const rb = attempt(() => bad.installS1ConsentTrigger());
+  push(
+    "§20 設定が欠けていればトリガを張らず、既存の段 1 のトリガも消さない",
+    rb.threw && bad.__triggers.length === 1,
+    { n: bad.__triggers.length }
+  );
+  const o1 = makeS1Ctx();
+  o1.__triggers.push({ getHandlerFunction: () => "onS1ConsentSubmit" });
+  o1.removeO1ConsentTriggers();
+  push("§20 O1 のトリガを外しても段 1 のトリガは残る", o1.__triggers.length === 1, {});
+}
+
+{
+  // 提出: 新しい人は採番され、段 1 の受付メールが届き、種別 s1-register で記録される。
+  const ctx = makeS1Ctx({ roster: [["P006", "既存", "old@example.com"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onS1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_PID]: "",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  const mail = ctx.__mails[0] || { subject: "", body: "" };
+  push("§20 段 1 の提出で採番される", roster.__rows.length === 2 && roster.__rows[1][0] === "P007", {
+    rows: roster.__rows,
+  });
+  push(
+    "§20 段 1 の受付メール（件名・段 1 の URL・P-ID）が届き、O1 の URL は入らない",
+    ctx.__mails.length === 1 &&
+      mail.subject === ctx.s1RegisterAckSubject_() &&
+      mail.body.indexOf(S1_URL) >= 0 &&
+      mail.body.indexOf("https://drive.example/o1") < 0 &&
+      mail.body.indexOf("P007") >= 0,
+    { subject: mail.subject }
+  );
+  push(
+    "§20 受付メールに段 1 の約束（答えなくてよい・やめる・取り消し）がある",
+    ["答えなくてかまいません", "「やめる」", "「問いへの同意を取り消す」", "長くても 8 週間"].every(
+      (s) => mail.body.indexOf(s) >= 0
+    ),
+    {}
+  );
+  const rows = logRows(ctx);
+  push(
+    "§20 登録ログの種別が s1-register",
+    rows.length === 1 && rows[0][1] === "s1-register" && rows[0][3] === "ok",
+    { rows }
+  );
+}
+
+{
+  // 提出: 段 1 の URL が O1 と同じなら P-ID を焼かずに止まる。
+  const ctx = makeS1Ctx({ roster: [["P006", "既存", "old@example.com"]], s1Url: "https://drive.example/o1" });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onS1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_PID]: "",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  const rows = logRows(ctx, MGMT_REJECT_TAB);
+  push(
+    "§20 URL が O1 と同じなら採番も送信もせず、s1-register / config-error で却下ログへ",
+    roster.__rows.length === 1 &&
+      ctx.__mails.length === 0 &&
+      rows.length === 1 &&
+      rows[0][1] === "s1-register" &&
+      rows[0][4] === "config-error",
+    { rows, mails: ctx.__mails.length }
+  );
+}
+
+{
+  // O1 の提出は今までどおり種別 register と O1 の受付メール（陰性対照）。
+  const ctx = makeS1Ctx({ roster: [["P006", "既存", "old@example.com"]] });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_PID]: "",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  const rows = logRows(ctx);
+  const mail = ctx.__mails[0] || { subject: "", body: "" };
+  push(
+    "§20 O1 の提出は種別 register・O1 の件名・段 1 の URL を入れない",
+    rows.length === 1 &&
+      rows[0][1] === "register" &&
+      mail.subject === ctx.o1RegisterAckSubject_() &&
+      mail.body.indexOf(S1_URL) < 0,
+    { rows, subject: mail.subject }
+  );
+}
+
 let ng = 0;
 cases.forEach((c) => {
   if (!c.ok) ng++;
@@ -3319,9 +3615,10 @@ cases.forEach((c) => {
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
 // 2026-10-08: §19 を足して 277 件、§6 に 5 件を足して 282 件なので下限 277。
-if (cases.length < 277) {
+// 2026-11-14: §20（段 1 の同意フォーム）を足した。下限は実数に合わせて直す。
+if (cases.length < 330) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（277 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（330 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }
