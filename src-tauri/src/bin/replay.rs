@@ -1573,6 +1573,21 @@ struct Args {
     /// --corr-floor: correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (Step 2)。
     /// `--sweep` と同様に複数セッションを受ける。
     corr_floor: bool,
+    /// --handmark-windows: 手跡の机上の道具（PR 4・ADR-051 D3）。記録から 30 秒の窓ごとの表（A・B_state・T1・T2）を
+    /// 出す。複数の記録を受ける。`--utc-offset-secs`・`--handmark-table`・`--handmark-table-sha` が必須。
+    handmark_windows: bool,
+    /// --handmark-table <path>: 割付の表（`gse-handmark-table` の出力）。
+    hm_table_path: Option<PathBuf>,
+    /// --handmark-table-sha <path>: 表の `.sha256`。合わなければ止める。
+    hm_table_sha_path: Option<PathBuf>,
+    /// --labels recomputed: T1・T2 を記録の `feat` でなく、`key` から計算し直した推定で作る（合成の入力用）。
+    hm_labels_recomputed: bool,
+    /// --frames <path>: 画素を描くためのコマ（バイナリ・`desk::Sample`）を書く先。
+    hm_frames_path: Option<PathBuf>,
+    /// --inject-stuck <λ>: 机上の陽性対照（判断 4）。描き直しの状態に `p_stuck` を混ぜる。0 は混ぜない。
+    hm_inject: f64,
+    /// --samples <n>: 窓あたりの標本の数（30000 を割り切る・既定 30）。
+    hm_samples: usize,
     /// --features: ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力する (issue 001-007)。
     /// ⚠️ 手元の解析用中間成果物であり `gse-dataset` へ共有しない (`docs/glossary.md` 逐語)。
     features: bool,
@@ -1587,6 +1602,30 @@ struct Args {
     pole: Option<String>,
     /// `--calibration` / `--sweep` / `--nudge-diag` / `--corr-floor` の 2 個目以降の positional。
     extra_sessions: Vec<PathBuf>,
+}
+
+/// フラグを取り除き、あったかを返す。
+fn take_flag(args: &mut Vec<String>, name: &str) -> bool {
+    match args.iter().position(|a| a == name) {
+        Some(pos) => {
+            args.remove(pos);
+            true
+        }
+        None => false,
+    }
+}
+
+/// `name <value>` を取り除き、値を返す。値が無ければ誤り。
+fn take_value(args: &mut Vec<String>, name: &str) -> Result<Option<String>, String> {
+    let Some(pos) = args.iter().position(|a| a == name) else {
+        return Ok(None);
+    };
+    if pos + 1 >= args.len() {
+        return Err(format!("{name} requires an argument"));
+    }
+    let v = args.remove(pos + 1);
+    args.remove(pos);
+    Ok(Some(v))
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -1706,9 +1745,66 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     } else {
         None
     };
-    if utc_offset_secs.is_some() && invitation_path.is_none() && !probes && !day_questions {
+    let handmark_windows = take_flag(&mut args, "--handmark-windows");
+    let hm_table_path = take_value(&mut args, "--handmark-table")?.map(PathBuf::from);
+    let hm_table_sha_path = take_value(&mut args, "--handmark-table-sha")?.map(PathBuf::from);
+    let hm_labels_recomputed = match take_value(&mut args, "--labels")?.as_deref() {
+        None | Some("recorded") => false,
+        Some("recomputed") => true,
+        Some(other) => {
+            return Err(format!(
+                "--labels must be recorded or recomputed, got {other}"
+            ))
+        }
+    };
+    let hm_frames_path = take_value(&mut args, "--frames")?.map(PathBuf::from);
+    let hm_inject = match take_value(&mut args, "--inject-stuck")? {
+        None => 0.0,
+        Some(v) => match v.parse::<f64>() {
+            Ok(x) if (0.0..=1.0).contains(&x) => x,
+            _ => {
+                return Err(format!(
+                    "--inject-stuck must be a number in [0, 1], got {v}"
+                ))
+            }
+        },
+    };
+    let hm_samples = match take_value(&mut args, "--samples")? {
+        None => gse_next_lib::analysis::handmark::desk::DEFAULT_SAMPLES,
+        Some(v) => v
+            .parse::<usize>()
+            .map_err(|_| format!("--samples must be a positive integer, got {v}"))?,
+    };
+    let hm_sub_flag = hm_table_path.is_some()
+        || hm_table_sha_path.is_some()
+        || hm_labels_recomputed
+        || hm_frames_path.is_some()
+        || hm_inject != 0.0
+        || hm_samples != gse_next_lib::analysis::handmark::desk::DEFAULT_SAMPLES;
+    if hm_sub_flag && !handmark_windows {
         return Err(
-            "--utc-offset-secs requires --invitation, --probes or --day-questions".to_string(),
+            "--handmark-table, --handmark-table-sha, --labels, --frames, --inject-stuck and --samples require --handmark-windows"
+                .to_string(),
+        );
+    }
+    if handmark_windows
+        && (utc_offset_secs.is_none() || hm_table_path.is_none() || hm_table_sha_path.is_none())
+    {
+        // ★ 既定の時差・表なしで黙って回さない（日の境と種が変わる）
+        return Err(
+            "--handmark-windows requires --utc-offset-secs, --handmark-table and --handmark-table-sha"
+                .to_string(),
+        );
+    }
+    if utc_offset_secs.is_some()
+        && invitation_path.is_none()
+        && !probes
+        && !day_questions
+        && !handmark_windows
+    {
+        return Err(
+            "--utc-offset-secs requires --invitation, --probes, --day-questions or --handmark-windows"
+                .to_string(),
         );
     }
     if day_questions && utc_offset_secs.is_none() {
@@ -1830,13 +1926,14 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         nudge_diag,
         corr_floor,
         features,
+        handmark_windows,
     ]
     .iter()
     .filter(|&&v| v)
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention, --invitation, --probes, --day-questions, --calibration, --sweep, --nudge-diag, --corr-floor, --features are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --invitation, --probes, --day-questions, --calibration, --sweep, --nudge-diag, --corr-floor, --features, --handmark-windows are mutually exclusive"
                 .to_string(),
         );
     }
@@ -1852,6 +1949,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         && !corr_floor
         && !probes
         && !day_questions
+        && !handmark_windows
         && args.len() != 1
     {
         return Err(format!(
@@ -1880,6 +1978,13 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         sweep,
         nudge_diag,
         corr_floor,
+        handmark_windows,
+        hm_table_path,
+        hm_table_sha_path,
+        hm_labels_recomputed,
+        hm_frames_path,
+        hm_inject,
+        hm_samples,
         features,
         feature_config_path,
         feature_sets,
@@ -2038,6 +2143,242 @@ fn read_session_text(path: &Path) -> Result<String, String> {
 }
 
 /// `--probes` / `--day-questions`: 記録を読み、段 1 の再生を JSON で返す。
+/// 割付の表の上限（表は日数ぶんの行だけで小さい）。
+const HM_TABLE_MAX_BYTES: u64 = 1 << 20;
+/// 記録の `feat` の T1 と、計算し直した T1 の一致の下限（設計 v2 §1.4・下回れば止める）。
+const HM_LABEL_AGREEMENT_MIN: f64 = 0.95;
+
+fn read_small(path: &Path, what: &str) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let file = File::open(path).map_err(|_| format!("{what} could not be read"))?;
+    let mut buf = Vec::new();
+    file.take(HM_TABLE_MAX_BYTES + 1)
+        .read_to_end(&mut buf)
+        .map_err(|_| format!("{what} could not be read"))?;
+    if buf.len() as u64 > HM_TABLE_MAX_BYTES {
+        return Err(format!("{what} is over 1 MiB"));
+    }
+    Ok(buf)
+}
+
+/// 机上の陽性対照（判断 4・設計 v2 §2）。製品の写像には入れない（`analysis/` に置かない）。
+/// `λ = 0` か `p_stuck` がまだ無いときは、入力をビットのまま返す。
+fn inject_stuck(
+    s: gse_next_lib::analysis::handmark::state::StageState,
+    p: Option<f64>,
+    lam: f64,
+) -> gse_next_lib::analysis::handmark::state::StageState {
+    match p {
+        Some(p) if lam != 0.0 => gse_next_lib::analysis::handmark::state::StageState {
+            speed: (1.0 - lam) * s.speed + lam * 0.6 * p,
+            irreg: (1.0 - lam) * s.irreg + lam * p,
+            ..s
+        },
+        _ => s,
+    }
+}
+
+/// コマ 1 枚をバイナリで書く（little endian）。
+/// `id u32・t u64・speed irreg phase drift f64・layout_seed u32・場の有無 u8・[480 × f32]・波紋の数 u8・(x f32, y f32, 経過 u16)…`
+fn write_frame(out: &mut Vec<u8>, id: u32, s: &gse_next_lib::analysis::handmark::desk::Sample) {
+    out.extend_from_slice(&id.to_le_bytes());
+    out.extend_from_slice(&s.t.to_le_bytes());
+    for v in [s.state.speed, s.state.irreg, s.state.phase, s.state.drift] {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.extend_from_slice(&s.state.layout_seed.to_le_bytes());
+    match &s.field {
+        Some(cells) => {
+            out.push(1);
+            for c in cells {
+                for v in c {
+                    out.extend_from_slice(&v.to_le_bytes());
+                }
+            }
+        }
+        None => out.push(0),
+    }
+    let n = s.ripples.len().min(255);
+    out.push(n as u8);
+    for r in &s.ripples[..n] {
+        out.extend_from_slice(&r.0.to_le_bytes());
+        out.extend_from_slice(&r.1.to_le_bytes());
+        out.extend_from_slice(&r.2.to_le_bytes());
+    }
+}
+
+/// `--handmark-windows`: 窓の表を NDJSON の文字列で返す（1 行目がヘッダ・最後の行が要約）。
+/// 誤りのときは stdout に 1 バイトも出さない（全部を作ってから返す）。
+fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String> {
+    use gse_next_lib::analysis::handmark::{assignment, desk};
+    let offset = args
+        .utc_offset_secs
+        .ok_or_else(|| "--utc-offset-secs is required".to_string())?;
+    let table_path = args
+        .hm_table_path
+        .as_ref()
+        .ok_or("--handmark-table is required")?;
+    let sha_path = args
+        .hm_table_sha_path
+        .as_ref()
+        .ok_or("--handmark-table-sha is required")?;
+    let table_bytes = read_small(table_path, "handmark table")?;
+    let sha_bytes = read_small(sha_path, "handmark table sha")?;
+    let sha_text = String::from_utf8(sha_bytes).map_err(|_| "handmark table sha is not UTF-8")?;
+    let table_sha = match assignment::load_from_bytes(Some(&table_bytes), Some(&sha_text)) {
+        assignment::TableLoad::Ok { sha256, .. } => sha256,
+        other => return Err(format!("handmark table rejected: {other:?}")),
+    };
+    let mut files = Vec::new();
+    let mut recomputed: Vec<Vec<desk::Feat>> = Vec::new();
+    for p in paths {
+        let name = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| p.display().to_string());
+        let f = desk::parse_file(&name, &read_session_text(p)?)?;
+        let snaps = run_replay(p)?;
+        recomputed.push(
+            snaps
+                .iter()
+                .map(|s| desk::Feat {
+                    t: s.timestamp,
+                    p: [s.p_flow, s.p_inc, s.p_stuck],
+                })
+                .collect(),
+        );
+        files.push(f);
+    }
+    let mut order: Vec<usize> = (0..files.len()).collect();
+    order.sort_by_key(|&i| files[i].session_start);
+    let mut files: Vec<desk::DeskFile> = order.iter().map(|&i| files[i].clone()).collect();
+    let mut recomputed: Vec<Vec<desk::Feat>> =
+        order.iter().map(|&i| recomputed[i].clone()).collect();
+    for w in files.windows(2) {
+        if w[1].session_start < w[0].end {
+            return Err(format!("{} and {} overlap", w[0].name, w[1].name));
+        }
+    }
+    // 対象の元を差し替える（recomputed）か、照合の相手にする（recorded）
+    if args.hm_labels_recomputed {
+        for (f, r) in files.iter_mut().zip(recomputed.iter_mut()) {
+            f.feats = std::mem::take(r);
+        }
+    }
+    let cfg = desk::DeskConfig {
+        utc_offset_secs: offset,
+        table_sha256_hex: table_sha.clone(),
+        samples: args.hm_samples,
+    };
+    let lam = args.hm_inject;
+    let transform = move |s, p| inject_stuck(s, p, lam);
+    // コマは大きい（窓 1 本で約 110 KB）ので、溜めずにファイルへ順に書く。誤りなら消す。
+    let want_frames = args.hm_frames_path.is_some();
+    let mut frame_writer = match &args.hm_frames_path {
+        Some(fp) => {
+            Some(std::io::BufWriter::new(File::create(fp).map_err(|_| {
+                "frames file could not be created".to_string()
+            })?))
+        }
+        None => None,
+    };
+    let mut frame_buf: Vec<u8> = Vec::new();
+    let mut frame_err = false;
+    let built = desk::build(&files, &cfg, &transform, &mut |id, s| {
+        if let Some(w) = frame_writer.as_mut() {
+            frame_buf.clear();
+            write_frame(&mut frame_buf, id, s);
+            if w.write_all(&frame_buf).is_err() {
+                frame_err = true;
+            }
+        }
+    });
+    let flushed = frame_writer.map_or(Ok(()), |mut w| w.flush());
+    let cleanup = || {
+        if let Some(fp) = &args.hm_frames_path {
+            let _ = std::fs::remove_file(fp);
+        }
+    };
+    let out = match built {
+        Ok(o) if !frame_err && flushed.is_ok() => o,
+        Ok(_) => {
+            cleanup();
+            return Err("frames file could not be written".to_string());
+        }
+        Err(e) => {
+            cleanup();
+            return Err(e);
+        }
+    };
+    // 記録の feat を使ったときは、計算し直した T1 と照らす（下回れば止める）
+    let label_check = if args.hm_labels_recomputed {
+        serde_json::Value::Null
+    } else {
+        let mut agree = 0usize;
+        for w in &out.windows {
+            let r = &recomputed[w.file];
+            let a = r.partition_point(|x| x.t < w.t_start);
+            let b = r.partition_point(|x| x.t < w.t_start + desk::WINDOW_MS);
+            if desk::targets(&r[a..b]).is_some_and(|t| t.t1 == w.t1) {
+                agree += 1;
+            }
+        }
+        let rate = if out.windows.is_empty() {
+            1.0
+        } else {
+            agree as f64 / out.windows.len() as f64
+        };
+        if rate < HM_LABEL_AGREEMENT_MIN {
+            cleanup();
+            return Err(format!(
+                "recorded and recomputed T1 agree on {agree} of {} windows (below {HM_LABEL_AGREEMENT_MIN})",
+                out.windows.len()
+            ));
+        }
+        serde_json::json!({ "t1_agree": agree, "windows": out.windows.len(), "rate": rate })
+    };
+    let mut text = String::new();
+    let header = serde_json::json!({
+        "kind": "header",
+        "mode": "handmark_windows",
+        "desk_version": desk::DESK_VERSION,
+        "engine_hmm_version": HMM_VERSION,
+        "labels": if args.hm_labels_recomputed { "recomputed" } else { "recorded" },
+        "inject_stuck": lam,
+        "samples": cfg.samples,
+        "utc_offset_secs": offset,
+        "table_sha256": table_sha,
+        "inputs": files.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+        "a_names": desk::A_NAMES,
+        "b_state_names": desk::B_STATE_NAMES,
+        "window_ms": desk::WINDOW_MS,
+        "warmup_ms": desk::WARMUP_MS,
+        "min_feats": desk::MIN_FEATS,
+        "t1_p_stuck": desk::T1_P_STUCK,
+        "pair_gap_ms": desk::PAIR_GAP_MS,
+        "frames": want_frames,
+    });
+    text.push_str(&header.to_string());
+    text.push('\n');
+    for w in &out.windows {
+        text.push_str(&serde_json::to_string(w).map_err(|e| e.to_string())?);
+        text.push('\n');
+    }
+    let summary = serde_json::json!({
+        "kind": "summary",
+        "windows": out.windows.len(),
+        "excluded": out.excluded,
+        "seed_mismatch_days": out.seed_mismatch_days,
+        "segments": out.segments,
+        "segments_recorded_t0": out.segments_recorded_t0,
+        "skipped_lines": files.iter().map(|f| f.skipped_lines).sum::<usize>(),
+        "label_check": label_check,
+    });
+    text.push_str(&summary.to_string());
+    text.push('\n');
+    Ok(text)
+}
+
 fn run_s1_replay(args: &Args, paths: &[PathBuf]) -> Result<serde_json::Value, String> {
     use gse_next_lib::s1_replay;
     let mut files = Vec::new();
@@ -2096,6 +2437,7 @@ fn usage() -> String {
          gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs <N>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --probes [--utc-offset-secs <N>] [--day-state <s1_day_state.json>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --day-questions --utc-offset-secs <N>\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
@@ -2110,6 +2452,7 @@ fn usage() -> String {
          --probes            段 1 の問いの行を記録から調停器を回し直して照合 (一致・欠け・余り・境目・未照合を JSON で)\n    \
          \x20                   時差が無ければ日の問いと no_ask は未照合。区間の削除をまたぐ記録は一致しない\n    \
          --day-questions     段 1 の日の問いに答えた後、次の現地 4:00 までの押下の数 (--utc-offset-secs 必須)\n    \
+         --handmark-windows  手跡の机上の道具: 30 秒の窓ごとの表 (A・B_state・T1・T2) を NDJSON で (ADR-051 D3)\n    \
          --calibration       v0.3 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット)。1 被験者の複数セッションを時刻順に渡す\n    \
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
          --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
@@ -2373,6 +2716,21 @@ fn main() -> ExitCode {
 
     // --probes / --day-questions 経路: 段 1 の問いを記録から再生する（M5 の 3 本目）。HMM・特徴量は通らない。
     //   ⚠️ 記録・状態ファイルが不正なら exit 1 で、stdout には 1 バイトも出さない。
+    if args.handmark_windows {
+        let mut paths = vec![args.session_path.clone()];
+        paths.extend(args.extra_sessions.iter().cloned());
+        return match run_handmark_windows(&args, &paths) {
+            Ok(text) => {
+                let _ = std::io::stdout().lock().write_all(text.as_bytes());
+                ExitCode::SUCCESS
+            }
+            Err(msg) => {
+                tracing::error!("invalid --handmark-windows input: {}", msg);
+                ExitCode::from(1)
+            }
+        };
+    }
+
     if args.probes || args.day_questions {
         let mut paths = vec![args.session_path.clone()];
         paths.extend(args.extra_sessions.iter().cloned());
@@ -4772,6 +5130,235 @@ mod tests {
     }
 
     /// `--invitation` は他のモードと相互排他で、パスを要る。`--utc-offset-secs` は `--invitation` 専用。
+    #[test]
+    fn handmark_windows_mode_args() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let base = [
+            "a.ndjson",
+            "b.ndjson",
+            "--handmark-windows",
+            "--utc-offset-secs",
+            "32400",
+            "--handmark-table",
+            "t.json",
+            "--handmark-table-sha",
+            "t.sha256",
+        ];
+        let p = parse_args_from(v(&base)).expect("minimal");
+        assert!(p.handmark_windows);
+        assert_eq!(p.extra_sessions.len(), 1);
+        assert!(!p.hm_labels_recomputed);
+        assert_eq!(p.hm_inject, 0.0);
+        assert_eq!(p.hm_samples, 30);
+        let mut full = base.to_vec();
+        full.extend([
+            "--labels",
+            "recomputed",
+            "--frames",
+            "f.bin",
+            "--inject-stuck",
+            "0.2",
+            "--samples",
+            "6",
+        ]);
+        let p = parse_args_from(v(&full)).expect("full");
+        assert!(p.hm_labels_recomputed);
+        assert_eq!(p.hm_frames_path, Some(PathBuf::from("f.bin")));
+        assert_eq!((p.hm_inject, p.hm_samples), (0.2, 6));
+        // 必須のどれかが欠けると止める
+        for drop in [
+            "--utc-offset-secs",
+            "--handmark-table",
+            "--handmark-table-sha",
+        ] {
+            let i = base.iter().position(|a| *a == drop).unwrap();
+            let mut xs = base.to_vec();
+            xs.drain(i..i + 2);
+            assert!(parse_args_from(v(&xs)).is_err(), "{drop}");
+        }
+        // 下位の引数はモード無しでは受けない
+        for sub in [
+            &["a.ndjson", "--labels", "recomputed"][..],
+            &["a.ndjson", "--frames", "f"][..],
+            &["a.ndjson", "--inject-stuck", "0.1"][..],
+            &["a.ndjson", "--samples", "6"][..],
+            &["a.ndjson", "--handmark-table", "t"][..],
+        ] {
+            assert!(parse_args_from(v(sub)).is_err(), "{sub:?}");
+        }
+        // 値の範囲と他のモードとの排他
+        for (k, val) in [
+            ("--inject-stuck", "1.5"),
+            ("--inject-stuck", "x"),
+            ("--labels", "both"),
+            ("--samples", "-1"),
+        ] {
+            let mut xs = base.to_vec();
+            xs.extend([k, val]);
+            assert!(parse_args_from(v(&xs)).is_err(), "{k} {val}");
+        }
+        let mut xs = base.to_vec();
+        xs.push("--probes");
+        assert!(parse_args_from(v(&xs)).is_err());
+    }
+
+    #[test]
+    fn inject_stuck_with_zero_or_no_p_stuck_keeps_the_bits() {
+        use gse_next_lib::analysis::handmark::state::StageState;
+        let s = StageState {
+            speed: 0.123_456_789,
+            irreg: 0.3,
+            phase: 1.5,
+            drift: 7.0,
+            layout_seed: 9,
+        };
+        assert_eq!(inject_stuck(s, Some(0.9), 0.0).bits(), s.bits());
+        assert_eq!(inject_stuck(s, None, 0.4).bits(), s.bits());
+        let j = inject_stuck(s, Some(1.0), 0.5);
+        assert!((j.speed - (0.5 * s.speed + 0.3)).abs() < 1e-15);
+        assert!((j.irreg - (0.5 * 0.3 + 0.5)).abs() < 1e-15);
+        assert_eq!(
+            (j.phase.to_bits(), j.drift.to_bits(), j.layout_seed),
+            (s.phase.to_bits(), s.drift.to_bits(), 9)
+        );
+    }
+
+    #[test]
+    fn a_frame_has_the_documented_layout() {
+        use gse_next_lib::analysis::handmark::desk::Sample;
+        use gse_next_lib::analysis::handmark::state::StageState;
+        let st = StageState {
+            speed: 1.0,
+            irreg: 2.0,
+            phase: 3.0,
+            drift: 4.0,
+            layout_seed: 5,
+        };
+        let mut buf = Vec::new();
+        write_frame(
+            &mut buf,
+            7,
+            &Sample {
+                t: 11,
+                state: st,
+                field: None,
+                ripples: vec![],
+            },
+        );
+        assert_eq!(buf.len(), 4 + 8 + 32 + 4 + 1 + 1);
+        assert_eq!(&buf[..4], &7u32.to_le_bytes());
+        buf.clear();
+        write_frame(
+            &mut buf,
+            7,
+            &Sample {
+                t: 11,
+                state: st,
+                field: Some([[0.5; 3]; 160]),
+                ripples: vec![(0.1, 0.2, 300)],
+            },
+        );
+        assert_eq!(buf.len(), 4 + 8 + 32 + 4 + 1 + 480 * 4 + 1 + 10);
+    }
+
+    #[test]
+    fn handmark_windows_runs_end_to_end_and_fails_closed() {
+        use gse_next_lib::analysis::handmark::assignment;
+        let dir = std::env::temp_dir().join(format!("gse-replay-hmw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let table = assignment::generate(3, 20_400, 7, 7, 10).unwrap();
+        let bytes = table.canonical_bytes();
+        let sha = assignment::sha256_hex(&bytes);
+        std::fs::write(dir.join("t.json"), &bytes).unwrap();
+        std::fs::write(dir.join("t.sha256"), format!("{sha}  t.json\n")).unwrap();
+        std::fs::write(
+            dir.join("bad.sha256"),
+            format!("{}  t.json\n", "0".repeat(64)),
+        )
+        .unwrap();
+        // 10:00（JST）から 5 分・150 ms おきに打鍵
+        let start = ((20_407i64 * 86_400 + 4 * 3_600 - 32_400 + 6 * 3_600) * 1000) as u64;
+        let mut lines = vec![format!(
+            "{{\"type\":\"meta\",\"session_start\":{start},\"hmm_version\":\"0.5.0\"}}"
+        )];
+        let mut t = start + 200;
+        while t < start + 300_000 {
+            lines.push(format!(
+                "{{\"type\":\"key\",\"t\":{t},\"category\":\"alphabetic\",\"press\":true}}"
+            ));
+            lines.push(format!(
+                "{{\"type\":\"key\",\"t\":{},\"category\":\"alphabetic\",\"press\":false}}",
+                t + 50
+            ));
+            t += 150;
+        }
+        lines.push(format!(
+            "{{\"type\":\"meta\",\"session_end\":{}}}",
+            start + 300_000
+        ));
+        let rec = dir.join("s.ndjson");
+        std::fs::write(&rec, lines.join("\n") + "\n").unwrap();
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let t_json = dir.join("t.json");
+        let t_sha = dir.join("t.sha256");
+        let frames = dir.join("f.bin");
+        let mk = |sha: &Path, extra: &[&str]| {
+            let mut xs = vec![
+                rec.to_str().unwrap(),
+                "--handmark-windows",
+                "--utc-offset-secs",
+                "32400",
+                "--handmark-table",
+                t_json.to_str().unwrap(),
+                "--handmark-table-sha",
+                sha.to_str().unwrap(),
+            ];
+            xs.extend_from_slice(extra);
+            parse_args_from(v(&xs)).unwrap()
+        };
+        let args = mk(
+            &t_sha,
+            &[
+                "--labels",
+                "recomputed",
+                "--frames",
+                frames.to_str().unwrap(),
+            ],
+        );
+        let paths = vec![rec.clone()];
+        let a = run_handmark_windows(&args, &paths).unwrap();
+        let b = run_handmark_windows(&args, &paths).unwrap();
+        assert_eq!(a, b, "同じ入力から同じ表");
+        let rows: Vec<serde_json::Value> = a
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        assert_eq!(rows[0]["kind"], "header");
+        assert_eq!(rows[0]["table_sha256"], sha.as_str());
+        let last = rows.last().unwrap();
+        assert_eq!(last["kind"], "summary");
+        let n = last["windows"].as_u64().unwrap() as usize;
+        assert_eq!(rows.len(), n + 2);
+        assert!(n >= 5, "{n}");
+        assert!(std::fs::metadata(&frames).unwrap().len() > 0);
+        // 記録に feat が無いとき、記録の対象では窓が 0（feat が 25 本未満で除く）
+        let rec_args = mk(&t_sha, &[]);
+        let r = run_handmark_windows(&rec_args, &paths).unwrap();
+        let s: serde_json::Value = serde_json::from_str(r.lines().last().unwrap()).unwrap();
+        assert_eq!(s["windows"], 0);
+        assert!(s["excluded"]["few_feats"].as_u64().unwrap() > 0);
+        // SHA が合わない表は止め、コマのファイルを残さない
+        let _ = std::fs::remove_file(&frames);
+        let bad = mk(
+            &dir.join("bad.sha256"),
+            &["--frames", frames.to_str().unwrap()],
+        );
+        assert!(run_handmark_windows(&bad, &paths).is_err());
+        assert!(!frames.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn probes_and_day_questions_mode_args() {
         let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
