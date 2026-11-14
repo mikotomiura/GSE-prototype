@@ -675,8 +675,9 @@ fn only_lib_and_the_pointer_thread_read_the_pointer() {
 
 // ---- 窓の TS（PR 3・ADR-050 D3・D4） ----
 
-/// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。
-const WINDOW: [(&str, &str); 2] = [
+/// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。描画の純関数（`handmarkStageDraw.ts`・手跡の PR 4）も
+/// 窓の側として同じ検査を受ける（机上の道具も同じ関数を呼ぶ）。
+const WINDOW: [(&str, &str); 3] = [
     (
         "HandmarkStage.tsx",
         include_str!("../../src/components/HandmarkStage.tsx"),
@@ -684,6 +685,10 @@ const WINDOW: [(&str, &str); 2] = [
     (
         "handmarkStageTrace.ts",
         include_str!("../../src/components/handmarkStageTrace.ts"),
+    ),
+    (
+        "handmarkStageDraw.ts",
+        include_str!("../../src/components/handmarkStageDraw.ts"),
     ),
 ];
 

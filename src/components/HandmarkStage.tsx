@@ -119,14 +119,14 @@ export default function HandmarkStage() {
       fieldLive = false;
     };
 
-    // 波紋の枠を、描く関数へ渡す形(0〜1 の経過)にする。
-    const rippleViews = (now: number): RippleView[] => {
-      const out: RippleView[] = [];
+    // 波紋の枠(6 つ)を、描く関数へ渡す形(0〜1 の経過)にする。毎回作り直し、溜めない。
+    const rippleViews = (now: number) => {
+      const ripples: RippleView[] = [];
       for (const rp of rippleSlots.ripples) {
         const t = rippleAge(rp, now);
-        if (t !== null) out.push({ x: rp.x, y: rp.y, t });
+        if (t !== null) ripples.push({ x: rp.x, y: rp.y, t });
       }
-      return out;
+      return ripples;
     };
 
     // 届いた状態を受け取り、いま見せている値からその状態へ寄せ始める。null は窓が閉じたこと。
