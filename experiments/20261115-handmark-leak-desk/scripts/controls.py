@@ -60,6 +60,8 @@ def one_set(job):
         summ = os.path.join(a["out"], f"{tag}.json")
         cmd = [py, "-I", os.path.join(HERE, "stats.py"), w, "--pixels", p, "--seed", str(seed),
                "--R", str(a["R"]), "--out", summ]
+        if a["truth"]:
+            cmd += ["--truth"]
         if a["R_nested"]:
             cmd += ["--R-nested", str(a["R_nested"])]
         if a["mut"]:
@@ -68,9 +70,15 @@ def one_set(job):
         timing[f"stats_s_{lam}"] = round(time.time() - s, 1)
         with open(summ) as fh:
             res = json.load(fh)
+        if a["truth"]:
+            out.append({"set": k, "lam": lam, "truth": res["truth"], "n_days": res["n_days"]})
+            continue
         out.append({"set": k, "lam": lam, "overall": res.get("overall"),
                     "T1": {b: res["targets"].get("T1", {}).get(b, {}).get("verdict") for b in ("state", "pixel")},
-                    "T2": {b: res["targets"].get("T2", {}).get(b, {}).get("verdict") for b in ("state", "pixel")}})
+                    "T2": {b: res["targets"].get("T2", {}).get(b, {}).get("verdict") for b in ("state", "pixel")},
+                    "ci90": {t: {b: res["targets"].get(t, {}).get(b, {}).get("ci90") for b in ("state", "pixel")}
+                             for t in ("T1", "T2")},
+                    "auc": {t: res["targets"].get(t, {}).get("auc") for t in ("T1", "T2")}})
     shutil.rmtree(work, ignore_errors=True)
     for o in out:
         o["timing"] = timing
@@ -94,18 +102,20 @@ def main():
     ap.add_argument("--R-nested", type=int, default=0)
     ap.add_argument("--mut", default="")
     ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--truth", action="store_true", help="大きな合成で母集団の差の近似を出す（S5）")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     args = {"work": a.work, "out": a.out, "replay": a.replay, "table_dir": a.table_dir, "python": sys.executable,
             "lams": [float(x) for x in a.lams.split(",")], "seed": a.seed, "days": a.days, "hours": a.hours,
-            "samples": a.samples, "R": a.R, "R_nested": a.R_nested, "mut": a.mut}
+            "samples": a.samples, "R": a.R, "R_nested": a.R_nested, "mut": a.mut, "truth": a.truth}
     jobs = [{"args": args, "set": k} for k in range(a.first_set, a.first_set + a.sets)]
     rows = []
     with ProcessPoolExecutor(max_workers=a.jobs) as ex:
         for res in ex.map(one_set, jobs):
             rows.extend(res)
             for r in res:
-                print(json.dumps({k: r[k] for k in ("set", "lam", "overall", "T1", "T2")}, ensure_ascii=False), flush=True)
+                print(json.dumps({k: r[k] for k in ("set", "lam", "overall", "T1", "T2", "truth") if k in r},
+                                 ensure_ascii=False), flush=True)
     with open(os.path.join(a.out, "controls.json"), "w", encoding="utf-8") as fh:
         json.dump(rows, fh, ensure_ascii=False, indent=1)
         fh.write("\n")

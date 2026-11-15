@@ -51,9 +51,13 @@ def load_windows(path):
     return header, rows, summary
 
 
-def load_pixels(path, n):
+def load_pixels(path, n, header):
+    """画素の特徴を読む。1 行目のヘッダの標本の数と窓の数が、窓の表と合わなければ止める。"""
     pix = [None] * n
     with open(path, encoding="utf-8") as f:
+        head = json.loads(f.readline())
+        if head.get("kind") != "header" or head.get("samples") != header["samples"] or head.get("windows") != n:
+            raise SystemExit(f"{path}: 画素の特徴が窓の表と合わない（{head}）")
         for line in f:
             r = json.loads(line)
             pix[r["id"]] = r["v"]
@@ -345,7 +349,11 @@ def class_check(y_cols, groups):
 def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_filter=None):
     """全体を回して集計を返す。day_filter は感度分析で使う日の集合（None なら全部）。"""
     t_start = time.time()
-    rng = np.random.default_rng(seed)
+
+    def stream(*key):
+        """(対象・B・方式) ごとに別の乱数の流れ（判定に入れない処理の有無で、主の標本が変わらないように）。"""
+        return np.random.default_rng([seed, *key])
+
     if day_filter is not None:
         keep = [i for i, r in enumerate(rows) if r["day"] in day_filter]
         rows = [rows[i] for i in keep]
@@ -354,6 +362,8 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
     A = np.array([r["a"] for r in rows], dtype=float)
     Bs = np.array([r["b_state"] for r in rows], dtype=float)
     t1 = np.array([r["t1"] for r in rows], dtype=float)
+    t1_all = np.array([r["t1_all"] for r in rows], dtype=float)
+    since = np.array([r["t_since_t0"] for r in rows], dtype=float) / 1000.0
     t2 = np.array([r["t2"] for r in rows])
     if "m1" in MUT:
         A, Bs = np.hstack([A, Bs]), A   # 変異: A と B を入れ替える（A に見た目を入れる）
@@ -374,9 +384,10 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
         designs["pixel"] = Design(A, pix=pix[:, :320], pix_scalars=pix[:, 320:])
     if diagnostics:
         perm = Bs.copy()
+        prng = stream(99)
         for d in np.unique(groups):
             ii = np.where(groups == d)[0]
-            perm[ii] = Bs[rng.permutation(ii)]
+            perm[ii] = Bs[prng.permutation(ii)]
         designs["state_perm"] = Design(np.hstack([A, perm]))
         names = header["a_names"]
         base = A[:, [names.index(n) for n in A2_BASE]]
@@ -385,9 +396,13 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
             for j in range(i + 1, len(A2_BASE)):
                 extra.append((base[:, i] * base[:, j])[:, None])
         designs["A2"] = Design(np.hstack([A] + extra))
+        # 経過時間（区間の始まりからの秒）を A に足したもの。画素には drift（経過時間）が写るので、
+        # B_pixel の上積みが経過時間で説明できるかを見る（判定には入れない・レビューの指摘 7）
+        designs["A_time"] = Design(np.hstack([A, since[:, None], np.log1p(since)[:, None]]))
     targets = {"T1": [t1], "T2": [(t2 == k).astype(float) for k in range(3)]}
     per_target = {}
-    for tname, ys in targets.items():
+    out["t1_all_windows"] = int(t1_all.sum())   # C1 の副（判定には使わない）
+    for ti, (tname, ys) in enumerate(targets.items()):
         ok, counts = class_check(ys, groups)
         res = {"class_counts": counts}
         if not ok:
@@ -410,31 +425,18 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
         res["auc"] = {dn: target_auc(p, ys, None) for dn, p in preds.items()}
         res["lambda"] = lams
         per_b = {}
-        for bn in [b for b in ("state", "pixel") if b in preds]:
-            diffs, aa, dropped = fixed_bootstrap(preds["A"], preds[bn], ys, groups, R, rng)
-            info = {"dropped": dropped, "kept": len(diffs)}
-            if dropped > MAX_DROPPED_SHARE * R or len(diffs) == 0:
-                info["verdict"], info["ceiling"] = V.UNDETERMINED, False
-                info["reason"] = "引き直しで欠けた標本が 5% を超えた"
-            else:
-                lo, hi = interval(diffs)
-                a_lo = float(np.quantile(aa, 0.05))
-                if "m3" in MUT:
-                    v = V.MEETS if a_lo > 1 - V.DELTA else V.three_valued(lo, hi)   # 変異: 天井を差と別の経路に
-                    c = a_lo > 1 - V.DELTA
-                else:
-                    v, c = V.with_ceiling(lo, hi, a_lo)
-                info.update({"diff": res["auc"][bn] - res["auc"]["A"], "ci90": [lo, hi], "auc_a_lo": a_lo,
-                             "verdict": v, "ceiling": c})
+        for bi, bn in enumerate(b for b in ("state", "pixel") if b in preds):
+            diffs, aa, dropped = fixed_bootstrap(preds["A"], preds[bn], ys, groups, R, stream(ti, bi, 0))
+            info = judge(diffs, aa, dropped, R)
+            info["diff"] = res["auc"][bn] - res["auc"]["A"]
             if R_nested:
                 nd, na, ndrop = nested_bootstrap(designs["A"], designs[bn], ys, groups,
-                                                 {"A": lams["A"], "B": lams[bn]}, R_nested, rng)
-                if len(nd):
-                    info["nested"] = {"ci90": list(interval(nd)), "dropped": ndrop, "kept": len(nd)}
+                                                 {"A": lams["A"], "B": lams[bn]}, R_nested, stream(ti, bi, 1))
+                info["nested"] = judge(nd, na, ndrop, R_nested)
             per_b[bn] = (info["verdict"], info["ceiling"])
             res[bn] = info
         if diagnostics:
-            for dn in ("state_perm", "A2"):
+            for dn in ("state_perm", "A2", "A_time"):
                 res.setdefault("diagnostics", {})[dn] = res["auc"][dn] - res["auc"]["A"]
         res["verdict"], res["ceiling"] = V.target_verdict(per_b)
         per_target[tname] = res
@@ -443,6 +445,55 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
     out["overall"] = v
     out["seconds"] = round(time.time() - t_start, 1)
     return out
+
+
+def holdout_truth(rows, pix):
+    """母集団の差の近似（S5・conditions C4）: 日を偶奇で二つに分け、片方で学習（λ は内側で選ぶ）して
+    もう片方の AUC(B) − AUC(A) を出し、向きを入れ替えた 2 回の平均。大きな合成でだけ使う。"""
+    groups = np.array([r["day"] for r in rows])
+    A = np.array([r["a"] for r in rows], dtype=float)
+    Bs = np.array([r["b_state"] for r in rows], dtype=float)
+    t1 = np.array([r["t1"] for r in rows], dtype=float)
+    t2 = np.array([r["t2"] for r in rows])
+    designs = {"A": Design(A), "state": Design(np.hstack([A, Bs]))}
+    if pix is not None:
+        designs["pixel"] = Design(A, pix=pix[:, :320], pix_scalars=pix[:, 320:])
+    days = np.unique(groups)
+    halves = [np.isin(groups, days[0::2]), np.isin(groups, days[1::2])]
+    out = {}
+    for tname, ys in {"T1": [t1], "T2": [(t2 == k).astype(float) for k in range(3)]}.items():
+        diffs = {b: [] for b in designs if b != "A"}
+        for h in (0, 1):
+            tr, te = np.where(halves[h])[0], np.where(halves[1 - h])[0]
+            aucs = {}
+            for dn, des in designs.items():
+                vals = []
+                for yy in ys:
+                    lam = choose_lambda(des, yy, groups, tr)
+                    p, _ = fit_predict(des, yy, tr, te, lam)
+                    vals.append(auc(p, yy[te]))
+                aucs[dn] = float(np.mean(vals))
+            for b in diffs:
+                diffs[b].append(aucs[b] - aucs["A"])
+        out[tname] = {b: float(np.mean(v)) for b, v in diffs.items()}
+    return {"n_windows": len(rows), "n_days": int(len(days)), "truth": out}
+
+
+def judge(diffs, aucs_a, dropped, R):
+    """引き直しの標本から 3 値と天井（固定の予測と入れ子で同じ規則・conditions C5・C6）。"""
+    info = {"dropped": dropped, "kept": len(diffs)}
+    if dropped > MAX_DROPPED_SHARE * R or len(diffs) == 0:
+        info.update({"verdict": V.UNDETERMINED, "ceiling": False, "reason": "引き直しで欠けた標本が 5% を超えた"})
+        return info
+    lo, hi = interval(diffs)
+    a_lo = float(np.quantile(aucs_a, 0.05))
+    if "m3" in MUT:
+        v = V.MEETS if a_lo > 1 - V.DELTA else V.three_valued(lo, hi)   # 変異: 天井を差と別の経路に
+        c = a_lo > 1 - V.DELTA
+    else:
+        v, c = V.with_ceiling(lo, hi, a_lo)
+    info.update({"ci90": [lo, hi], "auc_a_lo": a_lo, "verdict": v, "ceiling": c})
+    return info
 
 
 def main(argv):
@@ -455,15 +506,24 @@ def main(argv):
     ap.add_argument("--R-nested", type=int, default=0)
     ap.add_argument("--no-diagnostics", action="store_true")
     ap.add_argument("--mut", default="")
+    ap.add_argument("--truth", action="store_true", help="母集団の差の近似だけを出す（S5）")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     MUT.update(x for x in a.mut.split(",") if x)
     header, rows, summary = load_windows(a.windows)
-    pix = load_pixels(a.pixels, len(rows)) if a.pixels else None
+    pix = load_pixels(a.pixels, len(rows), header) if a.pixels else None
+    if a.truth:
+        with open(a.out, "w", encoding="utf-8") as f:
+            json.dump(holdout_truth(rows, pix), f, ensure_ascii=False, indent=1, sort_keys=True)
+            f.write("\n")
+        return
     res = analyse(rows, header, pix, a.seed, R=a.R, R_nested=a.R_nested, diagnostics=not a.no_diagnostics)
     res["desk"] = {k: header[k] for k in ("desk_version", "labels", "inject_stuck", "samples", "table_sha256")}
-    res["desk_summary"] = {k: summary[k] for k in ("windows", "excluded", "seed_mismatch_days", "segments",
-                                                  "segments_recorded_t0", "label_check")}
+    # 日の番号は暦の日付に戻せるので、summary には数だけを書く（security-checker LOW）
+    res["desk_summary"] = {k: summary[k] for k in ("windows", "excluded", "segments", "segments_recorded_t0",
+                                                  "label_check")}
+    res["desk_summary"]["seed_mismatch_days"] = len(summary.get("seed_mismatch_days", []))
+    res["desk_summary"]["overflow_days"] = len(summary.get("overflow_days", []))
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(res, f, ensure_ascii=False, indent=1, sort_keys=True)
         f.write("\n")

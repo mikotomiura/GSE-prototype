@@ -56,6 +56,13 @@ pub const PAIR_GAP_MS: u64 = 250;
 pub const DEFAULT_SAMPLES: usize = 10;
 
 const DAY_MS: i64 = 86_400_000;
+/// 時刻として受ける範囲（2020-01-01 〜 2100-01-01・壊れた時刻で窓の列を際限なく作らない）。
+pub const MIN_EPOCH_MS: u64 = 1_577_836_800_000;
+pub const MAX_EPOCH_MS: u64 = 4_102_444_800_000;
+/// 1 本の記録の幅の上限（一時停止の間はローテートしないので数日になりうる・`s1_replay` と同じ 40 日）。
+pub const MAX_FILE_SPAN_MS: u64 = 40 * 86_400_000;
+/// 画面の波紋の枠の数（`handmarkStageTrace.ts` の `RIPPLE_SLOTS`）。7 つ目は最も古い枠を上書きする。
+pub const RIPPLE_SLOTS: usize = 6;
 
 /// A の特徴の名前（表の列の順）。
 pub const A_NAMES: [&str; 22] = [
@@ -114,6 +121,10 @@ pub struct HmDay {
     pub t: u64,
     pub draw_seed: Option<u64>,
     pub stage_starts: Vec<u64>,
+    /// 行に書かれた表の SHA-256（渡した表と違えば止める）。
+    pub table_sha256: Option<String>,
+    /// `stage_starts` が上限を超えて切れた日（区間を正しく切れないので使わない）。
+    pub overflow: bool,
 }
 
 /// 1 本の記録から読んだもの。
@@ -131,8 +142,6 @@ pub struct DeskFile {
     /// 一時停止の区間 `[from, to)`。
     pub pauses: Vec<(u64, u64)>,
     pub hm_days: BTreeMap<i64, HmDay>,
-    /// JSON として読めず飛ばした行の数。
-    pub skipped_lines: usize,
 }
 
 fn u64_of(v: &Value, key: &str) -> Result<u64> {
@@ -153,8 +162,8 @@ fn u8_of(v: &Value, key: &str) -> Result<u8> {
     u8::try_from(x).map_err(|_| format!("{key} が u8 の範囲の外"))
 }
 
-/// 1 本の記録を読む。JSON として読めない行は数えて飛ばし、使う行種の欄が壊れていれば
-/// 行番号つきの誤りで止める（fail-closed）。
+/// 1 本の記録を読む。JSON として読めない行・使う行種の欄が壊れた行・範囲の外の時刻は、行番号つきの誤りで
+/// 止める（fail-closed。同じファイルを読む `run_replay` も読めない行で止まるので、規則をそろえる）。
 pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
     let mut f = DeskFile {
         name: name.to_string(),
@@ -168,16 +177,30 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
         if line.trim().is_empty() {
             continue;
         }
-        let Ok(v) = serde_json::from_str::<Value>(line) else {
-            f.skipped_lines += 1;
-            continue;
-        };
         let at = |e: String| format!("{name}:{}: {e}", i + 1);
-        if let Some(t) = v.get("t").and_then(Value::as_u64) {
+        let v = serde_json::from_str::<Value>(line)
+            .map_err(|_| at("JSON として読めない".to_string()))?;
+        let ty = v.get("type").and_then(Value::as_str);
+        // 終わりの時刻は、この道具が使う行種の時刻だけで取る（知らない行種の壊れた時刻に引きずられない）
+        if matches!(
+            ty,
+            Some("key" | "pointer_bin" | "feat" | "recording_pause" | "handmark_day")
+        ) {
+            let t = u64_of(&v, "t").map_err(at)?;
+            if !(MIN_EPOCH_MS..=MAX_EPOCH_MS).contains(&t) {
+                return Err(at(format!("時刻 {t} が範囲の外")));
+            }
             max_t = max_t.max(t);
         }
-        match v.get("type").and_then(Value::as_str) {
+        match ty {
             Some("meta") => {
+                for k in ["session_start", "session_end"] {
+                    if let Some(t) = v.get(k).and_then(Value::as_u64) {
+                        if !(MIN_EPOCH_MS..=MAX_EPOCH_MS).contains(&t) {
+                            return Err(at(format!("{k} {t} が範囲の外")));
+                        }
+                    }
+                }
                 if let Some(t) = v.get("session_start").and_then(Value::as_u64) {
                     start = Some(start.map_or(t, |s: u64| s.min(t)));
                     max_t = max_t.max(t);
@@ -254,10 +277,22 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
                 }
                 starts.sort_unstable();
                 starts.dedup();
+                let table_sha256 = match v.get("table_sha256") {
+                    None | Some(Value::Null) => None,
+                    Some(Value::String(s)) => Some(s.to_ascii_lowercase()),
+                    Some(_) => return Err(at("table_sha256 が文字列でない".to_string())),
+                };
+                let overflow = match v.get("overflow") {
+                    None | Some(Value::Null) => false,
+                    Some(Value::Bool(b)) => *b,
+                    Some(_) => return Err(at("overflow が真偽でない".to_string())),
+                };
                 let row = HmDay {
                     t,
                     draw_seed: seed,
                     stage_starts: starts,
+                    table_sha256,
+                    overflow,
                 };
                 match f.hm_days.get(&day) {
                     Some(prev) if prev.t > t => {}
@@ -271,6 +306,12 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
     }
     f.session_start = start.ok_or_else(|| format!("{name}: meta.session_start が無い"))?;
     f.end = session_end.unwrap_or(max_t).max(f.session_start);
+    if f.end - f.session_start > MAX_FILE_SPAN_MS {
+        return Err(format!(
+            "{name}: 記録の幅が {} 日を超える",
+            MAX_FILE_SPAN_MS / 86_400_000
+        ));
+    }
     f.presses.sort_unstable();
     f.bins.sort_by_key(|b| b.timestamp);
     f.feats.sort_by_key(|x| x.t);
@@ -317,6 +358,7 @@ pub fn segments(
     table_sha256_hex: &str,
     utc_offset_secs: i32,
     mismatched: &mut Vec<i64>,
+    overflowed: &mut Vec<i64>,
 ) -> Vec<Segment> {
     let mut out = Vec::new();
     for (fi, f) in files.iter().enumerate() {
@@ -329,6 +371,10 @@ pub fn segments(
             if rec.and_then(|r| r.draw_seed).is_some_and(|s| s != seed) {
                 if !mismatched.contains(&day) {
                     mismatched.push(day);
+                }
+            } else if rec.is_some_and(|r| r.overflow) {
+                if !overflowed.contains(&day) {
+                    overflowed.push(day);
                 }
             } else {
                 let mut t0s: Vec<(u64, bool)> = vec![(a, false)];
@@ -360,6 +406,7 @@ pub fn segments(
         }
     }
     mismatched.sort_unstable();
+    overflowed.sort_unstable();
     out
 }
 
@@ -587,7 +634,9 @@ pub fn stream_samples(
     let mut synth = Synth::new(&f.bins, seg.seed, seg.t0, q_last);
     let g0 = seg.t0 / super::trace::STEP_MS * super::trace::STEP_MS;
     let mut k: u64 = 0;
-    let mut ripples: Vec<(f32, f32, u64)> = Vec::new();
+    // 画面と同じ 6 枠の輪（`addRipple`: 次の枠を順に上書きする）
+    let mut ripples: [Option<(f32, f32, u64)>; RIPPLE_SLOTS] = [None; RIPPLE_SLOTS];
+    let mut ring_next = 0usize;
     let mut ripple_starts: Vec<u64> = Vec::new();
     let presses = &f.presses[f.presses.partition_point(|&t| t < seg.t0)..];
     let mut pi = 0usize;
@@ -612,11 +661,16 @@ pub fn stream_samples(
                 lost: false,
             }) {
                 let at = g0 + super::trace::STEP_MS * k;
-                ripples.push((r.x, r.y, at));
+                ripples[ring_next] = Some((r.x, r.y, at));
+                ring_next = (ring_next + 1) % RIPPLE_SLOTS;
                 ripple_starts.push(at);
             }
         }
-        ripples.retain(|r| r.2 + RIPPLE_LIFE_MS > q);
+        for slot in &mut ripples {
+            if slot.is_some_and(|r| r.2 + RIPPLE_LIFE_MS <= q) {
+                *slot = None;
+            }
+        }
         let last_p = f.feats[..f.feats.partition_point(|x| x.t <= q)]
             .last()
             .map(|x| x.p[2]);
@@ -627,6 +681,7 @@ pub fn stream_samples(
             field: if st.is_zero() { None } else { Some(st.cells) },
             ripples: ripples
                 .iter()
+                .flatten()
                 .map(|r| (r.0, r.1, (q - r.2).min(u64::from(u16::MAX)) as u16))
                 .collect(),
         });
@@ -690,6 +745,8 @@ pub struct WindowRow {
     pub day: i64,
     pub file: usize,
     pub t_start: u64,
+    /// 区間の始まりからの時間（ms・経過時間の診断に使う。判定の特徴には入れない）。
+    pub t_since_t0: u64,
     pub t0_recorded: bool,
     pub hmm_version: Option<String>,
     pub n_feats: usize,
@@ -724,6 +781,8 @@ pub struct DeskOut {
     pub windows: Vec<WindowRow>,
     pub excluded: Excluded,
     pub seed_mismatch_days: Vec<i64>,
+    /// `stage_starts` が切れていて使わなかった日。
+    pub overflow_days: Vec<i64>,
     pub segments: usize,
     pub segments_recorded_t0: usize,
 }
@@ -753,6 +812,17 @@ pub fn build(
             }
         }
     }
+    // 記録に書かれた表が、渡した表と違えば止める（別の人の表で黙って描き直さない）
+    if let Some((d, r)) = hm_days.iter().find(|(_, r)| {
+        r.table_sha256
+            .as_deref()
+            .is_some_and(|s| s != cfg.table_sha256_hex)
+    }) {
+        return Err(format!(
+            "日 {d} の handmark_day の表の SHA-256 が渡した表と違う（{}）",
+            r.table_sha256.as_deref().unwrap_or("")
+        ));
+    }
     let mut out = DeskOut::default();
     let segs = segments(
         files,
@@ -760,6 +830,7 @@ pub fn build(
         &cfg.table_sha256_hex,
         cfg.utc_offset_secs,
         &mut out.seed_mismatch_days,
+        &mut out.overflow_days,
     );
     out.segments = segs.len();
     out.segments_recorded_t0 = segs.iter().filter(|s| s.t0_recorded).count();
@@ -805,6 +876,7 @@ pub fn build(
                 day: seg.day,
                 file: seg.file,
                 t_start: *w,
+                t_since_t0: *w - seg.t0,
                 t0_recorded: seg.t0_recorded,
                 hmm_version: f.hmm_version.clone(),
                 n_feats: *n_feats,
@@ -878,48 +950,97 @@ mod tests {
 
     #[test]
     fn parse_reads_the_rows_and_fails_closed_on_broken_fields() {
+        // 時刻は T を基準にした相対で書いて置き換える
+        let t = |x: u64| (T + x).to_string();
         let text = [
-            r#"{"type":"meta","session_start":1000,"hmm_version":"0.5.0"}"#,
-            r#"{"type":"key","t":2000,"press":true,"category":"letter"}"#,
-            r#"{"type":"key","t":2050,"press":false,"category":"letter"}"#,
-            r#"{"type":"pointer_bin","t":3000,"moved":2,"buttons":1,"wheel":0}"#,
-            r#"{"type":"feat","t":3100,"p_flow":0.2,"p_inc":0.3,"p_stuck":0.5}"#,
-            r#"{"type":"recording_pause","t":4000,"paused":true}"#,
-            r#"{"type":"recording_pause","t":5000,"paused":false}"#,
-            r#"{"type":"handmark_day","t":6000,"day":7,"draw_seed":"00000000000000ff","stage_starts":[5500,5400]}"#,
-            r#"{"type":"handmark_day","t":5900,"day":7,"draw_seed":null,"stage_starts":[]}"#,
-            "not json",
-            r#"{"type":"focus_transition","t":9000}"#,
+            r#"{"type":"meta","session_start":@1000,"hmm_version":"0.5.0"}"#,
+            r#"{"type":"key","t":@2000,"press":true,"category":"letter"}"#,
+            r#"{"type":"key","t":@2050,"press":false,"category":"letter"}"#,
+            r#"{"type":"pointer_bin","t":@3000,"moved":2,"buttons":1,"wheel":0}"#,
+            r#"{"type":"feat","t":@3100,"p_flow":0.2,"p_inc":0.3,"p_stuck":0.5}"#,
+            r#"{"type":"recording_pause","t":@4000,"paused":true}"#,
+            r#"{"type":"recording_pause","t":@5000,"paused":false}"#,
+            r#"{"type":"handmark_day","t":@6000,"day":7,"draw_seed":"00000000000000ff","stage_starts":[@5500,@5400],"table_sha256":"AB","overflow":true}"#,
+            r#"{"type":"handmark_day","t":@5900,"day":7,"draw_seed":null,"stage_starts":[]}"#,
+            r#"{"type":"focus_transition","t":@9000}"#,
+            r#"{"type":"unknown_kind","t":99999999999999}"#,
         ]
         .join("\n");
+        let text = rel(&text, &t);
         let f = parse_file("a", &text).unwrap();
-        assert_eq!(f.session_start, 1000);
-        assert_eq!(f.end, 9000);
-        assert_eq!(f.presses, vec![2000]);
+        assert_eq!(f.session_start, T + 1000);
+        // 知らない行種の時刻（focus_transition・壊れた時刻）は終わりに使わない
+        assert_eq!(f.end, T + 6000);
+        assert_eq!(f.presses, vec![T + 2000]);
         assert_eq!(f.bins.len(), 1);
         assert_eq!(f.feats[0].p, [0.2, 0.3, 0.5]);
-        assert_eq!(f.pauses, vec![(4000, 5000)]);
+        assert_eq!(f.pauses, vec![(T + 4000, T + 5000)]);
         let d = &f.hm_days[&7];
         assert_eq!(d.draw_seed, Some(0xff));
-        assert_eq!(d.stage_starts, vec![5400, 5500]);
-        assert_eq!(f.skipped_lines, 1);
+        assert_eq!(d.stage_starts, vec![T + 5400, T + 5500]);
+        assert_eq!(d.table_sha256.as_deref(), Some("ab"));
+        assert!(d.overflow);
 
         for bad in [
             r#"{"type":"key","t":"x","press":true}"#,
-            r#"{"type":"feat","t":1,"p_flow":0.1,"p_inc":0.1}"#,
-            r#"{"type":"pointer_bin","t":1,"moved":300,"buttons":0,"wheel":0}"#,
-            r#"{"type":"handmark_day","t":1,"day":1,"draw_seed":"zz"}"#,
+            r#"{"type":"key","t":@1,"press":"yes"}"#,
+            r#"{"type":"feat","t":@1,"p_flow":0.1,"p_inc":0.1}"#,
+            r#"{"type":"pointer_bin","t":@1,"moved":300,"buttons":0,"wheel":0}"#,
+            r#"{"type":"handmark_day","t":@1,"day":1,"draw_seed":"zz"}"#,
+            r#"{"type":"handmark_day","t":@1,"day":1,"table_sha256":3}"#,
+            r#"{"type":"key","t":5,"press":true}"#,
+            r#"{"type":"key","t":@1,"press":true"#,
+            "not json",
         ] {
-            let text = format!("{{\"type\":\"meta\",\"session_start\":0}}\n{bad}");
+            let text = rel(
+                &format!("{{\"type\":\"meta\",\"session_start\":@0}}\n{bad}"),
+                &t,
+            );
             assert!(parse_file("b", &text).is_err(), "{bad}");
         }
-        assert!(parse_file("c", r#"{"type":"key","t":1,"press":true}"#).is_err());
+        assert!(parse_file("c", &rel(r#"{"type":"key","t":@1,"press":true}"#, &t)).is_err());
+        // 幅が 40 日を超える記録は止める
+        let long = rel(
+            &format!(
+                "{{\"type\":\"meta\",\"session_start\":@0}}\n{{\"type\":\"key\",\"t\":@{},\"press\":true}}",
+                MAX_FILE_SPAN_MS + 1
+            ),
+            &t,
+        );
+        assert!(parse_file("d", &long).is_err());
     }
+
+    /// `@123` を `t(123)` に置き換える。
+    fn rel(text: &str, t: &dyn Fn(u64) -> String) -> String {
+        let mut out = String::new();
+        let mut rest = text;
+        while let Some(i) = rest.find('@') {
+            out.push_str(&rest[..i]);
+            let tail = &rest[i + 1..];
+            let n = tail
+                .find(|c: char| !c.is_ascii_digit())
+                .unwrap_or(tail.len());
+            out.push_str(&t(tail[..n].parse().unwrap()));
+            rest = &tail[n..];
+        }
+        out.push_str(rest);
+        out
+    }
+
+    const T: u64 = 1_700_000_000_000;
 
     #[test]
     fn an_open_pause_runs_to_the_end_of_the_file() {
-        let text = "{\"type\":\"meta\",\"session_start\":0}\n{\"type\":\"recording_pause\",\"t\":10,\"paused\":true}\n{\"type\":\"meta\",\"session_end\":99}";
-        assert_eq!(parse_file("p", text).unwrap().pauses, vec![(10, 99)]);
+        let text = format!(
+            "{{\"type\":\"meta\",\"session_start\":{}}}\n{{\"type\":\"recording_pause\",\"t\":{},\"paused\":true}}\n{{\"type\":\"meta\",\"session_end\":{}}}",
+            T,
+            T + 10,
+            T + 99
+        );
+        assert_eq!(
+            parse_file("p", &text).unwrap().pauses,
+            vec![(T + 10, T + 99)]
+        );
     }
 
     #[test]
@@ -935,10 +1056,11 @@ mod tests {
                 t: 1,
                 draw_seed: Some(draw_seed(SHA, d + 1)),
                 stage_starts: vec![s1, day_start_ms(d + 3, OFF)],
+                ..HmDay::default()
             },
         );
         let mut mis = Vec::new();
-        let segs = segments(&[f], &hm, SHA, OFF, &mut mis);
+        let segs = segments(&[f], &hm, SHA, OFF, &mut mis, &mut Vec::new());
         assert!(mis.is_empty());
         let got: Vec<(i64, u64, u64, bool)> = segs
             .iter()
@@ -968,10 +1090,11 @@ mod tests {
                 t: 1,
                 draw_seed: Some(draw_seed(SHA, d) ^ 1),
                 stage_starts: vec![],
+                ..HmDay::default()
             },
         );
         let mut mis = Vec::new();
-        assert!(segments(&[f], &hm, SHA, OFF, &mut mis).is_empty());
+        assert!(segments(&[f], &hm, SHA, OFF, &mut mis, &mut Vec::new()).is_empty());
         assert_eq!(mis, vec![d]);
     }
 
@@ -1245,6 +1368,114 @@ mod tests {
             "{}",
             last - first
         );
+    }
+
+    #[test]
+    fn ripples_use_six_slots_like_the_screen() {
+        let t0 = 1_700_000_000_000;
+        let mut f = file(t0, t0 + 20_000);
+        // 1 秒に 15 回の押下（画面は最新の 6 つしか持たない）
+        f.bins = vec![PointerBin {
+            timestamp: t0 + 3_000,
+            moved: 0,
+            buttons: 15,
+            wheel: 0,
+        }];
+        let seg = Segment {
+            file: 0,
+            day: 0,
+            t0,
+            end: t0 + 20_000,
+            t0_recorded: false,
+            seed: 9,
+        };
+        let qs: Vec<u64> = (0..30).map(|i| t0 + 2_000 + i * 100).collect();
+        let st = stream_samples(&seg, &f, &qs, &ident);
+        assert_eq!(st.ripple_starts.len(), 15, "始まりは全部数える");
+        assert!(st.samples.iter().all(|x| x.ripples.len() <= RIPPLE_SLOTS));
+        let at_end = st.samples.iter().find(|x| x.t == t0 + 3_000).unwrap();
+        assert_eq!(at_end.ripples.len(), RIPPLE_SLOTS);
+        // 残るのは最新の 6 つ（経過が短い順に 6 つ）
+        let newest: Vec<u64> = st
+            .ripple_starts
+            .iter()
+            .rev()
+            .take(RIPPLE_SLOTS)
+            .copied()
+            .collect();
+        let mut ages: Vec<u16> = at_end.ripples.iter().map(|r| r.2).collect();
+        ages.sort_unstable();
+        let mut want: Vec<u16> = newest.iter().map(|&s| (t0 + 3_000 - s) as u16).collect();
+        want.sort_unstable();
+        assert_eq!(ages, want);
+    }
+
+    #[test]
+    fn a_second_segment_with_earlier_presses_still_matches_the_replay() {
+        // 区間の t0 より前にも打鍵とビンがある（日の 2 つ目の区間・stage の始まりの後）
+        for case in 0..6u64 {
+            let start = 1_700_000_000_000 + case * 13;
+            let f = random_file(case + 40, start, 180_000);
+            let t0 = start + 61_237;
+            let seg = Segment {
+                file: 0,
+                day: 0,
+                t0,
+                end: start + 180_000,
+                t0_recorded: true,
+                seed: 77 ^ case,
+            };
+            let qs: Vec<u64> = (1..40).map(|i| t0 + i * 2_900).collect();
+            let got = stream_samples(&seg, &f, &qs, &ident).samples;
+            for (q, s) in qs.iter().zip(&got) {
+                assert_eq!(
+                    s.state.bits(),
+                    replay_live(&f.presses, seg.seed, t0, *q).bits()
+                );
+                let tr = replay_trace(&f.bins, seg.seed, t0, *q);
+                let cells = s.field.unwrap_or([[0.0; 3]; CELLS]);
+                assert_eq!(
+                    tr.cells
+                        .iter()
+                        .flatten()
+                        .map(|v| v.to_bits())
+                        .collect::<Vec<_>>(),
+                    cells
+                        .iter()
+                        .flatten()
+                        .map(|v| v.to_bits())
+                        .collect::<Vec<_>>(),
+                    "case {case} q {q}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_recorded_table_other_than_the_given_one_stops_and_overflow_days_are_left_out() {
+        let d = 20_400;
+        let mut f = day_file(d, 0.3, 5);
+        f.hm_days.insert(
+            d,
+            HmDay {
+                t: 1,
+                table_sha256: Some("cd".into()),
+                ..HmDay::default()
+            },
+        );
+        assert!(build(&[f.clone()], &cfg(), &ident, &mut |_, _| {}).is_err());
+        f.hm_days.insert(
+            d,
+            HmDay {
+                t: 1,
+                table_sha256: Some(SHA.into()),
+                overflow: true,
+                ..HmDay::default()
+            },
+        );
+        let out = build(&[f], &cfg(), &ident, &mut |_, _| {}).unwrap();
+        assert_eq!(out.overflow_days, vec![d]);
+        assert!(out.windows.is_empty());
     }
 
     fn day_file(day: i64, p_stuck: f64, seed: u64) -> DeskFile {

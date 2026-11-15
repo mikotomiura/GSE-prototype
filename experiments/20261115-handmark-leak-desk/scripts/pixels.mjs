@@ -160,7 +160,9 @@ function main() {
     k++;
   }
   flush();
-  writeFileSync(outPath, lines.join("\n") + (lines.length ? "\n" : ""));
+  // 1 行目はヘッダ（stats.py が窓の表と照らす）
+  const head = JSON.stringify({ kind: "header", samples, windows: lines.length, w: W, h: H, gx: GX, gy: GY });
+  writeFileSync(outPath, [head, ...lines].join("\n") + "\n");
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

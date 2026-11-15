@@ -675,9 +675,9 @@ fn only_lib_and_the_pointer_thread_read_the_pointer() {
 
 // ---- 窓の TS（PR 3・ADR-050 D3・D4） ----
 
-/// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。描画の純関数（`handmarkStageDraw.ts`・手跡の PR 4）も
-/// 窓の側として同じ検査を受ける（机上の道具も同じ関数を呼ぶ）。
-const WINDOW: [(&str, &str); 3] = [
+/// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。この一覧は、場と波紋のイベント名を知ってよい
+/// ファイルの許可も兼ねる（`others_naming`）。
+const WINDOW: [(&str, &str); 2] = [
     (
         "HandmarkStage.tsx",
         include_str!("../../src/components/HandmarkStage.tsx"),
@@ -686,11 +686,14 @@ const WINDOW: [(&str, &str); 3] = [
         "handmarkStageTrace.ts",
         include_str!("../../src/components/handmarkStageTrace.ts"),
     ),
-    (
-        "handmarkStageDraw.ts",
-        include_str!("../../src/components/handmarkStageDraw.ts"),
-    ),
 ];
+
+/// 描画の純関数（手跡の PR 4・判断 8）。画面と机上の道具が同じに呼ぶ。窓の側と同じく保存・送信の語と名前の外の
+/// 列の検査を受けるが、イベント名を知ってよい一覧（`WINDOW`）には入れない（イベントを聞かない）。
+const DRAW: [(&str, &str); 1] = [(
+    "handmarkStageDraw.ts",
+    include_str!("../../src/components/handmarkStageDraw.ts"),
+)];
 
 /// 帯の窓の側の本文（ADR-051・手跡の下の縁の帯）。背景の窓と同じ検査を受ける。
 /// 帯のイベント（`handmark-strip-near`・`handmark-strip-visible`）を知ってよい TS はこの 2 ファイルだけ。
@@ -727,6 +730,28 @@ const WINDOW_BANNED: [&str; 14] = [
 #[test]
 fn the_window_does_not_store_send_back_or_talk_to_the_network() {
     assert_clean("窓", &WINDOW, &WINDOW_BANNED);
+    assert_clean("描画", &DRAW, &WINDOW_BANNED);
+}
+
+/// 描画の純関数はイベントを聞かず、どのイベント名も持たない（受け取りは画面の部品だけ）。
+#[test]
+fn the_draw_module_listens_to_nothing() {
+    let names = [
+        stage_event("STATE_EVENT"),
+        stage_event("TRACE_EVENT"),
+        stage_event("RIPPLE_EVENT"),
+    ];
+    let mut needles: Vec<&str> = names.iter().map(String::as_str).collect();
+    needles.extend(["listen", "@tauri-apps", "emit"]);
+    assert_clean("描画のイベント", &DRAW, &needles);
+    // 陽性対照: イベント名か listen を書けば赤になる（実行時に連結して作る）
+    for n in &needles {
+        let planted = format!("{}\n{n}", DRAW[0].1);
+        assert!(
+            !hits(&planted, &[n]).is_empty(),
+            "描画のイベント: 対照が赤にならない（{n}）"
+        );
+    }
 }
 
 /// 帯の窓も同じ（保存・返送・外への送りが無い。推定の語も受け取らない）。
@@ -1057,7 +1082,7 @@ fn unnamed_lists(src: &str) -> Vec<String> {
 /// 窓の側の列は、名前を許した枠だけ（位置・押下の列を作らない）。
 #[test]
 fn the_window_lists_only_named_slots() {
-    for (name, src) in WINDOW.into_iter().chain(STRIP_WINDOW) {
+    for (name, src) in WINDOW.into_iter().chain(DRAW).chain(STRIP_WINDOW) {
         let bad = unnamed_lists(src);
         assert!(
             bad.is_empty(),

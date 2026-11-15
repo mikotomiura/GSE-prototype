@@ -43,6 +43,7 @@ def session(rng, day, utc_offset_secs, hours, away_per_hour, no_flow=False):
     minute_end = start + 60_000
     t = start + 1_000
     away_until = 0
+    aways = []
     while t < end:
         while t >= minute_end:
             if rng.random() > STAY:
@@ -50,6 +51,7 @@ def session(rng, day, utc_offset_secs, hours, away_per_hour, no_flow=False):
             minute_end += 60_000
             if rng.random() < away_per_hour / 60.0:
                 away_until = minute_end + rng.randrange(240_000, 360_000)
+                aways.append((minute_end, away_until))
         if t < away_until:
             t = away_until
             continue
@@ -66,6 +68,9 @@ def session(rng, day, utc_offset_secs, hours, away_per_hour, no_flow=False):
         if pause_after:
             t += rng.randrange(*pause_rng)
     for s in range(start // 1000 + 1, end // 1000):
+        # 離席の間はポインタも動かない（離席の候補の除外を通すため）
+        if any(a < s * 1000 <= b for a, b in aways):
+            continue
         if rng.random() < 0.25:
             rows.append({
                 "type": "pointer_bin", "t": s * 1000, "moved": rng.randrange(1, 6),

@@ -42,6 +42,18 @@ def main(root):
             f"- S2（陰性）: λ = 0 の {len(null)} 組のうち、全体が「満たさない」は {null_fail} 組（1 組以下が合格）"
             f" → {'合格' if null_fail <= 1 else '不合格'}",
             f"- S3（陽性）: 80% 以上の組で「満たさない」になる最小の λ: 状態 {detect['state']}・画素 {detect['pixel']}"]
+    tp = os.path.join(root, "truth", "controls.json")
+    if os.path.exists(tp):
+        with open(tp, encoding="utf-8") as f:
+            truth = json.load(f)[0]["truth"]
+        out += ["", f"- S5（引き直しの方式）: 母集団の差の近似（大きな合成・日の偶奇で学習と試しを入れ替えた平均）: "
+                + "・".join(f"{t} {b} {v:+.4f}" for t, d in truth.items() for b, v in d.items())]
+        for t, d in truth.items():
+            for b, v in d.items():
+                cis = [r["ci90"][t][b] for r in null if r.get("ci90", {}).get(t, {}).get(b)]
+                cover = sum(1 for lo, hi in cis if lo <= v <= hi)
+                out.append(f"  - {t} {b}: 陰性 {len(cis)} 組の固定の予測の 90% 区間が含む割合 {cover}/{len(cis)}"
+                           f"（0.85 以上なら固定の予測を主にする）")
     t = [r["timing"] for r in rows if "timing" in r]
     if t:
         keys = sorted({k for x in t for k in x})

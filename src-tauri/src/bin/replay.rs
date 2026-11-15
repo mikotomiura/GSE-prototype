@@ -1586,7 +1586,7 @@ struct Args {
     hm_frames_path: Option<PathBuf>,
     /// --inject-stuck <λ>: 机上の陽性対照（判断 4）。描き直しの状態に `p_stuck` を混ぜる。0 は混ぜない。
     hm_inject: f64,
-    /// --samples <n>: 窓あたりの標本の数（30000 を割り切る・既定 30）。
+    /// --samples <n>: 窓あたりの標本の数（30000 を割り切る・既定 10・判断 9）。
     hm_samples: usize,
     /// --features: ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力する (issue 001-007)。
     /// ⚠️ 手元の解析用中間成果物であり `gse-dataset` へ共有しない (`docs/glossary.md` 逐語)。
@@ -2228,14 +2228,22 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         assignment::TableLoad::Ok { sha256, .. } => sha256,
         other => return Err(format!("handmark table rejected: {other:?}")),
     };
+    // コマの書き出し先が入力（記録・表）と同じなら止める（打ち間違いで一次の記録を上書き・削除しない）
+    if let Some(fp) = &args.hm_frames_path {
+        let target = std::fs::canonicalize(fp).ok();
+        for q in paths.iter().chain([table_path, sha_path]) {
+            if target.is_some() && std::fs::canonicalize(q).ok() == target {
+                return Err("--frames points at an input file".to_string());
+            }
+        }
+    }
     let mut files = Vec::new();
     let mut recomputed: Vec<Vec<desk::Feat>> = Vec::new();
     for p in paths {
-        let name = p
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| p.display().to_string());
-        let f = desk::parse_file(&name, &read_session_text(p)?)?;
+        let text = read_session_text(p)?;
+        // 出力に書く名前はファイルの中身の SHA-256 の先頭 12 桁（ファイル名には開始の時刻が入るため）
+        let name = assignment::sha256_hex(text.as_bytes())[..12].to_string();
+        let f = desk::parse_file(&name, &text)?;
         let snaps = run_replay(p)?;
         recomputed.push(
             snaps
@@ -2253,9 +2261,13 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
     let mut files: Vec<desk::DeskFile> = order.iter().map(|&i| files[i].clone()).collect();
     let mut recomputed: Vec<Vec<desk::Feat>> =
         order.iter().map(|&i| recomputed[i].clone()).collect();
-    for w in files.windows(2) {
+    for (i, w) in files.windows(2).enumerate() {
         if w[1].session_start < w[0].end {
-            return Err(format!("{} and {} overlap", w[0].name, w[1].name));
+            return Err(format!(
+                "inputs #{} and #{} (in time order) overlap",
+                i + 1,
+                i + 2
+            ));
         }
     }
     // 対象の元を差し替える（recomputed）か、照合の相手にする（recorded）
@@ -2271,14 +2283,19 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
     };
     let lam = args.hm_inject;
     let transform = move |s, p| inject_stuck(s, p, lam);
-    // コマは大きい（窓 1 本で約 110 KB）ので、溜めずにファイルへ順に書く。誤りなら消す。
+    // コマは大きい（10 時点で窓 1 本あたり約 11 KB）ので、溜めずにファイルへ順に書く。新しく作るだけで、
+    // 既にあるファイルには書かない（上書き・後始末での削除が自分の作ったファイルだけに及ぶように）。誤りなら消す。
     let want_frames = args.hm_frames_path.is_some();
     let mut frame_writer = match &args.hm_frames_path {
-        Some(fp) => {
-            Some(std::io::BufWriter::new(File::create(fp).map_err(|_| {
-                "frames file could not be created".to_string()
-            })?))
-        }
+        Some(fp) => Some(std::io::BufWriter::new(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(fp)
+                .map_err(|_| {
+                    "frames file could not be created (it must not exist yet)".to_string()
+                })?,
+        )),
         None => None,
     };
     let mut frame_buf: Vec<u8> = Vec::new();
@@ -2309,32 +2326,54 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
             return Err(e);
         }
     };
-    // 記録の feat を使ったときは、計算し直した T1 と照らす（下回れば止める）
+    // 記録の feat を使ったときは、計算し直した T1 と照らす。照らすのは、記録の HMM の版がいまのエンジンと
+    // 同じ記録の窓だけ（版が変わった日は、その日に系が出した判断のまま使う・設計 v2 §1.4）。下回れば止める。
     let label_check = if args.hm_labels_recomputed {
         serde_json::Value::Null
     } else {
-        let mut agree = 0usize;
+        let mut per_version: std::collections::BTreeMap<String, (usize, usize)> =
+            std::collections::BTreeMap::new();
         for w in &out.windows {
+            let v = w
+                .hmm_version
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string());
+            let e = per_version.entry(v.clone()).or_insert((0, 0));
+            e.1 += 1;
+            if v != HMM_VERSION {
+                continue;
+            }
             let r = &recomputed[w.file];
             let a = r.partition_point(|x| x.t < w.t_start);
             let b = r.partition_point(|x| x.t < w.t_start + desk::WINDOW_MS);
             if desk::targets(&r[a..b]).is_some_and(|t| t.t1 == w.t1) {
-                agree += 1;
+                e.0 += 1;
             }
         }
-        let rate = if out.windows.is_empty() {
+        let (agree, checked) = per_version.get(HMM_VERSION).copied().unwrap_or((0, 0));
+        if !out.windows.is_empty() && checked == 0 {
+            cleanup();
+            return Err(format!(
+                "no window was recorded with the engine's HMM {HMM_VERSION}; the labels cannot be checked"
+            ));
+        }
+        let rate = if checked == 0 {
             1.0
         } else {
-            agree as f64 / out.windows.len() as f64
+            agree as f64 / checked as f64
         };
         if rate < HM_LABEL_AGREEMENT_MIN {
             cleanup();
             return Err(format!(
-                "recorded and recomputed T1 agree on {agree} of {} windows (below {HM_LABEL_AGREEMENT_MIN})",
-                out.windows.len()
+                "recorded and recomputed T1 agree on {agree} of {checked} windows (below {HM_LABEL_AGREEMENT_MIN})"
             ));
         }
-        serde_json::json!({ "t1_agree": agree, "windows": out.windows.len(), "rate": rate })
+        serde_json::json!({
+            "t1_agree": agree,
+            "checked": checked,
+            "rate": rate,
+            "windows_by_hmm_version": per_version.iter().map(|(k, v)| (k.clone(), v.1)).collect::<std::collections::BTreeMap<_, _>>(),
+        })
     };
     let mut text = String::new();
     let header = serde_json::json!({
@@ -2348,6 +2387,7 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         "utc_offset_secs": offset,
         "table_sha256": table_sha,
         "inputs": files.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+        "inputs_are": "sha256_prefix_12",
         "a_names": desk::A_NAMES,
         "b_state_names": desk::B_STATE_NAMES,
         "window_ms": desk::WINDOW_MS,
@@ -2370,7 +2410,7 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         "seed_mismatch_days": out.seed_mismatch_days,
         "segments": out.segments,
         "segments_recorded_t0": out.segments_recorded_t0,
-        "skipped_lines": files.iter().map(|f| f.skipped_lines).sum::<usize>(),
+        "overflow_days": out.overflow_days,
         "label_check": label_check,
     });
     text.push_str(&summary.to_string());
@@ -2720,7 +2760,15 @@ fn main() -> ExitCode {
         paths.extend(args.extra_sessions.iter().cloned());
         return match run_handmark_windows(&args, &paths) {
             Ok(text) => {
-                let _ = std::io::stdout().lock().write_all(text.as_bytes());
+                let mut out = std::io::stdout().lock();
+                if out
+                    .write_all(text.as_bytes())
+                    .and_then(|_| out.flush())
+                    .is_err()
+                {
+                    tracing::error!("--handmark-windows: stdout could not be written");
+                    return ExitCode::from(1);
+                }
                 ExitCode::SUCCESS
             }
             Err(msg) => {
@@ -5327,8 +5375,17 @@ mod tests {
         );
         let paths = vec![rec.clone()];
         let a = run_handmark_windows(&args, &paths).unwrap();
+        let frames_a = std::fs::read(&frames).unwrap();
+        // 既にあるコマのファイルには書かない（中身も変えない）
+        assert!(run_handmark_windows(&args, &paths).is_err());
+        assert_eq!(std::fs::read(&frames).unwrap(), frames_a);
+        std::fs::remove_file(&frames).unwrap();
         let b = run_handmark_windows(&args, &paths).unwrap();
         assert_eq!(a, b, "同じ入力から同じ表");
+        assert_eq!(std::fs::read(&frames).unwrap(), frames_a, "同じコマ");
+        std::fs::remove_file(&frames).unwrap();
+        // 出力にファイル名を書かない（中身の SHA-256 の先頭 12 桁）
+        assert!(!a.contains("s.ndjson"));
         let rows: Vec<serde_json::Value> = a
             .lines()
             .map(|l| serde_json::from_str(l).unwrap())
@@ -5340,7 +5397,7 @@ mod tests {
         let n = last["windows"].as_u64().unwrap() as usize;
         assert_eq!(rows.len(), n + 2);
         assert!(n >= 5, "{n}");
-        assert!(std::fs::metadata(&frames).unwrap().len() > 0);
+        assert!(!frames_a.is_empty());
         // 記録に feat が無いとき、記録の対象では窓が 0（feat が 25 本未満で除く）
         let rec_args = mk(&t_sha, &[]);
         let r = run_handmark_windows(&rec_args, &paths).unwrap();
@@ -5348,13 +5405,42 @@ mod tests {
         assert_eq!(s["windows"], 0);
         assert!(s["excluded"]["few_feats"].as_u64().unwrap() > 0);
         // SHA が合わない表は止め、コマのファイルを残さない
-        let _ = std::fs::remove_file(&frames);
         let bad = mk(
             &dir.join("bad.sha256"),
             &["--frames", frames.to_str().unwrap()],
         );
         assert!(run_handmark_windows(&bad, &paths).is_err());
         assert!(!frames.exists());
+        // コマを作った後に失敗したら（標本の数が窓を割り切らない）、作ったファイルを消す
+        let late = mk(
+            &t_sha,
+            &[
+                "--labels",
+                "recomputed",
+                "--samples",
+                "7",
+                "--frames",
+                frames.to_str().unwrap(),
+            ],
+        );
+        assert!(run_handmark_windows(&late, &paths).is_err());
+        assert!(!frames.exists());
+        // コマの書き出し先が入力の記録・表なら止め、入力を変えない
+        let rec_bytes = std::fs::read(&rec).unwrap();
+        for target in [&rec, &t_json] {
+            let into_input = mk(
+                &t_sha,
+                &[
+                    "--labels",
+                    "recomputed",
+                    "--frames",
+                    target.to_str().unwrap(),
+                ],
+            );
+            assert!(run_handmark_windows(&into_input, &paths).is_err());
+        }
+        assert_eq!(std::fs::read(&rec).unwrap(), rec_bytes);
+        assert_eq!(std::fs::read(&t_json).unwrap(), bytes);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

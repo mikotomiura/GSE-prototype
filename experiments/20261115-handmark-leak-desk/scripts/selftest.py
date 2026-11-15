@@ -115,7 +115,8 @@ def fake_rows(days, per_day, leak, rng):
             y = int(rng.random() < S.sigmoid(1.0 * a[0] + 2.0 * hidden))
             b = list(rng.normal(size=13))
             b[0] = leak * hidden + (1 - leak) * b[0]
-            rows.append({"day": d, "a": list(a), "b_state": b, "t1": y, "t2": int(rng.integers(0, 3))})
+            rows.append({"day": d, "a": list(a), "b_state": b, "t1": y, "t1_all": y, "t2": int(rng.integers(0, 3)),
+                         "t_since_t0": int(rng.integers(30_000, 3_600_000))})
     return rows
 
 
@@ -135,6 +136,15 @@ def test_analysis_controls():
     r1.pop("seconds", None)
     r2.pop("seconds", None)
     check(r1 == r2, "同じ種で同じ結果")
+    # 判定に入れない処理（診断・入れ子）の有無で、主の区間と判定が変わらない（乱数の流れを分ける）
+    r3 = S.analyse(fake_rows(9, 40, 0.5, np.random.default_rng(4)), header, None, seed=5, R=100, diagnostics=True,
+                   R_nested=20)
+    for t in ("T1", "T2"):
+        a, b = r1["targets"][t].get("state", {}), r3["targets"][t].get("state", {})
+        check((a.get("ci90"), a.get("verdict")) == (b.get("ci90"), b.get("verdict")),
+              f"{t}: 診断・入れ子の有無で主の区間が変わる")
+        check("verdict" in b.get("nested", {}) or t == "T2" and r3["targets"][t].get("reason"),
+              f"{t}: 入れ子にも判定が付く")
 
 
 def main():

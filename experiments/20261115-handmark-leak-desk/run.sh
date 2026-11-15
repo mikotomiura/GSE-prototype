@@ -14,13 +14,24 @@ SEED="$(cat "$EXP_DIR/SEED")"
 PY="${PYTHON:-$HOME/gse-venvs/handmark-desk/bin/python}"
 REPLAY="${REPLAY:-$REPO_ROOT/src-tauri/target/debug/gse-replay}"
 TABLE_TOOL="${TABLE_TOOL:-$REPO_ROOT/src-tauri/target/debug/gse-handmark-table}"
-: "${WORK:=${TMPDIR:-/tmp}/handmark-leak-desk}"
+# 中間の置き場。既定は新しく作る私用のディレクトリ（700）。指定するなら、空でなく、${HOME}・/・repo そのものや
+# その上の階層でないこと（rm -rf の範囲を絞る・security-checker LOW）
+setup_work() {
+  if [ -z "${WORK:-}" ]; then
+    WORK="$(mktemp -d "${TMPDIR:-/tmp}/handmark-leak-desk.XXXXXX")"
+  fi
+  mkdir -p "$WORK"
+  case "$(cd "$WORK" && pwd -P)" in
+    /|"$HOME"|"$(cd "$REPO_ROOT" && pwd -P)"|"$(cd "$REPO_ROOT" && pwd -P)"/*) echo "WORK が広すぎる・repo の中: $WORK" >&2; exit 2 ;;
+  esac
+  chmod 700 "$WORK"
+}
 JOBS="${JOBS:-4}"
 MODE="${1:-selftest}"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 mkdir -p "$EXP_DIR/results"
 
-"$PY" -c 'import numpy, sys; sys.exit(0 if numpy.__version__ == "2.5.2" else 1)' \
+"$PY" -I -c 'import numpy, sys; sys.exit(0 if numpy.__version__ == "2.5.2" else 1)' \
   || { echo "numpy 2.5.2 の venv が要る（requirements.txt）: PYTHON=$PY" >&2; exit 2; }
 
 case "$MODE" in
@@ -29,10 +40,11 @@ case "$MODE" in
     "$PY" -I "$SC/check_mutations.py"
     ;;
   controls)
-    [ -x "$REPLAY" ] || { echo "gse-replay が無い: $REPLAY（cargo build --bin gse-replay）" >&2; exit 2; }
+    [ -x "$REPLAY" ] || { echo "gse-replay が無い: ${REPLAY}（cargo build --bin gse-replay）" >&2; exit 2; }
     [ -d "$EXP_DIR/node_modules/@napi-rs/canvas" ] || { echo "npm ci を実験のディレクトリで" >&2; exit 2; }
     "$PY" -I "$SC/selftest.py"
-    rm -rf "$WORK"; mkdir -p "$WORK/work" "$WORK/tbl"
+    setup_work
+    rm -rf "$WORK/work" "$WORK/tbl"; mkdir -p "$WORK/work" "$WORK/tbl"
     "$TABLE_TOOL" --seed "$SEED" --s1-start-day 20400 --early-min 30 --early-max 30 --late-days 10 --out "$WORK/tbl" --force >/dev/null
     OUT="$EXP_DIR/results/controls"; rm -rf "$OUT"
     # S3（段階をつけた陽性）と S2（陰性）。同じ組の中では λ だけを変える。
@@ -40,6 +52,9 @@ case "$MODE" in
       --sets 10 --first-set 0 --lams 0,0.002,0.005,0.01,0.02,0.05 --seed "$SEED" --jobs "$JOBS"
     "$PY" -I "$SC/controls.py" --work "$WORK/work" --out "$OUT/null" --replay "$REPLAY" --table-dir "$WORK/tbl" \
       --sets 10 --first-set 10 --lams 0 --seed "$SEED" --jobs "$JOBS"
+    # S5: 母集団の差の近似（120 日の大きな合成を 1 組・λ = 0）
+    "$PY" -I "$SC/controls.py" --work "$WORK/work" --out "$OUT/truth" --replay "$REPLAY" --table-dir "$WORK/tbl" \
+      --sets 1 --first-set 100 --lams 0 --days 120 --seed "$SEED" --jobs 1 --truth
     "$PY" -I "$SC/report.py" "$OUT" > "$EXP_DIR/results/controls_report.md"
     ;;
   records)
@@ -50,7 +65,7 @@ case "$MODE" in
     : "${TABLE_SHA:?TABLE_SHA（表の .sha256）}"
     : "${UTC_OFFSET_SECS:?UTC_OFFSET_SECS}"
     # Step 0（ADR-013 Migration 4）: この解析が読む行種
-    PYTHONUTF8=1 "$PY" "$REPO_ROOT/scripts/capabilities_gate.py" "$RECORDS_DIR" --require key --require feat \
+    PYTHONUTF8=1 "$PY" -I "$REPO_ROOT/scripts/capabilities_gate.py" "$RECORDS_DIR" --require key --require feat \
       --json > "$EXP_DIR/results/capabilities.json"
     echo "records は次のタスクで実装する（conditions.md C8）" >&2
     exit 5
