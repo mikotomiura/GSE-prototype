@@ -15,7 +15,7 @@
 2. 研究者は、評価された点（生産的苦闘・AI 依存の時代の切り口など）に合わせず、今の研究の資産を客観的に棚卸しして強いものから組むと決めた（判断 4）。
 3. 棚卸し（design.md §1・数字は一次で照合）で、実測が強いのは次の 3 つだった。
    - R1 事前登録の否定の結果。手で係数を決めた推定器（HMM 0.5.0）の 30 秒の上がりは、停滞の手前を同じ書き手の短い休止の手前から分けない。CS1 の holdout 139 人で AUC 0.489・0.487（事前の帯 [0.45, 0.55] の内）。KLiCKe 1,971 人で 0.512・0.518（検出できるがごく小さい）、CoAuthor で 0.503・0.493。前の打鍵の単純な量の学習器は 0.54〜0.57（論文 1 `papers/public-data-findings/manuscript/sections/abstract.tex`・枝 `docs/public-data-findings-paper`／`experiments/20261101-klicke-early-stall-trigger/notes.md`）。
-   - R2 本文を保存しない IME の変換の観測と、その漏れの実測。合成入力 9,000 試行・両 OS で変換を recall 約 0.89〜0.91 で拾う（Windows の precision 0.76）。本文なしのキーの種類の列だけで、10 候補から 0.902、100 候補から 0.421 の正答で打った句を特定できた（`papers/ime-observation/manuscript/generated/values.tex`）。
+   - R2 本文を保存しない IME の変換の観測と、その漏れの実測。合成入力 9,000 試行・両 OS で変換を recall 約 0.89〜0.91 で拾う（Windows の precision 0.76）。本文なしのキーの種類の列だけで、10 候補から 0.902、100 候補から 0.421 の正答で打った句を特定できた（macOS のライブ変換オフと Windows の値・オンは 0.907・0.435・`papers/ime-observation/manuscript/generated/values.tex`）。
    - R3 定義の multiverse。4 つの公開データ・約 125 の停滞と休止の定義で、率から引く結論（作文の点との関連の向き・データ間の比）が定義と調整で動く（論文 2 `papers/stall-shape-multiverse/`・枝 `docs/gse-paper2-stall-shape`。方法の出典は論文 2 の書誌）。
 4. 一方、ADR-047 の headline の中心（申告での見分け・保留・停滞の中の招待）と手跡は、人のデータが 0 件の設計の側にある。
 5. ADR-047 の Alternatives は「観測の方法そのものを貢献に」を採らなかった。その時点では R2・R3 がまだ無く（IME の評価の寄託と論文 2 はその後）、公開データの否定の結果だけでは方法の主張にならなかった。

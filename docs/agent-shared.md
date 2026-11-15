@@ -12,7 +12,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
   その中身（詰まり・熟考・外部資料・会話・離席）を本人の申告と照らして、**観測でどこまで見分けられ、どこで系は判断を保留すべきか**を確かめる。
   見分けられた所を、採点しない身体回帰の機会（招待・Physical Anchor の PC 面）の適格の条件に使う。
   系が判断しない所でも、本人の手の痕跡（手跡）だけは返す（行為の性質だけで、系の判断は返さない・ADR-048）。
-  一言は「本文を保存しない打鍵の観測から、作業の停滞についてどこまで言えるかを、予測・定義・漏れの 3 つの検査で確かめる」（ADR-054）。
+  一言は「本文を保存しない打鍵の観測から、作業の停滞についてどこまで言えるかを、予測・定義・漏れの 3 つの検査で確かめる」（ADR-054・Proposed）。
   一次は `docs/research-positioning.md`（2026-11-15 に現行版へ書き直した・ADR-053・ADR-054）と ADR-047。
 - **書き方の決まり**（詳細は `docs/glossary.md` の禁止用語）:
   - 「詰まる前に」とは書かない（手前の信号は公開データで見えていない・ADR-047）。
@@ -201,7 +201,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜054**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 設計判断 (**ADR-001〜054**・ADR-054 は Proposed) の根拠を確認したい時 |
 | `docs/history/README.md` | 履歴へ移した・削除した文書の旧パスを辿る時（ADR に書かれた旧パスもここで引く）。履歴は現行の根拠に使わない |
 | `docs/mitou_submission/review-response-2026.md` | 2026 年度未踏の不採択コメントの論点ごとに、今の対応と状態を確かめる時（内部の追跡表） |
 | `docs/theory/README.md` | 理論（生成的返権論ほか・theory candidate）を読む時。⚠️ **SSOT の主張ではない**（RP §1 は問いとして参照するだけ） |
