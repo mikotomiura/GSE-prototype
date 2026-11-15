@@ -58,7 +58,7 @@ d.rows(s, [("アプリの枠", "Tauri 2.0（権限は capabilities で管理）"
            ("フロントエンド", "React 19・TypeScript 5.8・Vite 7", INDIGO),
            ("OS の API", "Windows: windows crate（winapi は使わない）／ macOS: core-graphics・core-foundation", OLIVE),
            ("分析と学習", "Python（公開データの分析・推定の改良の試験）", PLUM),
-           ("対象", "Windows 11（Surface Pro 8）と macOS 13 以降", ORANGE)], label_w=2.4, size=17)
+           ("対象と機械", "Windows 11 と macOS 13 以降。Windows は主に G-GEAR（デスクトップ・GPU あり）、Surface Pro 8 はごく稀", ORANGE)], label_w=2.4, size=17)
 
 s = d.content("スレッド —— フックは重い仕事をしない",
               "打鍵は channel で分析のスレッドへ、記録の行は上限 512 の channel で Logger へ渡す。IME の区間は分析と記録の両方に届く。")

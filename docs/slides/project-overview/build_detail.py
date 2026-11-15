@@ -118,7 +118,7 @@ d.rows(s, [("段 1（応募の前から）", "本人で試す → 事前登録�
 
 s = d.content("開発の環境と手法", "開発の場所と時間帯は記入が要ります。")
 d.rows(s, [("主な開発の場所", [[("【要記入】", TODO)]], ORANGE),
-           ("計算機", "Windows 11（Surface Pro 8）と macOS 13 以降の Mac。重い計算は別の PC（GPU あり）", TEAL),
+           ("計算機", "Windows は主に G-GEAR（Ryzen 7・RTX 5060 Ti。重い計算もここ）、Surface Pro 8 はごく稀。Mac は macOS 13 以降", TEAL),
            ("言語・道具", "Rust（Tauri 2.0）・React と TypeScript・Python（分析と学習）", INDIGO),
            ("開発の手法", "記録の再生（gse-replay）の byte 一致で回帰を守る・設計の判断は ADR に残す・解析の条件は値の前に事前登録する・両 OS の CI", OLIVE),
            ("時間帯と時間数", [[("【要記入】", TODO)]], PLUM)], label_w=2.6, size=16)
