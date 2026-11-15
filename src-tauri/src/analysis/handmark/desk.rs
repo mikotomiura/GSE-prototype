@@ -866,10 +866,10 @@ pub struct SensSummary {
 }
 
 /// `toggles` から切っていた区間 `[from, to)` を作る。始めは出ている。切ったまま日が終われば `day_end` まで。
-/// 同じ時刻の要素は「切った」を先に並べる（記録の並びに依らない）。長さ 0 の区間は捨てる。
+/// 同じ時刻の要素は記録の並び（操作の順）のまま扱う（安定な並べ替え）。長さ 0 の区間は捨てる。
 pub fn off_intervals(toggles: &[(u64, bool)], day_end: u64) -> Vec<(u64, u64)> {
     let mut t = toggles.to_vec();
-    t.sort_unstable();
+    t.sort_by_key(|x| x.0);
     let mut out = Vec::new();
     let mut open: Option<u64> = None;
     for (ti, on) in t {
@@ -1727,9 +1727,17 @@ mod tests {
             off_intervals(&[(10, false), (20, true), (30, false)], 100),
             vec![(10, 20), (30, 100)]
         );
-        // 同じ時刻の切った・戻したは並びに依らず長さ 0 で捨てる
-        assert!(off_intervals(&[(10, true), (10, false)], 100).is_empty());
+        // 同じ時刻の要素は記録の順のまま: 切ってすぐ戻せば長さ 0 で捨て、戻してすぐ切れば切ったまま
         assert!(off_intervals(&[(10, false), (10, true)], 100).is_empty());
+        assert_eq!(
+            off_intervals(&[(10, true), (10, false)], 100),
+            vec![(10, 100)]
+        );
+        // 5 で切る・10 で戻す・10 で切る・20 で戻す（/cross-review 2 巡目の例）
+        assert_eq!(
+            off_intervals(&[(5, false), (10, true), (10, false), (20, true)], 100),
+            vec![(5, 10), (10, 20)]
+        );
         assert!(off_intervals(&[(100, false)], 100).is_empty());
         // 続けて切る・続けて戻すは 1 つにまとめる
         assert_eq!(

@@ -40,7 +40,7 @@ def split_lines(raw):
     （落ちて切れた記録・C2）。それより前の行は手を付けずに残し、読めなければ gse-replay が止める。
     """
     lines = raw.split(b"\n")
-    if lines and lines[-1] == b"":
+    while lines and lines[-1].strip() == b"":
         lines.pop()
     if lines:
         try:
@@ -96,7 +96,10 @@ def main(argv):
     ledger = None
     if a.ledger:
         # 回の途中で台帳が書き換わっても結果を再現できるよう、写しを使い SHA-256 を残す（/cross-review 指摘 9）
-        with open(a.ledger, "rb") as f:
+        if not stat.S_ISREG(os.lstat(a.ledger).st_mode):
+            print("削除の台帳が通常のファイルでない（シンボリックリンクなど）", file=sys.stderr)
+            sys.exit(5)
+        with os.fdopen(os.open(a.ledger, os.O_RDONLY | os.O_NOFOLLOW), "rb") as f:
             raw = f.read()
         fd = os.open(os.path.join(a.out, "..", "ledger.jsonl"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as g:

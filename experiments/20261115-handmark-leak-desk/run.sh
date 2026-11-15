@@ -99,37 +99,13 @@ case "$MODE" in
     # 落ちて終わりの行が無いものの両方）。日数の門で止まった実行だけは数えない。読めない行があれば止める。
     # 道具の誤りで回し直すときだけ RERUN_REASON に理由を書く（前の結果は消さずに残る）。
     set +e
-    "$PY" -I - "$RUNS" "$RUN_PHASE" <<'PY'
-import json, os, sys
-path, phase = sys.argv[1:]
-if not os.path.exists(path):
-    sys.exit(1)
-started, done = set(), {}
-try:
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            if not line.strip():
-                continue
-            r = json.loads(line)
-            if r.get("phase") != phase:
-                continue
-            if r.get("event") == "started":
-                started.add(r["run"])
-            elif r.get("event") == "finished":
-                done[r["run"]] = r.get("judged") is True
-            else:
-                sys.exit(3)
-except (ValueError, KeyError, TypeError):
-    sys.exit(3)
-# 判定まで進んだ実行・終わりの行が無い実行が 1 つでもあれば 0（止める）
-sys.exit(0 if any(done.get(k, True) for k in started) else 1)
-PY
+    "$PY" -I "$SC/runs_gate.py" "$RUNS" "$RUN_PHASE"
     rc=$?
     set -e
     case "$rc" in
-      0) [ -n "${RERUN_REASON:-}" ] || { echo "回 ${RUN_PHASE} は始めた実行がある（runs.jsonl）。回し直すなら RERUN_REASON を書く" >&2; exit 7; } ;;
-      1) ;;
-      *) echo "runs.jsonl が読めない（rc=${rc}）。直すまで回さない" >&2; exit 7 ;;
+      10) ;;
+      0) [ -n "${RERUN_REASON:-}" ] || { echo "回 ${RUN_PHASE} は統計に入った実行がある（runs.jsonl）。回し直すなら RERUN_REASON を書く" >&2; exit 7; } ;;
+      *) echo "runs.jsonl が読めないか形が違う（rc=${rc}）。直すまで回さない" >&2; exit 7 ;;
     esac
     "$PY" -I "$SC/selftest.py"
     if [ -z "${WORK:-}" ]; then
@@ -143,7 +119,7 @@ PY
     chmod 700 "$RUNW"
     RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)_$$"
     COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-    DIRTY="$(git -C "$REPO_ROOT" status --porcelain -- src-tauri/src experiments/20261115-handmark-leak-desk/scripts src/components/handmarkStageDraw.ts | wc -l | tr -d ' ')"
+    DIRTY="$(git -C "$REPO_ROOT" status --porcelain -- src-tauri/src experiments/20261115-handmark-leak-desk/scripts experiments/20261115-handmark-leak-desk/run.sh experiments/20261115-handmark-leak-desk/conditions.md src/components/handmarkStageDraw.ts | wc -l | tr -d ' ')"
     LEDGER_ARG=()
     [ "$LEDGER" = none ] || LEDGER_ARG=(--ledger "$LEDGER")
     "$PY" -I "$SC/prepare_records.py" --records-dir "$RECORDS_DIR" --out "$RUNW/rec" \

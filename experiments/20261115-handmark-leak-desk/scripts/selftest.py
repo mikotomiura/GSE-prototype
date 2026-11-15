@@ -1,5 +1,6 @@
 """統計と判定の自己検査（run.sh の頭で回す）。失敗したら exit 1。"""
 import itertools
+import json
 import math
 import os
 import sys
@@ -187,6 +188,46 @@ def test_prepare_records():
     lines, cut = P.split_lines(mid)
     check(len(lines) == 3 and not cut, "途中の壊れた行を勝手に除いた（gse-replay が止めるべき）")
     check(P.split_lines(b"") == ([], False), "空の記録")
+    check(P.split_lines(b'{"a":1}\n\n\n') == ([b'{"a":1}'], False), "末尾の空行を切れた行と数えた")
+
+
+def test_runs_gate():
+    """回の記録の門（S1-F5）: 想定外はすべて止める（/cross-review 2 巡目）。"""
+    import tempfile
+    import runs_gate as G
+    st = lambda run, ph="early": json.dumps({"event": "started", "run": run, "phase": ph})
+    fin = lambda run, j, ph="early": json.dumps({"event": "finished", "run": run, "phase": ph, "judged": j})
+    cases = [
+        (None, G.GO, "記録が無い"),
+        ("", G.GO, "空"),
+        (st("a") + "\n" + fin("a", False), G.GO, "日数の門で止まった回は数えない"),
+        (st("a") + "\n" + fin("a", True), G.BLOCKED, "判定まで進んだ回"),
+        (st("a"), G.BLOCKED, "終わりの行が無い回"),
+        (st("a", "late") + "\n" + fin("a", True, "late"), G.GO, "別の回は数えない"),
+        ("[]", G.BROKEN, "行が dict でない"),
+        ("null", G.BROKEN, "行が null"),
+        ('{"judged": true}', G.BROKEN, "旧い形（event が無い）"),
+        (st("a") + "\n" + fin("a", "yes"), G.BROKEN, "judged が真偽でない"),
+        (st("a") + "\n" + json.dumps({"event": "finished", "run": "a", "phase": "early"}), G.BROKEN, "judged が無い"),
+        (fin("a", False), G.BROKEN, "始めた行の無い終わり"),
+        (st("a") + "\n" + st("a"), G.BROKEN, "同じ回の名が 2 つ"),
+        (st("a") + "\n" + fin("a", False, "late"), G.BROKEN, "回の食い違い"),
+        ('{"event":"started"', G.BROKEN, "読めない行"),
+    ]
+    with tempfile.TemporaryDirectory() as d:
+        for text, want, msg in cases:
+            p = os.path.join(d, "runs.jsonl")
+            if os.path.exists(p):
+                os.remove(p)
+            if text is not None:
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(text + "\n")
+            check(G.main([p, "early"]) == want, f"runs_gate: {msg}")
+        os.chmod(p, 0)
+        if not os.access(p, os.R_OK):
+            check(G.main([p, "early"]) == G.BROKEN, "runs_gate: 読めない権限")
+        os.chmod(p, 0o600)
+    check(G.main(["only-one-arg"]) == G.BROKEN, "runs_gate: 引数の誤り")
 
 
 def main():
@@ -197,6 +238,7 @@ def main():
     test_analysis_controls()
     test_sensitivity_wiring()
     test_prepare_records()
+    test_runs_gate()
     if FAILS:
         for f in FAILS:
             print("FAIL:", f)
