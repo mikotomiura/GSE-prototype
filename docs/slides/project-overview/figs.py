@@ -285,12 +285,12 @@ def stage1():
 
 def tool():
     sk = Sk(1500, 600, 117)
-    node(sk, 20, 190, 260, 170, "同じ記録", ORANGE, 30, "時刻とキーの種類", 20)
+    node(sk, 20, 190, 260, 170, "同じ記録", ORANGE, 34, "時刻とキーの種類", 24)
     checks = [("予測", INDIGO, "同等の帯と区間"), ("定義", OLIVE, "定義と調整を振る"), ("漏れ", PLUM, "候補の照合")]
     for i, (n, c, d) in enumerate(checks):
         y = 40 + i * 170
         sk.arrow(285, 275, 400, y + 60, GRAY, 4, 14)
-        node(sk, 410, y, 300, 120, n, c, 30, d, 20)
+        node(sk, 410, y, 300, 120, n, c, 34, d, 23)
         sk.arrow(715, y + 60, 830, 275, GRAY, 4, 14)
     # 4 面の地図
     mx, my, s = 850, 60, 230
@@ -299,8 +299,8 @@ def tool():
         x = mx + (i % 2) * (s + 20)
         y = my + (i // 2) * (s + 20)
         sk.rect(x, y, s, s, c, 3, fill=PALE[c])
-        sk.text(x + s / 2, y + s / 2, n, 26, INK, "mm")
-    sk.text(mx + s + 10, 585, "4 つの面の地図（足りない面は「判定不能」）", 22, GRAY, "mb")
+        sk.text(x + s / 2, y + s / 2, n, 30, INK, "mm")
+    sk.text(mx + s + 10, 585, "4 つの面の地図（足りない面は「判定不能」）", 26, GRAY, "mb")
     sk.save(OUT + "fig_tool.png")
 
 
@@ -315,24 +315,24 @@ def chart_auc():
         return x0 + (v - lo) / (hi - lo) * (x1 - x0)
     top, bot = 40, 470
     sk.blob_rect(X(0.45), top, X(0.55) - X(0.45), bot - top, PALE[TEAL])
-    sk.text(X(0.50), top + 22, "同等の帯 0.45〜0.55（CS1 で事前登録）", 22, TEAL, "mm")
+    sk.text(X(0.50), top + 22, "同等の帯 0.45〜0.55（CS1 で事前登録）", 26, TEAL, "mm")
     sk.line(X(0.5), top + 40, X(0.5), bot, GRAY, 2, passes=1)
     rows = [("CS1（事前登録）", [(0.489, 0.479, 0.4995), (0.487, 0.476, 0.497)], INDIGO),
             ("KLiCKe", [(0.512, None, None), (0.518, None, None)], OLIVE),
             ("CoAuthor", [(0.503, None, None), (0.493, None, None)], PLUM)]
     for i, (lab, pts, c) in enumerate(rows):
         y = 120 + i * 120
-        sk.text(30, y + 18, lab, 26, INK, "lm")
+        sk.text(30, y + 18, lab, 30, INK, "lm")
         for j, (v, a, b) in enumerate(pts):
             yy = y + j * 40
             if a is not None:
                 sk.line(X(a), yy, X(b), yy, c, 4, jit=0.3, passes=1)
             sk.ellipse(X(v), yy, 10, 10, c, 3, fill=c)
-            sk.text(max(X(v), X(b) if b else 0) + 24, yy, f"{v:.3f}", 20, c, "lm")
+            sk.text(max(X(v), X(b) if b else 0) + 24, yy, f"{v:.3f}", 25, c, "lm")
     sk.line(x0, bot, x1, bot, INK, 3)
     for v in [0.40, 0.45, 0.50, 0.55, 0.60]:
         sk.line(X(v), bot, X(v), bot + 12, INK, 3, passes=1)
-        sk.text(X(v), bot + 34, f"{v:.2f}", 20, INK, "mm")
+        sk.text(X(v), bot + 34, f"{v:.2f}", 24, INK, "mm")
     sk.text((x0 + x1) / 2, bot + 72, "AUC（0.5 は見分けない）。各データの 2 点は推定器の 2 つの信号。CS1 の線は 95% 区間", 22, GRAY, "mm")
     sk.save(OUT + "chart_auc.png")
 

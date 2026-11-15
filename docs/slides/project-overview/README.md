@@ -21,6 +21,7 @@
 python3 -m venv .venv && .venv/bin/pip install python-pptx Pillow lxml
 .venv/bin/python sketch.py   # img/ を描き直す（図を変えたときだけ）
 .venv/bin/python figs.py     # 詳細版・知見版・技術版の図とグラフ（img/fig_*・chart_*）を描き直す
+.venv/bin/python figs2.py    # 文字だけだったスライドの図とグラフ（2 巻目。論文 2 の図の数は data/paper2_score.csv）
 .venv/bin/python build.py    # GSE_project_overview.pptx を組み直す
 .venv/bin/python build_detail.py; .venv/bin/python build_findings.py; .venv/bin/python build_tech.py
 ```
