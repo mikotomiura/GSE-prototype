@@ -1,4 +1,4 @@
-"""回の記録（runs.jsonl）を読み、同じ回をもう一度回してよいかを決める（事前登録 S1-F5）。
+"""回の記録（runs.txt）を読み、同じ回をもう一度回してよいかを決める（事前登録 S1-F5）。
 
 終了コード:
   10  回してよい（この回で統計に入った実行が無い・または日数の門で止まった実行だけ）
@@ -10,14 +10,23 @@
 """
 import json
 import os
+import stat
 import sys
 
 GO, BLOCKED, BROKEN = 10, 0, 3
 
 
 def decide(path, phase):
-    if not os.path.exists(path):
+    # 無いときだけ「回してよい」。読めない（親の権限・ぶら下がったリンク）・通常のファイルでないは止める
+    # （os.path.exists は OSError を False にして門を開くので使わない・/cross-review 3 巡目）
+    try:
+        st = os.lstat(path)
+    except FileNotFoundError:
+        if os.path.lexists(path):
+            return BROKEN
         return GO
+    if not stat.S_ISREG(st.st_mode):
+        return BROKEN
     phase_of, done = {}, {}
     with open(path, encoding="utf-8") as f:
         for line in f:

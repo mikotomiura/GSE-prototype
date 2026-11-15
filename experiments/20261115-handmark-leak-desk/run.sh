@@ -89,7 +89,7 @@ case "$MODE" in
     SYN=()
     [ -z "${RECORDS_OUT:-}" ] || SYN=(--require-synthetic)
     mkdir -p "$OUT"
-    RUNS="$OUT/runs.jsonl"
+    RUNS="$OUT/runs.txt"
     # 同じ回を同時に 2 つ走らせない（mkdir の印。macOS の mkdir は排他）
     LOCK="$OUT/.lock"
     mkdir "$LOCK" 2>/dev/null || { echo "別の records が走っているか、前の回の印が残っている: ${LOCK}" >&2; exit 7; }
@@ -104,8 +104,8 @@ case "$MODE" in
     set -e
     case "$rc" in
       10) ;;
-      0) [ -n "${RERUN_REASON:-}" ] || { echo "回 ${RUN_PHASE} は統計に入った実行がある（runs.jsonl）。回し直すなら RERUN_REASON を書く" >&2; exit 7; } ;;
-      *) echo "runs.jsonl が読めないか形が違う（rc=${rc}）。直すまで回さない" >&2; exit 7 ;;
+      0) [ -n "${RERUN_REASON:-}" ] || { echo "回 ${RUN_PHASE} は統計に入った実行がある（runs.txt）。回し直すなら RERUN_REASON を書く" >&2; exit 7; } ;;
+      *) echo "runs.txt が読めないか形が違う（rc=${rc}）。直すまで回さない" >&2; exit 7 ;;
     esac
     "$PY" -I "$SC/selftest.py"
     if [ -z "${WORK:-}" ]; then
@@ -176,6 +176,8 @@ print(json.dumps({"event": "finished", "run": run, "phase": phase, "files": p["f
                  ensure_ascii=False))
 PY
     tail -n 1 "$RUNS"
+    # 回の記録は git に入れて残す（記録が消えると同じ回を回し直せてしまう・S1-F5）
+    echo "回の記録・要約・入力の一覧を results/records/ からコミットする（runs.txt は消さない）" >&2
     ;;
   *) echo "使い方: bash run.sh [selftest|controls|records]" >&2; exit 2 ;;
 esac

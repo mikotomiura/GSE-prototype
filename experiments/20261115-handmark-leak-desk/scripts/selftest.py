@@ -216,7 +216,7 @@ def test_runs_gate():
     ]
     with tempfile.TemporaryDirectory() as d:
         for text, want, msg in cases:
-            p = os.path.join(d, "runs.jsonl")
+            p = os.path.join(d, "runs.txt")
             if os.path.exists(p):
                 os.remove(p)
             if text is not None:
@@ -228,6 +228,22 @@ def test_runs_gate():
             check(G.main([p, "early"]) == G.BROKEN, "runs_gate: 読めない権限")
         os.chmod(p, 0o600)
     check(G.main(["only-one-arg"]) == G.BROKEN, "runs_gate: 引数の誤り")
+    with tempfile.TemporaryDirectory() as d:
+        link = os.path.join(d, "runs.txt")
+        os.symlink(os.path.join(d, "nowhere"), link)
+        check(G.main([link, "early"]) == G.BROKEN, "runs_gate: ぶら下がったリンク")
+        os.remove(link)
+        os.mkdir(link)
+        check(G.main([link, "early"]) == G.BROKEN, "runs_gate: 通常のファイルでない")
+        os.rmdir(link)
+        sub = os.path.join(d, "sub")
+        os.mkdir(sub)
+        with open(os.path.join(sub, "runs.txt"), "w") as f:
+            f.write("")
+        os.chmod(sub, 0)
+        if not os.access(sub, os.X_OK):
+            check(G.main([os.path.join(sub, "runs.txt"), "early"]) == G.BROKEN, "runs_gate: 親の権限が無い")
+        os.chmod(sub, 0o700)
 
 
 def main():
