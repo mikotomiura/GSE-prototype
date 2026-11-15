@@ -5285,7 +5285,7 @@ mod tests {
         let mut t = start + 200;
         let mut k = 0u64;
         while t < start + 600_000 {
-            let cat = if k % 7 == 0 {
+            let cat = if k.is_multiple_of(7) {
                 "backspace"
             } else {
                 "alphabetic"
