@@ -13,6 +13,7 @@ ADR の本文は書き換えないので、ADR に書かれた旧パスはこの
 |---|---|---|---|---|
 | `docs/research-positioning.md`（2026-11-15 より前の全文） | 書き直し・旧全文を写した | `docs/history/research-positioning-2026-11-15.md`（現行版は同じパスのまま） | 2026-11-15 | 改訂ブロック 3 層の上書きの鎖を解く（ADR-053） |
 | `docs/research-positioning.md`（ADR-054 より前の現行版） | 書き直し・旧版を写した | `docs/history/research-positioning-2026-11-15b.md`（現行版は同じパスのまま） | 2026-11-15 | 一言と headline を 3 つの検査に改めた（ADR-054） |
+| `docs/research-positioning.md`（加工と照合の論文を足す前の現行版） | 書き直し・旧版を写した | `docs/history/research-positioning-2026-11-16.md`（現行版は同じパスのまま） | 2026-11-16 | 漏れの材料に公開の人の打鍵での照合を足した（ADR-054 の 2026-11-16 の注） |
 | `docs/design-history.md` | 履歴へ移した | `docs/history/design-history-2026-11-15.md` | 2026-11-15 | もともと履歴の文書（v2.1–v2.22）。現行の文書と分ける |
 | `docs/design-history.ja.md` | 削除 | 削除のコミットは PR2（`docs/gse-docs-clarity-pr2`）。英語版と同じ内容 | 2026-11-15 | 英語版の写しを履歴に残したので重複を外す |
 | `docs/calibration-smoke-runbook.md` | 履歴へ移した | `docs/history/calibration-smoke-runbook-2026-11-15.md`。§1.1–1.2（研究者デバッグ起動の二重 gate）は `docs/verification-runbook.md` §2.0 へ移した | 2026-11-15 | Phase1（v0.3 較正）は 2026-08-18 に終了した |
