@@ -396,8 +396,59 @@ def chart_zenodo():
     sk.save(OUT + "chart_zenodo.png")
 
 
+RELEASE = [  # (名前, 指標の中央の相関 ρ, 最も強い攻撃の正答・偶然の何倍か N=1,000, 札の向き) 加工と照合の論文の原稿 Table 4(a)
+    ("文字と数字を隠す（公開で使われた形）", 1.00, 1000, "u"),
+    ("キーの種類だけ", 0.92, 867, "d"),
+    ("時刻を 1 秒に丸める", 0.09, 867, "r"),
+    ("区切りをまとめる", 0.63, 360, "l"),
+    ("押下を 10% 間引く", 0.85, 702, "l2"),
+    ("25% 間引く", 0.81, 143, "l"),
+    ("50% 間引く", 0.70, 22, "l"),
+    ("まとまりの値だけ（粗さ 1）", 0.0, 405, "r"),
+    ("粗さ 2", 0.0, 44, "r"),
+    ("粗さ 4", 0.0, 3.5, "r"),
+    ("粗さ 8", 0.0, 1.4, "r"),
+]
+
+
+def chart_release():
+    """公開の前の加工: 指標が残るか（横）と当たる率（縦・偶然の何倍かの対数）"""
+    sk = Sk(1500, 640, 125)
+    x0, x1, y0, y1 = 220, 1320, 540, 60
+
+    def X(v):
+        return x0 + v * (x1 - x0)
+
+    def Y(m):
+        return y0 - math.log10(m) / 3 * (y0 - y1)
+    sk.line(x0, y0, x1, y0, INK, 3)
+    sk.line(x0, y0, x0, y1, INK, 3)
+    for m, lab in [(1, "偶然"), (10, "10 倍"), (100, "100 倍"), (1000, "1,000 倍")]:
+        sk.text(x0 - 16, Y(m), lab, 20, INK, "rm")
+    sk.line(x0, Y(4), x1, Y(4), TEAL, 2, passes=1)
+    sk.text(x1, Y(4) - 22, "偶然の 4 倍（論文の目安）", 20, TEAL, "rm")
+    for v in [0, 0.25, 0.5, 0.75, 1.0]:
+        sk.text(X(v), y0 + 28, f"{v:g}", 20, INK, "mm")
+    sk.text((x0 + x1) / 2, y0 + 66, "書く過程の 10 の指標が元の値とどれだけ合うか（中央の相関）", 22, GRAY, "mm")
+    sk.text(x0 - 10, y1 - 34, "1,000 個の候補から本物の文章が当たる率（偶然の何倍か）", 22, GRAY, "lm")
+    for name, rho, m, side in RELEASE:
+        c = ORANGE if m > 100 else (INDIGO if m > 4 else PLUM)
+        sk.ellipse(X(rho), Y(m), 11, 11, c, 3, fill=c)
+        if side == "r":
+            sk.text(X(rho) + 22, Y(m), name, 20, INK, "lm")
+        elif side == "u":
+            sk.text(X(rho) - 10, Y(m) - 30, name, 20, INK, "rm")
+        elif side == "d":
+            sk.text(X(rho) + 10, Y(m) + 34, name, 20, INK, "mm")
+        elif side == "l2":
+            sk.text(X(rho) - 22, Y(m) + 26, name, 20, INK, "rm")
+        else:
+            sk.text(X(rho) - 22, Y(m), name, 20, INK, "rm")
+    sk.save(OUT + "chart_release.png")
+
+
 if __name__ == "__main__":
     for f in [ime_flow, ime_why, ime_os, threads, features, record_flow, replay, stage1, tool,
-              chart_auc, chart_match, chart_zenodo]:
+              chart_auc, chart_match, chart_zenodo, chart_release]:
         f()
     print("ok")
