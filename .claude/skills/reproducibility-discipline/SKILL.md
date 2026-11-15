@@ -37,7 +37,7 @@ HMM_VERSION を config と結果に記録。入力 NDJSON は gse-dataset の co
 ### ルール 4: 1 コマンド再現
 scripts/repro.sh（実体は run-calibration-cohort.sh をラップ）で代表実験を再走できること。できないなら実験は未完了。
 ### ルール 5: 仮説・事前登録・出典に接続
-notes.md に「検証する仮説 = research-positioning.md §5 H?」「PreReg-?」「借用手法 = [n] (references.md)」を必ず書く。
+notes.md に「検証する仮説 = research-positioning.md §4.1 の H?（または事前登録の項目番号）」「PreReg-?」「借用手法 = [n] (references.md)」を必ず書く。
 
 ## チェックリスト
 - [ ] experiments/<date>-<name>/ 構造に従ったか

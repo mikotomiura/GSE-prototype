@@ -1,3 +1,6 @@
+> **履歴の文書（2026-11-15 に移した）。** 元のパスは `docs/calibration-smoke-runbook.md`。現行の根拠に使わない（ADR-053）。現行は `docs/research-positioning.md`・`docs/architecture/gse-design-map.md`・`docs/adr/`。
+> 写しの元: main `6fdd4023`。本文は移す前のまま変えていない。
+
 # v0.3 較正スモーク 実行ランブック (自己ドッグフード → 3-5名スモーク)
 
 > 対象: v0.3 較正の計測基盤 (A schema / B probe scheduler / C collect UI / D offline解析 /

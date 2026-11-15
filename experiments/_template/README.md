@@ -42,7 +42,7 @@
 | `data.md` | 入力 NDJSON の version/hash と被験者/OS (gse-dataset の commit hash) |
 | `env.md` | 環境固定 (Cargo.lock / rustc version / OS / requirements.txt) |
 | `results/` | 生成物 (`capabilities.json` / `metrics.json` / `calib.json` 等) |
-| `notes.md` | 所感・逸脱 ＋ 仮説 (`research-positioning.md §5`) と PreReg 番号へのリンク |
+| `notes.md` | 所感・逸脱 ＋ 仮説 (`research-positioning.md §4.1` か事前登録の項目番号) と PreReg 番号へのリンク |
 
 ## ⚠️ 使うときの注意 (★ 実測で踏んだもの)
 

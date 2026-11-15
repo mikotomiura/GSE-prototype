@@ -5,7 +5,7 @@ SSOT: `docs/experiment-tracking.md`。実験のたびに本リストを `notes.m
 ## 実験開始前 (pre-flight)
 
 - [ ] `experiments/<YYYYMMDD>-<exp-name>/` を作成した（`.steering/` ではない）
-- [ ] **仮説を先に書いた**: 検証する `research-positioning.md` §5 の H? と、該当 `preregistration-v0.3.md` の PreReg 番号
+- [ ] **仮説を先に書いた**: 検証する `research-positioning.md` §4.1 の H?（または事前登録の項目番号）と、該当 `preregistration-v0.3.md` の PreReg 番号
 - [ ] `config.(yaml|json)` に全ハイパーパラメータを列挙した（HMM 閾値 / α / β / ゲート定数 / merge-gap 等）
 - [ ] ランダム要素（プローブ時点抽選など）があれば `SEED` を固定した
 - [ ] `data.md` に入力 NDJSON の出所を固定した（gse-dataset の commit hash、被験者 ID、OS）

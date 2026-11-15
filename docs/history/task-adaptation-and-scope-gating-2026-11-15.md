@@ -1,11 +1,16 @@
+> **履歴の文書（2026-11-15 に移した）。** 元のパスは `docs/architecture/task-adaptation-and-scope-gating.md`。2026-07〜08 の Epic 期の Proposed の設計（ADR-008〜010）で、現行の根拠に使わない（ADR-053）。現行は `docs/research-positioning.md`・`docs/architecture/gse-design-map.md`・ADR-044・046・047。
+> 写しの元: `190d5ef6`（本文は移す前のまま。冒頭の 2026-11-15 の注は PR2 で足したもの）。
+
 # タスク適応と scope ゲーティング — head ルーティング × 「どの head も当てはまらない」
+
+> **2026-11-15 の注（ADR-053）**: この文書が上位・層詳細として引く `gse-v2-overview`・`domain-adapter-boundary`・`intervention-decision-engine` は `docs/history/` へ移した履歴の文書で、現行の根拠ではない。現行の設計は `docs/architecture/gse-design-map.md` と ADR を見る。中身を今の設計に合わせるかは `.steering/20261115-gse-docs-clarity/` の PR3 で見る。
 
 > **ステータス**: Proposed（設計のみ・**コード変更ゼロ**）。実装は Phase1 完了・凍結解除後。
 > **位置づけ**: ADR-006（`task_kind` → head ルーティング）の**拡張であって改訂ではない**。
 > ADR-006 の Decision は変更しない。本書が足すのは
 > **「宣言された head が当てはまっていないこと」を扱う経路**である。→ **ADR-010**。
-> **上位**: `gse-v2-overview.md`（7 層）／**隣接**: `personalization-and-online-learning.md`（§11-11 の起票元）・
-> `domain-adapter-boundary.md`（Layer 3-4 の原則）。
+> **上位**: `../history/gse-v2-overview-2026-11-15.md`（7 層）／**隣接**: `personalization-and-online-learning.md`（§11-11 の起票元）・
+> `../history/domain-adapter-boundary-2026-11-15.md`（Layer 3-4 の原則）。
 
 ## 0. 要約
 
@@ -47,7 +52,7 @@
 | `personalization…md §11-11` | out-of-scope の起票。対処案 ①②③④。**② 単独は無力**（Phase1 の宣言値は分散ゼロ） |
 | `experiments/20260802-task-scope-detector/` | 行動署名は**解像度を持つ**（p=0.00010）。判別特徴の第一候補は `bs_rate`（長ポーズではない） |
 | `experiments/20260802-within-person-scope-detector/` | ★ **within-person 単独の検出器は動かない**。マスキング／尺度過敏／偏った観測にレバレッジ無し |
-| `domain-adapter-boundary.md` | `uncertainty` / `evidence_quality` は必須。**未較正 head では強介入を禁止** |
+| `../history/domain-adapter-boundary-2026-11-15.md` | `uncertainty` / `evidence_quality` は必須。**未較正 head では強介入を禁止** |
 
 ---
 
@@ -165,7 +170,7 @@
 | head | Phase2 での baseline 獲得 | 較正状態 |
 |---|---|---|
 | **Writing** | Phase1 の実測 ＋ N 層の自然セッション。§2.3 の block A/A' が in-scope 側の参照分布になる | 較正可能 |
-| **Coding** | ★ **Phase2 では較正しない**。主信号（accept/reject/test/revert）は **Adapter B が未実装**で観測できない（`domain-adapter-boundary.md §Adapter B`・Epic 4 は feasibility 止まり）。打鍵 β だけで較正したことにしない | ★ **未較正のまま運用**＝強介入禁止が自動で効く |
+| **Coding** | ★ **Phase2 では較正しない**。主信号（accept/reject/test/revert）は **Adapter B が未実装**で観測できない（`../history/domain-adapter-boundary-2026-11-15.md §Adapter B`・Epic 4 は feasibility 止まり）。打鍵 β だけで較正したことにしない | ★ **未較正のまま運用**＝強介入禁止が自動で効く |
 | **Creative** | ★ **baseline を獲得しない**（ADR-006 #3 で打鍵 β を持たないと確定済み）。Phase2 の成果物は feasibility 調査であって baseline ではない | 較正対象外 |
 
 > ★ **これは先送りではなく決定である**: Coding / Creative に **較正（baseline 獲得）用の**被験者セッション枠を
@@ -174,7 +179,7 @@
 >
 > ⚠️ **ドメイン拡張そのものを止める決定ではない。** 本節が制限するのは**較正枠のみ**であり、
 > **Epic 4（Agentic Coding・observe-only / de-risk pilot）と Epic 6（Creative feasibility・Go/Defer/Kill 判定）は
-> 別トラックとして生きている**（`gse-v2-overview.md` の Epic 表）。
+> 別トラックとして生きている**（`../history/gse-v2-overview-2026-11-15.md` の Epic 表）。
 > それらが要求する観測は「baseline を作るための較正セッション」ではなく
 > **「どのイベントが取得可能か・privacy threat model はどうか・代理と客観的害を co-measure できるか」**であり、
 > 本設計はそれを一切妨げない。ADR-006 の枠組み C（task_kind → head ルーティング）も無改変である。
@@ -232,8 +237,8 @@ block 構成・counterbalance 規則・正例の種類・除外基準・§4.5 �
 3. **hard switch は情報を捨てる**。head を差し替えると走っていた head の推定が**消える**。
    フラグなら「推定は出るが弱く扱う」という**連続的な縮退**ができる。
 4. ★ **新機構が不要**という §11-11 の性質を保存できる。
-   `evidence_quality` が低い → `none`/`defer`（`intervention-decision-engine.md:82`）、
-   未較正 head → 強介入禁止（`domain-adapter-boundary.md §原則`）。**どちらも既に書かれている。**
+   `evidence_quality` が低い → `none`/`defer`（`../history/intervention-decision-engine-2026-11-15.md` の Layer 6 の `evidence_quality` の項（元の文書の行番号は使わない））、
+   未較正 head → 強介入禁止（`../history/domain-adapter-boundary-2026-11-15.md §原則`）。**どちらも既に書かれている。**
 5. ★ **文献の分類と一致する** [V73][V74]。棄権には **ambiguity rejection**（境界近傍で誤りやすいから棄権）と
    **novelty rejection**（訓練分布から乖離しているから棄権）の 2 種があり、**別の量**として区別される。
    GSE の `uncertainty`（head 内部の曖昧さ）＝ ambiguity、`evidence_quality`（証拠が較正分布に合うか）＝ novelty。
@@ -486,7 +491,7 @@ scope_fit    = g( { flag_m, margin_m } )        # 単調・(0,1] 有界・§4.4
 
 ---
 
-## 5. 主張しないこと（過大主張の禁止・`gse-v2-overview.md §5`）
+## 5. 主張しないこと（過大主張の禁止・`../history/gse-v2-overview-2026-11-15.md §5`）
 
 1. **外れ値であること ≠ 対象外作業をしていたこと。**
 2. ★ **フラグされないこと ≠ 対象作業だったこと。** §4.3 の `unreachable` はその機械的な実例である。
@@ -520,7 +525,7 @@ scope_fit    = g( { flag_m, margin_m } )        # 単調・(0,1] 有界・§4.4
 
 - **決定**: `docs/adr/ADR-010-task-scope-gating.md`（本書の決定を記録）／`ADR-006`（routing・**改訂しない**）／
   `ADR-002`（domain-local inference）／`ADR-005`（additive schema）／`ADR-008`・`ADR-009`
-- **上位/隣接**: `gse-v2-overview.md`／`domain-adapter-boundary.md`／`personalization-and-online-learning.md §11-11`
+- **上位/隣接**: `../history/gse-v2-overview-2026-11-15.md`／`../history/domain-adapter-boundary-2026-11-15.md`／`personalization-and-online-learning.md §11-11`
 - **実測の一次出典**: `experiments/20260802-task-scope-detector/`（署名は解像度を持つ）／
   `experiments/20260802-within-person-scope-detector/`（within-person 単独は動かない）
 - **凍結契約**: `docs/preregistration-v0.3.md`（Phase1・**変更しない**）

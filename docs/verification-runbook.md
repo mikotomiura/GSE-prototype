@@ -1,7 +1,7 @@
 # 検証テスト ランブック (回帰 + 機能 + フォーム)
 
 開発者・研究者向けの **動作検証手順** を一箇所にまとめる。リリース前・PR マージ前・実機配布前に
-ここを上から実行する。データ収集パイロットの運用は `docs/calibration-smoke-runbook.md` /
+ここを上から実行する。データ収集パイロットの運用は `docs/history/calibration-smoke-runbook-2026-11-15.md` /
 `docs/pilot-runbook.md` を、被験者スモークは `.steering/*/smoke-test-runbook.md` を参照。
 
 - **対象**: macOS 13+ (Apple Silicon) / Windows 11。`analysis/` は OS 非依存、`input/`・overlay は OS 固有。
@@ -285,6 +285,30 @@ VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
 dev ログ NDJSON: `~/Documents/GSE-sessions/gse_*.ndjson`。記録成功は同ファイルに該当エントリが
 残ることで客観確認する。
 
+### 2.0 起動モード: 被験者と研究者デバッグ（二重 gate）
+
+2026-11-15 に `docs/history/calibration-smoke-runbook-2026-11-15.md` §1.1–1.2 から移した（元の手順書は `docs/history/` へ移した・ADR-053）。
+
+デバッグ機能（プローブ・Nudge の強制表示、第 2 週のモデル出力の表示）は 2 つのフラグで守られる。被験者はフラグなしで起動し（完全に盲検）、研究者だけが両方を足す。
+
+| フラグ | 種別 | 効果 |
+|---|---|---|
+| `VITE_GSE_DEBUG=1` | Vite のビルド時の env（フロントの JS に焼き込む） | デバッグボタンの描画・第 2 週のモデル出力の表示 |
+| `GSE_DEBUG=1` | 実行時の env（Rust が `ensure_debug_enabled` で読む・`src-tauri/src/lib.rs`） | デバッグ用のコマンドを許可する。未設定だと DevTools から直接 invoke しても Err で拒否する |
+
+- 被験者への配布: CI の本番バイナリをフラグなしでそのまま起動する。
+- 研究者のデバッグ（dev）: 1 行で両方を渡す（vite と cargo の両プロセスが継承する）。
+  ```bash
+  VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
+  ```
+- 本番ビルドでのスモーク: `VITE_GSE_DEBUG=1 npm run tauri build` でビルドし、起動時に `GSE_DEBUG=1` を渡す。macOS の `open App.app` は起動中のアプリには env を渡さないので、実体を直接実行するか `launchctl setenv GSE_DEBUG 1` の後に起動する。
+  ```bash
+  GSE_DEBUG=1 "App.app/Contents/MacOS/<bin>"
+  ```
+ Windows は起動前のシェルで `set GSE_DEBUG=1`。
+- 強制の発火は NDJSON に `reason="debug_force"` で残り、解析で除ける。
+- ログの書き込み先が temp へのフォールバックや無効に縮退したときは、Dashboard の上部に警告のバナーが出続ける。本番の .app は dev と TCC の文脈が違うので、書き込み権限の再現は本番ビルドで確かめる。
+
 ### 2.1 介入カードのクリック受理 + フォーカス非奪取 (v2.22)
 1. セッション開始 → Dashboard「プローブを出す」→ 右上のプローブカードが表示される。
 2. Q1/Q2 を選び「回答する」を押す → **カードが閉じる** (ボタンが効く)。
@@ -381,7 +405,7 @@ overlay の NSPanel 化は **macOS 限定 gate**。Windows は従来の `set_ign
 
 ## 関連ドキュメント
 
-- `docs/calibration-smoke-runbook.md` — v0.3 較正スモーク (データ収集・3-5 名)
+- `docs/history/calibration-smoke-runbook-2026-11-15.md` — v0.3 較正スモーク (データ収集・3-5 名)
 - `docs/pilot-runbook.md` — M1 パイロット (収集 → 暗号化 → 分析パイプライン)
 - `docs/development-guidelines.md` §3 — テスト方針 (Replay-as-Truth)
 - `.steering/20260625-macos-overlay-clickthrough-fix/runbook.md` — overlay クリック修正の実機検証

@@ -2,7 +2,7 @@
 
 > 対象: M1 パイロット (n=3-5) で被験者から匿名化セッションを受領し、metrics + survey を
 > `participant_id × phase` で結合して `cross_section` を出すまでの **end-to-end 運用手順**。
-> X 側の対応物は `docs/calibration-smoke-runbook.md`。設計判断は
+> X 側の対応物は `docs/history/calibration-smoke-runbook-2026-11-15.md`。設計判断は
 > `.steering/20260624-pilot-pipeline-runbook/decisions.md` (D-PP1..5) /
 > `.steering/20260624-transfer-pipeline/decisions.md` (D1..7) を参照。
 >

@@ -8,30 +8,27 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 ## プロジェクト概要
 
 - **名称**: GSE (Generative Struggle Engine)
-- **目的**: キーストローク動態と打鍵の外の記録から作業上の停滞を観測し、
-  **Physical Anchor** (身体的回帰への方向づけ・採点しない招待) で「生産的苦闘」を守る、
-  **不便益を設計思想として引く** HCI フレームワーク
-  (⚠️★★★ **Lv2 Wall は 2026-08-23 に削除された** — ADR-015。
-   ⚠️★★★ **段階呼称 Lv1〜Lv4 は 2026-08-30 に廃止方向** — ADR-018 D7。★ **実体名で呼ぶ**。
-   ⚠️★★★ **「*段階的* 介入」とも書かない** — Wall が消え、Physical Anchor が完了条件を持たなくなった
-   (ADR-018 D1) 結果、**強度が単調に上がる「段」の構造は現存しない**。
-   2026-11-03 更新: 身体回帰の招待（Physical Anchor の PC 面）は EH3 モードで実装済み（`analysis/invitation.rs`）。通常のモードの第 2 週でも動く（ADR-040 Migration 2・2026-11-01）。
-   散歩の促進とその計測は行わない（2026-11-03 研究者の言。歩数・位置は ADR-017 D10 で本体から外してある）。身体回帰の後は、離席候補（打鍵の途絶 180 秒以上）明けの作業上の状態で見る。主は打鍵の再開と受領の有無（ADR-024 D1・D3。段 2 の主要アウトカムは段 2 の事前登録の前に決める・ADR-047 D4）、副はウィンドウを離れずに再開したか（フォーカスの遷移・ADR-040・ADR-041 D3）。離席候補とフォーカスの遷移は別の腕として解析する（ADR-023 D4）。ポインタ（移動・ボタン・ホイール）は、打鍵の無い作業を離席と取り違えないために記録し（ADR-014・ADR-016）、停滞の型の手の様子（移動やクリック・フォーカスの離脱）にも使う（ADR-041 D2）。身体が動いたことは測らない（ADR-024 D5・ADR-018 D3）。
-   「Physical Anchor は未実装」とは書かない。Nudge は本体では出さないと決め、既定を無効にした（ADR-040 D1・2026-10-31。判断のロジックは `gse-replay --intervention` の評価に残す）。
-   → ★ **「不便益 HCI である」とは書かない** — `docs/glossary.md` 禁止用語)
-- **位置づけ（2026-11-05 改訂・研究者決定・ADR-047）**: 打鍵の時刻と種類（本文は保存しない）と打鍵の外の記録で作業上の停滞を観測し、
-  その中身を本人の申告と照らして、**観測でどこまで見分けられ、どこで系は判断を保留すべきか**を確かめる。
-  見分けられた所を、**身体回帰の機会**（採点しない招待）の適格の条件に使う。系が判断しない所でも、本人の手の痕跡（手跡）だけは返す（ADR-048・手跡は行為の性質だけを返し、系の判断は返さない）。「詰まる前に」とは書かない（手前の信号は公開データで見えていない）。
-  段 1 と段 2 の主の比べで、推定（HMM）は契機を作らない（ADR-044・ADR-047 D2。今の EH3 モードの招待は今の推定を契機にしている）。3 状態の名前（Flow / Incubation / Stuck）は主張に使わない（ADR-046 D1・列名は識別子として残る）。
-  「作業中の認知状態」とは書かず「作業上の」と書く。通常のモードの招待は第 2 週で動く（契機は研究者の `~/.gse/invitation_trigger.json` で選ぶ・読めなければ出さない）。
-  Nudge は本体では出さない（ADR-040 D1・既定は無効）。
-  詳細は `docs/research-positioning.md` §1 冒頭の 2026-11-05 改訂ブロック。
+- **目的**: 打鍵の時刻と種類（本文は保存しない）と打鍵の外の記録（フォーカスの遷移・ポインタ）から作業上の停滞を観測し、
+  その中身（詰まり・熟考・外部資料・会話・離席）を本人の申告と照らして、**観測でどこまで見分けられ、どこで系は判断を保留すべきか**を確かめる。
+  見分けられた所を、採点しない身体回帰の機会（招待・Physical Anchor の PC 面）の適格の条件に使う。
+  系が判断しない所でも、本人の手の痕跡（手跡）だけは返す（行為の性質だけで、系の判断は返さない・ADR-048）。
+  一次は `docs/research-positioning.md`（2026-11-15 に現行版へ書き直した・ADR-053）と ADR-047。
+- **書き方の決まり**（詳細は `docs/glossary.md` の禁止用語）:
+  - 「詰まる前に」とは書かない（手前の信号は公開データで見えていない・ADR-047）。
+  - Flow / Incubation / Stuck を推定した状態の名として書かない（ADR-046 D1。`p_stuck` などの列名は識別子として残る）。
+  - 「作業中の認知状態」ではなく「作業上の認知状態」と書く。
+  - 「不便益 HCI である」「段階的介入」「Lv1〜Lv4」と書かない（Wall は ADR-015 で削除、段の構造は現存しない・ADR-018 D7）。
+  - 「Physical Anchor は未実装」とは書かない。PC 側の招待は実装済み（`analysis/invitation.rs`）。散歩の促進は行わず（2026-11-03 研究者の言・身体が動いたことは測らない・ADR-024 D5・ADR-018 D3）、身体活動のセンシングは本体から外してある（ADR-017 D10）。
+- **介入の今**: Nudge は本体では出さない（ADR-040 D1・既定は無効。判断のロジックは `gse-replay --intervention` の評価に残す）。
+  段 1・段 2 の主の比べで、推定（HMM 0.5.0）は契機を作らない。HMM は段 1 の終わりまで直さない（ADR-044・ADR-047 D2。既存の EH3 モードと通常のモードの第 2 週の招待は、今の推定を契機にしている）。
+  招待は EH3 モードと通常のモードの第 2 週で動く実装があるが、EH3 は研究として実施しない（ADR-049）。段 1 は招待を出さない（ADR-043）。
 - **主要技術**: Tauri 2.0 + Rust (Backend: KB Hook / HMM / ONNX) + React/TypeScript (Frontend)
   + Python/PyTorch (ML 学習) + Flutter (ストレッチ: Physical Anchor)
 - **ターゲット**: Windows 11 (Surface Pro 8 + Type Cover) + macOS 13+ (Accessibility / Input Monitoring)
 - **チーム規模**: 小規模 (2-3 人)
-- **重視する品質特性**: 正確性 (認知状態推定の精度、誤判定の最小化)
-- **現フェーズ**: v0.3 較正 (キャリブレーション)。データ収集より先に設計懸念に対応する v2 再設計を実装中。
+- **重視する品質特性**: 正確性（観測と記録の正しさ・見分けられない所で判断しないこと）とプライバシー（本文を保存しない）
+- **現フェーズ**: 次の検証の段 1 の準備。研究者本人の探索（macOS）→ 事前登録の凍結 → 本人を除く 3 名の確認（ADR-052）。
+  Phase1（v0.3 較正）は 2026-08-18 に終了した（GATE3 はデータ不足）。O1（自然作業の常時収集・ADR-014）の記録は形成的。
 
 ## アーキテクチャ要約
 
@@ -60,7 +57,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
   `capabilities.rs` (収集能力の自己記述・ADR-013)、`overlay_panel.rs`
 - `src-tauri/src/bin/` — `gse-replay` (回帰/評価 CLI)、`gse-cohort` (被験者横断判定)、`emit_schema` (JSON Schema 生成)、
   `gse-package` / `gse-unpack` / `gse-submit` (`--features package`)
-- `docs/` — 永続ドキュメント (**25 md**・2026-10-07 に数え直した + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + ★ `theory/`)
+- `docs/` — 永続ドキュメント (**22 md**・2026-11-15 に数え直した + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + `theory/` + `history/`（履歴・ADR-053）)
   ★ `docs/theory/` は理論の文書（**theory candidate・`EH0`・SSOT の主張ではない**。2026-09-19 に `.idea/` から移した）
 - `.steering/` — タスク単位の作業記録 (`[YYYYMMDD]-[task-name]/`)
 - `.claude/` — Claude Code 用 (skills / agents / commands / hooks)
@@ -196,33 +193,27 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/development-guidelines.md` | コーディング規約・テスト方針・レビュー基準を確認したい時 |
 | `docs/glossary.md` | 用語の正確な定義を確認したい時 (禁止用語の確認も含む) |
 | `docs/external-skills.md` | 公式 (anthropics/skills) 由来の Skill 一覧、外部 LLM 送信可否 |
-| `docs/research-positioning.md` | 研究の問い・差分・主張範囲 (機会保存/学習効果の分離) を確認したい時 |
+| `docs/research-positioning.md` | 研究の問い・主張・段 1/段 2 の設計・主張の上限・新規性の範囲を確認したい時（現行版・ADR-053） |
 | `docs/preregistration-v0.3.md` | Phase1 の凍結された合否契約 (PreReg-1..8・GATE1–3) を確認したい時 |
 | `docs/preregistration-p1-episode.md` | ★ **P1 の episode 定義パラメータ** (`W` / `q` / `B` / `hole_gap_ms` / `warmup_count` / 分位点の推定法 / `T1a` の窓) を確認する時。⚠️ **v0.3 とは別の契約**（向こうは較正スモークの合否、こちらは P1 の解析パラメータで**合否を判定しない**）。★ 値の SSOT は `src-tauri/prereg/p1-episode.json`（`gse-replay --features` が既定として読む）。一致は `scripts/check_prereg_parity.py` が検査する |
 | `docs/preregistration-stage1.md` | 次の検証の段 1（C4 を取る段・ADR-043。主の対象は停滞で、詰まりは中身の 1 つ・ADR-045）の事前登録を確かめる・書く時。草案で凍結していない（値は研究者本人の段 1 の探索の後に埋め、凍結の前に attack-me をかける） |
-| `docs/wbs-verification-halfyear.md` | 検証の 26 週マイルストーン・WBS・改訂予定を確認したい時 |
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜051**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜053**) の根拠を確認したい時 |
+| `docs/history/README.md` | 履歴へ移した・削除した文書の旧パスを辿る時（ADR に書かれた旧パスもここで引く）。履歴は現行の根拠に使わない |
+| `docs/mitou_submission/review-response-2026.md` | 2026 年度未踏の不採択コメントの論点ごとに、今の対応と状態を確かめる時（内部の追跡表） |
 | `docs/theory/README.md` | 理論（生成的返権論ほか・theory candidate）を読む時。⚠️ **SSOT の主張ではない**（RP §1 は問いとして参照するだけ） |
 | `docs/architecture/gse-design-map.md` | 今の設計の地図（層ごとに決まったこと・実装の状態・未決・根拠の ADR）と、段 1 の配布までの道筋・プローブの配線（ADR-031 M5）の設計を確かめる時。状態の文書で、決定の一次は ADR |
-| `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
 | `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |
 | `docs/o1-deletion-ledger.md` | ⚠️★★★ **進行中の O1 の削除保証台帳**。被験者からの削除要求に対応する時（★ 同意文書が逐語で約束している「記録に残します」の実体） |
 | `docs/o1-distribution-tag.md` | ★ **O1 の配布物を作る / 配る時**。`--mode o1` に使ってよいリリースタグ（最新節）・zip の SHA-256・実体検証の記録。⚠️ G1 の配布タグ（`experiments/20260801-controlled-friction-task/distribution-tag.md`）とは別 |
 | `docs/g1-deletion-ledger.md` | ⚠️★★★ **G1 の削除保証台帳**。G1 の被験者からの削除要求に対応する時（★ O1 版と対になる文書・前提条件 8） |
 | `docs/person-lifecycle-ledger-template.md` | 人単位のライフサイクル台帳（G1/O1 それぞれの進み具合・「やめた」「削除の求め」の記録）を構築・参照する時 |
-| `docs/architecture/intervention-decision-engine.md` | 介入決定エンジン (Layer 5-7) の設計を確認する時 |
-| `docs/architecture/domain-adapter-boundary.md` | ドメインアダプタ境界 (Layer 0-3) の設計を確認する時 |
-| `docs/architecture/personalization-and-online-learning.md` | 個人化・オンライン学習 (ADR-008 / ADR-009) を確認する時 |
-| `docs/architecture/task-adaptation-and-scope-gating.md` | task_kind 適応・scope gating (ADR-010) を確認する時 |
-| `docs/verification-runbook.md` | ★ **リリース前・マージ前の検証**を上から実行する時 |
+| `docs/verification-runbook.md` | ★ **リリース前・マージ前の検証**を上から実行する時。研究者デバッグ起動（二重 gate）は §2.0 |
 | `docs/pilot-runbook.md` | パイロットの受領 → 復号 → metrics 結合を行う時（★ `.age` の復号手順はここ） |
-| `docs/calibration-smoke-runbook.md` | 較正スモークを回す時・研究者デバッグ起動の手順 |
 | `docs/participant-setup-guide.md` | 被験者のセットアップを案内する時（★ **被験者向け文書は契約**） |
 | `docs/loop-engineering.md` | issue 単位の自律ループを回す時（★ 用語 / Done・Stop / budget の SSOT） |
-| `docs/design-history.md` / `docs/design-history.ja.md` | ⚠️ **履歴文書**。過去の実装 (v2.1–v2.22) を調べる時のみ（★ 現行仕様の根拠には使わない） |
 | `docs/architecture/expression-channel.md` | 表現チャネル (媒体分離・PC↔スマホ境界・復帰後の差分の扱い・曝露予算) を確認する時。⚠️★★★ **決定は ADR-017 だけではない** —— ★ **現行の裁定は ADR-021 (未決 11 件を確定) / ADR-022 (層 A の媒体実装制約) / ADR-025 (層 A に数値を添えない) / ADR-026 (招待を差し出す PC 面の要件) / ★★★ ADR-027 (境界イベントの発火・初期同期・解除) / ★★★ ADR-028 (生存を信号で示さず、失効を曝露の契機で判定する ＝ `W-3` を閉じた)**。⚠️ **ADR-017 単独で読むと古い契約を掴む** (例: `level` の 4 値は ADR-021 D4 が「作業状態 3 値 ＋ `invitation` 二値」へ改訂済み。★ **発火条件「`level` が変わったときだけ」も ADR-027 D1 が「意味フィールドの組が変わったとき」へ改訂済み**)。★ ADR 本文は書き換えない規約なので、**必ず番号の大きい方まで読む** |
 
 ## 公式 Skill (Phase 2 で導入)

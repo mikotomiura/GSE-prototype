@@ -1,3 +1,6 @@
+> **履歴の文書（2026-11-15 に移した）。** 元のパスは `docs/architecture/intervention-decision-engine.md`。現行の根拠に使わない（ADR-053）。現行は `docs/research-positioning.md`・`docs/architecture/gse-design-map.md`・`docs/adr/`。
+> 写しの元: main `6fdd4023`。本文は移す前のまま変えていない。
+
 # Intervention Decision Engine — Layer 5-7 (SSOT)
 
 > **ステータス**: Accepted（方向性・Need/Opportunity/none/defer は既に実装済み）。`gse-v2-overview.md` の

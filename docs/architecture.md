@@ -1,5 +1,7 @@
 # 技術設計書
 
+> 現行版（2026-11-15 に古い記述を直した・ADR-053）。直す前の全文は `docs/history/architecture-2026-11-15.md`。機能の意図は `docs/functional-design.md`、研究の主張は `docs/research-positioning.md`、決定の一次は ADR、実装の状態の地図は `docs/architecture/gse-design-map.md`。
+
 ## 1. アーキテクチャ概要
 
 ### 全体図
@@ -10,7 +12,7 @@
 │                                                              │
 │  ┌──────────────┐    ┌──────────────┐                        │
 │  │ Main Window  │    │   Overlay    │   React 19 / TS        │
-│  │ (Dashboard)  │◄──►│   (Nudge)    │   500ms polling        │
+│  │ (Dashboard)  │◄──►│(カード・招待)│   500ms polling        │
 │  └──────┬───────┘    └──────┬───────┘                        │
 │         │    Tauri IPC      │    Tauri Events                │
 │ ════════╪═══════════════════╪════════════════════════════════│
@@ -54,10 +56,7 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
-> ⚠️★★★ **2026-08-23: `wall_server.rs`（QR → Phone → Zen Timer → POST の tiny_http サーバー）は
-> 全削除された**（**ADR-015 D1**）。★ 図からも外してある。
-> ★ **PC ↔ スマホの境界を作り直す場合の設計は `docs/adr/ADR-017-expression-channel-boundary.md`**
-> （★ PC → スマホの一方向イベント / ⚠️ **PC 側に常設の LAN リスナを置かない**）。
+> 図に無いもの: 段 1 の駆動スレッド・手跡の窓と読みのスレッド・招待と肖像の runner（下の §3 と §4 の各層）。GSE はローカルの HTTP ポートを開かない（`wall_server.rs` は ADR-015 D1 で削除）。PC とスマホの境界を作るときは ADR-017（PC → スマホの一方向・常設の LAN リスナを置かない）。
 
 ### 採用したパターン
 
@@ -86,7 +85,7 @@
 
 ## 3. スレッドモデル
 
-GSE は 8 つのスレッド/タスクで構成される (★ G1 モード時のみ 2 つ増える。⚠️ **Cloak Resolver は Windows のみ**)。
+GSE は次のスレッド/タスクで構成される。G1・段 1・手跡のモードでだけ増えるものがある。Cloak Resolver は Windows のみ。
 
 | スレッド | 責務 | 通信方式 | 優先度 |
 |---|---|---|---|
@@ -99,21 +98,13 @@ GSE は 8 つのスレッド/タスクで構成される (★ G1 モード時の
 | **Logger** | NDJSON バッファリング + フラッシュ | Bounded channel (512) | 低 |
 | **Probe Scheduler** | v0.3 較正: ランダム時点プローブの一様時刻生成 (Poisson+thinning) → `probe_assignment` ログ + `probe_triggered` emit。純ロジックは `analysis/probe_scheduler.rs` (OS API 非依存) | Atomic SESSION_START_MS 読取, LogEntry Sender, AppHandle emit | 低 |
 | **G1 Block End** | ★ **G1 モード時のみ起動**。`g1::BLOCK_DURATION_MS` (5 分) でブロックの記録を終了し、`BlockEnd` 送信 + `g1-block-ended` emit | Atomic SESSION_START_MS / ANALYSIS_IDLE, LogEntry Sender, AppHandle emit | 低 |
+| **S1 Driver** | 段 1 のモードのときだけ。1 秒ごとに調停器（`analysis/probe_arbiter.rs`）を回し、問いを overlay に出す（下の「段 1 の層」） | LogEntry Sender, AppHandle emit | 低 |
+| **Handmark Pointer** | 手跡の日のときだけ。16ms ごとにカーソルの一点と左の押下を読み、手跡の窓へだけ送る（記録しない・ADR-050） | 手跡の窓への専用イベント | 低 |
 | **G1 Duplicate Check** | ★ **G1 モード時のみ・起動 1 回**。他の GSE プロセスを OS に問い合わせ (`pgrep` / `tasklist`)、居れば `second-instance-blocked` emit | AppHandle emit | 低 |
 
-⚠️★★★ **2026-08-23: `IME_ACTIVE` は推論を止めない (記録のみ)。**
-★ 旧設計は「IME 候補ウィンドウ表示中は HMM 推論を一時停止する」だったが、
-⚠️ 実測でこの信号は**候補リスト表示ではなく変換セッション全体**(ローマ字入力〜確定)を
-覆うと分かった。→ ★ pause すると日本語論述の推定窓が **約 56〜60%** 消える
-(⚠️ 実データ fixture `phase1_ime_heavy` では **94%**)。
-→ ★ 研究者判断で `lib.rs` と `analysis/loop_step.rs` の両方から `set_paused` を外した
-(`HMM_VERSION` 0.4.0 → **0.5.0**)。詳細は
-`.steering/20260823-ime-active-cloak-rewiring/decisions.md` D-10。
+`IME_ACTIVE` は推論を止めない（記録のみ）。この信号は候補リストの表示ではなく変換セッション全体（ローマ字入力〜確定）を覆うので、止めると日本語の論述の推定窓の約 56〜60% が消える。HMM 0.5.0 で止めるのをやめた（`.steering/20260823-ime-active-cloak-rewiring/decisions.md` D-10）。
 
 純スケジューリング (指数間隔・thinning・窓計算・不透明 ProbeId 生成) は `analysis/probe_scheduler.rs` に隔離し OS API を呼ばない。スレッド起動・実時刻取得・emit・hotkey 配線は `lib.rs` 側に閉じる (architecture-rules)。
-
-⚠️★★★ **2026-08-23 削除**: 旧文「Wall Server は Lv2 介入時にのみ起動する一時的なスレッド」は
-`wall_server.rs` の全削除により無効（ADR-015 D1）。★ **現行に一時起動スレッドは無い。**
 
 **macOS 固有のスレッド動作:**
 - Hook Thread: CGEventTap を CFRunLoop に登録し、専用スレッドで CFRunLoopRun() をブロッキング実行。タップ無効化時は自動再作成ループ（3 秒ポーリング）
@@ -203,33 +194,20 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **記録**: 実際に走った head は `session_meta` の `head_id` に残る。
   ⚠️ `FeatSnapshot` には入れない（ゴールデン snapshot が壊れるため）
 
-### 4.5 analysis::intervention — Opportunity MVP
+### 4.5 analysis::intervention — Nudge の判断（本体の既定では出さない）
+
+本体の既定では Nudge を出さない（`lib.rs` の `INTERVENTION_ENABLED` の初期値が無効・ADR-040 D1）。判断のロジックは時機のオフライン評価（`gse-replay --intervention`）に残す（ADR-040 D2）。
+
 
 - **責務**: Need (`p_stuck`) と Opportunity (`idle_ms`, F3/F4/F6, cooldown, daily cap, recent dismiss) を統合し、`none` / `nudge` / `defer` を返す
-  （⚠️ **2026-08-23 訂正**: `wall` action と Monk Mode は削除された — ADR-015 D1 / D2。★ **ACT = `{nudge}`**）
 - **依存先**: なし（純粋な計算）。OS API、Tauri、logger には依存しない
 - **インターフェース**:
   - `InterventionPolicyState::decide(input) -> DecisionResult`
   - `InterventionPolicyState::record_dismiss(action, now_ms)`
   - `InterventionDecision` は Tauri IPC で Frontend に返され、NDJSON `intervention_decision` としても記録される
 - **状態管理**: Tauri state の `InterventionState(Arc<Mutex<InterventionPolicyState>>)` が cooldown / daily cap / last decision を保持する
-  （⚠️ **2026-08-23 訂正**: `wall_accum_ms`（Wall 累積時間）は削除 — ADR-015 D1）
-- **MVP パラメータ**: Nudge `p_stuck >= 0.60`, Nudge cooldown 10 分, Nudge cap 6/day
-  （⚠️ **2026-08-23 訂正**: Wall の閾値 6 種 / cooldown / daily cap は削除 — ADR-015 D1）
+- **パラメータ**: Nudge `p_stuck >= 0.60`, Nudge cooldown 10 分, Nudge cap 6/day
 - **設計判断**: Main Window の `get_intervention_decision` 呼び出しだけが policy state を進める。Overlay Window は `last_decision` を読み取るだけにし、2 つの WebView による cooldown / cap の二重進行を防ぐ
-
-### 4.6 ⚠️★★★ wall_server — **削除済み**（2026-08-23・ADR-015 D1）
-
-- ⚠️★★★ **`src-tauri/src/wall_server.rs` は存在しない。**
-  ★ 旧責務（Lv2 介入の HTTP サーバー + QR コード生成 + スマートフォン連携・`start()` / `stop()` ・
-  Windows Defender ファイアウォールルール管理）は**すべて削除された**。依存 `tiny_http` / `qrcode` も外した。
-- ⚠️ **PM-D11 が Physical Anchor の運搬路として再利用する前提だった経路であり、その前提は覆っている**
-  （ADR-015 D4）。
-- ★ **PC ↔ スマホの境界を作り直す場合の設計は `docs/adr/ADR-017-expression-channel-boundary.md`**:
-  **PC → スマホの一方向の抽象状態イベント**（`level` / `seq` / `emitted_at` のみ・`level` 変化時だけ発火）で、
-  ⚠️ **inbound の「歩いた」二値経路を第 1 版で作らない**／⚠️ **PC 側に常設の LAN リスナを置かない**。
-  ★ 表現チャネル全体は `docs/architecture/expression-channel.md`。
-- ⚠️★★★ **削除済みの LAN HTTP サーバを無審査で復活させない**（ADR-017 D4）。
 
 ### 4.7 logger — セッションロガー
 
@@ -257,7 +235,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
   (前ブロックの `truncate` による静かな全損の防止)。
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 - **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
-- **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, reason, suppressed_by }` を追加（⚠️ **2026-08-23 に `wall_accum_ms` を削除** — ADR-015 D1・NDJSON schema の破壊的変更として gse-dataset と parity 同期済み）。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
+- **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, reason, suppressed_by }` を追加。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
 - **v0.3 較正バリアント**: `LogEntry::ProbeAssignment` (プローブ時刻の監査記録) / `LogEntry::ReviewMarker` / `LogEntry::SessionMeta` (track/task_kind 宣言・セッション開始 UI) / `LogEntry::RealtimeLabel` (Q1/Q2 プローブ回答・**アプリ内 ProbeCard 経由**で `record_realtime_answer` から emit) は production で emit される (NDJSON で着地を確認済み)。一方 `LogEntry::VignetteResponse` (尺度理解テスト) は **schema (`schema_dto`) と format 関数・テストには存在するが、UI 経路が未配線でまだ emit されない**。いずれも schema drift check の対象に含まれる
 
 ### 4.8 Ground Truth ラベリング経路 (Phase 1)
@@ -430,7 +408,7 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
   |---|---|---|
   | 1 | ⚠️★★★ **分析スレッドの門を通す** (`o1::analysis_gate_open`) | ★ 「開始する」を押さないと **打鍵だけが静かに欠け**、⚠️ **計器の欠損が「非打鍵区間」に化ける** (ADR-016 判断 4b-0) |
   | 2 | ⚠️★★★ 稼働中インジケータと `liveness` が **`recording_active` (= `!paused`)** を見る | ★ `session_active` は永久に false なので、放置すると「**記録しているのに『記録していません』**」と出て**同意文書 §4 の逐語と矛盾**し、`starved_ms` は**永久に 0** = フック死を検出できない |
-  | 3 | ★ 介入を出さない (`INTERVENTION_ENABLED = false`) | ★ 判断 O1-5。⚠️ **既定は `true`** なので何もしなければ出る |
+  | 3 | ★ 介入を出さない (`INTERVENTION_ENABLED = false`) | ★ 判断 O1-5。本体の既定も無効（ADR-040 D1）だが、O1 では明示で止める |
   | 4 | ★ スタート画面を出さず、宣言は `RecordingControls` から行う | ⚠️ 押させると `record_session_meta` が走り **未宣言を表せなくなる** (判断 4b-3) |
   | 5 | ★ 宣言 1 回 = **ローテート → `engine.reset()` → `session_meta`** (`lib.rs::o1_rotate`) | ⚠️ ローテートしないと `gse-replay` が「相異なる `task_kind` が 2 つ」で `Err`。⚠️ reset しないと新ファイル先頭 30 秒が前ファイルに依存する |
   | 6 | ★ **24 時間で日次ローテート** | ⚠️ `session_end` は Rotate / BlockEnd(G1) / 終了でしか書かれず、★ **閉じないファイルは提出候補にならない** |
@@ -489,7 +467,24 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 - 6 択の門は `o1::activity_label_allowed(段 1, 本人の同意の印)`。素の O1 では通さない（ADR-043 D8）。
 - `GSE_DISABLE_PROBES` は段 1 では見ない（立っていたら warn を 1 行・Windows の自動起動は launcher を通らないため）。止めるときは `s1.mode` を外す。
 - 配布: `make-common-app-zip.sh --mode s1` が本人の試し（R5）の配布物だけを組む（`o1.mode` と、中身 `audience=self` の `s1.mode`・launcher `launch-s1-windows.bat`）。配る前に `scripts/check-s1-release-readiness.sh --audience self --dist <Windows の zip> --dist <macOS の zip>` を通す（片方の OS だけなら `--os-only windows|macos`）。この門は組み立てと launcher・段 1 を含むタグの新しさ・同意（他の参加者向けは段 1 の同意文書の承認の印 `<!-- s1-esm-consent: approved -->`）・配布物の印と中身（`eh3.mode`・`g1.mode` の不在、本人用の配布物を他の参加者向けの門で弾く）・自動送信に要るファイル・launcher が repo の段 1 の launcher とバイト一致することを見る。O1 の門は、`s1.mode` の書き出しが段 1 の分岐（`[ "$MODE" = s1 ] &&`）の中にだけあることを確かめる。
-- 詳細: `.steering/20261106-gse-m5-s1-core/`・`.steering/20261107-gse-m5-s1-driver-ui/`・`.steering/20261107-gse-m5-s1-replay-gate/`・`docs/functional-design.md` の段 1 の節。
+- 詳細: `.steering/20261106-gse-m5-s1-core/`・`.steering/20261107-gse-m5-s1-driver-ui/`・`.steering/20261107-gse-m5-s1-replay-gate/`・`docs/functional-design.md` §3.6。
+
+### 手跡の層（段 1 の後期・ADR-050・051・macOS）
+
+段 1 のモードで、入口の門（割付の表と SHA-256）が通る日だけ動く。それ以外の日は窓も読みも作らない。
+
+| 層 | 置き場 | スレッド | 記録 |
+|---|---|---|---|
+| 割付・入口の門・日ごとの行 | `handmark_stage.rs`・`handmark_store.rs`・`handmark_driver.rs` | 分析スレッドと駆動役 | `handmark_day`（割付・表示の量 `visible_ms`・入れ切りの時刻・種・出せなかった理由） |
+| 打鍵の状態 | `analysis/handmark/state.rs`（純関数・250ms の格子） | 分析スレッド | 記録しない |
+| カーソルとクリックの跡 | `handmark_pointer_thread.rs`（16ms の読み）→ `analysis/handmark/trace.rs`（場・0 へ戻る） | Handmark Pointer | 記録しない（ADR-050 D2） |
+| 背景の窓・下の縁の帯 | WebView・`handmark_edge_strip.rs` | WebView | 記録しない |
+| 守り | `handmark_guard.rs`（型・ソース・振る舞いの検査） | テスト | — |
+
+- ポインタの値（座標・押下・場・画面の大きさ）は、記録・applog・`tracing`・提出物・ネットワーク・推定のどこにも入れない（ADR-050 D2〜D4）。記録の一時停止の間は、両方を切ったのと同じに扱う。
+- 区間の削除と一時停止の間の手跡の量・時刻は残さない（PR #411・ADR-052 D2）。
+- 再生は `pointer_bin` の 1 秒の量から合成の軌跡を作って同じ関数に入れる（`trace_replay.rs`・位置は再現できない・ADR-051 D3 の限界）。
+- 詳細: `docs/functional-design.md` §3.7。
 
 ## 5. データフロー
 
@@ -508,12 +503,9 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 11. Frontend が 500ms ポーリングで get_cognitive_state を呼び出し
 12. ダッシュボード/オーバーレイに反映
 
-### フロー 2: Opportunity 判定と Lv1 Nudge 介入
+### フロー 2: Nudge の判断（本体の既定では出さない）
 
-> ⚠️★★★ **2026-08-23 改訂**: 旧フローは **Lv2 Wall**（QR → Zen Timer → `POST /unlock`）を記述していたが、
-> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。通常モードで出る介入は Nudge だった（2026-11-03 更新: PC 側の身体回帰の招待は EH3 モードで実装済み・`analysis/invitation.rs`。散歩の促進とその計測は行わず、身体回帰の後は離席候補明けの作業上の状態（打鍵の再開と受領の有無・フォーカスの遷移・ポインタ）で見る〔2026-11-03 研究者の言・ADR-024・ADR-023 D4・ADR-016〕）。
-> ⚠️ **2026-10-31 改訂**: ADR-040 D1 で **Nudge も既定で無効**にした（`lib.rs` の `INTERVENTION_ENABLED` の初期値と、開始画面の第2週の `interventionEnabled` を false）。
-> 下のフローは介入が有効なとき（研究者が戻したとき）の経路であり、判断のロジックは `gse-replay --intervention` の評価に残す（D2）。招待は EH3 モードと、通常のモードの第 2 週で動く（上の「招待の契機と通常のモードの配線」）。
+本体の既定では Nudge を出さない（ADR-040 D1）。下は研究者が介入を有効に戻したときの経路で、判断のロジックは `gse-replay --intervention` の評価に残す（ADR-040 D2）。招待の経路は §4 の「招待の契機と通常のモードの配線」。
 
 1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
 2. Main Window が 500ms ごとに `get_intervention_decision` を invoke
@@ -523,83 +515,25 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 6. action が `nudge` の場合、Overlay がメタ認知質問を**非ブロックで**表示する
    （⚠️ **クリック透過・自動消失**。★ 画面を塞がない）
 7. ユーザーの dismiss / 無操作を `intervention_response` として記録する
-   （⚠️ **`elapsed_ms` を書く経路は Wall 削除で無くなり、現状 production では常に `null`** — ADR-015 Consequences）
-8. Physical Anchor の PC 側の招待は EH3 モードで実装済み（`analysis/invitation.rs`）。散歩の促進とその計測は行わない（2026-11-03 研究者の言。歩数・位置は ADR-017 D10 で本体から外してある）。身体回帰の後は、離席候補（打鍵の途絶 180 秒以上）明けの作業上の状態で見る。主は打鍵の再開と受領の有無（ADR-024 D1・D3）、副はウィンドウを離れずに再開したか（フォーカスの遷移・ADR-040・ADR-041 D3）。離席候補とフォーカスの遷移は別の腕として解析する（ADR-023 D4）。ポインタ（移動・ボタン・ホイール）は、打鍵の無い作業を離席と取り違えないために記録し（ADR-014・ADR-016）、停滞の型の手の様子（移動やクリック・フォーカスの離脱）にも使う（ADR-041 D2）。身体が動いたことは測らない（ADR-024 D5・ADR-018 D3）（2026-11-03 更新）。段階呼称 Lv3/Lv4 は ADR-018 D7 で廃止方向。★ 第 1 版の境界の形は **ADR-017 D3** が確定している
-   （PC → スマホの一方向イベント / inbound を作らない / ⚠️ **完了条件は課さない** —— ADR-018 D1 で
-   既決 D11 条件 2「完了条件は時間・往復」は取り下げ済み）
-
-### フロー 3: Ground Truth ラベル記録 (Phase 1)
-
-1. ユーザーがホットキー (`⌘⇧⌥ F/I/S` on macOS) を押す
-2. `tauri-plugin-global-shortcut` のハンドラが fire、modifier + Code マッチで `UserLabelKind` を決定
-3. `record_label_internal(log, label)` を呼び出し、`AtomicU64::compare_exchange` で 2 秒デバウンス (Tauri コマンド経路と同じヘルパーを共有)
-4. デバウンス通過時: `SystemTime::now()` で timestamp 付与、`log_tx.try_send(LogEntry::UserLabel { timestamp, label, recovered_at: None })`
-5. logger スレッドが 5 秒フラッシュ間隔で NDJSON に書き出し (`format_user_label_line`)
-6. `app.emit("user_label_recorded", {label, timestamp})` で Tauri event 発火
-7. Dashboard の `listen<...>` ハンドラが state 更新 → counter widget 再レンダリング
-8. デバウンス失敗時: `tracing::warn!("debounced")` のみ、UI 変化なし
-
-### フロー 4: `gse-replay --metrics` によるオフライン集計 (Phase 1)
-
-1. 開発者が `cargo run --bin gse-replay -- <session.ndjson> --metrics [--json]` を実行
-2. `parse_args` が `--metrics` / `--snapshot` の排他、`--json` が `--metrics` 必須を検証
-3. `collect_logged_feats` が NDJSON を読み `{"type":"feat",...}` 行を `FeatSnapshot` として抽出 (production が wall-clock で書いた値を source of truth とする)
-4. `collect_user_labels` が NDJSON を 2 度目に開き `{"type":"user_label",...}` 行を抽出
-5. `analysis::metrics::compute_session_metrics` が以下を算出:
-   - `nearest_feat` で各ラベルに対応する FeatSnapshot を取得 (±1 秒窓)
-   - `argmax_class` で推定クラスを決定 (Flow > Inc > Stuck のタイブレーク)
-   - 混同行列に加算、警告は `warnings` Vec に集約
-   - `detection_lead_ms` を ±60 秒窓内の最近傍同クラス feat で計算
-   - Stuck ラベルは `compute_pflow_exit_at` で p_flow > 0.5 到達時刻を探す
-6. `format_pretty` または `serde_json::to_string_pretty(&metrics)` で出力
-7. 開発者が出力を `gse-dataset/metrics/P000/<os>/` にコピーして commit (UC-GT3)
-
-> **Note (2026-04-16)**: フロー 4 step 3 は以前 `run_replay` による step() 再実行で FeatSnapshot 列を生成していたが、virtual-clock tick と label の wall-clock 時刻が揃わず label 近接の feat を取りこぼすバグ (`.steering/20260416-replay-feat-alignment-bug/`) が顕在化。`collect_logged_feats` に切替済み。`run_replay` は `--snapshot` / デフォルト JSON 出力 (step() 決定論検証) 用途に残している。
-
-### フロー 4b: `gse-replay --calibration` による v0.3 較正解析 (Task D・オフライン)
-
-1. 開発者が `cargo run --bin gse-replay -- <s1.ndjson> [s2.ndjson ...] --calibration [--json]` を実行 (1 被験者の複数セッションを時刻順)
-2. `parse_args` が全モード排他と `--calibration` の可変長 positional (≤`MAX_CALIBRATION_FILES`)・`--json` 条件を検証
-3. 各ファイルで `load_calibration_session` が 1 パスで `session_meta`(track) / `probe_assignment`(件数) / `realtime_label`(→`ProbeRecord`) / `vignette_response`(→`VignetteRecord`) を抽出 (未知 enum・範囲外 q1/q2 は件数のみ warn で skip)、X/Y 源の `feat` は `collect_logged_feats` を再利用
-4. `analysis::calibration_eval::compute_calibration_metrics` が以下を算出:
-   - **時間隔離窓** (t−31s..t−1s) の `feat` を `AggSpec`(既定 ewma 中央値) で X/Y 集約 (probe 後窓は不使用 D-8)
-   - **前向き holdout**: 先頭 2 セッション = 較正・残り = 評価 (§8)。C-index は評価セッションのみ
-   - **方向付き C-index** (X↔Q1 / Y↔Q2)、**2段ゲート**、**MNAR 上下限**、**ビネット採点**、**二軸性**、Recall は withheld
-   - `track=exploratory` は主指標から除外 (§1.3)
-5. `format_calibration_pretty` または `serde_json::to_string_pretty(&report)` で出力 → `gse-dataset/metrics/P*/<os>/`
-6. 被験者**横断**の最終 Go/Kill 判定 (`model_gate`/`measurement_gate` は純関数として実装済) と実データ評価は Task E
-
-> **Note**: 既存 `metrics.rs` の confusion/precision/recall は v0.2 流のため流用せず (D-14)、C-index 系は独立モジュール `calibration_eval.rs` に実装。`ReplayEvent` に較正 4 variant を追加したが `timestamp()==None` で snapshot 経路 (`run_replay`) からは除外され、既存スナップショット回帰に影響しない。
-
-### フロー 5: JSON Schema 生成と CI drift 検知 (Phase 1)
-
-1. 開発者が `logger::LogEntry` を変更 (例: Phase 2b で `ImeShadow` バリアント追加)
-2. `schema_dto::LogEntryDto` を同期して mirror 型を更新
-3. `cargo run --bin emit_schema > src-tauri/schema/current.json` で生成物を更新
-4. gse-dataset 側に `cp src-tauri/schema/current.json /path/to/gse-dataset/schema/current.json`
-5. 両 repo で commit + push
-6. CI (`.github/workflows/ci.yml` の `check` ジョブ) が両 OS で `emit_schema` を走らせ、
-   `diff src-tauri/schema/current.json /tmp/emitted.json` で drift を検知
-7. drift がある場合 CI FAIL — 開発者が forgot-sync を発見して対応
+   （`elapsed_ms` は production では常に `null`・ADR-015 Consequences）
 
 ## 6. 外部システム連携
 
 | システム | 連携方式 | 認証 | 失敗時の挙動 |
 |---|---|---|---|
 | Win: Keyboard Hook | WH_KEYBOARD_LL (SetWindowsHookEx) | なし（OS 権限） | フック登録失敗 → 推定不能、アプリは起動 |
-| mac: CGEventTap | core-graphics CGEventTap | TCC Input Monitoring or Accessibility | 権限未付与 → ポーリング再試行、10 回失敗で Accessibility フォールバック |
+| mac: CGEventTap | core-graphics CGEventTap | TCC Input Monitoring or Accessibility | 権限未付与 → ポーリング再試行、3 回連続の失敗で Accessibility フォールバック（`hook_macos.rs` の `consecutive_failures >= 3`） |
 | Win: IME API | ImmGetOpenStatus, WinEvent | なし | フォールバック検出（VK_DBE_\* → polling） |
 | mac: TIS API | TISCopyCurrentKeyboardInputSource (Carbon) | なし | dispatch_sync_f で main GCD queue に dispatch（HIToolbox 制約） |
 | mac: TCC System | CGPreflight/CGRequest, AXIsProcessTrusted | OS 権限 | tccutil reset でリカバリ可能。Dashboard に TCC リセットボタンあり |
-| ~~Wall Server (Phone)~~ | — | — | ⚠️★★★ **2026-08-23 に削除**（ADR-015 D1）。★ 再設計は ADR-017 |
-| ~~Win: Defender Firewall~~ | — | — | ⚠️ **Wall Server と共に削除**（ADR-015 D1） |
 | ファイルシステム | std::fs (NDJSON ログ) | なし | 書き込み失敗 → ログドロップ、推定継続 |
 | Win: Global Shortcut | `tauri-plugin-global-shortcut` (RegisterHotKey) | Capabilities 2 件 | 登録失敗 → `tracing::warn!` で継続、GT ラベリングなしでも動作維持 |
 | mac: Global Shortcut | `tauri-plugin-global-shortcut` (Carbon RegisterEventHotKey) | Capabilities 2 件 | 同上 |
 | **gse-dataset repo** (Phase 1) | git push/pull (`metrics/P*/<os>/*.metrics.json`) | GitHub 認証 | push 失敗 → ローカル保持、次回同期。生 NDJSON は絶対に repo に置かない |
 | **JSON Schema sync** (Phase 1) | 手動コピー (`cp src-tauri/schema/current.json gse-dataset/schema/`) | — | CI drift check が両 repo の非整合を機械的にブロック |
 | **G1 自動提出** (2026-08-08) | HTTPS POST (`gse-submit --reconcile` → GAS Web App → 研究者 Drive) | 本文の共有シークレット (⚠️ GAS の `e` にヘッダが無いためヘッダ認証は不可能・実測) | ★ `.age` はローカルに残り `.sent` が付かない → **次の機会に自動で送り直す**。未送信件数をスタート画面に表示 (fail-loud)。⚠️ 送るのは `.age` のみで生 NDJSON の経路は存在しない |
-| 学習データ収集 (Phase 2+) | 未定 (gse-dataset 経由 or 別) | オプトイン同意 + 匿名化 | Phase 2 ML 訓練時に設計再検討 |
+| **O1・段 1 の自動提出** | HTTPS POST（収束器 → GAS Web App `Form_O1/GSE_O1_Submit.gs` → 研究者 Drive） | G1 と同じ形 | `session_end` から 48 時間の猶予の後・6 時間ごとに収束器。32 MiB を超える `.age` は送らず `oversize/` へ（`docs/functional-design.md` §3.9） |
+| 学習データの収集 | 作っていない | — | 提出は同意の範囲の `.age` だけ |
 
 ## 7. プラットフォーム抽象化
 
@@ -663,7 +597,8 @@ CGPreflightListenEventAccess()
 
 ### 採用しなかった選択肢（Windows）
 
-- **ITfThreadMgr グローバルフック**: UIPI によりブロックされるため、SetWindowsHookEx + WinEvent の組み合わせを採用
+- **他プロセスの TSF の観測**: `ITfThreadMgr` は呼び出したスレッドでしか有効にならず、他プロセスの変換を見る API が無い（UIPI が理由ではない・`docs/agent-shared.md` の技術的制約 7）。DLL 注入を伴うグローバルフックは使わない。WinEvent（out-of-context）を採用
+- **Wall と `wall_server.rs`**: ADR-015 D1 で削除。ローカルの HTTP サーバを無審査で戻さない（ADR-017 D4）
 - **winapi crate**: メンテナンス停止。公式の windows crate (v0.58+) を採用
 - **chrono**: 依存最小化のため手動で日時フォーマットを実装
 - **tauri-plugin-store**: 現時点では設定永続化の必要が薄いため未導入（将来導入予定）
@@ -687,44 +622,16 @@ CGPreflightListenEventAccess()
 
 ## 9. 拡張ポイント
 
-### ML モデル移行（計画済み）
+### 推定の段（ADR-019・046）
 
-- **現状**: 手動チューニング HMM（3×26 emission matrix）
-- **移行先**: ONNX Runtime による学習済みモデル推論
-- **変更箇所**: `analysis::engine` の `update()` メソッドを差し替え。FeatureExtractor は共通利用可能
-- **データ収集経路**: セッション終了後にオプトインでローカルログを匿名化し外部エンドポイントへバッチ送信。送信先・プロトコルは未定
-- **前提条件**: 十分なセッションログデータの蓄積（ローカル + 収集サーバー）
+- **現状**: 手で置いた HMM 0.5.0（3×26 の放出行列）が固定 baseline。段 1 の終わりまで直さない（ADR-044）。
+- **次の段**: criterion 直結の段（1 人ごと・固定 baseline の再較正と表の特徴の正則化ロジスティック回帰・`docs/preregistration-stage1.md` S1-E8）→ タスク適応 → 時系列（ROCKET 系・1 人ごとの EM）。昇格は人の中の時間順の holdout での較正で判定する（ADR-019 D3・ADR-046 D3）。
+- **変更箇所**: `analysis::engine` の `update()` を差し替える。`FeatureExtractor` は共通に使える。オフラインの候補の評価は `gse-replay` と `experiments/` で行う。
+- 学習のためにログを外部へ送る経路は作っていない。提出は同意の範囲の `.age` だけ（`docs/functional-design.md` §3.9）。
 
-### Physical Anchor
+### Physical Anchor（招待）
 
-> 2026-11-03 更新: 見出しの「未実装」を外した。PC 側の招待は EH3 モードで実装済み（`analysis/invitation.rs`）。散歩の促進とその計測は行わない（2026-11-03 研究者の言。歩数・位置は ADR-017 D10 で本体から外してある）。身体回帰の後は、離席候補（打鍵の途絶 180 秒以上）明けの作業上の状態で見る。主は打鍵の再開と受領の有無（ADR-024 D1・D3）、副はウィンドウを離れずに再開したか（フォーカスの遷移・ADR-040・ADR-041 D3）。離席候補とフォーカスの遷移は別の腕として解析する（ADR-023 D4）。ポインタ（移動・ボタン・ホイール）は、打鍵の無い作業を離席と取り違えないために記録し（ADR-014・ADR-016）、停滞の型の手の様子（移動やクリック・フォーカスの離脱）にも使う（ADR-041 D2）。身体が動いたことは測らない（ADR-024 D5・ADR-018 D3）。
-
-> ⚠️★★★ **2026-09-01 訂正 —— 見出しから段階呼称「Lv3/Lv4」を外した**（ADR-018 D7）。
-> ★★★ **ADR-018 D1 / D2: 系は開始も完了も判定しない。** Physical Anchor が提示するのは
-> **「いま画面から離れる」という方向づけ（invitation）**であり、
-> **時間長・往復回数・再開のタイミングに系の側の閾値を置かない。**
-> ⚠️★★★ **タイマー・カウントダウン・残り時間表示を実装しない**
-> （★ これらは閾値を持たないと表示できず、持った瞬間に D1 が崩れる）。
-> ★ **「離席候補区間があり、復帰した」は観測としては残す**が、**完了判定には使わない**（ADR-018 D3）。
-> ⚠️ UI・表現層・ログのいずれにも `completed` / `achieved` / `達成` に相当する語を置かない。
-
-- **概要**: **画面から離れることへの方向づけ**として**離席・歩行という身体的回帰**を促す。PC 側の招待は EH3 モードで実装済み（2026-11-03 更新・上の注記）
-  （★ Phase1 の実体は **WoZ ＋ 自己申告**）。
-- ⚠️★★★ **2026-08-30 訂正**: 旧文「**Wall Server の拡張、または独立サービスとして実装**」は無効である
-  —— ★ `wall_server.rs` は ADR-015 D1 で削除され、**Physical Anchor は運搬路を失っていた**（ADR-015 D4）。
-- ★ **境界の形は ADR-017 が確定した**:
-  **PC → スマホの一方向の抽象状態イベント**（`level` / `seq` / `emitted_at` / **`epoch`**・`level` 変化時だけ発火）。
-  ⚠️★★★ **2026-09-01 訂正 —— 契約は 4 フィールドである。** 旧文は `epoch` を落としていたが、
-  **`epoch` が無いと再接続時に「欠落 / 巻き戻り / リプレイ / 再起動」を区別できない**（ADR-017 D2・S6）。
-  ⚠️ **inbound の「歩いた」二値経路は第 1 版で作らない** ——
-  ⚠️★★★ **2026-09-01 訂正: 根拠を ADR-018 D4 で書き換えた。**
-  旧根拠は「完了条件が『時間・往復』（既決 D11 条件 2）なのでセンサの量が要らない」だったが、
-  **既決 D11 条件 2 は ADR-018 D1 で取り下げられた**。
-  ★ **新しい根拠: 完了判定を置かない ＝ センサが寄与しうる判定が存在しない**（＝ 要る余地が構造的に無い）。
-  ★ **結論は不変で、むしろ再燃しなくなる**（旧根拠は完了条件が変われば再燃した）。
-- ⚠️★★★ **量（歩数・距離・速度）を本人にも表現層にも渡さない**（典拠は **ADR-017 D10**。
-  ⚠️ 既決 D11 条件 1「量は二値のみ」は ADR-018 D1 で**失効（moot）**した —— 量そのものを扱わなくなったため）。
-  ⚠️ **歩行を MhD の観測に入れない**（既決 D10・合流点は表現層）。
-- ⚠️★★★ **位置情報は `data-privacy` に規定が入るまで実装しない**（ADR-017 D9・★ 2026-08-30 実測で規定ゼロ）。
-- ★ 詳細: `docs/adr/ADR-017-expression-channel-boundary.md` / `docs/architecture/expression-channel.md` /
-  `.claude/skills/physical-anchor/SKILL.md`。
+- PC 側の招待は実装済み（`analysis/invitation.rs`・§4 の「招待の契機と通常のモードの配線」）。段 2 で、適格な時点ごとに出す・出さないを無作為に決める（ADR-047 D4）。
+- 系は開始も完了も判定しない（ADR-018 D1・D2）。タイマー・カウントダウン・残り時間・`completed` に当たる語を置かない。離席候補区間と復帰は観測として残すが、完了判定に使わない（ADR-018 D3）。
+- 身体活動のセンシング（歩数・距離・速度・位置）は本体から外してある（ADR-017 D10）。散歩の促進は行わない。身体回帰の後は離席候補明けの作業上の状態で見る（ADR-024）。
+- スマホとの境界を作るときは ADR-017（PC → スマホの一方向の抽象状態イベント `level` / `seq` / `emitted_at` / `epoch`・inbound の「歩いた」経路を作らない・常設の LAN リスナを置かない）と、その後の裁定（ADR-021・022・025〜028）を読む。表現チャネルの全体は `docs/architecture/expression-channel.md`。
