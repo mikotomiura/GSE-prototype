@@ -1,6 +1,6 @@
 # ADR-053: 文書の現行版と履歴を分ける —— 現行版は最新の ADR に合わせて書き直し、旧版は docs/history/ に逐語で残す
 
-- **ステータス**: **Proposed**（2026-11-15。形は研究者が AskUserQuestion で選んだ。研究者が本文を読んだら Accepted にする）。コードの変更は無い。
+- **ステータス**: **Accepted**（2026-11-15。形は研究者が AskUserQuestion で選び、/cross-review 1 巡目の後、同日に研究者が Accepted にした）。コードの変更は無い。
 - **日付**: 2026-11-15
 - **決定者**: 研究者 ＋ Claude Code
 - **関連**: ADR-047 Migration 1（research-positioning の本文は書き直さず、改訂ブロックと注で直す）／ADR-046 D1（3 状態の名前を新しい文書の地の文で使わない・既存の文書の直しは別タスク）
