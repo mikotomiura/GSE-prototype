@@ -25,7 +25,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
   招待は EH3 モードと通常のモードの第 2 週で動く実装があるが、EH3 は研究として実施しない（ADR-049）。段 1 は招待を出さない（ADR-043）。
 - **主要技術**: Tauri 2.0 + Rust (Backend: KB Hook / HMM / ONNX) + React/TypeScript (Frontend)
   + Python/PyTorch (ML 学習) + Flutter (ストレッチ: Physical Anchor)
-- **ターゲット**: Windows 11 (Surface Pro 8 + Type Cover) + macOS 13+ (Accessibility / Input Monitoring)
+- **ターゲット**: Windows 11 + macOS 13+ (Accessibility / Input Monitoring)。Windows の作業機は主に G-GEAR で、Surface Pro 8 + Type Cover はごく稀
 - **チーム規模**: 小規模 (2-3 人)
 - **重視する品質特性**: 正確性（観測と記録の正しさ・見分けられない所で判断しないこと）とプライバシー（本文を保存しない）
 - **現フェーズ**: 次の検証の段 1 の準備。研究者本人の探索（macOS）→ 事前登録の凍結 → 本人を除く 3 名の確認（ADR-052）。
