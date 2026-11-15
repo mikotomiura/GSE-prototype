@@ -21,8 +21,15 @@ setup_work() {
     WORK="$(mktemp -d "${TMPDIR:-/tmp}/handmark-leak-desk.XXXXXX")"
   fi
   mkdir -p "$WORK"
-  case "$(cd "$WORK" && pwd -P)" in
-    /|"$HOME"|"$(cd "$REPO_ROOT" && pwd -P)"|"$(cd "$REPO_ROOT" && pwd -P)"/*) echo "WORK が広すぎる・repo の中: $WORK" >&2; exit 2 ;;
+  local w r
+  w="$(cd "$WORK" && pwd -P)"
+  r="$(cd "$REPO_ROOT" && pwd -P)"
+  case "$w" in
+    /|"$HOME"|"${r}"|"${r}"/*) echo "WORK が広すぎる・repo の中: ${WORK}" >&2; exit 2 ;;
+  esac
+  # repo の祖先（repo を中に含む階層）も拒む
+  case "${r}/" in
+    "${w}"/*) echo "WORK が repo を含む: ${WORK}" >&2; exit 2 ;;
   esac
   chmod 700 "$WORK"
 }
@@ -55,7 +62,8 @@ case "$MODE" in
     # S5: 母集団の差の近似（120 日の大きな合成を 1 組・λ = 0）
     "$PY" -I "$SC/controls.py" --work "$WORK/work" --out "$OUT/truth" --replay "$REPLAY" --table-dir "$WORK/tbl" \
       --sets 1 --first-set 100 --lams 0 --days 120 --seed "$SEED" --jobs 1 --truth
-    "$PY" -I "$SC/report.py" "$OUT" > "$EXP_DIR/results/controls_report.md"
+    "$PY" -I "$SC/report.py" "$OUT" > "$EXP_DIR/results/controls_report.md" \
+      || { echo "S2（陰性）が不合格か組が足りない: results/controls_report.md" >&2; exit 6; }
     ;;
   records)
     grep -q '<!-- conditions: fixed -->' "$EXP_DIR/conditions.md" \

@@ -78,7 +78,8 @@ def one_set(job):
                     "T2": {b: res["targets"].get("T2", {}).get(b, {}).get("verdict") for b in ("state", "pixel")},
                     "ci90": {t: {b: res["targets"].get(t, {}).get(b, {}).get("ci90") for b in ("state", "pixel")}
                              for t in ("T1", "T2")},
-                    "auc": {t: res["targets"].get(t, {}).get("auc") for t in ("T1", "T2")}})
+                    "auc": {t: res["targets"].get(t, {}).get("auc") for t in ("T1", "T2")},
+                    "newton_nonconverged": res.get("newton_nonconverged")})
     shutil.rmtree(work, ignore_errors=True)
     for o in out:
         o["timing"] = timing
@@ -116,9 +117,13 @@ def main():
             for r in res:
                 print(json.dumps({k: r[k] for k in ("set", "lam", "overall", "T1", "T2", "truth") if k in r},
                                  ensure_ascii=False), flush=True)
-    with open(os.path.join(a.out, "controls.json"), "w", encoding="utf-8") as fh:
+    # 書き終えてから置き換える（途中で止まっても壊れた controls.json を残さない）
+    dst = os.path.join(a.out, "controls.json")
+    tmp = dst + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(rows, fh, ensure_ascii=False, indent=1)
         fh.write("\n")
+    os.replace(tmp, dst)
 
 
 if __name__ == "__main__":

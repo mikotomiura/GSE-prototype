@@ -19,6 +19,7 @@ export const H = 200;
 export const GX = 16;
 export const GY = 10;
 const BG = 128;
+const PAIR_GAP_MS = 250; // desk.rs の PAIR_GAP_MS（τ − 250 と τ の 2 枚）
 
 /** コマの列を読む（replay.rs の write_frame と同じ並び）。 */
 export function* readFrames(buf) {
@@ -141,22 +142,33 @@ function main() {
   let cur = null;
   let pairs = [];
   let prev = null;
+  let prevT = 0;
   let k = 0;
+  const seen = new Set();
   const flush = () => {
     if (cur === null) return;
-    if (pairs.length !== samples) throw new Error(`窓 ${cur} のコマが ${pairs.length} 組（${samples} のはず）`);
+    if (k !== 2 * samples || pairs.length !== samples) {
+      throw new Error(`窓 ${cur} のコマが ${k} 枚・${pairs.length} 組（${2 * samples} 枚・${samples} 組のはず）`);
+    }
     lines.push(JSON.stringify({ id: cur, v: windowVector(pairs) }));
   };
   for (const fr of readFrames(buf)) {
     if (fr.id !== cur) {
       flush();
+      if (seen.has(fr.id)) throw new Error(`窓 ${fr.id} のコマが続いていない`);
+      seen.add(fr.id);
       cur = fr.id;
       pairs = [];
       k = 0;
     }
     const lum = renderLum(ctx, worlds, fr);
-    if (k % 2 === 0) prev = lum;
-    else pairs.push([prev, lum]);
+    if (k % 2 === 0) {
+      prev = lum;
+      prevT = fr.t;
+    } else {
+      if (fr.t - prevT !== PAIR_GAP_MS) throw new Error(`窓 ${cur} の組の間が ${fr.t - prevT} ms（${PAIR_GAP_MS} のはず）`);
+      pairs.push([prev, lum]);
+    }
     k++;
   }
   flush();

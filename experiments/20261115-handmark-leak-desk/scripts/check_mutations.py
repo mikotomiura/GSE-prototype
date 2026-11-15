@@ -6,6 +6,7 @@
   m3: 天井を差と別の合格の経路にする                    → 等価に近い（A の AUC の 5% 点が 0.95 を超えると差の上限は
                                                          ほぼ 1 − AUC(A) < δ なので、判定がほとんど変わらない）。
                                                          verdict.with_ceiling の単体の検査で縛り、ここでは数えない。
+赤は名指しした対照（メッセージの頭の P-…:）が赤になったときだけ数える。
 終了コード: すべての変異が赤なら 0、どれかが緑（素通り）なら 3、変異なしで赤なら 4。
 """
 import os
@@ -37,10 +38,12 @@ def main():
             print(f"{name}: 変異なしで赤")
             sys.exit(4)
         fails = run(fn, {m})
-        if fails:
-            print(f"{m} → {name}: 赤（{len(fails)} 件）")
+        named = [f for f in fails if f.startswith(name + ":")]
+        if named:
+            print(f"{m} → {name}: 赤（{len(named)} 件・ほかの赤 {len(fails) - len(named)} 件）")
         else:
-            print(f"{m} → {name}: 緑（素通り）")
+            # 名指しした対照が赤にならなければ、ほかの検査が赤でも素通りと数える
+            print(f"{m} → {name}: 緑（素通り・ほかの赤 {len(fails)} 件）")
             rc = 3
     sys.exit(rc)
 

@@ -52,7 +52,7 @@ def test_logistic():
         beta = S.fit_logistic(X, y, lam)
         p = S.sigmoid(beta[0] + X @ beta[1:])
         g = np.concatenate([[np.mean(p - y)], X.T @ (p - y) / len(y) + lam * beta[1:]])
-        check(np.max(np.abs(g)) < 1e-8, f"勾配が 0 でない（λ={lam}）: {np.max(np.abs(g))}")
+        check(np.max(np.abs(g)) < 1e-8, f"P-GRAD: 勾配が 0 でない（λ={lam}）: {np.max(np.abs(g))}")
     big = S.fit_logistic(X, y, 1e3)
     check(np.max(np.abs(big[1:])) < 1e-3, "強い罰で係数が 0 に寄らない")
 
@@ -126,9 +126,11 @@ def test_analysis_controls():
     header["a_names"][:8] = S.A2_BASE
     rng = np.random.default_rng(2)
     leak = S.analyse(fake_rows(10, 60, 1.0, rng), header, None, seed=3, R=300, diagnostics=False)
-    check(leak["targets"]["T1"].get("state", {}).get("verdict") == V.FAILS, f"漏れを入れて満たさないにならない: {leak['targets']['T1']}")
+    check(leak["targets"]["T1"].get("state", {}).get("verdict") == V.FAILS, f"P-LEAK: 漏れを入れて満たさないにならない: {leak['targets']['T1']}")
     none = S.analyse(fake_rows(10, 60, 0.0, rng), header, None, seed=3, R=300, diagnostics=False)
     check(none["targets"]["T1"].get("state", {}).get("verdict") != V.FAILS, "漏れが無いのに満たさない")
+    check(none["targets"]["T1"]["pixel"]["verdict"] == V.UNDETERMINED and none["targets"]["T1"]["verdict"] != V.MEETS,
+          "画素の特徴が無いのに対象が満たす")
     few = S.analyse(fake_rows(5, 60, 0.0, rng), header, None, seed=3, R=50, diagnostics=False)
     check(few["overall"] == V.UNDETERMINED, "日が足りなければ判定不能")
     r1 = S.analyse(fake_rows(9, 40, 0.5, np.random.default_rng(4)), header, None, seed=5, R=100, diagnostics=False)

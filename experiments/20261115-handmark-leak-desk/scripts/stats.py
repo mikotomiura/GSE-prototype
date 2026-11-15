@@ -23,6 +23,7 @@ import verdict as V
 
 LAMS = [1e-4, 1e-3, 1e-2, 1e-1, 1.0]   # 罰の強さ（平均の対数損失 + λ/2‖w‖²）
 PCA_K = 12
+PIX_COLS = 325   # 16×10 の動き 160・明るさ 160・全体の 5（pixels.mjs）
 A2_BASE = ["n_press_30", "iki_median_30", "iki_cv_30", "max_gap_60", "since_last_press",
            "pauses_2s_30", "move_sum_30", "buttons_30"]
 MIN_CLASS_WINDOWS = 50
@@ -31,6 +32,7 @@ MIN_DAY_WINDOWS = 20
 MIN_DAYS = 8
 MAX_DROPPED_SHARE = 0.05
 MUT = set()   # 変異（mutate.sh が設定する）
+NONCONV = [0]   # ニュートン法が iters 回で収束しなかった回数（summary に書く）
 
 
 # ---------------------------------------------------------------- 読み込み
@@ -48,6 +50,8 @@ def load_windows(path):
                 rows.append(r)
     if header is None or summary is None:
         raise SystemExit(f"{path}: ヘッダか要約の行が無い")
+    if [r.get("id") for r in rows] != list(range(len(rows))):
+        raise SystemExit(f"{path}: 窓の番号が 0 からの連番でない")
     return header, rows, summary
 
 
@@ -60,7 +64,13 @@ def load_pixels(path, n, header):
             raise SystemExit(f"{path}: 画素の特徴が窓の表と合わない（{head}）")
         for line in f:
             r = json.loads(line)
-            pix[r["id"]] = r["v"]
+            i, v = r.get("id"), r.get("v")
+            if not isinstance(i, int) or isinstance(i, bool) or not 0 <= i < n or pix[i] is not None:
+                raise SystemExit(f"{path}: 窓の番号が範囲の外か重なる（{i}）")
+            if not isinstance(v, list) or len(v) != PIX_COLS or not all(
+                    isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) for x in v):
+                raise SystemExit(f"{path}: 窓 {i} の画素の特徴が {PIX_COLS} 個の有限の数でない")
+            pix[i] = v
     if any(p is None for p in pix):
         raise SystemExit(f"{path}: 画素の特徴が欠けた窓がある")
     return np.asarray(pix, dtype=float)
@@ -90,6 +100,8 @@ def fit_logistic(X, y, lam, iters=100, tol=1e-9):
         beta -= step
         if np.max(np.abs(step)) < tol:
             break
+    else:
+        NONCONV[0] += 1
     return beta
 
 
@@ -142,7 +154,6 @@ class Design:
         self.k = k
 
     def fit(self, tr):
-        parts = [self.fixed]
         self.mu_pix = None
         if self.pix is not None:
             P = self.pix[tr]
@@ -349,6 +360,7 @@ def class_check(y_cols, groups):
 def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_filter=None):
     """全体を回して集計を返す。day_filter は感度分析で使う日の集合（None なら全部）。"""
     t_start = time.time()
+    NONCONV[0] = 0
 
     def stream(*key):
         """(対象・B・方式) ごとに別の乱数の流れ（判定に入れない処理の有無で、主の標本が変わらないように）。"""
@@ -435,6 +447,11 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
                 info["nested"] = judge(nd, na, ndrop, R_nested)
             per_b[bn] = (info["verdict"], info["ceiling"])
             res[bn] = info
+        for bn in ("state", "pixel"):
+            if bn not in per_b:
+                # B の 2 つがそろわなければ「満たす」にしない（/cross-review の指摘）
+                per_b[bn] = (V.UNDETERMINED, False)
+                res[bn] = {"verdict": V.UNDETERMINED, "ceiling": False, "reason": "特徴が無い"}
         if diagnostics:
             for dn in ("state_perm", "A2", "A_time"):
                 res.setdefault("diagnostics", {})[dn] = res["auc"][dn] - res["auc"]["A"]
@@ -443,6 +460,7 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
         out["targets"][tname] = res
     v = V.combine_both(per_target["T1"]["verdict"], per_target["T2"]["verdict"])
     out["overall"] = v
+    out["newton_nonconverged"] = NONCONV[0]
     out["seconds"] = round(time.time() - t_start, 1)
     return out
 
