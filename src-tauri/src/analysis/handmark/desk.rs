@@ -142,6 +142,8 @@ pub struct DeskFile {
     /// 一時停止の区間 `[from, to)`。
     pub pauses: Vec<(u64, u64)>,
     pub hm_days: BTreeMap<i64, HmDay>,
+    /// `handmark_day` の全部の行に書かれた表の SHA-256（同じ日の古い行も含む。畳む前に照らすため）。
+    pub table_shas: Vec<String>,
 }
 
 fn u64_of(v: &Value, key: &str) -> Result<u64> {
@@ -150,11 +152,11 @@ fn u64_of(v: &Value, key: &str) -> Result<u64> {
         .ok_or_else(|| format!("{key} が無いか u64 でない"))
 }
 
-fn f64_of(v: &Value, key: &str) -> Result<f64> {
+fn prob_of(v: &Value, key: &str) -> Result<f64> {
     v.get(key)
         .and_then(Value::as_f64)
-        .filter(|x| x.is_finite())
-        .ok_or_else(|| format!("{key} が無いか有限の数でない"))
+        .filter(|x| (0.0..=1.0).contains(x))
+        .ok_or_else(|| format!("{key} が無いか 0〜1 の数でない"))
 }
 
 fn u8_of(v: &Value, key: &str) -> Result<u8> {
@@ -195,9 +197,13 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
         match ty {
             Some("meta") => {
                 for k in ["session_start", "session_end"] {
-                    if let Some(t) = v.get(k).and_then(Value::as_u64) {
-                        if !(MIN_EPOCH_MS..=MAX_EPOCH_MS).contains(&t) {
-                            return Err(at(format!("{k} {t} が範囲の外")));
+                    match v.get(k) {
+                        None | Some(Value::Null) => {}
+                        Some(x) => {
+                            let t = x.as_u64().ok_or_else(|| at(format!("{k} が u64 でない")))?;
+                            if !(MIN_EPOCH_MS..=MAX_EPOCH_MS).contains(&t) {
+                                return Err(at(format!("{k} {t} が範囲の外")));
+                            }
                         }
                     }
                 }
@@ -234,9 +240,9 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
                 f.feats.push(Feat {
                     t: u64_of(&v, "t").map_err(at)?,
                     p: [
-                        f64_of(&v, "p_flow").map_err(at)?,
-                        f64_of(&v, "p_inc").map_err(at)?,
-                        f64_of(&v, "p_stuck").map_err(at)?,
+                        prob_of(&v, "p_flow").map_err(at)?,
+                        prob_of(&v, "p_inc").map_err(at)?,
+                        prob_of(&v, "p_stuck").map_err(at)?,
                     ],
                 });
             }
@@ -287,6 +293,11 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
                     Some(Value::Bool(b)) => *b,
                     Some(_) => return Err(at("overflow が真偽でない".to_string())),
                 };
+                if let Some(sh) = &table_sha256 {
+                    if !f.table_shas.contains(sh) {
+                        f.table_shas.push(sh.clone());
+                    }
+                }
                 let row = HmDay {
                     t,
                     draw_seed: seed,
@@ -508,10 +519,14 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
 }
 
 /// A の特徴（窓の終わり `e` で、許した情報だけから）。[`A_NAMES`] の順。
-pub fn a_features(presses: &[u64], bins: &[PointerBin], e: u64) -> [f64; 22] {
-    let count = |l: u64| in_range(presses, |&t| t, e.saturating_sub(l), e).len() as f64;
+///
+/// 振り返りは区間の始まり `from` より前を見ない（手跡の状態も `t0` より前を知らない。stage の始まりで切った
+/// 区間とセッションの再起動の直後で、規則をそろえる・/cross-review の指摘）。
+pub fn a_features(presses: &[u64], bins: &[PointerBin], e: u64, from: u64) -> [f64; 22] {
+    let lo = |l: u64| e.saturating_sub(l).max(from);
+    let count = |l: u64| in_range(presses, |&t| t, lo(l), e).len() as f64;
     let (n10, n30, n60) = (count(10_000), count(30_000), count(60_000));
-    let p30 = in_range(presses, |&t| t, e.saturating_sub(30_000), e);
+    let p30 = in_range(presses, |&t| t, lo(30_000), e);
     let gaps: Vec<f64> = p30.windows(2).map(|w| (w[1] - w[0]) as f64).collect();
     let mut sorted = gaps.clone();
     sorted.sort_by(f64::total_cmp);
@@ -528,15 +543,17 @@ pub fn a_features(presses: &[u64], bins: &[PointerBin], e: u64) -> [f64; 22] {
         0.0
     };
     // 60 秒の中の最長の間隔（窓の端も区切りに含める・上限 60 秒）
-    let s60 = e.saturating_sub(60_000);
+    let s60 = lo(60_000);
     let p60 = in_range(presses, |&t| t, s60, e);
     let mut edges: Vec<u64> = Vec::with_capacity(p60.len() + 2);
     edges.push(s60);
     edges.extend_from_slice(p60);
     edges.push(e);
     let max_gap = edges.windows(2).map(|w| w[1] - w[0]).max().unwrap_or(0) as f64;
-    let last = presses[..presses.partition_point(|&t| t < e)].last();
-    let since = last.map_or(600_000, |&t| (e - t).min(600_000)) as f64;
+    let last = presses[..presses.partition_point(|&t| t < e)]
+        .last()
+        .filter(|&&t| t >= from);
+    let since = last.map_or(e - from.min(e), |&t| e - t).min(600_000) as f64;
     let pauses = gaps.iter().filter(|&&g| g >= 2_000.0).count() as f64;
     // 200 ms 未満で続く打鍵の列（2 打以上）の数と平均の長さ
     let (mut runs, mut run_total, mut cur) = (0usize, 0usize, 1usize);
@@ -560,7 +577,7 @@ pub fn a_features(presses: &[u64], bins: &[PointerBin], e: u64) -> [f64; 22] {
     } else {
         0.0
     };
-    let bins_in = |l: u64| in_range(bins, |b| b.timestamp, e.saturating_sub(l) + 1, e + 1);
+    let bins_in = |l: u64| in_range(bins, |b| b.timestamp, lo(l) + 1, e + 1);
     let move_sum = |l: u64| {
         bins_in(l)
             .iter()
@@ -812,15 +829,19 @@ pub fn build(
             }
         }
     }
-    // 記録に書かれた表が、渡した表と違えば止める（別の人の表で黙って描き直さない）
-    if let Some((d, r)) = hm_days.iter().find(|(_, r)| {
-        r.table_sha256
-            .as_deref()
-            .is_some_and(|s| s != cfg.table_sha256_hex)
-    }) {
+    // 記録に書かれた表が、渡した表と違えば止める（別の人の表で黙って描き直さない）。同じ日の古い行も含めて
+    // 全部の行を、畳む前に照らす。
+    if let Some(sh) = files
+        .iter()
+        .flat_map(|f| {
+            f.table_shas
+                .iter()
+                .chain(f.hm_days.values().filter_map(|r| r.table_sha256.as_ref()))
+        })
+        .find(|s| s.as_str() != cfg.table_sha256_hex)
+    {
         return Err(format!(
-            "日 {d} の handmark_day の表の SHA-256 が渡した表と違う（{}）",
-            r.table_sha256.as_deref().unwrap_or("")
+            "handmark_day の行の表の SHA-256 が渡した表と違う（{sh}）"
         ));
     }
     let mut out = DeskOut::default();
@@ -884,7 +905,7 @@ pub fn build(
                 t1: tg.t1,
                 t1_all: tg.t1_all,
                 t2: tg.t2,
-                a: a_features(&f.presses, &f.bins, w + WINDOW_MS).to_vec(),
+                a: a_features(&f.presses, &f.bins, w + WINDOW_MS, seg.t0).to_vec(),
                 b_state: b_state_features(&taus, ripple_starts).to_vec(),
             });
             id = id
@@ -1203,7 +1224,7 @@ mod tests {
         ];
         let mut sorted = bins.clone();
         sorted.sort_by_key(|b| b.timestamp);
-        let a = a_features(&presses, &sorted, e);
+        let a = a_features(&presses, &sorted, e, 0);
         let get = |n: &str| a[A_NAMES.iter().position(|x| *x == n).unwrap()];
         assert_eq!(get("n_press_10"), 5.0);
         assert_eq!(get("n_press_30"), 5.0);
@@ -1222,14 +1243,51 @@ mod tests {
         assert_eq!(get("moved_secs_30"), 3.0);
         assert_eq!(get("buttons_30"), 2.0);
         assert_eq!(get("wheel_30"), 1.0);
-        let none = a_features(&[], &[], e);
+        // 打鍵が無ければ、最後の打鍵からの時間は区間の始まり（ここでは 0）からの時間（上限 600 秒）
+        let none = a_features(&[], &[], e, 0);
         assert!(none.iter().all(|v| v.is_finite()));
         assert_eq!(
             none[A_NAMES
                 .iter()
                 .position(|x| *x == "since_last_press")
                 .unwrap()],
-            600_000.0
+            100_000.0
+        );
+    }
+
+    #[test]
+    fn a_features_do_not_look_before_the_segment_start() {
+        let e = 1_000_000;
+        let from = e - 40_000;
+        let presses = vec![e - 55_000, e - 45_000, e - 20_000, e - 1_000];
+        let bins = vec![
+            PointerBin {
+                timestamp: e - 50_000,
+                moved: 3,
+                buttons: 1,
+                wheel: 0,
+            },
+            PointerBin {
+                timestamp: e - 5_000,
+                moved: 2,
+                buttons: 0,
+                wheel: 0,
+            },
+        ];
+        let a = a_features(&presses, &bins, e, from);
+        let get = |n: &str| a[A_NAMES.iter().position(|x| *x == n).unwrap()];
+        assert_eq!(get("n_press_60"), 2.0, "t0 より前の 2 打は数えない");
+        // 60 秒の最長の間隔は from から測る: from → e-20000 は 20000
+        assert_eq!(get("max_gap_60"), 20_000.0);
+        assert_eq!(get("buttons_30"), 0.0);
+        // t0 の後に打鍵が無ければ、最後の打鍵からの時間は t0 からの時間
+        let a = a_features(&presses, &bins, from + 10_000, from + 5_000);
+        assert_eq!(
+            a[A_NAMES
+                .iter()
+                .position(|x| *x == "since_last_press")
+                .unwrap()],
+            5_000.0
         );
     }
 

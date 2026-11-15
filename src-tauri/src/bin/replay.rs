@@ -1746,6 +1746,16 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         None
     };
     let handmark_windows = take_flag(&mut args, "--handmark-windows");
+    let hm_sub_given = [
+        "--handmark-table",
+        "--handmark-table-sha",
+        "--labels",
+        "--frames",
+        "--inject-stuck",
+        "--samples",
+    ]
+    .iter()
+    .any(|f| args.iter().any(|a| a == f));
     let hm_table_path = take_value(&mut args, "--handmark-table")?.map(PathBuf::from);
     let hm_table_sha_path = take_value(&mut args, "--handmark-table-sha")?.map(PathBuf::from);
     let hm_labels_recomputed = match take_value(&mut args, "--labels")?.as_deref() {
@@ -1771,16 +1781,14 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     };
     let hm_samples = match take_value(&mut args, "--samples")? {
         None => gse_next_lib::analysis::handmark::desk::DEFAULT_SAMPLES,
-        Some(v) => v
-            .parse::<usize>()
-            .map_err(|_| format!("--samples must be a positive integer, got {v}"))?,
+        Some(v) => match v.parse::<usize>() {
+            // 区間の標本は全部メモリに持つので、上限を置く（1 日・窓 2880 本・30 時点で約 350 MB）
+            Ok(n) if (1..=30).contains(&n) => n,
+            _ => return Err(format!("--samples must be an integer in 1..=30, got {v}")),
+        },
     };
-    let hm_sub_flag = hm_table_path.is_some()
-        || hm_table_sha_path.is_some()
-        || hm_labels_recomputed
-        || hm_frames_path.is_some()
-        || hm_inject != 0.0
-        || hm_samples != gse_next_lib::analysis::handmark::desk::DEFAULT_SAMPLES;
+    // 値が既定でも、下位の引数を渡したこと自体を見る（モードなしで黙って無視しない）
+    let hm_sub_flag = hm_sub_given;
     if hm_sub_flag && !handmark_windows {
         return Err(
             "--handmark-table, --handmark-table-sha, --labels, --frames, --inject-stuck and --samples require --handmark-windows"
@@ -2142,7 +2150,6 @@ fn read_session_text(path: &Path) -> Result<String, String> {
     Ok(text)
 }
 
-/// `--probes` / `--day-questions`: 記録を読み、段 1 の再生を JSON で返す。
 /// 割付の表の上限（表は日数ぶんの行だけで小さい）。
 const HM_TABLE_MAX_BYTES: u64 = 1 << 20;
 /// 記録の `feat` の T1 と、計算し直した T1 の一致の下限（設計 v2 §1.4・下回れば止める）。
@@ -2245,6 +2252,10 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         let name = assignment::sha256_hex(text.as_bytes())[..12].to_string();
         let f = desk::parse_file(&name, &text)?;
         let snaps = run_replay(p)?;
+        // run_replay はファイルを読み直すので、その間に中身が変わっていないかを確かめる
+        if assignment::sha256_hex(read_session_text(p)?.as_bytes())[..12] != name {
+            return Err(format!("input {name} changed while it was being read"));
+        }
         recomputed.push(
             snaps
                 .iter()
@@ -2418,6 +2429,7 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
     Ok(text)
 }
 
+/// `--probes` / `--day-questions`: 記録を読み、段 1 の再生を JSON で返す。
 fn run_s1_replay(args: &Args, paths: &[PathBuf]) -> Result<serde_json::Value, String> {
     use gse_next_lib::s1_replay;
     let mut files = Vec::new();
@@ -2753,8 +2765,8 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    // --probes / --day-questions 経路: 段 1 の問いを記録から再生する（M5 の 3 本目）。HMM・特徴量は通らない。
-    //   ⚠️ 記録・状態ファイルが不正なら exit 1 で、stdout には 1 バイトも出さない。
+    // --handmark-windows 経路: 手跡の机上の道具（PR 4・ADR-051 D3）。窓の表を NDJSON で出す。
+    //   ⚠️ 記録・表が不正なら exit 1 で、stdout には 1 バイトも出さない。
     if args.handmark_windows {
         let mut paths = vec![args.session_path.clone()];
         paths.extend(args.extra_sessions.iter().cloned());
@@ -2778,6 +2790,8 @@ fn main() -> ExitCode {
         };
     }
 
+    // --probes / --day-questions 経路: 段 1 の問いを記録から再生する（M5 の 3 本目）。HMM・特徴量は通らない。
+    //   ⚠️ 記録・状態ファイルが不正なら exit 1 で、stdout には 1 バイトも出さない。
     if args.probes || args.day_questions {
         let mut paths = vec![args.session_path.clone()];
         paths.extend(args.extra_sessions.iter().cloned());
@@ -5176,7 +5190,6 @@ mod tests {
         p
     }
 
-    /// `--invitation` は他のモードと相互排他で、パスを要る。`--utc-offset-secs` は `--invitation` 専用。
     #[test]
     fn handmark_windows_mode_args() {
         let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
@@ -5223,8 +5236,11 @@ mod tests {
             xs.drain(i..i + 2);
             assert!(parse_args_from(v(&xs)).is_err(), "{drop}");
         }
-        // 下位の引数はモード無しでは受けない
+        // 下位の引数はモード無しでは受けない（既定の値を渡しても）
         for sub in [
+            &["a.ndjson", "--labels", "recorded"][..],
+            &["a.ndjson", "--inject-stuck", "0"][..],
+            &["a.ndjson", "--samples", "10"][..],
             &["a.ndjson", "--labels", "recomputed"][..],
             &["a.ndjson", "--frames", "f"][..],
             &["a.ndjson", "--inject-stuck", "0.1"][..],
@@ -5239,6 +5255,7 @@ mod tests {
             ("--inject-stuck", "x"),
             ("--labels", "both"),
             ("--samples", "-1"),
+            ("--samples", "31"),
         ] {
             let mut xs = base.to_vec();
             xs.extend([k, val]);
@@ -5247,6 +5264,101 @@ mod tests {
         let mut xs = base.to_vec();
         xs.push("--probes");
         assert!(parse_args_from(v(&xs)).is_err());
+    }
+
+    /// 照合の門: 記録の feat を計算し直した値に合わせた記録は通り、逆にした記録は止まってコマを消す。
+    /// 古い版だけの記録は照らせないので止め、版が混ざれば同じ版の窓だけを照らす。
+    #[test]
+    fn the_label_gate_checks_recorded_against_recomputed_t1() {
+        use gse_next_lib::analysis::handmark::assignment;
+        let dir = std::env::temp_dir().join(format!("gse-replay-hmgate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let table = assignment::generate(3, 20_400, 7, 7, 10).unwrap();
+        let bytes = table.canonical_bytes();
+        let sha = assignment::sha256_hex(&bytes);
+        std::fs::write(dir.join("t.json"), &bytes).unwrap();
+        std::fs::write(dir.join("t.sha256"), format!("{sha}  t.json\n")).unwrap();
+        let start = ((20_407i64 * 86_400 + 4 * 3_600 - 32_400 + 6 * 3_600) * 1000) as u64;
+        // 打鍵だけの記録を作り、計算し直した feat を得る
+        let mut keys = Vec::new();
+        let mut t = start + 200;
+        let mut k = 0u64;
+        while t < start + 600_000 {
+            let cat = if k % 7 == 0 {
+                "backspace"
+            } else {
+                "alphabetic"
+            };
+            keys.push(format!(
+                "{{\"type\":\"key\",\"t\":{t},\"category\":\"{cat}\",\"press\":true}}"
+            ));
+            keys.push(format!(
+                "{{\"type\":\"key\",\"t\":{},\"category\":\"{cat}\",\"press\":false}}",
+                t + 50
+            ));
+            t += if k % 40 < 20 { 150 } else { 900 };
+            k += 1;
+        }
+        let write = |name: &str, version: &str, feats: &[String]| {
+            let mut lines = vec![format!(
+                "{{\"type\":\"meta\",\"session_start\":{start},\"hmm_version\":\"{version}\"}}"
+            )];
+            lines.extend(keys.iter().cloned());
+            lines.extend(feats.iter().cloned());
+            lines.push(format!(
+                "{{\"type\":\"meta\",\"session_end\":{}}}",
+                start + 600_000
+            ));
+            let p = dir.join(name);
+            std::fs::write(&p, lines.join("\n") + "\n").unwrap();
+            p
+        };
+        let bare = write("bare.ndjson", HMM_VERSION, &[]);
+        let snaps = run_replay(&bare).unwrap();
+        let feat_line = |s: &FeatSnapshot, flip: bool| {
+            let ps = if flip { 1.0 - s.p_stuck } else { s.p_stuck };
+            let pf = (1.0 - ps) / 2.0;
+            format!(
+                "{{\"type\":\"feat\",\"t\":{},\"p_flow\":{pf},\"p_inc\":{pf},\"p_stuck\":{ps}}}",
+                s.timestamp
+            )
+        };
+        let same: Vec<String> = snaps.iter().map(|s| feat_line(s, false)).collect();
+        let flipped: Vec<String> = snaps.iter().map(|s| feat_line(s, true)).collect();
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let tj = dir.join("t.json");
+        let ts = dir.join("t.sha256");
+        let frames = dir.join("f.bin");
+        let run = |p: &Path, with_frames: bool| {
+            let mut xs = vec![
+                p.to_str().unwrap(),
+                "--handmark-windows",
+                "--utc-offset-secs",
+                "32400",
+                "--handmark-table",
+                tj.to_str().unwrap(),
+                "--handmark-table-sha",
+                ts.to_str().unwrap(),
+            ];
+            if with_frames {
+                xs.extend(["--frames", frames.to_str().unwrap()]);
+            }
+            run_handmark_windows(&parse_args_from(v(&xs)).unwrap(), &[p.to_path_buf()])
+        };
+        // 一致すれば通り、照らした窓の数が出る
+        let ok = run(&write("same.ndjson", HMM_VERSION, &same), false).unwrap();
+        let summ: serde_json::Value = serde_json::from_str(ok.lines().last().unwrap()).unwrap();
+        assert_eq!(summ["label_check"]["rate"], 1.0);
+        assert!(summ["label_check"]["checked"].as_u64().unwrap() > 0);
+        // 逆にすれば止まり、作ったコマのファイルを消す
+        let flip = write("flip.ndjson", HMM_VERSION, &flipped);
+        assert!(run(&flip, true).unwrap_err().contains("agree"));
+        assert!(!frames.exists());
+        // 古い版だけの記録は照らせないので止める
+        let old = write("old.ndjson", "0.0.1", &flipped);
+        assert!(run(&old, false).unwrap_err().contains("cannot be checked"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -5534,6 +5646,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// `--invitation` は他のモードと相互排他で、パスを要る。`--utc-offset-secs` は `--invitation` 専用。
     #[test]
     fn invitation_mode_args() {
         let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
