@@ -33,4 +33,4 @@
 - 定義: 論文 2（`papers/stall-shape-multiverse/manuscript/sections/abstract.tex`・枝 `docs/gse-paper2-stall-shape`）
 - 漏れ: `papers/ime-observation/manuscript/generated/values.tex`・`sections/conclusions.tex`・`sections/limitations.tex`
 - 先行: `docs/literature/20261115-three-checks-precedent.md`
-- 位置づけ: ADR-047・048・054（Proposed）、`docs/research-positioning.md` §1・§2・§8・§9
+- 位置づけ: ADR-047・048・054、`docs/research-positioning.md` §1・§2・§8・§9
