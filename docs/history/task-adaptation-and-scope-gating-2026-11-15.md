@@ -1,3 +1,6 @@
+> **履歴の文書（2026-11-15 に移した）。** 元のパスは `docs/architecture/task-adaptation-and-scope-gating.md`。2026-07〜08 の Epic 期の Proposed の設計（ADR-008〜010）で、現行の根拠に使わない（ADR-053）。現行は `docs/research-positioning.md`・`docs/architecture/gse-design-map.md`・ADR-044・046・047。
+> 写しの元: `190d5ef6`（本文は移す前のまま。冒頭の 2026-11-15 の注は PR2 で足したもの）。
+
 # タスク適応と scope ゲーティング — head ルーティング × 「どの head も当てはまらない」
 
 > **2026-11-15 の注（ADR-053）**: この文書が上位・層詳細として引く `gse-v2-overview`・`domain-adapter-boundary`・`intervention-decision-engine` は `docs/history/` へ移した履歴の文書で、現行の根拠ではない。現行の設計は `docs/architecture/gse-design-map.md` と ADR を見る。中身を今の設計に合わせるかは `.steering/20261115-gse-docs-clarity/` の PR3 で見る。

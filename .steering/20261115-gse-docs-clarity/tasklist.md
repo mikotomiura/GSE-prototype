@@ -17,12 +17,12 @@
 - [ ] 節番号の残り（PR3 で直す）: agent-shared:28（§1 冒頭の改訂ブロック）・architecture/personalization-and-online-learning:238,248・gse-v2-overview:55（移すなら不要）・expression-channel:732・intervention-decision-engine:165（移すなら不要）
 - [x] agent-shared・glossary・gse-design-map を現行へ
 - [x] 未踏の不採択コメントの対応表（内部の追跡表）
-- [ ] /cross-review・コミット
+- [x] /cross-review・コミット
 
 ## PR3: functional-design・architecture
 - [x] 現行とのずれの洗い出し
 - [x] 直す（functional-design は構成から書き直し・architecture は古い箇所だけ直した・判断 11）
-- [ ] /cross-review・コミット
+- [x] /cross-review・コミット
 
 ## 場面ごとの道具（完了前に照合する）
 - 文書の差分のレビュー → /cross-review（code-reviewer＋Codex）

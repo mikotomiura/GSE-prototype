@@ -210,8 +210,6 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/o1-distribution-tag.md` | ★ **O1 の配布物を作る / 配る時**。`--mode o1` に使ってよいリリースタグ（最新節）・zip の SHA-256・実体検証の記録。⚠️ G1 の配布タグ（`experiments/20260801-controlled-friction-task/distribution-tag.md`）とは別 |
 | `docs/g1-deletion-ledger.md` | ⚠️★★★ **G1 の削除保証台帳**。G1 の被験者からの削除要求に対応する時（★ O1 版と対になる文書・前提条件 8） |
 | `docs/person-lifecycle-ledger-template.md` | 人単位のライフサイクル台帳（G1/O1 それぞれの進み具合・「やめた」「削除の求め」の記録）を構築・参照する時 |
-| `docs/architecture/personalization-and-online-learning.md` | 個人化・オンライン学習 (ADR-008 / ADR-009) を確認する時。⚠️ 上位として引く文書（gse-v2-overview など）は 2026-11-15 に履歴へ移した。現行の設計は `gse-design-map.md` と ADR |
-| `docs/architecture/task-adaptation-and-scope-gating.md` | task_kind 適応・scope gating (ADR-010) を確認する時。⚠️ 上位として引く文書は 2026-11-15 に履歴へ移した。現行の設計は `gse-design-map.md` と ADR |
 | `docs/verification-runbook.md` | ★ **リリース前・マージ前の検証**を上から実行する時。研究者デバッグ起動（二重 gate）は §2.0 |
 | `docs/pilot-runbook.md` | パイロットの受領 → 復号 → metrics 結合を行う時（★ `.age` の復号手順はここ） |
 | `docs/participant-setup-guide.md` | 被験者のセットアップを案内する時（★ **被験者向け文書は契約**） |

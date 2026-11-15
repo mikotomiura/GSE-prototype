@@ -98,3 +98,9 @@
   3. §3.7 の PR の並びを番号順に。
   4. LOW の要確認: `review_marker` は `logger.rs`・`lib.rs` に、第 2 週の宣言 `invitationEnabled` は `src/App.tsx` にあることを確かめた（直しは不要）。
 - **却下**: Codex「履歴の写しが diff に無い」は、除外して送った副作用による誤検知。
+
+## 判断 13: PR の出し方と Epic 期の 2 本
+
+- **判断日時**: 2026-11-15（研究者・AskUserQuestion。どちらも推奨どおり）
+- **PR**: PR2・PR3 を #412 の枝（`docs/gse-docs-clarity`）へ fast-forward で進め、1 つの PR にする。参照が PR の間で一時的に切れる期間を作らない。[skip ci] のまま。
+- **Epic 期の 2 本**: `docs/architecture/personalization-and-online-learning.md`・`task-adaptation-and-scope-gating.md` を履歴へ移した（本文は逐語）。今の推定の段の地図は ADR-046 D3 と gse-design-map が担う。agent-shared の表から外し、data-privacy の Skill（`.claude` と `.agents`）の参照を履歴のパスへ付け替えた。G1 の凍結した設定・事前登録、p1-episode の事前登録、文献カード、実験の記録、コードのコメントの参照は過去の記録として残し、旧パスの表で辿る。

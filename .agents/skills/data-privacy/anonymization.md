@@ -66,7 +66,7 @@ impl KeyCategory {
 
 ### ⚠️★★★ `SentencePunctuation` を分けている理由（★ 消さないこと）
 
-★ `personalization-and-online-learning.md §5.2` は **boundary keys を「採用（弁別の前提条件）」** に
+★ `docs/history/personalization-and-online-learning-2026-11-15.md` §5.2（履歴） は **boundary keys を「採用（弁別の前提条件）」** に
 格上げしており（[P121] N=475・2 独立文脈）、その接地は散文の階層
 **語内 < 語間 < 文間 < 段落間** である。
 ⚠️ `Punctuation` へ一括で畳むと **「文間」の段だけが失われる**（`[` `=` `-` と同じラベルになる）。

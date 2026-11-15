@@ -20,3 +20,5 @@ ADR の本文は書き換えないので、ADR に書かれた旧パスはこの
 | `docs/architecture/domain-adapter-boundary.md` | 履歴へ移した | `docs/history/domain-adapter-boundary-2026-11-15.md` | 2026-11-15 | 2026-07 の Epic 期の Layer 0-3 の案。現行は ADR-002・006 と gse-design-map |
 | `docs/wbs-verification-halfyear.md` | 削除 | 削除のコミットは PR2（`docs/gse-docs-clarity-pr2`）。最後の版は main `6fdd4023` | 2026-11-15 | 研究者の指示。26 週の WBS は段 1・段 2 の設計（ADR-043〜052）で置き換わった |
 | `docs/eh3-distribution-tag.md` | 削除 | 削除のコミットは PR2（`docs/gse-docs-clarity-pr2`）。最後の版は main `6fdd4023` | 2026-11-15 | EH3 は研究として実施しない（ADR-049） |
+| `docs/architecture/personalization-and-online-learning.md` | 履歴へ移した | `docs/history/personalization-and-online-learning-2026-11-15.md` | 2026-11-15 | Epic 期の Proposed の設計（ADR-008・009）。今の推定の段の地図は ADR-046 D3 と gse-design-map |
+| `docs/architecture/task-adaptation-and-scope-gating.md` | 履歴へ移した | `docs/history/task-adaptation-and-scope-gating-2026-11-15.md` | 2026-11-15 | Epic 期の Proposed の設計（ADR-010）。タスク適応は ADR-046 D3 の段の 1 つ |
