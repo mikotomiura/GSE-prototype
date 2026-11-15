@@ -38,3 +38,5 @@ python3 -m venv .venv && .venv/bin/pip install python-pptx Pillow lxml
 ## 更新するとき
 
 位置づけ（headline・一言・新規性の書き方）が変わったら、`build.py` の表紙のサブタイトル・11 枚目「だから、問いを変えた」・17 枚目「大切にしていること」・19 枚目「まとめ」を見直す。研究の決定はスライドで下さず、ADR と `research-positioning.md` を先に直す。
+
+成果物と貢献の一覧（投稿先・状態・見込みと根拠を含む内部用）は `docs/project-outputs.md`。スライドの「成果物と貢献」「これからの貢献の見込み」はその要約。
