@@ -35,6 +35,6 @@
 - [x] validate.py --original tpl.pptx・Keynote の PDF で全枚を見る
 
 ## 完了処理
-- [ ] /cross-review
-- [ ] design.md・decisions.md の最終化
+- [x] /cross-review（判断 12 まで対応）
+- [x] design.md・decisions.md の最終化
 - [ ] git commit（push・PR は研究者に確かめる）
