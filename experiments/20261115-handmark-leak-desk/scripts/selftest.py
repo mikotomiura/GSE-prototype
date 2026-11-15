@@ -1,0 +1,154 @@
+"""統計と判定の自己検査（run.sh の頭で回す）。失敗したら exit 1。"""
+import itertools
+import math
+import os
+import sys
+
+import numpy as np
+
+# -I（隔離）で起動しても同じディレクトリの部品を読む
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import stats as S
+import verdict as V
+
+FAILS = []
+
+
+def check(cond, msg):
+    if not cond:
+        FAILS.append(msg)
+
+
+def auc_brute(score, y, w=None):
+    w = np.ones(len(y)) if w is None else w
+    num = den = 0.0
+    for i, j in itertools.product(range(len(y)), repeat=2):
+        if y[i] == 1 and y[j] == 0:
+            ww = w[i] * w[j]
+            den += ww
+            num += ww * (1.0 if score[i] > score[j] else 0.5 if score[i] == score[j] else 0.0)
+    return num / den if den else float("nan")
+
+
+def test_auc():
+    rng = np.random.default_rng(0)
+    for _ in range(30):
+        n = int(rng.integers(5, 25))
+        s = np.round(rng.normal(size=n), 1)        # 同点を含める
+        y = (rng.random(n) < 0.4).astype(int)
+        w = rng.integers(0, 3, n).astype(float)
+        a, b = S.auc(s, y), auc_brute(s, y)
+        check(math.isnan(a) and math.isnan(b) or abs(a - b) < 1e-12, f"AUC {a} != {b}")
+        a, b = S.auc(s, y, w), auc_brute(s, y, w)
+        check(math.isnan(a) and math.isnan(b) or abs(a - b) < 1e-12, f"重みつき AUC {a} != {b}")
+    check(math.isnan(S.auc([1, 2], [1, 1])), "片方のクラスだけなら nan")
+
+
+def test_logistic():
+    rng = np.random.default_rng(1)
+    X = rng.normal(size=(400, 3))
+    y = (rng.random(400) < S.sigmoid(0.5 + X @ np.array([1.0, -2.0, 0.0]))).astype(float)
+    for lam in (1e-4, 1e-1):
+        beta = S.fit_logistic(X, y, lam)
+        p = S.sigmoid(beta[0] + X @ beta[1:])
+        g = np.concatenate([[np.mean(p - y)], X.T @ (p - y) / len(y) + lam * beta[1:]])
+        check(np.max(np.abs(g)) < 1e-8, f"勾配が 0 でない（λ={lam}）: {np.max(np.abs(g))}")
+    big = S.fit_logistic(X, y, 1e3)
+    check(np.max(np.abs(big[1:])) < 1e-3, "強い罰で係数が 0 に寄らない")
+
+
+def test_verdicts():
+    check(V.three_valued(-0.1, 0.049) == V.MEETS, "上限 < δ は満たす")
+    check(V.three_valued(-0.1, 0.05) == V.UNDETERMINED, "上限 = δ は判定不能")
+    check(V.three_valued(0.051, 0.2) == V.FAILS, "下限 > δ は満たさない")
+    check(V.three_valued(0.05, 0.2) == V.UNDETERMINED, "下限 = δ は判定不能")
+    check(V.with_ceiling(-0.01, 0.01, 0.96) == (V.MEETS, True), "天井")
+    check(V.with_ceiling(-0.01, 0.01, 0.95) == (V.MEETS, False), "A の下限 = 1 − δ は天井でない")
+    check(V.with_ceiling(0.0, 0.06, 0.99) == (V.UNDETERMINED, False), "差の上限が δ 以上なら天井でも満たさない")
+    vals = (V.MEETS, V.FAILS, V.UNDETERMINED)
+    for a, b in itertools.product(vals, vals):
+        got = V.combine_both(a, b)
+        want = V.FAILS if V.FAILS in (a, b) else V.MEETS if a == b == V.MEETS else V.UNDETERMINED
+        check(got == want, f"combine_both({a},{b})")
+    table = {
+        (V.MEETS, V.MEETS): (V.MEETS, False),
+        (V.MEETS, V.FAILS): (V.FAILS, False),
+        (V.MEETS, V.UNDETERMINED): (V.UNDETERMINED, True),
+        (V.MEETS, V.NOT_RUN): (V.UNDETERMINED, True),
+        (V.FAILS, V.MEETS): (V.FAILS, False),
+        (V.FAILS, V.FAILS): (V.FAILS, False),
+        (V.FAILS, V.UNDETERMINED): (V.FAILS, False),
+        (V.FAILS, V.NOT_RUN): (V.FAILS, False),
+        (V.UNDETERMINED, V.MEETS): (V.UNDETERMINED, False),
+        (V.UNDETERMINED, V.FAILS): (V.FAILS, False),
+        (V.UNDETERMINED, V.UNDETERMINED): (V.UNDETERMINED, False),
+        (V.UNDETERMINED, V.NOT_RUN): (V.UNDETERMINED, False),
+    }
+    for (m, s), want in table.items():
+        check(V.combine_main_sensitivity(m, s) == want, f"主 {m} × 感度 {s}")
+    check(V.target_verdict({"state": (V.MEETS, True), "pixel": (V.MEETS, False)}) == (V.MEETS, False), "天井は両方のとき")
+    check(V.target_verdict({"state": (V.MEETS, False), "pixel": (V.FAILS, False)}) == (V.FAILS, False), "B の片方が満たさない")
+
+
+def test_day_bootstrap():
+    """日を単位に引き直す: 陽性が 1 日目だけ・陰性が 2 日目だけなら、標本の半分ほどで片方のクラスが欠ける。
+
+    窓の単位で引き直すとほとんど欠けない（変異 m2 を赤にする対照 P-DAY）。
+    """
+    groups = np.array([0] * 30 + [1] * 30)
+    y = np.array([1] * 30 + [0] * 30, dtype=float)
+    rng = np.random.default_rng(9)
+    p = rng.random(60)
+    _, _, dropped = S.fixed_bootstrap([p], [p], [y], groups, 400, np.random.default_rng(10))
+    check(120 <= dropped <= 280, f"P-DAY: 日の引き直しで欠けた標本が {dropped}/400（半分ほどのはず）")
+    w = S.weights_for(np.array([1, 1, 0]), groups)
+    check(np.all(w[:30] == 1) and np.all(w[30:] == 2), "weights_for は日の回数")
+
+
+def fake_rows(days, per_day, leak, rng):
+    """A は打鍵の量だけ・対象は A と隠れた量の両方に依る・B_state に隠れた量を leak の強さで混ぜる。"""
+    rows = []
+    for d in range(days):
+        for _ in range(per_day):
+            a = rng.normal(size=22)
+            hidden = rng.normal()
+            y = int(rng.random() < S.sigmoid(1.0 * a[0] + 2.0 * hidden))
+            b = list(rng.normal(size=13))
+            b[0] = leak * hidden + (1 - leak) * b[0]
+            rows.append({"day": d, "a": list(a), "b_state": b, "t1": y, "t2": int(rng.integers(0, 3))})
+    return rows
+
+
+def test_analysis_controls():
+    """統計の部分だけの対照: 隠れた量を B に入れれば満たさない・入れなければ満たさない以外（設計 v2 §6 S1）。"""
+    header = {"a_names": [f"a{i}" for i in range(22)]}
+    header["a_names"][:8] = S.A2_BASE
+    rng = np.random.default_rng(2)
+    leak = S.analyse(fake_rows(10, 60, 1.0, rng), header, None, seed=3, R=300, diagnostics=False)
+    check(leak["targets"]["T1"].get("state", {}).get("verdict") == V.FAILS, f"漏れを入れて満たさないにならない: {leak['targets']['T1']}")
+    none = S.analyse(fake_rows(10, 60, 0.0, rng), header, None, seed=3, R=300, diagnostics=False)
+    check(none["targets"]["T1"].get("state", {}).get("verdict") != V.FAILS, "漏れが無いのに満たさない")
+    few = S.analyse(fake_rows(5, 60, 0.0, rng), header, None, seed=3, R=50, diagnostics=False)
+    check(few["overall"] == V.UNDETERMINED, "日が足りなければ判定不能")
+    r1 = S.analyse(fake_rows(9, 40, 0.5, np.random.default_rng(4)), header, None, seed=5, R=100, diagnostics=False)
+    r2 = S.analyse(fake_rows(9, 40, 0.5, np.random.default_rng(4)), header, None, seed=5, R=100, diagnostics=False)
+    r1.pop("seconds", None)
+    r2.pop("seconds", None)
+    check(r1 == r2, "同じ種で同じ結果")
+
+
+def main():
+    test_auc()
+    test_logistic()
+    test_verdicts()
+    test_day_bootstrap()
+    test_analysis_controls()
+    if FAILS:
+        for f in FAILS:
+            print("FAIL:", f)
+        sys.exit(1)
+    print("selftest OK")
+
+
+if __name__ == "__main__":
+    main()

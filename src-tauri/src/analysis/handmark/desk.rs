@@ -53,7 +53,7 @@ pub const RIPPLE_LIFE_MS: u64 = 1_600;
 /// 動きを測る 2 枚目のずれ（画面の状態の寄せの幅）。
 pub const PAIR_GAP_MS: u64 = 250;
 /// 窓あたりの標本の数（既定）。30_000 を割り切る数だけを受ける。
-pub const DEFAULT_SAMPLES: usize = 30;
+pub const DEFAULT_SAMPLES: usize = 10;
 
 const DAY_MS: i64 = 86_400_000;
 

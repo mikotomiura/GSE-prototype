@@ -2436,7 +2436,7 @@ fn usage() -> String {
          gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs <N>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --probes [--utc-offset-secs <N>] [--day-state <s1_day_state.json>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --day-questions --utc-offset-secs <N>\n    \
-         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>（既定 10）]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
@@ -5148,7 +5148,7 @@ mod tests {
         assert_eq!(p.extra_sessions.len(), 1);
         assert!(!p.hm_labels_recomputed);
         assert_eq!(p.hm_inject, 0.0);
-        assert_eq!(p.hm_samples, 30);
+        assert_eq!(p.hm_samples, 10);
         let mut full = base.to_vec();
         full.extend([
             "--labels",
