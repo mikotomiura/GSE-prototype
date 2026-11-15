@@ -22,7 +22,7 @@ pub const RIPPLE_EVENT: &str = "handmark-ripple";
 #[cfg(target_os = "macos")]
 mod imp {
     use super::*;
-    use crate::analysis::handmark::trace::{RipplePoint, TraceState, BEND_MAX, CELLS, MOTE_MAX};
+    use crate::analysis::handmark::trace::{encode_cells, RipplePoint, TraceState};
     use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
     use tauri::{AppHandle, Emitter, Manager, Wry};
 
@@ -66,22 +66,12 @@ mod imp {
         y: f32,
     }
 
-    /// `v / max` を −127〜127 に丸める。
-    fn quantize(v: f32, max: f32) -> i8 {
-        ((v / max) * 127.0).round().clamp(-127.0, 127.0) as i8
-    }
-
+    /// 場の量子化は `trace::encode_cells`（机上のコマと同じ関数・手跡の PR 4）。
     fn trace_payload(state: &TraceState, t_ms: u64) -> TracePayload {
-        let mut cells = Vec::with_capacity(CELLS * 3);
-        for c in &state.cells {
-            cells.push(quantize(c[0], BEND_MAX));
-            cells.push(quantize(c[1], MOTE_MAX));
-            cells.push(quantize(c[2], MOTE_MAX));
-        }
         TracePayload {
             epoch: state.epoch,
             t_ms,
-            cells,
+            cells: encode_cells(&state.cells),
         }
     }
 
@@ -268,17 +258,7 @@ mod imp {
     #[cfg(test)]
     mod tests {
         use super::*;
-
-        #[test]
-        fn quantize_rounds_and_clips() {
-            assert_eq!(quantize(0.0, BEND_MAX), 0);
-            assert_eq!(quantize(BEND_MAX, BEND_MAX), 127);
-            assert_eq!(quantize(-BEND_MAX, BEND_MAX), -127);
-            assert_eq!(quantize(BEND_MAX * 3.0, BEND_MAX), 127);
-            assert_eq!(quantize(-BEND_MAX * 3.0, BEND_MAX), -127);
-            assert_eq!(quantize(f32::NAN, BEND_MAX), 0);
-            assert_eq!(quantize(MOTE_MAX / 2.0, MOTE_MAX), 64);
-        }
+        use crate::analysis::handmark::trace::{BEND_MAX, CELLS, MOTE_MAX};
 
         #[test]
         fn payload_is_cell_major_bend_pull_x_pull_y() {

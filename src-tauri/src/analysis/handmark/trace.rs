@@ -336,6 +336,22 @@ impl TraceField {
     }
 }
 
+/// 場の値 `v / max` を −127〜127 に丸める（窓へ送る形。机上のコマも同じ関数で作る・手跡の PR 4）。
+pub fn quantize_cell(v: f32, max: f32) -> i8 {
+    ((v / max) * 127.0).round().clamp(-127.0, 127.0) as i8
+}
+
+/// 場を窓へ送る形にする（`i * GRID_W + col` の順に `bend`・`pull_x`・`pull_y`、各 −127〜127）。
+pub fn encode_cells(cells: &[[f32; 3]; CELLS]) -> Vec<i8> {
+    let mut out = Vec::with_capacity(CELLS * 3);
+    for c in cells {
+        out.push(quantize_cell(c[0], BEND_MAX));
+        out.push(quantize_cell(c[1], MOTE_MAX));
+        out.push(quantize_cell(c[2], MOTE_MAX));
+    }
+    out
+}
+
 /// マス `i`（横でも縦でも）の中心（箱の単位）。
 fn center(i: usize) -> f32 {
     (i as f32 + 0.5) * CELL
@@ -344,6 +360,29 @@ fn center(i: usize) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quantize_rounds_and_clips() {
+        assert_eq!(quantize_cell(0.0, BEND_MAX), 0);
+        assert_eq!(quantize_cell(BEND_MAX, BEND_MAX), 127);
+        assert_eq!(quantize_cell(-BEND_MAX, BEND_MAX), -127);
+        assert_eq!(quantize_cell(BEND_MAX * 3.0, BEND_MAX), 127);
+        assert_eq!(quantize_cell(-BEND_MAX * 3.0, BEND_MAX), -127);
+        assert_eq!(quantize_cell(f32::NAN, BEND_MAX), 0);
+        assert_eq!(quantize_cell(MOTE_MAX / 2.0, MOTE_MAX), 64);
+    }
+
+    #[test]
+    fn encoded_cells_are_cell_major_bend_pull_x_pull_y() {
+        let mut cells = [[0.0; 3]; CELLS];
+        cells[0] = [BEND_MAX, 0.0, 0.0];
+        cells[1] = [0.0, MOTE_MAX, -MOTE_MAX];
+        cells[CELLS - 1] = [-BEND_MAX, 0.0, MOTE_MAX];
+        let e = encode_cells(&cells);
+        assert_eq!(e.len(), CELLS * 3);
+        assert_eq!(&e[0..6], &[127, 0, 0, 0, 127, -127]);
+        assert_eq!(&e[(CELLS - 1) * 3..], &[-127, 0, 127]);
+    }
 
     fn pt(x: f32, y: f32) -> Point {
         Point {

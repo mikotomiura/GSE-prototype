@@ -1,0 +1,208 @@
+{
+ "days_with_min_windows": 20,
+ "desk": {
+  "desk_version": "hm-desk-1",
+  "inject_stuck": 0.05,
+  "labels": "recomputed",
+  "samples": 10,
+  "table_sha256": "bd09f2cb7bd8128306bb39d1e58e2f7f63158c7b6338c3093ae238d3b888f177"
+ },
+ "desk_summary": {
+  "excluded": {
+   "away": 78,
+   "few_feats": 0,
+   "pause": 0
+  },
+  "label_check": null,
+  "overflow_days": 0,
+  "seed_mismatch_days": 0,
+  "segments": 20,
+  "segments_recorded_t0": 0,
+  "windows": 3482
+ },
+ "n_days": 20,
+ "n_windows": 3482,
+ "overall": "fails",
+ "seconds": 132.7,
+ "t1_all_windows": 287,
+ "targets": {
+  "T1": {
+   "auc": {
+    "A": 0.8193458598808767,
+    "A2": 0.8150928461129205,
+    "A_time": 0.8137292431733344,
+    "pixel": 0.8116524791404436,
+    "state": 0.9792134357603519,
+    "state_perm": 0.8179595482484028
+   },
+   "ceiling": false,
+   "class_counts": [
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 2828,
+     "windows": 654
+    }
+   ],
+   "const_folds": {
+    "A": 0,
+    "A2": 0,
+    "A_time": 0,
+    "pixel": 0,
+    "state": 0,
+    "state_perm": 0
+   },
+   "diagnostics": {
+    "A2": -0.004253013767956171,
+    "A_time": -0.005616616707542321,
+    "state_perm": -0.0013863116324739355
+   },
+   "lambda": {
+    "A": [
+     0.0001
+    ],
+    "A2": [
+     0.001
+    ],
+    "A_time": [
+     0.0001
+    ],
+    "pixel": [
+     0.0001
+    ],
+    "state": [
+     0.0001
+    ],
+    "state_perm": [
+     0.0001
+    ]
+   },
+   "pixel": {
+    "auc_a_lo": 0.7995477395728311,
+    "ceiling": false,
+    "ci90": [
+     -0.013607873021834426,
+     -0.0023514078777457387
+    ],
+    "diff": -0.007693380740433131,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "state": {
+    "auc_a_lo": 0.7988056956301849,
+    "ceiling": false,
+    "ci90": [
+     0.14057249059794566,
+     0.18017008217936453
+    ],
+    "diff": 0.1598675758794752,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "fails"
+   },
+   "verdict": "fails"
+  },
+  "T2": {
+   "auc": {
+    "A": 0.8385604378806483,
+    "A2": 0.8355015261831434,
+    "A_time": 0.8352140359540741,
+    "pixel": 0.8333440374648631,
+    "state": 0.9515910377089202,
+    "state_perm": 0.8375333260362184
+   },
+   "ceiling": false,
+   "class_counts": [
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 1697,
+     "windows": 1785
+    },
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 2672,
+     "windows": 810
+    },
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 2595,
+     "windows": 887
+    }
+   ],
+   "const_folds": {
+    "A": 0,
+    "A2": 0,
+    "A_time": 0,
+    "pixel": 0,
+    "state": 0,
+    "state_perm": 0
+   },
+   "diagnostics": {
+    "A2": -0.003058911697504829,
+    "A_time": -0.003346401926574205,
+    "state_perm": -0.0010271118444298288
+   },
+   "lambda": {
+    "A": [
+     0.0001,
+     0.0001,
+     0.0001
+    ],
+    "A2": [
+     0.001,
+     0.001,
+     0.001
+    ],
+    "A_time": [
+     0.0001,
+     0.0001,
+     0.001
+    ],
+    "pixel": [
+     0.0001,
+     0.0001,
+     0.0001
+    ],
+    "state": [
+     0.0001,
+     0.0001,
+     0.0001
+    ],
+    "state_perm": [
+     0.0001,
+     0.0001,
+     0.0001
+    ]
+   },
+   "pixel": {
+    "auc_a_lo": 0.8225803054406466,
+    "ceiling": false,
+    "ci90": [
+     -0.008727043776750015,
+     -0.0017576450136760572
+    ],
+    "diff": -0.005216400415785194,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "state": {
+    "auc_a_lo": 0.8225970623074312,
+    "ceiling": false,
+    "ci90": [
+     0.10151834763438349,
+     0.125202125515165
+    ],
+    "diff": 0.1130305998282719,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "fails"
+   },
+   "verdict": "fails"
+  }
+ }
+}

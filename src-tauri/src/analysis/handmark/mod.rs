@@ -5,6 +5,7 @@
 
 pub mod assignment;
 pub mod day;
+pub mod desk;
 pub mod gate;
 pub mod state;
 pub mod trace;
