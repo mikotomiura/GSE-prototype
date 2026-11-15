@@ -2,7 +2,7 @@
 
 # 🧠 GSE — Generative Struggle Engine
 
-**Aims to infer a work-level cognitive state from how you type, and to offer an unscored invitation to step away before you get stuck — privacy-preserving HCI.**
+**Tests how far content-free keystroke observation can speak about work stalls, with three checks: prediction, definition, and leakage — privacy-preserving HCI.**
 
 GSE doesn't read your mind. It reads *keystroke dynamics* (key timing and key type only; no text is stored) — and decides
 whether to offer an invitation to step away from the screen now, or to stay out of the way. The invitation never measures whether you started or finished.
