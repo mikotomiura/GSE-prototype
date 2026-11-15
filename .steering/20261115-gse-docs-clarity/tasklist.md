@@ -20,8 +20,8 @@
 - [ ] /cross-review・コミット
 
 ## PR3: functional-design・architecture
-- [ ] 現行とのずれの洗い出し
-- [ ] 直す
+- [x] 現行とのずれの洗い出し
+- [x] 直す（functional-design は構成から書き直し・architecture は古い箇所だけ直した・判断 11）
 - [ ] /cross-review・コミット
 
 ## 場面ごとの道具（完了前に照合する）
