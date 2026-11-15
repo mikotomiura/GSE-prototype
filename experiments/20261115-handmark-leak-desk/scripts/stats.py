@@ -385,6 +385,7 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
         "n_windows": len(rows),
         "n_days": len(day_counts),
         "days_with_min_windows": good_days,
+        "day_gate_passed": good_days >= MIN_DAYS,   # C6 の日数の門（越えなければ回に数えない・S1-F5）
         "targets": {},
     }
     if good_days < MIN_DAYS:
@@ -465,15 +466,23 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
     return out
 
 
-def with_sensitivity(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True):
+def with_sensitivity(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, sensitivity=True, late_days=0):
     """主（全部の窓）と感度分析（`sens` の印の窓・conditions C7）を回し、ADR-051 D3 の表で合わせる。
 
     返り値は主の集計に `sensitivity` と `combined` を足したもの。`overall` は主のまま（合成の対照と同じ読み）。
-    感度分析の窓が 1 本も無ければ「未実施」。感度分析では診断と入れ子は回さない（判定だけを使う）。
+    感度分析では診断と入れ子は回さない（判定だけを使う）。
+    - sensitivity=False（回 1 = early・事前登録 S1-F5）: 回さず「未実施」。
+    - 後期の「あり」の日（late_days）が 1 日も無い: 「未実施」。
+    - 後期の「あり」の日はあるが C7 で全部除いた: 「判定不能」（除外が多いほど甘くならないように・/cross-review 指摘 8）。
     """
     res = analyse(rows, header, pix, seed, R=R, R_nested=R_nested, diagnostics=diagnostics)
     idx = [i for i, r in enumerate(rows) if r.get("sens") is True]
-    if idx:
+    if not sensitivity:
+        sens = {"overall": V.NOT_RUN, "n_windows": 0, "reason": "回 1（early）では感度分析を回さない（S1-F5）"}
+    elif not idx and late_days > 0:
+        sens = {"overall": V.UNDETERMINED, "n_windows": 0,
+                "reason": "後期の「あり」の日はあるが、C7 の条件で全部の日を除いた"}
+    elif idx:
         sens = analyse([rows[i] for i in idx], header, pix[idx] if pix is not None else None, seed + 1,
                        R=R, diagnostics=False)
     else:
@@ -545,6 +554,7 @@ def main(argv):
     ap.add_argument("--no-diagnostics", action="store_true")
     ap.add_argument("--mut", default="")
     ap.add_argument("--truth", action="store_true", help="母集団の差の近似だけを出す（S5）")
+    ap.add_argument("--no-sensitivity", action="store_true", help="感度分析を回さない（回 1 = early・S1-F5）")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     MUT.update(x for x in a.mut.split(",") if x)
@@ -555,7 +565,9 @@ def main(argv):
             json.dump(holdout_truth(rows, pix), f, ensure_ascii=False, indent=1, sort_keys=True)
             f.write("\n")
         return
-    res = with_sensitivity(rows, header, pix, a.seed, R=a.R, R_nested=a.R_nested, diagnostics=not a.no_diagnostics)
+    late = (summary.get("sensitivity") or {}).get("late_days", 0)
+    res = with_sensitivity(rows, header, pix, a.seed, R=a.R, R_nested=a.R_nested, diagnostics=not a.no_diagnostics,
+                           sensitivity=not a.no_sensitivity, late_days=late)
     res["desk"] = {k: header[k] for k in ("desk_version", "labels", "inject_stuck", "samples", "table_sha256")}
     # 日の番号は暦の日付に戻せるので、summary には数だけを書く（security-checker LOW）
     res["desk_summary"] = {k: summary[k] for k in ("windows", "excluded", "segments", "segments_recorded_t0",

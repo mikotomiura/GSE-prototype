@@ -76,73 +76,128 @@ case "$MODE" in
     : "${UTC_OFFSET_SECS:?UTC_OFFSET_SECS}"
     : "${RUN_PHASE:?RUN_PHASE（early か late。事前登録 S1-F5 の回）}"
     case "$RUN_PHASE" in early|late) ;; *) echo "RUN_PHASE は early か late: ${RUN_PHASE}" >&2; exit 2 ;; esac
+    # 区間指定削除の台帳: 既定は記録の場所の redaction_ledger.jsonl。無いなら REDACTION_LEDGER=none と明示する
+    LEDGER="${REDACTION_LEDGER:-$RECORDS_DIR/redaction_ledger.jsonl}"
+    if [ "$LEDGER" != none ] && [ ! -f "$LEDGER" ]; then
+      echo "削除の台帳が無い: ${LEDGER}（使っていないなら REDACTION_LEDGER=none）" >&2; exit 2
+    fi
     [ -x "$REPLAY" ] || { echo "gse-replay が無い: ${REPLAY}（cargo build --bin gse-replay）" >&2; exit 2; }
     [ -d "$EXP_DIR/node_modules/@napi-rs/canvas" ] || { echo "npm ci を実験のディレクトリで" >&2; exit 2; }
-    # 試しの通し（合成の記録）では RECORDS_OUT で置き場を変える
+    # 試しの通し（合成の記録）では RECORDS_OUT で置き場を変える。そのときは合成の記録しか受けない
+    # （置き場を変えて回の記録を空にし、本人の記録を回し直す抜け道を塞ぐ・code-reviewer の指摘）
     OUT="${RECORDS_OUT:-$EXP_DIR/results/records}"
+    SYN=()
+    [ -z "${RECORDS_OUT:-}" ] || SYN=(--require-synthetic)
     mkdir -p "$OUT"
     RUNS="$OUT/runs.jsonl"
-    # 判定を繰り返さない（S1-F5）: 同じ回で日数の門を越えて判定まで進んだ実行があれば止める。
+    # 同じ回を同時に 2 つ走らせない（mkdir の印。macOS の mkdir は排他）
+    LOCK="$OUT/.lock"
+    mkdir "$LOCK" 2>/dev/null || { echo "別の records が走っているか、前の回の印が残っている: ${LOCK}" >&2; exit 7; }
+    CLEAN=""   # 環境から受け継がない（security-checker の指摘）
+    trap 'rmdir "$LOCK"; [ -z "$CLEAN" ] || rm -rf "$CLEAN"' EXIT
+    # 判定を繰り返さない（S1-F5）: 同じ回で始めた実行が 1 つでもあれば止める（判定まで進んだもの・途中で
+    # 落ちて終わりの行が無いものの両方）。日数の門で止まった実行だけは数えない。読めない行があれば止める。
     # 道具の誤りで回し直すときだけ RERUN_REASON に理由を書く（前の結果は消さずに残る）。
-    if [ -f "$RUNS" ] && "$PY" -I - "$RUNS" "$RUN_PHASE" <<'PY'
-import json, sys
+    set +e
+    "$PY" -I - "$RUNS" "$RUN_PHASE" <<'PY'
+import json, os, sys
 path, phase = sys.argv[1:]
-n = 0
-with open(path, encoding="utf-8") as f:
-    for line in f:
-        if line.strip():
+if not os.path.exists(path):
+    sys.exit(1)
+started, done = set(), {}
+try:
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
             r = json.loads(line)
-            n += r.get("phase") == phase and r.get("judged") is True
-sys.exit(0 if n else 1)
+            if r.get("phase") != phase:
+                continue
+            if r.get("event") == "started":
+                started.add(r["run"])
+            elif r.get("event") == "finished":
+                done[r["run"]] = r.get("judged") is True
+            else:
+                sys.exit(3)
+except (ValueError, KeyError, TypeError):
+    sys.exit(3)
+# 判定まで進んだ実行・終わりの行が無い実行が 1 つでもあれば 0（止める）
+sys.exit(0 if any(done.get(k, True) for k in started) else 1)
 PY
-    then
-      [ -n "${RERUN_REASON:-}" ] || { echo "回 ${RUN_PHASE} は判定まで進んだ実行がある（runs.jsonl）。回し直すなら RERUN_REASON を書く" >&2; exit 7; }
-    fi
+    rc=$?
+    set -e
+    case "$rc" in
+      0) [ -n "${RERUN_REASON:-}" ] || { echo "回 ${RUN_PHASE} は始めた実行がある（runs.jsonl）。回し直すなら RERUN_REASON を書く" >&2; exit 7; } ;;
+      1) ;;
+      *) echo "runs.jsonl が読めない（rc=${rc}）。直すまで回さない" >&2; exit 7 ;;
+    esac
     "$PY" -I "$SC/selftest.py"
     if [ -z "${WORK:-}" ]; then
       WORK="$(mktemp -d "${TMPDIR:-/tmp}/handmark-leak-desk.XXXXXX")"
       CLEAN="$WORK"
     fi
     setup_work
-    RUNW="$WORK/records.$$"
-    [ -n "${CLEAN:-}" ] || CLEAN="$RUNW"
-    # 中間（記録の写し・窓の表・コマ・画素）は終わったら、失敗しても消す（C8）
-    trap 'rm -rf "$CLEAN"' EXIT
-    mkdir -m 700 "$RUNW"
-    STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+    RUNW="$(mktemp -d "$WORK/records.XXXXXX")"
+    [ -n "$CLEAN" ] || CLEAN="$RUNW"
+    # 中間（記録の写し・窓の表・コマ・画素）は終わったら、失敗・中断しても消す（C8）。SIGKILL・電源断では残る
+    chmod 700 "$RUNW"
+    RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)_$$"
+    COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+    DIRTY="$(git -C "$REPO_ROOT" status --porcelain -- src-tauri/src experiments/20261115-handmark-leak-desk/scripts src/components/handmarkStageDraw.ts | wc -l | tr -d ' ')"
+    LEDGER_ARG=()
+    [ "$LEDGER" = none ] || LEDGER_ARG=(--ledger "$LEDGER")
     "$PY" -I "$SC/prepare_records.py" --records-dir "$RECORDS_DIR" --out "$RUNW/rec" \
-      --manifest "$RUNW/manifest.json" > "$RUNW/prep.json"
+      --manifest "$RUNW/manifest.json" ${LEDGER_ARG[@]+"${LEDGER_ARG[@]}"} ${SYN[@]+"${SYN[@]}"} > "$RUNW/prep.json"
     # Step 0（ADR-013 Migration 4）: この解析が読む行種（写しに対して）
     PYTHONUTF8=1 "$PY" -I "$REPO_ROOT/scripts/capabilities_gate.py" "$RUNW/rec" --require key --require feat \
-      --json > "$OUT/capabilities_${STAMP}.json"
+      --json > "$RUNW/capabilities.json"
     RED=()
-    if [ -f "$RECORDS_DIR/redaction_ledger.jsonl" ]; then
-      RED=(--handmark-redactions "$RECORDS_DIR/redaction_ledger.jsonl")
-    fi
+    [ "$LEDGER" = none ] || RED=(--handmark-redactions "$RUNW/ledger.jsonl")
     "$REPLAY" "$RUNW"/rec/*.ndjson --handmark-windows --utc-offset-secs "$UTC_OFFSET_SECS" \
       --handmark-table "$TABLE_JSON" --handmark-table-sha "$TABLE_SHA" --labels recorded --samples 10 \
       ${RED[@]+"${RED[@]}"} --frames "$RUNW/frames.bin" > "$RUNW/w.ndjson"
     node "$SC/pixels.mjs" "$RUNW/frames.bin" 10 "$RUNW/p.ndjson"
     rm -f "$RUNW/frames.bin"
+    # 回と記録の中身を照らす（S1-F5）: 回 1（early）は後期の日を含まない記録で、回 2（late）は後期の日を含む記録で。
+    # 表の最後の日を過ぎたか（回 2 の時期）は回す人が確かめる。
+    LATE_DAYS="$("$PY" -I -c 'import json,sys; print(json.loads(open(sys.argv[1]).readlines()[-1])["sensitivity"]["late_days"])' "$RUNW/w.ndjson")"
+    if [ "$RUN_PHASE" = early ] && [ "$LATE_DAYS" -gt 0 ]; then
+      echo "回 1（early）なのに記録に後期の日（割付 late_first・on）が ${LATE_DAYS} 日ある" >&2; exit 8
+    fi
+    if [ "$RUN_PHASE" = late ] && [ "$LATE_DAYS" -eq 0 ]; then
+      echo "回 2（late）なのに記録に後期の日が無い" >&2; exit 8
+    fi
+    SENS=()
+    [ "$RUN_PHASE" = late ] || SENS=(--no-sensitivity)   # 回 1 は主のみ（S1-F5・/cross-review 指摘 7）
+    # 統計に入る直前に「始めた」を書く。これより後で落ちても、この回は「始めた」として次を止める
+    # （/cross-review 指摘 2）。これより前の失敗は AUC を計算していないので回に数えない。
+    printf '{"event":"started","run":"%s","phase":"%s","commit":"%s","dirty_files":%s,"rerun_reason":%s}\n' \
+      "$RUN_ID" "$RUN_PHASE" "$COMMIT" "$DIRTY" \
+      "$("$PY" -I -c 'import json,sys; print(json.dumps(sys.argv[1] or None, ensure_ascii=False))' "${RERUN_REASON:-}")" >> "$RUNS"
     "$PY" -I "$SC/stats.py" "$RUNW/w.ndjson" --pixels "$RUNW/p.ndjson" --seed "$SEED" --R 2000 \
-      --out "$OUT/summary_${RUN_PHASE}_${STAMP}.json"
-    # 入力の一覧（元の名前と SHA-256）と、回の記録（追記だけ）
-    cp "$RUNW/manifest.json" "$OUT/inputs_${STAMP}.json"
-    COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-    DIRTY="$(git -C "$REPO_ROOT" status --porcelain -- src-tauri/src experiments/20261115-handmark-leak-desk/scripts src/components/handmarkStageDraw.ts | wc -l | tr -d ' ')"
-    "$PY" -I - "$OUT/summary_${RUN_PHASE}_${STAMP}.json" "$RUNW/prep.json" "$RUN_PHASE" "$STAMP" "$COMMIT" "$DIRTY" \
-      "${RERUN_REASON:-}" >> "$RUNS" <<'PY'
+      ${SENS[@]+"${SENS[@]}"} --out "$RUNW/summary.json"
+    # repo に残すのは集計・入力の SHA-256・行種の門の結果だけ（元のファイル名は日付と時刻なので残さない）
+    cp "$RUNW/summary.json" "$OUT/summary_${RUN_PHASE}_${RUN_ID}.json"
+    cp "$RUNW/capabilities.json" "$OUT/capabilities_${RUN_ID}.json"
+    "$PY" -I - "$RUNW/manifest.json" > "$OUT/inputs_${RUN_ID}.json" <<'PY'
 import json, sys
-summ, prep, phase, stamp, commit, dirty, reason = sys.argv[1:]
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+out = {"records": [{k: r[k] for k in ("copy", "sha256", "last_line_cut")} for r in m["records"]],
+       "redaction_ledger": m["redaction_ledger"] and {"sha256": m["redaction_ledger"]["sha256"]}}
+print(json.dumps(out, ensure_ascii=False, indent=1))
+PY
+    "$PY" -I - "$RUNW/summary.json" "$RUNW/prep.json" "$RUN_PHASE" "$RUN_ID" >> "$RUNS" <<'PY'
+import json, sys
+summ, prep, phase, run = sys.argv[1:]
 s = json.load(open(summ, encoding="utf-8"))
 p = json.load(open(prep, encoding="utf-8"))
-judged = s.get("days_with_min_windows", 0) >= 8
+judged = s.get("day_gate_passed") is True   # C6 の日数の門を越えたか（越えなければ回に数えない）
 c = s.get("combined", {})
-print(json.dumps({"phase": phase, "utc": stamp, "commit": commit, "dirty_files": int(dirty),
-                  "files": p["files"], "last_line_cut": p["last_line_cut"], "judged": judged,
+print(json.dumps({"event": "finished", "run": run, "phase": phase, "files": p["files"],
+                  "last_line_cut": p["last_line_cut"], "ledger": p["ledger"], "judged": judged,
                   "main": c.get("main"), "sensitivity": c.get("sensitivity"), "overall": c.get("overall"),
-                  "provisional_meets": c.get("provisional_meets"), "rerun_reason": reason or None,
-                  "summary": f"summary_{phase}_{stamp}.json"}, ensure_ascii=False))
+                  "provisional_meets": c.get("provisional_meets"), "summary": f"summary_{phase}_{run}.json"},
+                 ensure_ascii=False))
 PY
     tail -n 1 "$RUNS"
     ;;

@@ -172,6 +172,23 @@ def test_sensitivity_wiring():
           "感度分析は印の窓だけで回り、日が足りなければ判定不能")
 
 
+def test_prepare_records():
+    """記録の写しの行の分け方（C2）: \n だけで分け、最後の行だけを救う。"""
+    import json
+    import prepare_records as P
+    u2028 = json.dumps({"type": "x", "s": "a\u2028b"}, ensure_ascii=False).encode()
+    good = b'{"type":"meta","session_start":1}\n' + u2028 + b"\n"
+    lines, cut = P.split_lines(good)
+    check(len(lines) == 2 and not cut, "U+2028 を含む行を 2 つに割った")
+    cutmb = good + '{"type":"key","s":"あ'.encode()[:-1]
+    lines, cut = P.split_lines(cutmb)
+    check(len(lines) == 2 and cut, "多バイト文字の途中で切れた最後の行を除かない")
+    mid = b'{"type":"meta"}\nnot json\n{"a":1}\n'
+    lines, cut = P.split_lines(mid)
+    check(len(lines) == 3 and not cut, "途中の壊れた行を勝手に除いた（gse-replay が止めるべき）")
+    check(P.split_lines(b"") == ([], False), "空の記録")
+
+
 def main():
     test_auc()
     test_logistic()
@@ -179,6 +196,7 @@ def main():
     test_day_bootstrap()
     test_analysis_controls()
     test_sensitivity_wiring()
+    test_prepare_records()
     if FAILS:
         for f in FAILS:
             print("FAIL:", f)

@@ -8,4 +8,4 @@
 
 - 置き場: GSE の既定のセッションのディレクトリ。段 1 の記録は `prepare_records.py` が最初の `meta` の `s1_mode` で選ぶ（O1 の記録は選ばない）。区間指定削除の台帳が同じ場所にあれば渡す。
 - 割付の表: まだ無い（段 1 の配布のフォルダに置く。判断 16）。
-- 回したら、`results/records/inputs_<UTC>.json`（元の名前と SHA-256）と `runs.jsonl` の行をここから指す。
+- 回したら、`results/records/inputs_<回>.json`（写しの番号と SHA-256。元の名前は残さない）と `runs.jsonl` の行をここから指し、日の範囲（最初と最後の日付）だけをここに書く。

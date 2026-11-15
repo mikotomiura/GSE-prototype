@@ -866,25 +866,35 @@ pub struct SensSummary {
 }
 
 /// `toggles` から切っていた区間 `[from, to)` を作る。始めは出ている。切ったまま日が終われば `day_end` まで。
+/// 同じ時刻の要素は「切った」を先に並べる（記録の並びに依らない）。長さ 0 の区間は捨てる。
 pub fn off_intervals(toggles: &[(u64, bool)], day_end: u64) -> Vec<(u64, u64)> {
     let mut t = toggles.to_vec();
-    t.sort_by_key(|x| x.0);
+    t.sort_unstable();
     let mut out = Vec::new();
     let mut open: Option<u64> = None;
     for (ti, on) in t {
         match (open, on) {
             (None, false) => open = Some(ti),
             (Some(a), true) => {
-                out.push((a, ti));
+                if ti > a {
+                    out.push((a, ti));
+                }
                 open = None;
             }
             _ => {}
         }
     }
     if let Some(a) = open {
-        out.push((a, day_end.max(a)));
+        if day_end > a {
+            out.push((a, day_end));
+        }
     }
     out
+}
+
+/// 切っていない窓の割合が下限以上か（C7: 「その日の有効な窓の 50% 以上」・ちょうど半分は使う）。窓が 0 なら偽。
+pub fn on_share_ok(on: usize, valid: usize) -> bool {
+    valid > 0 && on as f64 >= SENS_MIN_ON_SHARE * valid as f64
 }
 
 /// 感度分析の日を選び、使う窓に印を付ける（C7）。
@@ -901,7 +911,8 @@ fn mark_sensitivity(hm_days: &BTreeMap<i64, HmDay>, cfg: &DeskConfig, out: &mut 
             s.overflow += 1;
             continue;
         }
-        if cfg.redactions.iter().any(|&(a, b)| a < de && b > ds) {
+        // 台帳の区間は両端を含む（`redaction.rs` は `[from, to]` を消す）
+        if cfg.redactions.iter().any(|&(a, b)| a < de && b >= ds) {
             s.redacted += 1;
             continue;
         }
@@ -926,7 +937,7 @@ fn mark_sensitivity(hm_days: &BTreeMap<i64, HmDay>, cfg: &DeskConfig, out: &mut 
                 !offs.iter().any(|&(a, b)| a < e && b > w)
             })
             .collect();
-        if idx.is_empty() || (on.len() as f64) < SENS_MIN_ON_SHARE * idx.len() as f64 {
+        if !on_share_ok(on.len(), idx.len()) {
             s.few_on_windows += 1;
             continue;
         }
@@ -1716,11 +1727,48 @@ mod tests {
             off_intervals(&[(10, false), (20, true), (30, false)], 100),
             vec![(10, 20), (30, 100)]
         );
+        // 同じ時刻の切った・戻したは並びに依らず長さ 0 で捨てる
+        assert!(off_intervals(&[(10, true), (10, false)], 100).is_empty());
+        assert!(off_intervals(&[(10, false), (10, true)], 100).is_empty());
+        assert!(off_intervals(&[(100, false)], 100).is_empty());
         // 続けて切る・続けて戻すは 1 つにまとめる
         assert_eq!(
             off_intervals(&[(10, false), (15, false), (20, true), (25, true)], 100),
             vec![(10, 20)]
         );
+    }
+
+    #[test]
+    fn on_share_boundary_is_inclusive_at_half() {
+        assert!(on_share_ok(10, 20));
+        assert!(!on_share_ok(9, 20));
+        assert!(on_share_ok(1, 1));
+        assert!(!on_share_ok(0, 0));
+        assert!(on_share_ok(2, 3) && !on_share_ok(1, 3));
+    }
+
+    #[test]
+    fn a_redaction_ending_at_the_day_start_touches_that_day() {
+        let d = 20_400;
+        let mut f = day_file(d, 0.3, 3);
+        f.hm_days.insert(
+            d,
+            HmDay {
+                t: 1,
+                assigned: Some("on".into()),
+                shown_ms: Some(1000),
+                visible_ms: Some(1000),
+                ..HmDay::default()
+            },
+        );
+        let ds = day_start_ms(d, OFF);
+        let mut c = cfg();
+        c.redactions = vec![(ds - 60_000, ds - 1)];
+        let out = build(&[f.clone()], &c, &ident, &mut |_, _| {}).unwrap();
+        assert_eq!((out.sens.days, out.sens.redacted), (1, 0));
+        c.redactions = vec![(ds - 60_000, ds)];
+        let out = build(&[f], &c, &ident, &mut |_, _| {}).unwrap();
+        assert_eq!((out.sens.days, out.sens.redacted), (0, 1));
     }
 
     /// 感度分析の日（C7）: 割付・overflow・削除・見えていた割合・切っていない窓の割合の各分岐。
