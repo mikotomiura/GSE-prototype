@@ -21,7 +21,7 @@ allowed-tools: Read, Grep, Glob, Edit
 > ★ **有効なのは Lv1 Nudge と `none` / `defer` の扱いだけ**である。
 > ⚠️ **HIR（有害介入率）は残る**（ADR-015 D3。★ ACT = `{nudge}` になった）。
 > ★ Physical Anchor の運搬路は **ADR-015 D4 で空いた**（`physical-anchor` Skill 参照）。
-> ⚠️ **見直し候補（未決）**: Nudge の時期（と有無）を本人が統制する経路 → `docs/architecture/intervention-decision-engine.md` §「見直し候補（未決）」R-1（2026-09-20 登録・★ Nudge を被験者に出す研究を設計する前に決める）。
+> ⚠️ **見直し候補（未決）**: Nudge の時期（と有無）を本人が統制する経路 → `docs/history/intervention-decision-engine-2026-11-15.md` §「見直し候補（未決）」R-1（2026-09-20 登録・★ Nudge を被験者に出す研究を設計する前に決める）。
 > ★ **招待（Physical Anchor の PC 面）の契機**（ADR-040 D4・2026-11-01）: 出す規則は `analysis/invitation.rs` の `InvitationMachine::tick` で共有し、
 > 契機だけを `TriggerKind`（`estimator` / `rising` / `random` / `none`）で差し替える。通常のモードでは第 2 週だけ出し（第 1 週・O1・G1 は出さない）、
 > 契機は研究者の `~/.gse/invitation_trigger.json`（読めなければ出さない）。EH3 は割り当ての段のまま。再現は `gse-replay --invitation`。

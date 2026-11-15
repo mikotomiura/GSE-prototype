@@ -25,7 +25,7 @@ whether to offer an invitation to step away from the screen now, or to stay out 
 ![Rust](https://img.shields.io/badge/Rust-1.77+-CE412B?logo=rust&logoColor=white)
 ![License](https://img.shields.io/badge/license-Research%20Prototype-8B8B8B)
 
-[🇯🇵 日本語版 README](README.ja.md) · [📐 Design History](docs/design-history.md) · [📥 Download](https://github.com/mikotomiura/GSE-prototype/releases)
+[🇯🇵 日本語版 README](README.ja.md) · [📐 Design History](docs/history/design-history-2026-11-15.md) · [📥 Download](https://github.com/mikotomiura/GSE-prototype/releases)
 
 </div>
 
@@ -69,7 +69,7 @@ Any app ──▶ Keyboard hook (Rust)            Win: WH_KEYBOARD_LL · Mac: CG
 ```
 
 `analysis/` is **platform-agnostic**; all OS-specific code is isolated in `input/`.
-For the thread model and the full version-by-version rationale, see **[Design History](docs/design-history.md)**.
+For the thread model and the full version-by-version rationale, see **[Design History](docs/history/design-history-2026-11-15.md)**.
 
 ---
 
@@ -96,7 +96,7 @@ Y (Productive Silence) = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 
 `(X, Y)` is discretized into a 5×5 grid (+1 Backspace-penalty bin) and fed to a 3-state HMM
 (**Flow / Incubation / Stuck**) via a one-step Forward Algorithm with a hysteresis EMA on top.
-Matrices, β baselines, quantization, and the tuning history live in **[Design History](docs/design-history.md)**.
+Matrices, β baselines, quantization, and the tuning history live in **[Design History](docs/history/design-history-2026-11-15.md)**.
 
 ---
 
@@ -223,7 +223,7 @@ Debug features are guarded by two flags; participants run with **none** (fully b
 ```bash
 VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
 ```
-See `docs/calibration-smoke-runbook.md` §1.1–1.2.
+See `docs/verification-runbook.md` §2.0.
 </details>
 
 <details>
@@ -263,14 +263,14 @@ src-tauri/src/
   input/             hook_* · ime_*                                              (OS-specific)
   lib.rs · logger.rs · schema_dto.rs · redaction.rs · recording.rs
 src-tauri/bin/       gse-replay (eval CLI) · emit_schema
-docs/                architecture · functional-design · design-history · runbooks
+docs/                architecture · functional-design · history · runbooks
 ```
 
 ## 📚 Docs
 
 | File | Read when |
 |---|---|
-| [`docs/design-history.md`](docs/design-history.md) | the v2.1–v2.22 deep dive (hysteresis, IME, intervention, parity) |
+| [`docs/history/design-history-2026-11-15.md`](docs/history/design-history-2026-11-15.md) | the v2.1–v2.22 deep dive (hysteresis, IME, intervention, parity) |
 | `docs/architecture.md` | thread model & data flow |
 | `docs/functional-design.md` | intent, requirements, use cases |
 | `docs/development-guidelines.md` | conventions, testing, review, dataset workflow |

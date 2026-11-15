@@ -1,3 +1,6 @@
+> **履歴の文書（2026-11-15 に移した）。** 元のパスは `docs/design-history.md`。現行の根拠に使わない（ADR-053）。現行は `docs/research-positioning.md`・`docs/architecture/gse-design-map.md`・`docs/adr/`。
+> 写しの元: main `6fdd4023`。本文は移す前のまま変えていない。
+
 # GSE — Design & Engineering History
 
 > Version-by-version record of the cognitive-state engine's evolution (**v2.1 – v2.22**):

@@ -22,7 +22,7 @@ GSE はあなたの脳内を読みません。読むのは*キーストローク
 ![Rust](https://img.shields.io/badge/Rust-1.77+-CE412B?logo=rust&logoColor=white)
 ![License](https://img.shields.io/badge/license-Research%20Prototype-8B8B8B)
 
-[🇺🇸 English README](README.md) · [📐 設計の変遷](docs/design-history.ja.md) · [📥 ダウンロード](https://github.com/mikotomiura/GSE-prototype/releases)
+[🇺🇸 English README](README.md) · [📐 設計の変遷（英語）](docs/history/design-history-2026-11-15.md) · [📥 ダウンロード](https://github.com/mikotomiura/GSE-prototype/releases)
 
 </div>
 
@@ -66,7 +66,7 @@ GSE はあなたの脳内を読みません。読むのは*キーストローク
 ```
 
 `analysis/` は **OS 非依存**。OS 固有のコードはすべて `input/` に隔離されています。
-スレッドモデルとバージョン別の詳細な根拠は **[設計の変遷](docs/design-history.ja.md)** を参照。
+スレッドモデルとバージョン別の詳細な根拠は **[設計の変遷（英語）](docs/history/design-history-2026-11-15.md)** を参照。
 
 ---
 
@@ -93,7 +93,7 @@ Y（生産的沈黙） = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 
 `(X, Y)` を 5×5 グリッド（+ Backspace ペナルティビン）に離散化し、3 状態 HMM
 （**Flow / Incubation / Stuck**）へ前向きアルゴリズム 1 ステップで投入、上層にヒステリシス EMA を重ねます。
-遷移/放出行列・β ベースライン・量子化・チューニング履歴は **[設計の変遷](docs/design-history.ja.md)** に収録。
+遷移/放出行列・β ベースライン・量子化・チューニング履歴は **[設計の変遷（英語）](docs/history/design-history-2026-11-15.md)** に収録。
 
 ---
 
@@ -220,7 +220,7 @@ Windows 差分、Google Form ビルダー。
 ```bash
 VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
 ```
-詳細は `docs/calibration-smoke-runbook.md` §1.1–1.2。
+詳細は `docs/verification-runbook.md` §2.0。
 </details>
 
 <details>
@@ -260,14 +260,14 @@ src-tauri/src/
   input/             hook_* · ime_*                                              （OS 固有）
   lib.rs · logger.rs · schema_dto.rs · redaction.rs · recording.rs
 src-tauri/bin/       gse-replay（評価 CLI） · emit_schema
-docs/                architecture · functional-design · design-history · runbooks
+docs/                architecture · functional-design · history · runbooks
 ```
 
 ## 📚 ドキュメント
 
 | ファイル | いつ読むか |
 |---|---|
-| [`docs/design-history.ja.md`](docs/design-history.ja.md) | v2.1–v2.22 の詳細（ヒステリシス・IME・介入・パリティ） |
+| [`docs/history/design-history-2026-11-15.md`](docs/history/design-history-2026-11-15.md) | v2.1–v2.22 の詳細（ヒステリシス・IME・介入・パリティ） |
 | `docs/architecture.md` | スレッドモデルとデータフロー |
 | `docs/functional-design.md` | 意図・要件・ユースケース |
 | `docs/development-guidelines.md` | 規約・テスト・レビュー・データ repo 運用 |

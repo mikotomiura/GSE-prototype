@@ -56,3 +56,27 @@
 
 - **判断日時**: 2026-11-15（研究者・AskUserQuestion）
 - **採用**: 2 巡目の /cross-review は回さず、push して docs だけの PR を [skip ci] で出し、PR2 へ進む。マージは研究者が本文を読んでから。ADR-053 は今 Accepted にする（推奨の「本文を読んでから」ではなく、研究者が今を選んだ）。
+
+## 判断 9: PR2 の削除・移動で見つけた運用中の手順と、付け替えない参照
+
+- **判断日時**: 2026-11-15（Claude。判断 6 の条件の範囲で行った）
+- **研究者デバッグ起動の手順**: `docs/calibration-smoke-runbook.md` §1.1–1.2（二重 gate）は今も使う手順で、README・agent-shared が指していた。手順書全体を履歴へ移す前に、この節だけを現行の `docs/verification-runbook.md` §2.0 へ移した（削除された Wall の強制ボタンの記述は持ち込まない）。README の参照は §2.0 へ向けた。
+- **design-history.ja.md の削除**: README.ja.md の「設計の変遷」は英語版の履歴の写しへ向け、「（英語）」と添えた。
+- **付け替えない参照**: ADR の本文・`.steering/`・文献カード・実験の notes・凍結した事前登録（v0.3）・`references.md` の用途の欄・コードのコメント（`src/components/InvitationGlyph.tsx`・`src-tauri/src/analysis/heads/*.rs`）は過去の記録として残し、`docs/history/README.md` の旧パスの表で辿る。コードのコメントを触ると docs だけの PR でなくなるので、このタスクでは触らない。
+- **移した文書を参照し続ける現行の文書**: `docs/architecture/personalization-and-online-learning.md`・`task-adaptation-and-scope-gating.md` は gse-v2-overview などを「上位」として参照している。パスは履歴へ付け替えた。中身を今の設計に合わせるかは PR3 で見る。
+
+## 判断 10: /cross-review 1 巡目（PR2）の扱い
+
+- **判断日時**: 2026-11-15
+- **結果**: Codex は完走（削除 3 本の中身を除いた 841 行）。HIGH 0・MEDIUM 5・LOW 4。ADR との照合は Claude 側の結果に拠る（Codex は固定 prompt で diff だけを見た）。
+- **採用（すべて）**:
+  1. 両者一致: personalization・task-adaptation が履歴の文書を上位として引いている → 2 文書の冒頭と agent-shared の表に「引用先は履歴・現行は gse-design-map と ADR」の注を足した。中身の見直しは PR3。
+  2. verification-runbook §2.0 で dev 起動のコマンドが抜けていた → コードブロックで戻した（直接実行の例も）。
+  3. 未踏の表の「段階的な縮退」の行が Wall の削除にすり替わっていた → 評価されたのは下位のモデルを残す昇格の設計なので、固定 baseline と昇格ゲートと保留に引き継いだ形で書き直した。
+  4. agent-shared の散歩の行の出典 → ADR-024 D5・018 D3 と研究者の言を足し、ADR-017 D10 はセンシングの除外に限った。
+  5. task-adaptation の行番号での参照 → 節名で引いた。
+  6. gse-design-map の同意の承認 → `38e37ce1` の承認し直しと PR #411 を足した。
+  7. コードのコメントの旧パスは判断 9 のまま残す。
+  8. Codex: agent-shared の「推定は契機を作らず」が無条件だった → 「段 1・段 2 の主の比べで」に限り、既存の招待の例外を書いた。
+  9. Codex: 未踏の表の 1 行目が先行予測の否定を識別の否定に広げていた → 先行予測に限り、小さい効果を否定できないこと・識別は未確定を書いた。
+- 未踏の表の「面白い」は原本の語の可能性があるので言い換えた（逐語を repo に置かない）。

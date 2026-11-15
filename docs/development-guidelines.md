@@ -75,7 +75,7 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 - ⚠️★★★ **2026-09-01 訂正 —— README に changelog 節は存在しない。**
   ★ **リリース版は `package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` の 3 点を同値に保つ**
   （実測 2026-09-01: いずれも `0.1.30`）。`v*` タグ push で `ci.yml` の release job が発火する。
-  ★ 設計上の v2.x 系譜は `docs/design-history.md` を正とする（⚠️ **履歴文書であり現行仕様ではない**）
+  ★ 設計上の v2.x 系譜は `docs/history/design-history-2026-11-15.md` を正とする（⚠️ **履歴文書であり現行仕様ではない**）
 - コミットメッセージ末尾に `(vX.XX)` を付与（重要な機能変更時）
 
 ## 3. テスト方針

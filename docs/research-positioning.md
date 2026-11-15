@@ -194,6 +194,8 @@ GSE が主張しうるのは、作業の続き方（行動の指標）の変化�
 | 手跡 | macOS で実装中。Windows 版は未着手（2026-11-08 の引き継ぎの時点） | ADR-051・ADR-052 D5 |
 | 段 2 | 方向だけ決めた | ADR-047 D4 |
 | Phase1（v0.3 較正） | 終了。GATE3 はデータ不足で判定できなかった | `docs/preregistration-v0.3.md`・`docs/adr/README.md` |
+
+2026 年度未踏の不採択コメントへの対応は `docs/mitou_submission/review-response-2026.md`（内部の追跡表）。
 ## 参照した書誌
 
 [P9]・[P12]・[P27]・[P28]・[P42]・[P221]・[V28]・[V58]・[V299]・[V303]・[V305]・[V321]・[V325]・[V336]・[V370]・[V371]・[V372]・[V376]・[V377]・[V379]・[V383]（`docs/references.md`）。

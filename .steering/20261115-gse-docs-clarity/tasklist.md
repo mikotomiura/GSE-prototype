@@ -8,15 +8,15 @@
 - [x] 主張ごとに一次で照合する
 - [x] ADR-053 と adr/README.md
 - [x] /cross-review（Codex を加える）1 巡目・指摘 8 件を採用（判断 7）
-- [ ] コミット（push と PR は研究者に確かめる）
+- [x] コミット（push と PR は研究者に確かめる）
 
 ## PR2: 周辺の文書と削除
-- [ ] 削除・移動の候補ごとに参照元を grep
-- [ ] wbs・eh3-distribution-tag・design-history.ja を削除、design-history・calibration-smoke-runbook・architecture の 3 本を履歴へ
-- [ ] 参照元（ADR 以外）を付け替える
-- [ ] 節番号の残り: agent-shared:28（§1 冒頭の改訂ブロック）・architecture/personalization-and-online-learning:238,248・gse-v2-overview:55（移すなら不要）・expression-channel:732・intervention-decision-engine:165（移すなら不要）
-- [ ] agent-shared・glossary・gse-design-map を現行へ
-- [ ] 未踏の不採択コメントの対応表（内部の追跡表）
+- [x] 削除・移動の候補ごとに参照元を grep
+- [x] wbs・eh3-distribution-tag・design-history.ja を削除、design-history・calibration-smoke-runbook・architecture の 3 本を履歴へ
+- [x] 参照元（ADR 以外）を付け替える
+- [ ] 節番号の残り（PR3 で直す）: agent-shared:28（§1 冒頭の改訂ブロック）・architecture/personalization-and-online-learning:238,248・gse-v2-overview:55（移すなら不要）・expression-channel:732・intervention-decision-engine:165（移すなら不要）
+- [x] agent-shared・glossary・gse-design-map を現行へ
+- [x] 未踏の不採択コメントの対応表（内部の追跡表）
 - [ ] /cross-review・コミット
 
 ## PR3: functional-design・architecture

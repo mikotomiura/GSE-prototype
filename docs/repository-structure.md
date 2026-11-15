@@ -109,8 +109,9 @@ GSE-prototype/
 │   ├── mitou_submission/         #   ★ 未踏提出資料 (2026-09-02 に mitou_docs から改称・種別で分割)
 │   │   ├── mitou_docs/           #     .docx 出力の 4 本 (詳細資料 / 技術設計書 / 検証レポート / 参考文献)
 │   │   └── mitou_pptx/           #     .pptx 出力の 1 本 (設計スライド)
-│   ├── adr/                      #   ADR-001〜035 + README (確定した設計判断)
-│   ├── architecture/             #   v2 設計文書 7 本 (gse-v2-overview が上位)
+│   ├── adr/                      #   ADR-001〜053 + README (確定した設計判断)
+│   ├── architecture/             #   設計文書 6 本 (gse-design-map が状態の地図・2026-11-15)
+│   ├── history/                  #   履歴の文書と旧パスの表 (ADR-053・現行の根拠に使わない)
 │   ├── literature/               #   落合フォーマットの文献カード + _index.md
 │   └── theory/                   #   ★ 理論の文書（theory candidate・EH0・SSOT の主張ではない。2026-09-19 に .idea/ から移設）
 │

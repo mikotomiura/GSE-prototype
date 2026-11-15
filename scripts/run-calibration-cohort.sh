@@ -13,7 +13,7 @@
 #   ./scripts/run-calibration-cohort.sh --os windows      # <os> サブディレクトリ名を明示
 #
 # 前提: gse-dataset レイアウト  <root>/raw/P000/gse_*.ndjson (logger は P000 固定。多人数は
-#       収集後に P001/P002/... へ手動整理する。docs/calibration-smoke-runbook.md 参照)
+#       収集後に P001/P002/... へ手動整理する。docs/history/calibration-smoke-runbook-2026-11-15.md 参照)
 # プライバシー: NDJSON 生ログは共有しない。共有は metrics/ と cohort/ の集計 JSON のみ (§10)。
 set -euo pipefail
 

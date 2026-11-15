@@ -175,7 +175,7 @@ v0.3 較正スモークで収集した criterion label (`realtime_label`) と記
 methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 §4.2/§6.4/§7/§8/§9/§10 に凍結。
 
 > **実行手順 (自己ドッグフード→3-5名スモーク)**: 収集→解析→cohort 判定の運用は
-> `docs/calibration-smoke-runbook.md` を参照。`scripts/run-calibration-cohort.sh` が
+> `docs/history/calibration-smoke-runbook-2026-11-15.md` を参照。`scripts/run-calibration-cohort.sh` が
 > `raw/P*/` → `gse-replay --calibration` → `metrics/Pxxx/<os>/*.calib.json` → `gse-cohort` を 1 コマンドで回す。
 
 - **CLI (`gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]`)**:
@@ -417,7 +417,7 @@ O1 の自然作業のセッション NDJSON から、1 Hz の特徴行（stall o
 
 > 2026-11-07: EH3 は研究として実施しない（ADR-049）。この UC は、残したコードの振る舞いの記録として置く。
 
-- **前提**: 研究者が配布フォルダに `o1.mode` と、その参加者の割り当てを書いた `eh3.mode` を置いた（`docs/eh3-distribution-tag.md`）。
+- **前提**: 研究者が配布フォルダに `o1.mode` と、その参加者の割り当てを書いた `eh3.mode` を置いた（配布タグの手順書は 2026-11-15 に削除した・`docs/history/README.md`・EH3 は実施しない・ADR-049）。
 - **流れ**:
   1. 参加者はふだんどおり作業する（O1 と同じく「開始する」を押さずに記録が続く）。
   2. その日に初めて打鍵すると、その日が稼働日として数えられ、条件（空 / D / A-none / A-seed）が決まる。

@@ -1,7 +1,9 @@
 # 個人適応とオンライン学習 — `self_directed_recovery_risk` 軸への再定義（Layer 3-4 拡張）
 
+> **2026-11-15 の注（ADR-053）**: この文書が上位・層詳細として引く `gse-v2-overview`・`domain-adapter-boundary`・`intervention-decision-engine` は `docs/history/` へ移した履歴の文書で、現行の根拠ではない。現行の設計は `docs/architecture/gse-design-map.md` と ADR を見る。中身を今の設計に合わせるかは `.steering/20261115-gse-docs-clarity/` の PR3 で見る。
+
 > **ステータス**: **Proposed**（方向合意・確定は実装時の ADR に委ねる）。実装は **Phase1 完了後**。
-> 本書は `gse-v2-overview.md` の Layer 3-4 を、Phase1 較正の実測結果に接地して拡張する設計案である。
+> 本書は `../history/gse-v2-overview-2026-11-15.md` の Layer 3-4 を、Phase1 較正の実測結果に接地して拡張する設計案である。
 > **本書は 7 層アーキテクチャを置き換えない**。層は不変で、Layer 4 の出力に 1 フィールドを additive に足し、
 > Layer 3-4 の推定器と個人適応の境界を定める。
 >
@@ -178,7 +180,7 @@ paste の頻度は被験者間で **97 倍**（8.99 vs 0.09 / 1000 打鍵）。�
    よって `uncertainty` / `evidence_quality` / Opportunity / Consent を併用し、
    **`recovery_risk` 単独では強介入を出さない**。
 
-> 2 は Layer 6 の最低ルール（`intervention-decision-engine.md §Layer 6`）と配線される。
+> 2 は Layer 6 の最低ルール（`../history/intervention-decision-engine-2026-11-15.md §Layer 6`）と配線される。
 > 新軸を作っても「Need が高い＝介入する」にはならない、という v2 の中核（Need × Opportunity ×
 > Receptivity × Consent）は不変である。
 
@@ -225,7 +227,7 @@ GATE3 = DataInsufficient。つまり問題は「モデルが悪い」より前�
 > per-user 較正が不可避であること（被験者横断の universal marker は存在しない [V30]）を前提にすると、
 > **較正コストをプローブから行動へ移せること**が設計上の最大の利得になる。
 
-### 2.3 何を主張しないか（過大主張の禁止・`gse-v2-overview.md §5` に従う）
+### 2.3 何を主張しないか（過大主張の禁止・`../history/gse-v2-overview-2026-11-15.md §5` に従う）
 
 - 「認知状態を読んだ」とは主張しない。主張は
   **「本文非保存の行動 proxy が、特定の task 文脈における自力前進の回復と介入効用にどの程度整合するか」**に限定する。
@@ -288,7 +290,7 @@ doc#1 §6 は新規性を 3 点に置いていた:
 2. **閉ループ較正**: **介入のランダム化が較正の教師になる**（§7.4）＝ doc#1 (c) を維持。
 
 > ⚠️ **(a)(b) は §4.3 の採用ゲートを通れば Phase 4 で復活しうる**。降格は棄却ではない。
-> ⚠️ **新規性の主張を先に立てて実装を正当化しない**（`gse-v2-overview.md §5` の温度）。
+> ⚠️ **新規性の主張を先に立てて実装を正当化しない**（`../history/gse-v2-overview-2026-11-15.md §5` の温度）。
 
 #### ★ 新規性の再裁定（2026-08-01・RQ-2 のサーヴェイ結果を反映）
 
@@ -311,7 +313,7 @@ doc#1 §6 は新規性を 3 点に置いていた:
 > (iii) stall onset の検出とラベル生成を同時に行う**という**制約の組合せ**にある。
 > そして **この組合せで成功した先行例も失敗例も、本ラウンドでは見つけられなかった**。
 
-⚠️ **「見つけられなかった」を「存在しない」と読まない**（`gse-v2-overview.md §5`）。
+⚠️ **「見つけられなかった」を「存在しない」と読まない**（`../history/gse-v2-overview-2026-11-15.md §5`）。
 本ラウンドの探索範囲は **ITS の wheel-spinning 系 / HCI の中断・復帰系 / 行動ログからの struggle 検出系**であり、
 **探索水準は書誌＋abstract（一次全文未読）**である。網羅性は主張しない。
 探索の範囲と限界は `docs/literature/20260801-recovery-labeling-and-online-prereg.md` RQ-2 に記載する。
@@ -343,7 +345,7 @@ doc#1 §6 は新規性を 3 点に置いていた:
 > 窓内の（挿入打鍵 − 削除打鍵）を個人基準で正規化し、**T 秒以内に取り消されない**ことを条件とする。
 
 - 保存するのは**打鍵数と時刻だけ**。本文・クリップボード本文・ウィンドウタイトルは保存しない
-  （`data-privacy` Skill・`domain-adapter-boundary.md §Layer 2` の禁止事項をそのまま継承）。
+  （`data-privacy` Skill・`../history/domain-adapter-boundary-2026-11-15.md §Layer 2` の禁止事項をそのまま継承）。
 - 「取り消されない」条件は revision loop（削除の直後に再挿入が続く）を前進とカウントしないため。
 
 > ### ⚠️ `progress_proxy` は「対象作業をしている」ことを暗黙の前提にしている（★ 未解決・§11-11）
@@ -760,7 +762,7 @@ doc#2 §9 の評価指標にこれが無かったことが、4 状態案の危�
 | burst 長の分布 | 本書 | 1 | **採用** | 現行 F4 は平均のみ |
 | 純産出＋取り消し判定（→ `progress_proxy`） | 本書 §3.2 | 1 | **採用** | 目的変数の構成要素 |
 | stall onset / recovery のイベント化 | doc#2 §3.1 | 1 | **採用** | Decision Episode 境界。ラベル生成の起点 |
-| **boundary keys**（語/文/段落境界） | `domain-adapter-boundary.md §Adapter A`・[V31][V32]・★ **[P121]** | 1–2 | ★★★ **採用（弁別の前提条件）** ★ 2026-08-15 に「採用候補」から格上げ | ポーズの**長さ**でなく**位置**を分類する。散文の階層（語内<語間<文間<段落間）に接地し、**VK コードのみで本文非保存のまま移植可能**。<br>★★★ **2026-08-15 の格上げ根拠**（`docs/literature/20260815-silence-discrimination-pause-semantics.md`）: ⚠️★★★ **「沈黙を長さの帯域で切る」は N=475・2 独立文脈の一次で否決された** —— **micro 2–15s（局所思考）/ short 15–180s（計画・修正）/ mid 3–10min（離脱 or 外部資源）/ long >10min（離脱）を事前宣言して検定した結果は逐語 `frequency of pauses of all lengths is negatively correlated with performance`** で、★ **著者自身の事前予測（micro は正相関するはず）が外れた** [P121]。★★★ **代わりに弁別したのは「沈黙の直前に押したイベント」**: **英数キーは全イベントの 57% を占めるのに micro の 27%/long の 15% しか開始しない** ／ ★ **特殊文字は micro と負相関**（著者の解釈 `student hesitancy and lack of fluency with ... syntax` ＝つまずき）／ ★ **Return は全帯域でほぼ一定＝弁別に使えない** ／ ★ **run（検証行動）は short/mid/long に集中**。→ ★★★ **`沈黙長の分位点`（上行）だけでは弁別が始まらない。boundary keys はその前提条件である。** ★ 本項の接地はこれまで散文の言語構造 [V31][V32] のみだったが、**coding 文脈の実測が加わった**（★ `research-positioning.md §8` の転移仮説にも掛かる）。⚠️ **格上げしたのは「採否」だけである** —— ★ **Tier は 1–2 のまま／実装は凍結解除後のまま／下の投資順序（Tier 0 が先）も不変**。 |
+| **boundary keys**（語/文/段落境界） | `../history/domain-adapter-boundary-2026-11-15.md §Adapter A`・[V31][V32]・★ **[P121]** | 1–2 | ★★★ **採用（弁別の前提条件）** ★ 2026-08-15 に「採用候補」から格上げ | ポーズの**長さ**でなく**位置**を分類する。散文の階層（語内<語間<文間<段落間）に接地し、**VK コードのみで本文非保存のまま移植可能**。<br>★★★ **2026-08-15 の格上げ根拠**（`docs/literature/20260815-silence-discrimination-pause-semantics.md`）: ⚠️★★★ **「沈黙を長さの帯域で切る」は N=475・2 独立文脈の一次で否決された** —— **micro 2–15s（局所思考）/ short 15–180s（計画・修正）/ mid 3–10min（離脱 or 外部資源）/ long >10min（離脱）を事前宣言して検定した結果は逐語 `frequency of pauses of all lengths is negatively correlated with performance`** で、★ **著者自身の事前予測（micro は正相関するはず）が外れた** [P121]。★★★ **代わりに弁別したのは「沈黙の直前に押したイベント」**: **英数キーは全イベントの 57% を占めるのに micro の 27%/long の 15% しか開始しない** ／ ★ **特殊文字は micro と負相関**（著者の解釈 `student hesitancy and lack of fluency with ... syntax` ＝つまずき）／ ★ **Return は全帯域でほぼ一定＝弁別に使えない** ／ ★ **run（検証行動）は short/mid/long に集中**。→ ★★★ **`沈黙長の分位点`（上行）だけでは弁別が始まらない。boundary keys はその前提条件である。** ★ 本項の接地はこれまで散文の言語構造 [V31][V32] のみだったが、**coding 文脈の実測が加わった**（★ `research-positioning.md §8` の転移仮説にも掛かる）。⚠️ **格上げしたのは「採否」だけである** —— ★ **Tier は 1–2 のまま／実装は凍結解除後のまま／下の投資順序（Tier 0 が先）も不変**。 |
 | **undo / redo** | `§Adapter A` | 2 | **採用候補** | 「修正ループ」「no_strategy_change」の直接観測。Writing/Coding で意味が違う点に注意（早期同一化の禁止・ADR-005） |
 | **editor focus / return** | `§Adapter A` | 2 | **採用** | **打ち切り指標**として必須（§3.4）。回数と時刻のみ |
 | アプリ切替**回数**（識別子なし） | doc#1 §3-A / §8-3 | 2 | **条件付き採用** | 打ち切り指標として。**アプリ識別子は保存しない**（持つと事実上ウィンドウタイトルの代理になり content-free が崩れる）＝ doc#1 §8-3 の未解決点への回答 |
@@ -931,7 +933,7 @@ repository 名 / 外部送信を前提とした raw session log は**保存し�
 | **A** | 参照点依存・損失非対称 | **採用** | `false_positive_cost`（不要介入で集中を壊す）と `false_negative_cost`（見逃し）を分けて持ち、個人×task で更新する | 参照点依存の**概念的出所**は [P29]。ただし GSE で作動しているのは**標準的な cost-sensitive decision theory（非対称損失）**であり、prospect theory 固有の要素（確率加重・価値関数の曲率）は使っていない |
 | **B** | 現在バイアス・時間割引 | **採用（proxy 限定）** | pause/再試行後の外部化までの時間・外部化後の自力復帰率・進行を伴わない外部化の反復 | 時間割引率を**人格特性として断定しない**。「現在の文脈で即時報酬を優先した度合い」として扱う |
 | **C** | 努力コストの割引 | **採用（低次元 proxy）** | 試行回数・修正ループ・再開までの時間・検証行動の有無 | 遅延報酬 MDP に努力割引を入れて個人別にインセンティブを最適化した研究例は実在する [V56]。ただし **GSE で同じパラメータが識別できる保証はない**ため、明示的な割引率は推定しない |
-| **D** | 曖昧性回避と不確実性 | **採用（ただし引用は棄却の側）** | `model_uncertainty` が高い状態で強介入を出さない | ⚠️ **この設計は行動経済学を必要としない**。根拠は既存 SSOT（`domain-adapter-boundary.md §原則`「uncertainty 必須・未較正 head は強介入禁止」）に既にある。[P30] は **「ユーザーの ambiguity aversion を推定しない」という棄却の出典**として引く |
+| **D** | 曖昧性回避と不確実性 | **採用（ただし引用は棄却の側）** | `model_uncertainty` が高い状態で強介入を出さない | ⚠️ **この設計は行動経済学を必要としない**。根拠は既存 SSOT（`../history/domain-adapter-boundary-2026-11-15.md §原則`「uncertainty 必須・未較正 head は強介入禁止」）に既にある。[P30] は **「ユーザーの ambiguity aversion を推定しない」という棄却の出典**として引く |
 | **E** | 習慣化と目標志向の切替 | **採用（Markov count として）** | `context → action family → outcome → next action family` の遷移統計。停滞後に毎回検索へ移るが戻らないなら `externalization_recovery_gap` を更新 | 実装実体は**個人別 Markov count**であり心理学を要さない。[P31] は「個人ごとに文脈から行動が予測できる程度が違う」「予測しやすい（習慣的な）人ほど介入に反応しにくい」という**設計ヒント**としてのみ引く（運動・手洗いのデータであり知的作業へ直接一般化しない） |
 | **F** | 選択アーキテクチャ・個人化ナッジ | **★条件付き採用（抑制方向のみ）** | 下記 §6.2 | [P32] は個人化を「何を促すか」と「どう提示するか」に分ける枠組みとして引く。**GSE は後者を採らない** |
 | **G** | Sunk cost / escalation | **条件付き** | `repeated_attempts + no_progress_proxy + no_strategy_change + recovery_probability_low` の**組合せでのみ**利用。単独で「不毛な固執」と分類しない（粘り強さ・生産的苦闘 [P12] と区別できないため） | — |
@@ -944,7 +946,7 @@ doc#2 §2.1-F は個人化ナッジ（どの形式・強度・タイミングで
 
 - ナッジ **assistance 系（GSE の Nudge に最近似）は d=0.22 → 出版バイアス補正後 d≈0.01（BF01≈9）** [V40]
 - 実行意図は素 d=.36 → 補正後 **d≈.15** [P21]
-- 結論として **Motivation Generator を標準実装しない**（`gse-v2-overview.md §5`）
+- 結論として **Motivation Generator を標準実装しない**（`../history/gse-v2-overview-2026-11-15.md §5`）
 
 > **決定**: 個人化の対象を 2 つに割り、**抑制方向のみ採用する**。
 >
@@ -954,11 +956,11 @@ doc#2 §2.1-F は個人化ナッジ（どの形式・強度・タイミングで
 > | **抑制方向**（いつ**出さない**か・強度の**上限**） | **採る** | [V40] の否定対象外。[V43]（受動観測の行動指標が受容性を予測し、自己申告は予測しない）が支持する方向 |
 >
 > すなわち **個人化は「よりうまく説得するため」ではなく「より確実に黙るため」に使う**。
-> これは GSE のアイデンティティ（`none`/`defer` を第一級の判断とする・`gse-v2-overview.md §2.2`）と一致する。
+> これは GSE のアイデンティティ（`none`/`defer` を第一級の判断とする・`../history/gse-v2-overview-2026-11-15.md §2.2`）と一致する。
 
 > ⚠️ **未否定の残余**: [V40] で **structure 系（選択環境の変更）のみ inconclusive**
 > ＝未否定である。⚠️★★★ **2026-09-01 訂正 —— GSE でこれに最も近かった Lv2 Wall は 2026-08-23 に全削除された**（ADR-015 D1）。★ 将来 structure 系の介入を再導入して個人化を検討する余地は残るが、**復活には新規 ADR が要る**ので本書では扱わない。
-> 高リスクの実験介入**（`intervention-decision-engine.md §Layer 6`）なので本書では扱わない。
+> 高リスクの実験介入**（`../history/intervention-decision-engine-2026-11-15.md §Layer 6`）なので本書では扱わない。
 
 ### 6.3 初期採用しない候補（doc#2 §2.3 を維持）
 
@@ -1307,7 +1309,7 @@ Frontend に推論ロジックを置かない。raw session log や学習デー�
       ③ ★ **content-free な out-of-scope 検出**——打鍵の行動署名（特に**ポーズ分布の裾**。
       論述には計画ポーズが出るが反復的な打鍵作業には構造的に出ない）で「対象作業らしくない」を判定し、
       **`evidence_quality` を下げ `uncertainty` を上げる**。これにより
-      「未較正 head では強介入を出さない」という既存原則（`domain-adapter-boundary.md §原則`）が
+      「未較正 head では強介入を出さない」という既存原則（`../history/domain-adapter-boundary-2026-11-15.md §原則`）が
       **そのまま発火する**——新しいゲート機構を作る必要がない ／
       ④ **除外基準にタスク内容を含める**（現行 inclusion criteria は触れていない・研究者判断）。
     - ★ **③ の実行可能性は検証済み（2026-08-02・`experiments/20260802-task-scope-detector/`）。**
@@ -1387,9 +1389,9 @@ Frontend に推論ロジックを置かない。raw session log や学習デー�
 
 ## 12. 関連文書
 
-- **上位**: `docs/architecture/gse-v2-overview.md`（アーキテクチャ SSOT・7 層・エビデンスの温度）
-- **層詳細**: `docs/architecture/domain-adapter-boundary.md`（Layer 0-3）/
-  `docs/architecture/intervention-decision-engine.md`（Layer 5-7）
+- **上位**: `docs/history/gse-v2-overview-2026-11-15.md`（アーキテクチャ SSOT・7 層・エビデンスの温度）
+- **層詳細**: `docs/history/domain-adapter-boundary-2026-11-15.md`（Layer 0-3）/
+  `docs/history/intervention-decision-engine-2026-11-15.md`（Layer 5-7）
 - **決定**: `docs/adr/ADR-008`（オンライン学習の境界）/ `docs/adr/ADR-009`（新軸と潜在状態）/
   `ADR-002`（domain-local inference）/ `ADR-005`（envelope versioning）/ `ADR-006`（task_kind→β）/
   `ADR-007`（receptivity 分解維持）
