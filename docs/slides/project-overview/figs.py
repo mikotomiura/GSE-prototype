@@ -447,8 +447,45 @@ def chart_release():
     sk.save(OUT + "chart_release.png")
 
 
+def stages():
+    """推定の段の地図（ADR-046 D3・ADR-019 D3・ADR-044）。段の並びは昇格の順ではない"""
+    sk = Sk(1500, 640, 127)
+    # 床
+    sk.rect(20, 150, 300, 250, GRAY, 3, fill=PALE[GRAY])
+    sk.text(170, 190, "固定の床", 28, INK, "mm")
+    sk.text(170, 235, "HMM 0.5.0", 23, INK, "mm")
+    sk.text(170, 285, "手で置いた値", 19, INK, "mm")
+    sk.text(170, 315, "段 1 の終わりまで凍結", 19, INK, "mm")
+    sk.text(170, 370, "今", 19, GRAY, "mm")
+    # 門
+    sk.arrow(330, 275, 450, 275, INK, 4, 14)
+    sk.arrow(450, 305, 330, 305, GRAY, 3, 12)
+    sk.text(390, 240, "比べる", 19, INK, "mm")
+    # ラベルで学ぶ段
+    sk.rect(460, 60, 1020, 400, ORANGE, 2, fill=WHITE)
+    sk.text(480, 95, "段 1 の申告（ラベル）で学ぶ段 —— どれも床と比べ、昇格の門を通ったときだけ使う", 22, ORANGE, "lm")
+    cols = [("criterion 直結", "1 人ごと", ["再較正・表の特徴の", "罰つきロジスティック"], ORANGE, "段 1 の申告の後"),
+            ("タスク適応", "1 人の中", ["作業の種類ごとの頭"], TEAL, "種類が 2 つ以上で件数を満たす"),
+            ("時系列", "1 人ごと", ["ROCKET 系・本人の", "記録で学ぶ HMM"], INDIGO, "criterion 直結が門を通った後")]
+    w, gap = 310, 20
+    for i, (n, unit, cand, c, when) in enumerate(cols):
+        x = 490 + i * (w + gap)
+        y = 140
+        sk.rect(x, y, w, 290, c, 3, fill=PALE[c])
+        sk.text(x + w / 2, y + 40, n, 26, INK, "mm")
+        sk.text(x + w / 2, y + 85, unit, 21, c, "mm")
+        for k, line in enumerate(cand):
+            sk.text(x + w / 2, y + 140 + k * 30, line, 19, INK, "mm")
+        sk.text(x + w / 2, y + 250, when, 17, GRAY, "mm")
+    sk.text(750, 490, "昇格の門: その人の日の時間順の holdout で、較正と上下界を床と比べる（並びは昇格の順ではない）", 21, INK, "mm")
+    sk.rect(380, 525, 740, 100, PLUM, 3, fill=PALE[PLUM])
+    sk.text(750, 558, "人をまたぐ個人適応（partial pooling・階層ロジスティック）", 21, INK, "mm")
+    sk.text(750, 598, "段 1 の確認（本人以外 3 名）では使わない。段 2 の設計で決める", 18, GRAY, "mm")
+    sk.save(OUT + "fig_stages.png")
+
+
 if __name__ == "__main__":
     for f in [ime_flow, ime_why, ime_os, threads, features, record_flow, replay, stage1, tool,
-              chart_auc, chart_match, chart_zenodo, chart_release]:
+              chart_auc, chart_match, chart_zenodo, chart_release, stages]:
         f()
     print("ok")
