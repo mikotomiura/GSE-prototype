@@ -3,7 +3,7 @@ description: >
   先行研究サーヴェイを 1 ラウンド分実行する。RQ を検証可能な下位問いに分解し、
   複数 angle で探索 → claim 抽出 → 敵対的 3 票検証 → 落合フォーマットのカード生成 →
   docs/references.md への append-only 登録 → docs/literature/_index.md 追記 →
-  research-positioning.md §3/§4 への還元まで行う。「サーベイする」「先行研究を調べる」
+  research-positioning.md §8（新規性として書ける範囲）への還元まで行う。「サーベイする」「先行研究を調べる」
   「この主張の証拠を確かめる」「Epic の go/no-go を文献で判定する」時に実行する。
 allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task,
   Bash(date *), Bash(ls *), Bash(grep *), Bash(git *), Bash(python3 *)
@@ -17,7 +17,7 @@ allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task,
 > **前提 Skill (実行前に Read すること)**
 > - `.claude/skills/literature-card/SKILL.md` — 落合 6 項目・カード契約
 > - `.claude/skills/citation-ssot/SKILL.md` — `[Pn]`/`[Vn]` 名前空間・append-only・provisional
-> - `docs/research-positioning.md` §8 — **エビデンス温度**（過大主張の禁止）
+> - `docs/research-positioning.md` §8・§9 — **新規性として書ける範囲と、主張しないこと**（過大主張の禁止）
 
 ---
 
@@ -174,8 +174,10 @@ renumber しない。重複は DOI / arXiv / 正規化 URL の key で判定し�
 
 ## Step 8: research-positioning.md への還元
 
-本ラウンドの結果が §3（ランドスケープ）/ §4（差分の主張）を **補強 / 反証 / 精緻化**の
-どれをしたかを判定し、該当箇所を inline `[Pn]`/`[Vn]` 付きで更新する。
+本ラウンドの結果が §8（新規性として書ける範囲・数えないもの）を **補強 / 反証 / 精緻化**の
+どれをしたかを判定し、該当箇所を inline `[Pn]`/`[Vn]` 付きで更新する。主張の範囲が変わるなら §2・§9 も直す。
+先行研究の詳しい整理はカードと `_index.md` に置き、research-positioning には要点だけを書く（ADR-053。
+旧 §3 ランドスケープ・§4 差分は `docs/history/research-positioning-2026-11-15.md` にある）。
 
 **反証だった場合は主張を下げる。** 過去ラウンドでは「摩擦が能力を育てる」→「自力解決の
 機会を保存する」への**主張範囲の縮小**が正しい還元だった。

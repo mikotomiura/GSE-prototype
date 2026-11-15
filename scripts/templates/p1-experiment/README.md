@@ -13,7 +13,7 @@
 | 項目 | 値 |
 |---|---|
 | この実験で確かめること（1 文） | （未記入） |
-| 検証する仮説（`docs/research-positioning.md` §5 の H?） | （未記入） |
+| 検証する仮説（`docs/research-positioning.md` §4.1 の H? か事前登録の項目番号） | （未記入） |
 | 関連する事前登録（PreReg-?） | （未記入） |
 | 借用した手法の出典（`docs/references.md` の `[n]`） | （未記入） |
 

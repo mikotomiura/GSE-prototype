@@ -14,7 +14,7 @@ allowed-tools: Read, Write, Edit, Grep, WebSearch, WebFetch
 
 ## このスキルの目的
 文献の精読を、再利用可能な構造化カードに落とす。「やり残し」の抽出を毎回強制し、
-research-positioning.md §3（ランドスケープ）/ §4（差分）に還元できる形にする。
+research-positioning.md §8（新規性として書ける範囲）に還元できる形にする。
 本 skill は規約を再定義せず、`_index.md` の出力契約と `references.md` の登録を発火させる。
 
 ## カードの必須 6 項目（落合フォーマット）
@@ -28,13 +28,13 @@ research-positioning.md §3（ランドスケープ）/ §4（差分）に還元
 
 ## 主要なルール
 ### ルール 1: 1 文献 = 1 カード、6 項目すべて埋める
-「やり残し」（項目 2/5 から導く）を必ず 1 行で書く。これが §4 差分の素材になる。
+「やり残し」（項目 2/5 から導く）を必ず 1 行で書く。これが research-positioning §8 の素材になる。
 ### ルール 2: ファイルと索引
 docs/literature/<YYYYMMDD>-<topic-slug>.md に保存し、_index.md の表に 1 行追記。
 ### ルール 3: 出典は citation-ssot 経由
 各カードの文献を references.md に append-only 登録し、カードに [n] を付ける（書誌未確定は provisional）。
 ### ルール 4: GSE 文脈への還元
-カードの「やり残し」が research-positioning.md §4（差分）の主張を補強/反証するかを 1 行で述べる。
+カードの「やり残し」が research-positioning.md §8（新規性として書ける範囲）の主張を補強/反証するかを 1 行で述べる。
 
 ## チェックリスト
 - [ ] 6 項目すべて埋めたか

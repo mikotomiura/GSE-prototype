@@ -19,5 +19,5 @@
 - NDJSON 生ログ・キーストローク内容はコミットしない（data-privacy SSOT）。入力は gse-dataset の
   commit hash で `data.md` に固定参照する。
 - 共有は集計 JSON のみ（`metrics.json` / `*.calib.json` / `cohort.json`）。
-- 各実験の `notes.md` は必ず `docs/research-positioning.md` §5 の仮説と
+- 各実験の `notes.md` は必ず `docs/research-positioning.md` §4.1 の仮説（または事前登録の項目番号）と
   `docs/preregistration-v0.3.md` の PreReg 番号にリンクする。

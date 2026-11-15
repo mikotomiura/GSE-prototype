@@ -163,7 +163,7 @@ if [ ! -f "$EXP_DIR/notes.md" ]; then
   cat > "$EXP_DIR/notes.md" <<'NOTES'
 # notes
 
-- 検証する仮説: docs/research-positioning.md §5 H?  <!-- 埋める -->
+- 検証する仮説: docs/research-positioning.md §4.1 の H? か事前登録の項目番号  <!-- 埋める -->
 - 事前登録: docs/preregistration-v0.3.md PreReg-?    <!-- 埋める -->
 - 借用手法の出典: [n] (docs/references.md)           <!-- 該当あれば -->
 
