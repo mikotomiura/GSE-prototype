@@ -25,13 +25,13 @@
 - [ ] 実機で前後を見比べる
 
 ## 3. 実験 experiments/20261115-handmark-leak-desk/
-- [ ] conditions.md（記録を開く前に固定・数値を研究者に確かめる）→ 先にコミット
-- [ ] synth.py・pixels.mjs・stats.py・verdict.py・controls.py・timing.py・selftest.py
-- [ ] run.sh・SEED・env.md・notes.md・requirements.txt・package.json と lock
-- [ ] 段階 S0〜S5 を回す・計算時間を実測（2 時間を超えたら研究者に聞く）
-- [ ] mutate.sh（変異がすべて赤）
+- [ ] conditions.md（記録を開く前に固定・数値を研究者に確かめる）→ 先にコミット（C3・C4 は判断 12・13 で記入済み。残りの数値の確認と固定の印は未）
+- [x] synth.py・pixels.mjs・stats.py・verdict.py・controls.py・selftest.py・report.py・check_mutations.py（timing は controls.py の timing に入れた）
+- [x] run.sh・SEED・env.md・notes.md・requirements.txt・package.json と lock
+- [x] 段階 S0〜S5 を回す・計算時間を実測（JOBS=2 で約 4 時間・入れ子は回さない＝判断 13）
+- [x] 変異（check_mutations.py・名指しした対照が赤）
 
 ## 4. 仕上げ
-- [ ] code-reviewer＋security-checker・/cross-review
+- [x] code-reviewer＋security-checker・/cross-review（Rust・描画・実験。実験の指摘は対照の後に直した）
 - [ ] 事前登録の改訂へ渡すもの（判断 3 の読み替え・条件）を記録
 - [ ] df -h / を見て push・PR は研究者に確かめる
