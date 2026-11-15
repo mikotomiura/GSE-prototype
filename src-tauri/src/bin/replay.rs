@@ -1588,6 +1588,9 @@ struct Args {
     hm_inject: f64,
     /// --samples <n>: 窓あたりの標本の数（30000 を割り切る・既定 10・判断 9）。
     hm_samples: usize,
+    /// --handmark-redactions <ledger>: 区間指定削除の台帳（`redaction_ledger.jsonl`）。重なる日を感度分析から除く
+    /// （conditions.md C7）。
+    hm_redactions_path: Option<PathBuf>,
     /// --features: ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力する (issue 001-007)。
     /// ⚠️ 手元の解析用中間成果物であり `gse-dataset` へ共有しない (`docs/glossary.md` 逐語)。
     features: bool,
@@ -1753,6 +1756,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         "--frames",
         "--inject-stuck",
         "--samples",
+        "--handmark-redactions",
     ]
     .iter()
     .any(|f| args.iter().any(|a| a == f));
@@ -1768,6 +1772,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         }
     };
     let hm_frames_path = take_value(&mut args, "--frames")?.map(PathBuf::from);
+    let hm_redactions_path = take_value(&mut args, "--handmark-redactions")?.map(PathBuf::from);
     let hm_inject = match take_value(&mut args, "--inject-stuck")? {
         None => 0.0,
         Some(v) => match v.parse::<f64>() {
@@ -1791,7 +1796,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     let hm_sub_flag = hm_sub_given;
     if hm_sub_flag && !handmark_windows {
         return Err(
-            "--handmark-table, --handmark-table-sha, --labels, --frames, --inject-stuck and --samples require --handmark-windows"
+            "--handmark-table, --handmark-table-sha, --labels, --frames, --inject-stuck, --samples and --handmark-redactions require --handmark-windows"
                 .to_string(),
         );
     }
@@ -1992,6 +1997,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         hm_labels_recomputed,
         hm_frames_path,
         hm_inject,
+        hm_redactions_path,
         hm_samples,
         features,
         feature_config_path,
@@ -2213,6 +2219,31 @@ fn write_frame(out: &mut Vec<u8>, id: u32, s: &gse_next_lib::analysis::handmark:
     }
 }
 
+/// 区間指定削除の台帳（1 行 1 件・`from`・`to` を ms で持つ）から区間を読む。読めない行は止める（fail-closed）。
+fn parse_redaction_ledger(bytes: &[u8]) -> Result<Vec<(u64, u64)>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|_| "redaction ledger is not UTF-8")?;
+    let mut out = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = serde_json::from_str(line)
+            .map_err(|_| format!("redaction ledger line {} is not JSON", i + 1))?;
+        let from = v.get("from").and_then(serde_json::Value::as_u64);
+        let to = v.get("to").and_then(serde_json::Value::as_u64);
+        match (from, to) {
+            (Some(a), Some(b)) if a <= b => out.push((a, b)),
+            _ => {
+                return Err(format!(
+                    "redaction ledger line {} has no valid from/to",
+                    i + 1
+                ))
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// `--handmark-windows`: 窓の表を NDJSON の文字列で返す（1 行目がヘッダ・最後の行が要約）。
 /// 誤りのときは stdout に 1 バイトも出さない（全部を作ってから返す）。
 fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String> {
@@ -2287,10 +2318,15 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
             f.feats = std::mem::take(r);
         }
     }
+    let redactions = match &args.hm_redactions_path {
+        Some(p) => parse_redaction_ledger(&read_small(p, "redaction ledger")?)?,
+        None => Vec::new(),
+    };
     let cfg = desk::DeskConfig {
         utc_offset_secs: offset,
         table_sha256_hex: table_sha.clone(),
         samples: args.hm_samples,
+        redactions,
     };
     let lam = args.hm_inject;
     let transform = move |s, p| inject_stuck(s, p, lam);
@@ -2423,6 +2459,8 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         "segments_recorded_t0": out.segments_recorded_t0,
         "overflow_days": out.overflow_days,
         "label_check": label_check,
+        "sensitivity": out.sens,
+        "redactions_given": args.hm_redactions_path.is_some(),
     });
     text.push_str(&summary.to_string());
     text.push('\n');
@@ -2488,7 +2526,7 @@ fn usage() -> String {
          gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs <N>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --probes [--utc-offset-secs <N>] [--day-state <s1_day_state.json>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --day-questions --utc-offset-secs <N>\n    \
-         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>（既定 10）]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>（既定 10）] [--handmark-redactions <redaction_ledger.jsonl>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
@@ -5191,6 +5229,24 @@ mod tests {
     }
 
     #[test]
+    fn redaction_ledger_reads_intervals_and_fails_closed() {
+        let ok = b"{\"requested_at\":9,\"from\":100,\"to\":200,\"files_touched\":1,\"lines_removed\":3}\n\n{\"from\":5,\"to\":5}\n";
+        assert_eq!(
+            parse_redaction_ledger(ok).unwrap(),
+            vec![(100, 200), (5, 5)]
+        );
+        for bad in [
+            &b"not json"[..],
+            &b"{\"from\":1}"[..],
+            &b"{\"from\":3,\"to\":2}"[..],
+            &b"{\"from\":\"1\",\"to\":2}"[..],
+            &[0xff, 0xfe][..],
+        ] {
+            assert!(parse_redaction_ledger(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
     fn handmark_windows_mode_args() {
         let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         let base = [
@@ -5220,8 +5276,11 @@ mod tests {
             "0.2",
             "--samples",
             "6",
+            "--handmark-redactions",
+            "r.jsonl",
         ]);
         let p = parse_args_from(v(&full)).expect("full");
+        assert_eq!(p.hm_redactions_path, Some(PathBuf::from("r.jsonl")));
         assert!(p.hm_labels_recomputed);
         assert_eq!(p.hm_frames_path, Some(PathBuf::from("f.bin")));
         assert_eq!((p.hm_inject, p.hm_samples), (0.2, 6));
@@ -5246,6 +5305,7 @@ mod tests {
             &["a.ndjson", "--inject-stuck", "0.1"][..],
             &["a.ndjson", "--samples", "6"][..],
             &["a.ndjson", "--handmark-table", "t"][..],
+            &["a.ndjson", "--handmark-redactions", "r"][..],
         ] {
             assert!(parse_args_from(v(sub)).is_err(), "{sub:?}");
         }

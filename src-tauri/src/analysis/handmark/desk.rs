@@ -39,7 +39,8 @@ use crate::eh3::{local_day, DAY_CUTOFF_HOUR};
 pub type Result<T> = std::result::Result<T, String>;
 
 /// 道具の版（表のヘッダに書く）。窓・特徴・対象の規則を変えたら上げる。
-pub const DESK_VERSION: &str = "hm-desk-1";
+/// hm-desk-2（2026-11-16）: 感度分析の日（conditions.md C7）の印 `sens` と要約を足した。主の窓・特徴・対象は変えていない。
+pub const DESK_VERSION: &str = "hm-desk-2";
 /// 窓の長さ（ADR-051 D3）。
 pub const WINDOW_MS: u64 = 30_000;
 /// 区間の始まりから捨てる長さ（状態が 0 から立ち上がる間）。
@@ -125,6 +126,14 @@ pub struct HmDay {
     pub table_sha256: Option<String>,
     /// `stage_starts` が上限を超えて切れた日（区間を正しく切れないので使わない）。
     pub overflow: bool,
+    /// 割付（`late_first`・`on` など）。古い行・前期の行には無い。
+    pub assigned: Option<String>,
+    /// その日に出ていた時間（ms・日の累計）。
+    pub shown_ms: Option<u64>,
+    /// 帯が見えていた時間（ms・日の累計）。記録が無ければ `None`。
+    pub visible_ms: Option<u64>,
+    /// 切った（`false`）／戻した（`true`）時刻。
+    pub toggles: Vec<(u64, bool)>,
 }
 
 /// 1 本の記録から読んだもの。
@@ -293,6 +302,36 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
                     Some(Value::Bool(b)) => *b,
                     Some(_) => return Err(at("overflow が真偽でない".to_string())),
                 };
+                let assigned = match v.get("assigned") {
+                    None | Some(Value::Null) => None,
+                    Some(Value::String(s)) => Some(s.clone()),
+                    Some(_) => return Err(at("assigned が文字列でない".to_string())),
+                };
+                let opt_u64 = |key: &str| -> Result<Option<u64>> {
+                    match v.get(key) {
+                        None | Some(Value::Null) => Ok(None),
+                        Some(x) => x
+                            .as_u64()
+                            .map(Some)
+                            .ok_or_else(|| at(format!("{key} が u64 でない"))),
+                    }
+                };
+                let shown_ms = opt_u64("shown_ms")?;
+                let visible_ms = opt_u64("visible_ms")?;
+                let mut toggles = Vec::new();
+                if let Some(a) = v.get("toggles") {
+                    let a = a
+                        .as_array()
+                        .ok_or_else(|| at("toggles が配列でない".to_string()))?;
+                    for x in a {
+                        let t = x.get("t").and_then(Value::as_u64);
+                        let on = x.get("on").and_then(Value::as_bool);
+                        match (t, on) {
+                            (Some(t), Some(on)) => toggles.push((t, on)),
+                            _ => return Err(at("toggles の要素が {t, on} でない".to_string())),
+                        }
+                    }
+                }
                 if let Some(sh) = &table_sha256 {
                     if !f.table_shas.contains(sh) {
                         f.table_shas.push(sh.clone());
@@ -304,6 +343,10 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
                     stage_starts: starts,
                     table_sha256,
                     overflow,
+                    assigned,
+                    shown_ms,
+                    visible_ms,
+                    toggles,
                 };
                 match f.hm_days.get(&day) {
                     Some(prev) if prev.t > t => {}
@@ -773,6 +816,8 @@ pub struct WindowRow {
     pub t2: u8,
     pub a: Vec<f64>,
     pub b_state: Vec<f64>,
+    /// 感度分析に使う窓（conditions.md C7: 使う日で、切っていた区間に重ならない）。
+    pub sens: bool,
 }
 
 /// 除いた窓の数。
@@ -790,6 +835,109 @@ pub struct DeskConfig {
     pub table_sha256_hex: String,
     /// 窓あたりの標本の数（30_000 を割り切る）。
     pub samples: usize,
+    /// 区間指定削除の区間 `[from, to)`（台帳から）。重なる日は感度分析に使わない（C7）。
+    pub redactions: Vec<(u64, u64)>,
+}
+
+/// 感度分析の日の、帯が見えていた割合の下限（C7）。
+pub const SENS_MIN_VISIBLE: f64 = 0.5;
+/// 感度分析の日の、切っていない窓の割合の下限（C7）。
+pub const SENS_MIN_ON_SHARE: f64 = 0.5;
+
+/// 感度分析の日の数え（日は数だけを出す。日の番号は暦に戻せるので書かない）。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct SensSummary {
+    /// 割付が `late_first` か `on` の日。
+    pub late_days: usize,
+    /// 使う日。
+    pub days: usize,
+    /// 除いた日: `overflow`。
+    pub overflow: usize,
+    /// 除いた日: 区間指定削除に重なる。
+    pub redacted: usize,
+    /// 除いた日: `visible_ms / shown_ms` が下限未満か、量が無い。
+    pub not_visible: usize,
+    /// 除いた日: 切っていない窓がその日の有効な窓の下限未満（窓が無い日を含む）。
+    pub few_on_windows: usize,
+    /// 使う窓。
+    pub windows: usize,
+    /// 使う日のうち、切っていた区間に重なって除いた窓。
+    pub windows_off: usize,
+}
+
+/// `toggles` から切っていた区間 `[from, to)` を作る。始めは出ている。切ったまま日が終われば `day_end` まで。
+pub fn off_intervals(toggles: &[(u64, bool)], day_end: u64) -> Vec<(u64, u64)> {
+    let mut t = toggles.to_vec();
+    t.sort_by_key(|x| x.0);
+    let mut out = Vec::new();
+    let mut open: Option<u64> = None;
+    for (ti, on) in t {
+        match (open, on) {
+            (None, false) => open = Some(ti),
+            (Some(a), true) => {
+                out.push((a, ti));
+                open = None;
+            }
+            _ => {}
+        }
+    }
+    if let Some(a) = open {
+        out.push((a, day_end.max(a)));
+    }
+    out
+}
+
+/// 感度分析の日を選び、使う窓に印を付ける（C7）。
+fn mark_sensitivity(hm_days: &BTreeMap<i64, HmDay>, cfg: &DeskConfig, out: &mut DeskOut) {
+    let mut s = SensSummary::default();
+    for (&day, r) in hm_days {
+        if !matches!(r.assigned.as_deref(), Some("late_first" | "on")) {
+            continue;
+        }
+        s.late_days += 1;
+        let ds = day_start_ms(day, cfg.utc_offset_secs);
+        let de = day_start_ms(day + 1, cfg.utc_offset_secs);
+        if r.overflow {
+            s.overflow += 1;
+            continue;
+        }
+        if cfg.redactions.iter().any(|&(a, b)| a < de && b > ds) {
+            s.redacted += 1;
+            continue;
+        }
+        let visible = match (r.visible_ms, r.shown_ms) {
+            (Some(v), Some(sh)) if sh > 0 => v as f64 >= SENS_MIN_VISIBLE * sh as f64,
+            _ => false,
+        };
+        if !visible {
+            s.not_visible += 1;
+            continue;
+        }
+        let offs = off_intervals(&r.toggles, de);
+        let idx: Vec<usize> = (0..out.windows.len())
+            .filter(|&i| out.windows[i].day == day)
+            .collect();
+        let on: Vec<usize> = idx
+            .iter()
+            .copied()
+            .filter(|&i| {
+                let w = out.windows[i].t_start;
+                let e = w + WINDOW_MS;
+                !offs.iter().any(|&(a, b)| a < e && b > w)
+            })
+            .collect();
+        if idx.is_empty() || (on.len() as f64) < SENS_MIN_ON_SHARE * idx.len() as f64 {
+            s.few_on_windows += 1;
+            continue;
+        }
+        s.days += 1;
+        s.windows += on.len();
+        s.windows_off += idx.len() - on.len();
+        for i in on {
+            out.windows[i].sens = true;
+        }
+    }
+    out.sens = s;
 }
 
 /// 道具の出力（コマは呼び出し側へ流す）。
@@ -802,6 +950,8 @@ pub struct DeskOut {
     pub overflow_days: Vec<i64>,
     pub segments: usize,
     pub segments_recorded_t0: usize,
+    /// 感度分析の日の数え（C7）。
+    pub sens: SensSummary,
 }
 
 /// 窓の表を作る。コマ（`τ − 250` と `τ` の 2 枚ずつ）は `on_frame(window_id, sample)` に流す。
@@ -907,12 +1057,14 @@ pub fn build(
                 t2: tg.t2,
                 a: a_features(&f.presses, &f.bins, w + WINDOW_MS, seg.t0).to_vec(),
                 b_state: b_state_features(&taus, ripple_starts).to_vec(),
+                sens: false,
             });
             id = id
                 .checked_add(1)
                 .ok_or_else(|| "窓の数が u32 を超えた".to_string())?;
         }
     }
+    mark_sensitivity(&hm_days, cfg, &mut out);
     Ok(out)
 }
 
@@ -957,6 +1109,7 @@ mod tests {
             utc_offset_secs: OFF,
             table_sha256_hex: SHA.into(),
             samples: DEFAULT_SAMPLES,
+            redactions: Vec::new(),
         }
     }
 
@@ -981,7 +1134,7 @@ mod tests {
             r#"{"type":"feat","t":@3100,"p_flow":0.2,"p_inc":0.3,"p_stuck":0.5}"#,
             r#"{"type":"recording_pause","t":@4000,"paused":true}"#,
             r#"{"type":"recording_pause","t":@5000,"paused":false}"#,
-            r#"{"type":"handmark_day","t":@6000,"day":7,"draw_seed":"00000000000000ff","stage_starts":[@5500,@5400],"table_sha256":"AB","overflow":true}"#,
+            r#"{"type":"handmark_day","t":@6000,"day":7,"draw_seed":"00000000000000ff","stage_starts":[@5500,@5400],"table_sha256":"AB","overflow":true,"assigned":"on","shown_ms":900,"visible_ms":800,"toggles":[{"t":@5600,"on":false},{"t":@5700,"on":true}]}"#,
             r#"{"type":"handmark_day","t":@5900,"day":7,"draw_seed":null,"stage_starts":[]}"#,
             r#"{"type":"focus_transition","t":@9000}"#,
             r#"{"type":"unknown_kind","t":99999999999999}"#,
@@ -1001,8 +1154,16 @@ mod tests {
         assert_eq!(d.stage_starts, vec![T + 5400, T + 5500]);
         assert_eq!(d.table_sha256.as_deref(), Some("ab"));
         assert!(d.overflow);
+        assert_eq!(d.assigned.as_deref(), Some("on"));
+        assert_eq!((d.shown_ms, d.visible_ms), (Some(900), Some(800)));
+        assert_eq!(d.toggles, vec![(T + 5600, false), (T + 5700, true)]);
 
         for bad in [
+            r#"{"type":"handmark_day","t":@1,"day":1,"assigned":3}"#,
+            r#"{"type":"handmark_day","t":@1,"day":1,"shown_ms":-1}"#,
+            r#"{"type":"handmark_day","t":@1,"day":1,"visible_ms":"x"}"#,
+            r#"{"type":"handmark_day","t":@1,"day":1,"toggles":{}}"#,
+            r#"{"type":"handmark_day","t":@1,"day":1,"toggles":[{"t":@1}]}"#,
             r#"{"type":"key","t":"x","press":true}"#,
             r#"{"type":"key","t":@1,"press":"yes"}"#,
             r#"{"type":"feat","t":@1,"p_flow":0.1,"p_inc":0.1}"#,
@@ -1541,6 +1702,138 @@ mod tests {
         let mut f = random_file(seed, t0, 600_000);
         f.feats = feats_every_second(t0, t0 + 600_000, p_stuck);
         f
+    }
+
+    #[test]
+    fn off_intervals_start_shown_and_close_at_the_day_end() {
+        assert!(off_intervals(&[], 100).is_empty());
+        assert_eq!(
+            off_intervals(&[(50, true), (10, false), (20, true), (30, false)], 100),
+            vec![(10, 20), (30, 50)]
+        );
+        // 切ったまま日が終われば日の終わりまで
+        assert_eq!(
+            off_intervals(&[(10, false), (20, true), (30, false)], 100),
+            vec![(10, 20), (30, 100)]
+        );
+        // 続けて切る・続けて戻すは 1 つにまとめる
+        assert_eq!(
+            off_intervals(&[(10, false), (15, false), (20, true), (25, true)], 100),
+            vec![(10, 20)]
+        );
+    }
+
+    /// 感度分析の日（C7）: 割付・overflow・削除・見えていた割合・切っていない窓の割合の各分岐。
+    #[test]
+    fn sensitivity_days_follow_c7() {
+        let base = 20_400;
+        // 日ごとに (割付, 見えていた/出ていた, 切った区間の長さの割合, overflow, 削除)
+        /// (割付, (見えていた, 出ていた), 切った割合, overflow, 削除)
+        type Case<'a> = (Option<&'a str>, (u64, u64), f64, bool, bool);
+        let cases: [Case; 8] = [
+            (Some("on"), (900, 1000), 0.0, false, false), // 使う
+            (Some("late_first"), (500, 1000), 0.4, false, false), // 使う（境界ちょうど・切った窓は除く）
+            (Some("off"), (900, 1000), 0.0, false, false),        // 割付の外
+            (None, (900, 1000), 0.0, false, false),               // 前期の行
+            (Some("on"), (499, 1000), 0.0, false, false),         // 見えていない
+            (Some("on"), (900, 1000), 0.7, false, false),         // 切っていた窓が多い
+            (Some("on"), (900, 1000), 0.0, true, false),          // overflow
+            (Some("on"), (900, 1000), 0.0, false, true),          // 削除に重なる
+        ];
+        let mut files = Vec::new();
+        let mut redactions = Vec::new();
+        for (i, (asg, (vis, shown), off_share, overflow, redacted)) in cases.iter().enumerate() {
+            let d = base + i as i64;
+            let mut f = day_file(d, 0.3, 10 + i as u64);
+            let t0 = at10(d);
+            let toggles = if *off_share > 0.0 {
+                // 窓の格子の始まり（t0 + 30 s の後）から切る
+                let a = t0 + 30_000;
+                vec![(a, false), (a + (600_000.0 * off_share) as u64, true)]
+            } else {
+                Vec::new()
+            };
+            f.hm_days.insert(
+                d,
+                HmDay {
+                    t: 1,
+                    assigned: asg.map(str::to_string),
+                    shown_ms: Some(*shown),
+                    visible_ms: Some(*vis),
+                    toggles,
+                    overflow: *overflow,
+                    ..HmDay::default()
+                },
+            );
+            if *redacted {
+                redactions.push((t0 + 100_000, t0 + 160_000));
+            }
+            files.push(f);
+        }
+        let mut c = cfg();
+        c.redactions = redactions;
+        let out = build(&files, &c, &ident, &mut |_, _| {}).unwrap();
+        let s = out.sens;
+        assert_eq!(s.late_days, 6);
+        assert_eq!(s.days, 2);
+        assert_eq!(
+            (s.not_visible, s.few_on_windows, s.overflow, s.redacted),
+            (1, 1, 1, 1)
+        );
+        let used: Vec<i64> = out
+            .windows
+            .iter()
+            .filter(|w| w.sens)
+            .map(|w| w.day)
+            .collect();
+        assert!(used.iter().all(|&d| d == base || d == base + 1));
+        let day1 = out.windows.iter().filter(|w| w.day == base + 1).count();
+        let day1_used = out
+            .windows
+            .iter()
+            .filter(|w| w.day == base + 1 && w.sens)
+            .count();
+        assert!(
+            day1_used < day1 && day1_used * 2 >= day1,
+            "{day1_used}/{day1}"
+        );
+        assert_eq!(s.windows, used.len());
+        assert_eq!(s.windows_off, day1 - day1_used);
+        // 切っていた区間に重なる窓は使わない
+        let off_end = at10(base + 1) + 30_000 + 240_000;
+        assert!(out
+            .windows
+            .iter()
+            .filter(|w| w.day == base + 1 && w.sens)
+            .all(|w| w.t_start >= off_end));
+        // 主の窓の表は変えない（感度の印のほかは、割付の行が無い場合と同じ）
+        let plain: Vec<DeskFile> = files
+            .iter()
+            .map(|f| {
+                let mut g = f.clone();
+                for r in g.hm_days.values_mut() {
+                    *r = HmDay {
+                        t: r.t,
+                        overflow: r.overflow,
+                        ..HmDay::default()
+                    };
+                }
+                g
+            })
+            .collect();
+        let out0 = build(&plain, &cfg(), &ident, &mut |_, _| {}).unwrap();
+        let strip = |o: &DeskOut| -> Vec<WindowRow> {
+            o.windows
+                .iter()
+                .cloned()
+                .map(|mut w| {
+                    w.sens = false;
+                    w
+                })
+                .collect()
+        };
+        assert_eq!(strip(&out), strip(&out0));
+        assert_eq!(out0.sens.late_days, 0);
     }
 
     #[test]

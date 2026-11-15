@@ -149,12 +149,36 @@ def test_analysis_controls():
               f"{t}: 入れ子にも判定が付く")
 
 
+def test_sensitivity_wiring():
+    """主と感度分析の合わせ方の配線（C7・ADR-051 D3）。表そのものは test_verdicts が縛る。"""
+    header = {"a_names": [f"a{i}" for i in range(22)]}
+    header["a_names"][:8] = S.A2_BASE
+    rows = fake_rows(9, 40, 0.0, np.random.default_rng(6))
+    r = S.with_sensitivity(rows, header, None, seed=7, R=100, diagnostics=False)
+    check(r["sensitivity"]["overall"] == V.NOT_RUN, "印の無い窓だけなら感度分析は未実施")
+    check(r["combined"]["overall"] == V.combine_main_sensitivity(r["overall"], V.NOT_RUN)[0], "未実施の合わせ方")
+    leak = fake_rows(10, 60, 1.0, np.random.default_rng(8))
+    for x in leak:
+        x["sens"] = True
+    r = S.with_sensitivity(leak, header, None, seed=7, R=200, diagnostics=False)
+    check(r["targets"]["T1"]["state"]["verdict"] == V.FAILS, "P-SENS: 主が漏れを拾わない")
+    check(r["sensitivity"].get("targets", {}).get("T1", {}).get("state", {}).get("verdict") == V.FAILS, "P-SENS: 印の窓の感度分析が漏れを拾わない")
+    check(r["combined"]["overall"] == V.FAILS, "感度分析が満たさないなら全体も満たさない")
+    few = fake_rows(9, 40, 0.0, np.random.default_rng(9))
+    for x in few:
+        x["sens"] = x["day"] < 3
+    r = S.with_sensitivity(few, header, None, seed=7, R=100, diagnostics=False)
+    check(r["sensitivity"]["overall"] == V.UNDETERMINED and r["sensitivity"]["n_days"] == 3,
+          "感度分析は印の窓だけで回り、日が足りなければ判定不能")
+
+
 def main():
     test_auc()
     test_logistic()
     test_verdicts()
     test_day_bootstrap()
     test_analysis_controls()
+    test_sensitivity_wiring()
     if FAILS:
         for f in FAILS:
             print("FAIL:", f)

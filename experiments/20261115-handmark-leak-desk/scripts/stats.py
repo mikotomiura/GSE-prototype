@@ -465,6 +465,26 @@ def analyse(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True, day_f
     return out
 
 
+def with_sensitivity(rows, header, pix, seed, R=2000, R_nested=0, diagnostics=True):
+    """主（全部の窓）と感度分析（`sens` の印の窓・conditions C7）を回し、ADR-051 D3 の表で合わせる。
+
+    返り値は主の集計に `sensitivity` と `combined` を足したもの。`overall` は主のまま（合成の対照と同じ読み）。
+    感度分析の窓が 1 本も無ければ「未実施」。感度分析では診断と入れ子は回さない（判定だけを使う）。
+    """
+    res = analyse(rows, header, pix, seed, R=R, R_nested=R_nested, diagnostics=diagnostics)
+    idx = [i for i, r in enumerate(rows) if r.get("sens") is True]
+    if idx:
+        sens = analyse([rows[i] for i in idx], header, pix[idx] if pix is not None else None, seed + 1,
+                       R=R, diagnostics=False)
+    else:
+        sens = {"overall": V.NOT_RUN, "n_windows": 0, "reason": "感度分析の窓が無い（後期の「あり」の日がまだ無い）"}
+    overall, provisional = V.combine_main_sensitivity(res["overall"], sens["overall"])
+    res["sensitivity"] = sens
+    res["combined"] = {"main": res["overall"], "sensitivity": sens["overall"], "overall": overall,
+                       "provisional_meets": provisional}
+    return res
+
+
 def holdout_truth(rows, pix):
     """母集団の差の近似（S5・conditions C4）: 日を偶奇で二つに分け、片方で学習（λ は内側で選ぶ）して
     もう片方の AUC(B) − AUC(A) を出し、向きを入れ替えた 2 回の平均。大きな合成でだけ使う。"""
@@ -535,13 +555,15 @@ def main(argv):
             json.dump(holdout_truth(rows, pix), f, ensure_ascii=False, indent=1, sort_keys=True)
             f.write("\n")
         return
-    res = analyse(rows, header, pix, a.seed, R=a.R, R_nested=a.R_nested, diagnostics=not a.no_diagnostics)
+    res = with_sensitivity(rows, header, pix, a.seed, R=a.R, R_nested=a.R_nested, diagnostics=not a.no_diagnostics)
     res["desk"] = {k: header[k] for k in ("desk_version", "labels", "inject_stuck", "samples", "table_sha256")}
     # 日の番号は暦の日付に戻せるので、summary には数だけを書く（security-checker LOW）
     res["desk_summary"] = {k: summary[k] for k in ("windows", "excluded", "segments", "segments_recorded_t0",
                                                   "label_check")}
     res["desk_summary"]["seed_mismatch_days"] = len(summary.get("seed_mismatch_days", []))
     res["desk_summary"]["overflow_days"] = len(summary.get("overflow_days", []))
+    res["desk_summary"]["sensitivity"] = summary.get("sensitivity")
+    res["desk_summary"]["redactions_given"] = summary.get("redactions_given")
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(res, f, ensure_ascii=False, indent=1, sort_keys=True)
         f.write("\n")
