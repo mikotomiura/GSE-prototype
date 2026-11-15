@@ -9,12 +9,12 @@
 - [x] agent-shared.md の Windows の作業機（別コミット）
 - [x] 数値の照合の記録
 - [x] /cross-review（cross-reviewer ＋ Codex・判断 7）
-- [ ] コミット（push と PR は研究者に確かめる）
+- [x] コミット（A は 2 コミット・E は 1 コミット。push と PR は研究者に確かめる）
 
 ## C
-- [ ] 研究者に PR を出すか確かめる
-- [ ] origin/main との両方向の差を見て PR（[skip ci]）
+- [x] 研究者に PR を出すか確かめる
+- [x] origin/main との両方向の差を見て PR（[skip ci]・#414）
 
 ## E
-- [ ] RQ と下位の問いを研究者と合意
-- [ ] /literature-review 1 ラウンド
+- [x] RQ と下位の問いを研究者と合意（判断 8）
+- [x] /literature-review 1 ラウンド（V539〜V553・カード 4）
