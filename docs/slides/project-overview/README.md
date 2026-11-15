@@ -24,8 +24,8 @@ python3 -m venv .venv && .venv/bin/pip install python-pptx Pillow lxml
 
 ## 中身の出どころ
 
-- 位置づけ・問い・設計: `docs/research-positioning.md`（2026-11-15 の現行版）と ADR-043〜053。
-- 数字（AUC 0.49〜0.52・1 時間に 124〜182 回・6.3〜9.1%・2.2%〜26%）: ADR-047 Context と `research-positioning.md` §1.4。
+- 位置づけ・問い・設計: `docs/research-positioning.md`（2026-11-15 の現行版）と ADR-043〜054。表紙・4・9・11・17・19 枚目は ADR-054（一言を 3 つの検査に改めた）に合わせて 2026-11-15 に直した。
+- 数字（AUC 0.49〜0.52・単純な学習器 0.54〜0.57・1 時間に 124〜182 回・6.3〜9.1%・2.2%〜26%）: ADR-047 Context と `research-positioning.md` §1.4（学習器は論文 1）。
 - 外に見せる前提で、論文の投稿先と状態・未踏の不採択・参加者のデータは入れていない。
 
 ## 更新するとき
