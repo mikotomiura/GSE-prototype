@@ -15,10 +15,10 @@
 - [x] grill（判断 2〜5）
 - [x] worktree（判断 6）
 - [x] conditions.md を値の前にコミット
-- [ ] defcheck.py・run.sh・data.md・env.md
-- [ ] 試しの走り（B0 だけ・dir の外）で K1・K2・K4 と所要時間
-- [ ] スクリプトをコミットしてから本番の run.sh
-- [ ] notes.md（結果の読み・言えないこと）
-- [ ] code-reviewer ＋ /cross-review
+- [x] defcheck.py・run.sh・data.md・env.md
+- [x] 試しの走り（B0 だけ・dir の外）で K1・K2・K4 と所要時間
+- [x] スクリプトをコミットしてから本番の run.sh
+- [x] notes.md（結果の読み・言えないこと）
+- [x] code-reviewer ＋ /cross-review
 - [ ] ADR-054 D4 を埋める記録と前提の訂正を main 側へ返す形を決める（AskUserQuestion）
 - [ ] push（PR は確かめてから）

@@ -23,3 +23,9 @@
 
 - 論文 2 の枝 `docs/gse-paper2-stall-shape` から worktree を切る（`/Users/johnd/GSE-prototype-r1-defcheck`・枝 `exp/gse-r1-definition-check`）。論文 2 の枝は論文 1 の枝を祖先に持ち、`confirm_p1.py` は同一（blob `079fdfb5`）。
 - 両方の枝は main に入っていない。結果を main に返す形（記録だけを main 側の枝に写す）は完了時に決める。
+
+## 判断 7: レビューの指摘の採否（2026-11-16）
+
+- code-reviewer: 正しさの不具合なし。K5 が止まらない（MEDIUM）と重なりの鍵（LOW）は、実行で K5 が全て通り鍵の衝突が無いことを確かめ、notes に逸脱として書いた。
+- /cross-review（Claude ＋ Codex・Codex に渡したのはスクリプトと条件書の diff だけ・台帳 +28,406）: 正しさの不具合なし。K2 の学習器の区間を confirm で照らした点は notes に書いた（推移律で 2e-12 以内）。provenance に run.sh が無い点も notes に書いた。変種の中間の打鍵の中身の照合（K3 で塞がる）・試しの走りの出力先の判定（拒む側に倒れる）・門の外れる経路のテスト（探索のスクリプトには足さない）は採らない。
+- 再計算はしない。
