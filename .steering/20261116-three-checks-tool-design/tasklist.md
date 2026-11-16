@@ -19,8 +19,8 @@
 - [x] codex-consult（7 件・§12）
 
 ## レビュー（場面ごとの対応）
-- [ ] /cross-review（code-reviewer＋Codex）
-- [ ] 指摘への対応
+- [x] /cross-review 1 巡目（Codex 1 回・cross-reviewer 本人が Claude 側・§10）
+- [x] 指摘への対応（design v3 に織り込み）
 
 ## 完了処理
 - [ ] design.md の最終化
