@@ -1,0 +1,360 @@
+{
+ "people": {
+  "A": {
+   "files_used": 30,
+   "files_zero_obs": 15,
+   "files_no_focus": 10,
+   "calendar_days": 15,
+   "max_day_number": 30,
+   "missing_day_numbers": 0,
+   "duplicated_day_numbers": 0,
+   "obs_h": 40,
+   "unit_obs_h": {
+    "n": 30,
+    "q1": 0,
+    "median": 0,
+    "q3": 2
+   },
+   "pointer_usable": false,
+   "rows": {
+    "key_press": {
+     "per_obs_h": 830.0,
+     "files_with_rows": {
+      "num": 15,
+      "den": 30
+     }
+    },
+    "focus_transition": {
+     "per_obs_h": 100.0,
+     "files_with_rows": {
+      "num": 20,
+      "den": 30
+     }
+    },
+    "pointer_bin": {
+     "per_obs_h": 3.1,
+     "files_with_rows": {
+      "num": 15,
+      "den": 30
+     }
+    },
+    "paste": {
+     "per_obs_h": 8.9,
+     "files_with_rows": {
+      "num": 10,
+      "den": 30
+     }
+    },
+    "ime_state": {
+     "per_obs_h": 130.0,
+     "files_with_rows": {
+      "num": 25,
+      "den": 30
+     }
+    },
+    "ime_shadow": {
+     "per_obs_h": 62.0,
+     "files_with_rows": {
+      "num": 15,
+      "den": 30
+     }
+    },
+    "feat": {
+     "per_obs_h": 8300.0,
+     "files_with_rows": {
+      "num": 30,
+      "den": 30
+     }
+    },
+    "hook_health": {
+     "per_obs_h": 26.0,
+     "files_with_rows": {
+      "num": 15,
+      "den": 30
+     }
+    },
+    "recording_pause": {
+     "per_obs_h": 0.068,
+     "files_with_rows": {
+      "num": 5,
+      "den": 30
+     }
+    },
+    "other_types": {
+     "per_obs_h": 13.0,
+     "files_with_rows": {
+      "num": 30,
+      "den": 30
+     }
+    }
+   }
+  },
+  "B": {
+   "files_used": 15,
+   "files_zero_obs": 10,
+   "files_no_focus": 10,
+   "calendar_days": 5,
+   "max_day_number": 15,
+   "missing_day_numbers": 0,
+   "duplicated_day_numbers": 0,
+   "obs_h": 0,
+   "unit_obs_h": {
+    "n": 15,
+    "q1": 0,
+    "median": 0,
+    "q3": 0
+   },
+   "pointer_usable": false,
+   "rows": {
+    "key_press": {
+     "per_obs_h": 3000.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "focus_transition": {
+     "per_obs_h": 280.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "pointer_bin": {
+     "per_obs_h": 15.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "paste": {
+     "per_obs_h": 5.1,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "ime_state": {
+     "per_obs_h": 190.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "ime_shadow": {
+     "per_obs_h": 330.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "feat": {
+     "per_obs_h": 4700.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "hook_health": {
+     "per_obs_h": 49.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "recording_pause": {
+     "per_obs_h": 46.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    },
+    "other_types": {
+     "per_obs_h": 120.0,
+     "files_with_rows": {
+      "num": null,
+      "den": 15
+     }
+    }
+   }
+  },
+  "C": {
+   "files_used": 45,
+   "files_zero_obs": 20,
+   "files_no_focus": 5,
+   "calendar_days": 35,
+   "max_day_number": 45,
+   "missing_day_numbers": 0,
+   "duplicated_day_numbers": 0,
+   "obs_h": 40,
+   "unit_obs_h": {
+    "n": 45,
+    "q1": 0,
+    "median": 0,
+    "q3": 1
+   },
+   "pointer_usable": false,
+   "rows": {
+    "key_press": {
+     "per_obs_h": 730.0,
+     "files_with_rows": {
+      "num": 25,
+      "den": 45
+     }
+    },
+    "focus_transition": {
+     "per_obs_h": 42.0,
+     "files_with_rows": {
+      "num": 40,
+      "den": 45
+     }
+    },
+    "pointer_bin": {
+     "per_obs_h": 12.0,
+     "files_with_rows": {
+      "num": 15,
+      "den": 45
+     }
+    },
+    "paste": {
+     "per_obs_h": 2.1,
+     "files_with_rows": {
+      "num": 10,
+      "den": 45
+     }
+    },
+    "ime_state": {
+     "per_obs_h": 160.0,
+     "files_with_rows": {
+      "num": 45,
+      "den": 45
+     }
+    },
+    "ime_shadow": {
+     "per_obs_h": 81.0,
+     "files_with_rows": {
+      "num": 40,
+      "den": 45
+     }
+    },
+    "feat": {
+     "per_obs_h": 85000.0,
+     "files_with_rows": {
+      "num": 45,
+      "den": 45
+     }
+    },
+    "hook_health": {
+     "per_obs_h": 12.0,
+     "files_with_rows": {
+      "num": 25,
+      "den": 45
+     }
+    },
+    "recording_pause": {
+     "per_obs_h": 0.0,
+     "files_with_rows": {
+      "num": 0,
+      "den": 45
+     }
+    },
+    "other_types": {
+     "per_obs_h": 15.0,
+     "files_with_rows": {
+      "num": 45,
+      "den": 45
+     }
+    }
+   }
+  },
+  "D": {
+   "files_used": 50,
+   "files_zero_obs": 5,
+   "files_no_focus": 10,
+   "calendar_days": 25,
+   "max_day_number": 50,
+   "missing_day_numbers": 0,
+   "duplicated_day_numbers": 0,
+   "obs_h": 220,
+   "unit_obs_h": {
+    "n": 50,
+    "q1": 0,
+    "median": 2,
+    "q3": 10
+   },
+   "pointer_usable": true,
+   "rows": {
+    "key_press": {
+     "per_obs_h": 1100.0,
+     "files_with_rows": {
+      "num": 30,
+      "den": 50
+     }
+    },
+    "focus_transition": {
+     "per_obs_h": 49.0,
+     "files_with_rows": {
+      "num": 35,
+      "den": 50
+     }
+    },
+    "pointer_bin": {
+     "per_obs_h": 930.0,
+     "files_with_rows": {
+      "num": 50,
+      "den": 50
+     }
+    },
+    "paste": {
+     "per_obs_h": 2.9,
+     "files_with_rows": {
+      "num": 25,
+      "den": 50
+     }
+    },
+    "ime_state": {
+     "per_obs_h": 43.0,
+     "files_with_rows": {
+      "num": 45,
+      "den": 50
+     }
+    },
+    "ime_shadow": {
+     "per_obs_h": 47.0,
+     "files_with_rows": {
+      "num": 25,
+      "den": 50
+     }
+    },
+    "feat": {
+     "per_obs_h": 8000.0,
+     "files_with_rows": {
+      "num": 50,
+      "den": 50
+     }
+    },
+    "hook_health": {
+     "per_obs_h": 20.0,
+     "files_with_rows": {
+      "num": 35,
+      "den": 50
+     }
+    },
+    "recording_pause": {
+     "per_obs_h": 0.036,
+     "files_with_rows": {
+      "num": 5,
+      "den": 50
+     }
+    },
+    "other_types": {
+     "per_obs_h": 16.0,
+     "files_with_rows": {
+      "num": 50,
+      "den": 50
+     }
+    }
+   }
+  }
+ }
+}

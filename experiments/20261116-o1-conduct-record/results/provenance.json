@@ -1,0 +1,38 @@
+{
+ "git_head": "49446b567fd8e74f37bb88208ed4bff0522434b5",
+ "git_dirty_paths": [
+  "?? experiments/20261116-o1-conduct-record/notes.md"
+ ],
+ "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+ "gse_unpack_sha256": "c9475ded4858b0336c21754839f1389e2169284dea89d3402a87b841a4fdc282",
+ "symbol_salt_sha256": "414cefe3438e05ddb9e8679709c38aee5c73b6f83857c066542cf7a25f75c270",
+ "input_age_digest": "c389bf06a18ac7e3a4c7934cdc9b952a8186a9777d3c3230144b2b23722f6cb1",
+ "input_files_rounded": 100,
+ "plain_sha256_digest": "f8cf62349b32267a8de9d3944702588c41bf8baad9338a22f299c516cad7a11d",
+ "scripts_sha256": {
+  "experiments/20261116-o1-conduct-record/auc.py": "9af6b07a1fe7cc75ca6536e4bfde1922b2000eaced9b9ac5b936d6baa53dfd1c",
+  "experiments/20261116-o1-conduct-record/build_cr.py": "eeb87a9053ce8d54873519027fb2489cb3b959cbf1bb054b895931b90ecd8f44",
+  "experiments/20261116-o1-conduct-record/build_cr_test.py": "9a6e9f2d65b4dc1aed86e4450d4ed7729260d37ea0314faef2b373f03d2b51b4",
+  "experiments/20261116-o1-conduct-record/conditions.md": "7f3f331dfea862d60ebef8e614fc11876947f0f354fe20a55f4536f836cdd84a",
+  "experiments/20261116-o1-conduct-record/conduct.py": "f5110676b67962990fa10315187570e9fd2ac49831854cdd27ac602dc134f11a",
+  "experiments/20261116-o1-conduct-record/cr_common.py": "f12df2f09b47fb4823728c372f8eb7ead24173926cbf9ccbd1e39f9e2a500eed",
+  "experiments/20261116-o1-conduct-record/cr_common_test.py": "22edd0cc2166398f3bd6f7182da90d35cbe119d8809db8181f168133aeebfac4",
+  "experiments/20261116-o1-conduct-record/data.md": "e2a7b45650fd32da2aa3fcb0cb0789d72dac738210ebc22bd8f64fe520ffd135",
+  "experiments/20261116-o1-conduct-record/e2e_test.py": "0be283319061fdde38b8b52783c97e5534a741f5a1cc6ed902165d132471a86e",
+  "experiments/20261116-o1-conduct-record/env.md": "085469b738a26433295e8dd4c7ac7719ea1cd5c596690e5221caa1f7959dde71",
+  "experiments/20261116-o1-conduct-record/ledger_gate.py": "9ef5f86c13c20fa28a125393fb23d8ff09df5183e6231114f1d0973f3699a574",
+  "experiments/20261116-o1-conduct-record/mutants.py": "765d486ec1787a7dd649f2889427259fde7fab0f0fd706ae98f505cbf627f792",
+  "experiments/20261116-o1-conduct-record/prewin.py": "1ccdf78dd17240300536cd3222ac3f8fc645407161bbf4cc356f0d1a78c571fe",
+  "experiments/20261116-o1-conduct-record/run.sh": "48b301c7968e3ed7d32d34e0facbf414c01f045de136a16e5418f13701e2d476",
+  "experiments/20261116-o1-conduct-record/SEED": "bda85b4d482ada19c231e19534a204c12ea3f1812d834fb267e98ae515f7323c",
+  "experiments/20261103-o1-n4-pause-stall/build_n4.py": "1ea3f3f1cb4b00f5b633935640cf85e7a4e5da7b915f5b08d33f0ad6431e74db",
+  "experiments/20261103-o1-n4-pause-stall/pausestall.py": "0d2d54bf8f9074a7574f86b810e0f554fa5be8746e4c1415d81f2ccc150fb623",
+  "experiments/20261103-stall-candidates-c1c2c6/candidates.py": "03b033183493d8cd6f60391aa1bb030d89750dab1406df0101ca51c93c4199e8",
+  "experiments/20261102-stall-decomposition/types_core.py": "c47b0324576972e15452fbb54c3f586eba1bb91e32ed8aba8fc9937bfaa12b19",
+  "experiments/20261102-stall-decomposition/o1/build_o1.py": "299dbadaf82548c1086dc7673dfb9d0dc0ea6f4aae1df430fd3da5fd3079e118",
+  "experiments/20261102-stall-decomposition/o1/analyze_o1.py": "c31eb63a4380bfd0a421858eef7ddca2fd245879ff192358bedce34fd42771f9",
+  "experiments/20261102-stall-decomposition/o1/posthoc.py": "4a83b12c6665b4ee8219b96153e0fe3d930bcc9213eadc30d2ff0f1584bc5418",
+  "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22",
+  "src-tauri/prereg/p1-episode.json": "dd1bb614021af09e2eab2112e27a7dc9ff42ae219364dfb122acaa68d30f3267"
+ }
+}
