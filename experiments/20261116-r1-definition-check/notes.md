@@ -45,6 +45,6 @@
 - 条件の K1 は「438 課題の全て」と書いたが、照合したのは観測 10 分以上の 140 人の 427 課題（`load_cs1` が書き手を絞った後の単位）。除いた 5 人の課題は対の計算にも入らない。
 - 条件の §K は全ての門を「外れたら止める」としたが、スクリプトは K5 が外れても止めずに警告を付ける作りだった（コードレビューの指摘）。K5 は全て通ったので結果に影響はない。
 - 条件の K2 は学習器の区間を `explore_comparison.json` と照らすとしたが、スクリプトは `confirm_holdout.json` の H3 と照らしていた（/cross-review の指摘・Claude と Codex が一致）。X11 自身が同じ 1e-12 で confirm と一致することを門にしているので、explore とのずれは 2e-12 以内に収まる。
-- run.sh の `provenance.json` は run.sh 自身の SHA-256 を含まない（/cross-review の指摘）。走らせた run.sh はコミット `f6271b47` の前のもの（`git log -- run.sh` の最後）で、走らせた後に変えていない。
+- run.sh の `provenance.json` は run.sh 自身の SHA-256 を含まない（/cross-review の指摘）。走らせたのは `provenance.json` の git_head `0b5f6b2e` の run.sh（run.sh を変えた最後のコミット）で、走らせた後に変えていない。
 - 最初の本番は run.sh の入力の照合（変種の中間に build_summary.json が無い）で、値を計算する前に止まった。照合を `rebuild_summary.json` と書き手・課題の対応の一致に改めて回し直した。
 - 引き継ぎと ADR-054 Context 6 の前提（論文 1 は停滞の定義を変えていない）は推定器の側では誤りだった。P1〜P4 は論文 1 の事前登録の感度として計算済みで、付録の表にある（`.steering/20261116-gse-r1-definition-check/decisions.md` 判断 1）。この実験で新しいのは、学習器の側（9 定義）と N1〜N4 の推定器の側。
