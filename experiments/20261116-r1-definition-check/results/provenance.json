@@ -1,0 +1,16 @@
+{
+ "git_head": "0b5f6b2eb14a5c19d89d5c6f076273539d8172d2",
+ "uncommitted_script_or_conditions": false,
+ "sha256": {
+  "experiments/20261116-r1-definition-check/scripts/defcheck.py": "e5df40dba9b33e0e53d813dcc1bc0e1a8a67d0daf221680b0a0994061ee71c87",
+  "experiments/20261116-r1-definition-check/conditions.md": "6d01bb0c2b0f4c5d15d9defd0d124539c56795dce94acc07ccdf0fecb47a84f3",
+  "experiments/20261105-findings-paper1-prefreeze/scripts/confirm_p1.py": "4e5f1894eeb35daef6bbe6165615efc29bfe091f8403f2f551c87456f04c7c93",
+  "experiments/20261105-findings-paper1-prefreeze/scripts/prefreeze.py": "c1ab0c1825e7b6ce4268d646b25ae209c9253c52c64a82818c6feed4789fc632",
+  "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22",
+  "experiments/20261106-findings-paper1-exploration/scripts/explore_comparison.py": "bb915ad8d1f4d0e00b7de87019a3737fa8f08e404ce2f000389a3fbad62aeb1c",
+  "experiments/20261107-stall-shape-multiverse/scripts/core.py": "8a2a4e00a78c5b9543f2bb974950da49f3f7bb930d46060e246dc4387d64e9b5",
+  "experiments/20261103-stall-candidates-c1c2c6/candidates.py": "03b033183493d8cd6f60391aa1bb030d89750dab1406df0101ca51c93c4199e8",
+  "experiments/20261105-findings-paper1-prefreeze/results_holdout/confirm_holdout.json": "3a73346f9194295e15af0fe0085ea04d3e57b82f338e12a8165590abb1d72018",
+  "experiments/20261106-findings-paper1-exploration/results/explore_comparison.json": "e624784fdd1cc5f5c1a5e621a990c472a8b9eeffecae6d8639c114bd263b3a1d"
+ }
+}
