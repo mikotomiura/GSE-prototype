@@ -2,7 +2,7 @@
 # O1 の実施の記録・全期間の記述・探索の AUC（conditions.md）。.age を repo の外で復号し、記号を付けた集計値だけを出す。
 # 平文・中間・結果の本文を外部の LLM に送らない（data-privacy）。
 set -euo pipefail
-export PYTHONDONTWRITEBYTECODE=1   # 依存のフォルダに pyc を書かない（未追跡の差し替えを検査で見るため）
+export PYTHONDONTWRITEBYTECODE=1   # 依存のフォルダに pyc を書かない（-I はこの変数を無視するので、python3 の呼び出しにはすべて -B も付ける）
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REL="experiments/20261116-o1-conduct-record"
@@ -56,7 +56,7 @@ python3 -I -B "$HERE/conduct.py" "$WORK" "$OUT/conduct.json"
 python3 -I -B "$HERE/cr_common.py" --r3 "$WORK" "$SEED" "$OUT/pausestall.json"
 python3 -I -B "$HERE/prewin.py" "$WORK" "$SEED" "$OUT/prewin.json"
 python3 -I -B "$HERE/auc.py" "$WORK" "$SEED" "$OUT/auc.json"
-python3 -I - "$REPO_ROOT" "$HERE" "$OUT/provenance.json" "$WORK/files.json" "$BIN" "$UNPACK" <<'PY'
+python3 -I -B - "$REPO_ROOT" "$HERE" "$OUT/provenance.json" "$WORK/files.json" "$BIN" "$UNPACK" <<'PY'
 import hashlib, json, os, subprocess, sys
 root, here, out, files_json, binp, unpack = sys.argv[1:]
 sys.path.insert(0, here)
