@@ -16,12 +16,13 @@
 ## 設計書
 - [x] design.md の初案（v1）
 - [x] /reimagine で比べる（ハイブリッドを採用）
-- [x] codex-consult（7 件・§12）
+- [x] codex-consult（7 件・§9）
 
 ## レビュー（場面ごとの対応）
 - [x] /cross-review 1 巡目（Codex 1 回・cross-reviewer 本人が Claude 側・§10）
 - [x] 指摘への対応（design v3 に織り込み）
+- [x] /cross-review 2 巡目（code-reviewer＋Codex・§11）→ v4 に織り込み
 
 ## 完了処理
-- [ ] design.md の最終化
-- [ ] git commit（push・PR は研究者に確かめる）
+- [x] design.md の最終化（v4）
+- [x] git commit（push・PR は研究者に確かめる）
