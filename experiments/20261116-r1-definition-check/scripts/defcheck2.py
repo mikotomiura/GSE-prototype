@@ -69,11 +69,29 @@ def evaluate(ws, seed, cs1):
         e["effective_writers"] = s[sig]["weights"]["effective_writers"]
         e["writers_with_pairs"] = s[sig]["weights"]["writers_with_pairs"]
         h1[sig] = e
-    x11 = X.x11(ws, rows, {"H3": {m: {"auc": float("nan"), "ci95": [0, 0], "boot_failures": -1} for m in X.LEARNERS}})
-    x11.pop("gates")
-    d = {"counts": dict(cnt), "H1": h1, "X11": x11, "stall_keys": D.stall_keys(rows)}
-    d["judgement"] = D.judge(h1, x11)
+    d = {"counts": dict(cnt), "H1": h1, "stall_keys": D.stall_keys(rows)}
+    try:
+        x11 = X.x11(ws, rows, {"H3": {m: {"auc": float("nan"), "ci95": [0, 0], "boot_failures": -1}
+                                      for m in X.LEARNERS}})
+        x11.pop("gates")
+        d["X11"] = x11
+        d["judgement"] = D.judge(h1, x11)
+    except (TypeError, ValueError) as e:
+        # 学習器が全データで失敗する・両方がそろって成功した引き直しが 0 など（コードレビューの指摘・§J の「判定できない」）
+        a = all(h1[s][e2]["branch"] == 1 for s in C.SIGS for e2 in EPS)
+        d["X11"] = {"error": type(e).__name__}
+        d["judgement"] = {"a_estimator_equivalent": a, "b_learners_above_changes": "undecidable", "kept": False,
+                          "a_branches": {s: {e2: h1[s][e2]["branch"] for e2 in EPS} for s in C.SIGS},
+                          "b_lower_bounds": None, "boot_failures": None}
     return d
+
+
+def evaluate_keys(ws):
+    """B0 の停滞の行の鍵だけ（続きから回すとき・対照の引きは evaluate と同じ流れ）。"""
+    cnt = Counter()
+    rng = random.Random(D.SEED)
+    rows = [C.h1_writer(u, rng, cnt, C.MAIN, feats=False, cs1=True) for u in ws]
+    return D.stall_keys(rows)
 
 
 def same(d, ref):
@@ -103,7 +121,15 @@ def provenance():
     import subprocess
     root = os.path.realpath(os.path.join(HERE, "..", "..", ".."))
     files = [os.path.join(HERE, f) for f in ("defcheck.py", "defcheck2.py")] + \
-            [os.path.join(HERE, "..", f) for f in ("conditions.md", "conditions-2.md", "run2.sh")]
+            [os.path.join(HERE, "..", f) for f in ("conditions.md", "conditions-2.md", "run2.sh", "results/defcheck.json")] + \
+            [os.path.join(root, f) for f in (
+                "experiments/20261105-findings-paper1-prefreeze/scripts/confirm_p1.py",
+                "experiments/20261105-findings-paper1-prefreeze/scripts/prefreeze.py",
+                "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py",
+                "experiments/20261106-findings-paper1-exploration/scripts/explore_comparison.py",
+                "experiments/20261106-findings-paper1-exploration/results/explore_klicke.json",
+                "experiments/20261107-stall-shape-multiverse/scripts/core.py",
+                "experiments/20261103-stall-candidates-c1c2c6/candidates.py")]
     head = subprocess.run(["git", "-C", root, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     dirty = subprocess.run(["git", "-C", root, "status", "--porcelain", "--"] + files, capture_output=True,
                            text=True).stdout.strip()
@@ -163,8 +189,20 @@ def run_grid(work, hold_p, run1_p, out, only):
     assert len(cfgs) == 90 and set(GRID_TO_RUN1) <= set(cfgs)
     order = list(GRID_TO_RUN1) + [k for k in cfgs if k not in GRID_TO_RUN1]  # 門の 7 つを先に回す
     b0_keys = None
+    if os.environ.get("DEFCHECK_RESUME") and os.path.exists(out):
+        # 途中で止まった走りの続き: 済んだ定義はそのまま使い、門の 7 つが通っていることだけ確かめる
+        prev = json.load(open(out))
+        if not all(prev["gates"].get("%s_equals_run1_%s" % (k, v)) for k, v in GRID_TO_RUN1.items()):
+            sys.exit("続きから回すには、前の走りで門の 7 つが通っている必要がある")
+        res["gates"], res["definitions"] = prev["gates"], prev["definitions"]
+        res["resumed_from_git_head"] = prev["provenance"]["git_head"]
+        b0_keys = None  # 重なりは B0 の鍵が要る。続きの定義では B0 を回し直して鍵だけ取る
+        ws0, _ = detect_ws(base, cfgs["W30_q0.99_net_replay"])
+        b0_keys = evaluate_keys(ws0)
     for name in order:
         if only and name not in only:
+            continue
+        if name in res["definitions"]:
             continue
         ws, n_on = detect_ws(base, cfgs[name])
         if n_on == 0:
