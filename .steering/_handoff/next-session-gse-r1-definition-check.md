@@ -1,5 +1,7 @@
 # 引き継ぎ —— 予測の検査（R1）に定義の検査を当てる
 
+> **使用済み（2026-11-16）**: このメモから `.steering/20261116-gse-r1-definition-check/`（枝 `exp/gse-r1-definition-check`・論文 2 の枝の上）を始めた。§1 の前提（論文 1 は停滞の定義を変えていない）は推定器の側で誤りだった（判断 1）。結果は `experiments/20261116-r1-definition-check/notes.md`（同じ枝）で、8 つの定義の全てで読みが残った。main には `docs/research-positioning.md` §1.4 と `docs/adr/README.md` の ADR-054 の行で返した。
+
 > 作成: 2026-11-15（`.steering/20261115-gse-core-and-edge/` 判断 6・ADR-054 D4）。このメモは入口で一次ではない。一次は ADR-054・論文 1・論文 2 の原稿と実験の notes。
 
 ## 0 入口の文
