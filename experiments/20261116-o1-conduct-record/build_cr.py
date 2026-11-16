@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 N4 = os.path.join(HERE, "../20261103-o1-n4-pause-stall")
@@ -105,7 +106,8 @@ def replay_feat(replay, plain, onsets, tmpdir):
     if r.returncode == 0:
         return [[x["timestamp"], x["p_stuck"], x["ewma_x"]] for x in json.loads(r.stdout)], {}
     types = []
-    tmp = os.path.join(tmpdir, "stripped.ndjson")
+    fd, tmp = tempfile.mkstemp(prefix="stripped-", suffix=".ndjson", dir=tmpdir)  # 権限 0600・名前は一意
+    os.close(fd)
     try:
         for _ in range(MAX_STRIP):
             m = UNKNOWN.search(r.stderr)

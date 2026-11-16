@@ -64,13 +64,13 @@ else:
                         '{"type": "day_question", "t": 3}\n{"type": "probe_frame", "t": 4}\n')
     feat, stripped = bc.replay_feat(fake, nd, [[10, 20]], td)
     assert feat == [[1, 0.1, 0.2]] and stripped == {"probe_frame": 2, "day_question": 1}, (feat, stripped)
-    assert not os.path.exists(os.path.join(td, "stripped.ndjson"))  # 一時の写しは消す
+    assert not [f for f in os.listdir(td) if f.startswith("stripped-")]  # 一時の写しは消す
     try:
         bc.replay_feat(fake, nd, [[10, 21]], td)
         raise AssertionError("停滞の始まりの食い違いで止めなかった")
     except RuntimeError as e:
         assert str(e) == "onsets"
-    assert not os.path.exists(os.path.join(td, "stripped.ndjson"))
+    assert not [f for f in os.listdir(td) if f.startswith("stripped-")]
     ok = os.path.join(td, "ok.ndjson")
     open(ok, "w").write('{"type": "key", "t": 1}\n')
     assert bc.replay_feat(fake, ok, [], td) == ([[1, 0.1, 0.2]], {})  # 知らない型が無ければ写しを作らない

@@ -11,10 +11,10 @@ pub = cm.ps.public({"total": 137, "stalls_used": 23, "pairs": 1234, "missing_day
                     "files_with_rows": {"num": 23, "den": 37, "ratio": 0.6216},
                     "ci95": {"K": [0.51234, 0.59876]}, "signal_auc": {"d_p_stuck": 0.50049},
                     "C0": {"pooled_per_h": 7.4321}, "by_class": {"x": {"diff": 0.12345, "diff_ci95": [0.01234, 0.2]}}})
-assert pub["total"] == 100 and pub["stalls_used"] == 25 and pub["pairs"] == 1200 and pub["missing_day_numbers"] == 5, pub
+assert "total" not in pub and pub["stalls_used"] == 25 and pub["pairs"] == 1200 and pub["missing_day_numbers"] == 5, pub
 assert pub["per_obs_h"] == 12.0 and pub["obs_h"] == 120 and pub["auc_K"] == 0.543, pub
 assert "app_version_kinds" not in pub
-assert pub["files_with_rows"] == {"num": 25, "den": 35, "ratio": 0.62}, pub["files_with_rows"]
+assert pub["files_with_rows"] == {"num": 25, "den": 35}, pub["files_with_rows"]  # 割合は出さない
 assert pub["ci95"]["K"] == [0.512, 0.599] and pub["signal_auc"]["d_p_stuck"] == 0.5, pub
 assert pub["C0"]["pooled_per_h"] == 7.4 and pub["by_class"]["x"] == {"diff": 0.123, "diff_ci95": [0.012, 0.2]}, pub
 # n4 の人の間の表: 親のキーの規則を子（by_person・min・max）に引き継ぐ。share を含むキーは有効数字 2 桁
@@ -40,5 +40,9 @@ assert sl["diff"] == 0.05 and sl["diff_ci95"] == [0.012, 0.1] and sl["random"] =
 z = cm.ps.public({"sd_ratio": 1.23456, "q0.5": 0.0123456, "theta_ms": 31234, "mu_log10_ms": 3.98765,
                   "delta_auc": 0.012345})
 assert z == {"sd_ratio": 1.23, "q0.5": 0.0123, "theta_ms": 31234, "mu_log10_ms": 3.99, "delta_auc": 0.012}, z  # AUC は小数 3 桁
+# 行の型の表: 総数と secure_input を出さない（率と、本のある数だけ）
+rw = cm.ps.public({"rows": {"key_press": {"total": 36712, "per_obs_h": 830.4, "files_with_rows": {"num": 31, "den": 32, "ratio": 0.9688}},
+                            "secure_input": {"total": 0, "per_obs_h": 0.0, "files_with_rows": {"num": 0, "den": 32, "ratio": 0.0}}}})
+assert rw == {"rows": {"key_press": {"per_obs_h": 830.0, "files_with_rows": {"num": 30, "den": 30}}}}, rw
 assert cm.ps.leaks('{"x": "P006"}', {"P006": {}}, set()) == ["P-ID"]
 print("cr_common test ok")

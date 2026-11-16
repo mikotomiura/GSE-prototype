@@ -29,7 +29,9 @@ EXTRA_COUNT_KEYS = {"total", "max_day_number", "missing_day_numbers", "duplicate
                     "excl_early", "excl_no_feat", "excl_no_interval", "excl_no_control", "excl_dup_u", "stalls_typed",
                     "random_windows", "days_used"}
 ps.COUNT_KEYS |= EXTRA_COUNT_KEYS
-DROP_KEYS = {"app_version_kinds", "random_windows"}  # 公開の版では出さない（版の数は期間の目安・無作為の窓の数は停滞の数 × 10）
+DROP_KEYS = {"app_version_kinds", "random_windows", "total", "secure_input"}
+# 公開の版では出さない: 版の数は期間の目安・無作為の窓の数は停滞の数 × 10・行の型の総数は率で割ると観測時間が戻る・
+# secure_input の行は macOS だけが出すので OS が分かる（判断 12）
 THREE_KEYS = {"auc_K", "auc_KN", "delta_auc", "diff"}
 THREE_PARENTS = {"signal_auc", "ci95", "diff_ci95", "K", "KN", "delta"}
 
@@ -71,6 +73,8 @@ def coarsen(x, key=None, parent=None):
         for k, v in x.items():
             if k in DROP_KEYS:
                 continue
+            if k == "ratio" and key == "files_with_rows":
+                continue  # 分母（本数）を共有する割合が並ぶと本数が 1 通りに戻る（判断 12）
             ck = k if rule(k) else (key if rule(key) else k)  # 自分のキーに規則が無い子は親の規則を引き継ぐ
             out[k] = coarsen(v, ck, key)
         return out
