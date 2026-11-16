@@ -76,7 +76,63 @@ def ime_rows(path):
     return sorted(st), sorted(sh)
 
 
-def build_extra(replay, plain, dst, day_number):
+UNKNOWN = re.compile(r"unknown variant `([a-z_0-9]+)`")
+MAX_STRIP = 10
+
+
+def strip_types(src, dst, types):
+    """src から type が types のどれかの行を除いて dst に写す。除いた行の数を型ごとに返す（中身は読まない）。"""
+    n = {t: 0 for t in types}
+    with open(src, encoding="utf-8", errors="replace") as fi, open(dst, "w", encoding="utf-8") as fo:
+        for line in fi:
+            try:
+                o = json.loads(line)
+            except json.JSONDecodeError:
+                fo.write(line)
+                continue
+            if isinstance(o, dict) and o.get("type") in n:
+                n[o["type"]] += 1
+                continue
+            fo.write(line)
+    return n
+
+
+def replay_feat(replay, plain, onsets, tmpdir):
+    """逸脱 1（notes・研究者の決定 2026-11-16）: 固定した replay が知らない行の型（版 0.1.41 の probe_frame など）で
+    止まったら、その型の行だけを除いた一時の写しで回す。写しの --features の停滞の始まりが元の本の中間（onsets）と
+    全件一致しなければ止める。戻り値: (feat の列, {除いた型: 行の数})。"""
+    r = subprocess.run([replay, plain], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if r.returncode == 0:
+        return [[x["timestamp"], x["p_stuck"], x["ewma_x"]] for x in json.loads(r.stdout)], {}
+    types = []
+    tmp = os.path.join(tmpdir, "stripped.ndjson")
+    try:
+        for _ in range(MAX_STRIP):
+            m = UNKNOWN.search(r.stderr)
+            if not m or m.group(1) in types:
+                raise RuntimeError("replay")
+            types.append(m.group(1))
+            counts = strip_types(plain, tmp, types)
+            r = subprocess.run([replay, tmp], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+            if r.returncode == 0:
+                break
+        else:
+            raise RuntimeError("replay")
+        feat = [[x["timestamp"], x["p_stuck"], x["ewma_x"]] for x in json.loads(r.stdout)]
+        fr = subprocess.run([replay, tmp, "--features"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        if fr.returncode != 0:
+            raise RuntimeError("replay")
+        got = [[x["stall_onset"]["s_ms"], x["stall_onset"]["t0_ms"]] for x in json.loads(fr.stdout)["rows"]
+               if x["stall_onset"]["is_onset"]]
+        if got != [list(o) for o in onsets]:
+            raise RuntimeError("onsets")
+        return feat, counts
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def build_extra(replay, plain, dst, day_number, onsets=None, tmpdir=None):
     digest = sha256(plain)
     if os.path.exists(dst):
         try:
@@ -85,15 +141,13 @@ def build_extra(replay, plain, dst, day_number):
                 return
         except (OSError, ValueError):
             pass
-    r = subprocess.run([replay, plain], capture_output=True, text=True, stdin=subprocess.DEVNULL)
-    if r.returncode != 0:
-        raise RuntimeError("replay")
-    feat = [[x["timestamp"], x["p_stuck"], x["ewma_x"]] for x in json.loads(r.stdout)]
+    feat, stripped = replay_feat(replay, plain, onsets or [], tmpdir or os.path.dirname(dst))
     st, sh = ime_rows(plain)
     if sha256(plain) != digest:
         raise RuntimeError("changed")
     json.dump({"plain_sha256": digest, "replay_sha256": sha256(replay), "day_number": day_number,
-               "feat": sorted(feat), "ime_state": st, "ime_shadow": sh}, open(dst, "w"))
+               "stripped_types_for_feat": stripped, "feat": sorted(feat), "ime_state": st, "ime_shadow": sh},
+              open(dst, "w"))
 
 
 def open_hold():
@@ -126,7 +180,8 @@ def main(receiving, unpack, identity, replay, work, n4_work, n4_prov, want_diges
                 sys.exit(f"日番号が読めない（人 {p['symbol']}）")
             dst = os.path.join(xdir, stem + ".json")
             try:
-                build_extra(replay, plain, dst, int(m.group(1)))
+                onsets = json.load(open(f["inter"]))["onsets"]
+                build_extra(replay, plain, dst, int(m.group(1)), onsets, work)
             except Exception:  # noqa: BLE001  失敗の文にファイル名が入りうるので記号だけで止める
                 sys.exit(f"追加の中間の作成に失敗した（人 {p['symbol']}）")
             f["extra"] = dst

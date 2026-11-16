@@ -65,6 +65,7 @@ MUTANTS = [
     ("auc.py", "日の下限を外す", "N_MATCHED, MIN_STALLS, MIN_DAYS, FOLDS, NBOOT = 5, 30, 5, 5, 200",
      "N_MATCHED, MIN_STALLS, MIN_DAYS, FOLDS, NBOOT = 5, 30, 1, 5, 200", "e2e"),
     ("cr_common.py", "規則の無い小数を粗くしない", "    return sig3(x)  #", "    return x  #"),
+    ("build_cr.py", "写しの停滞の始まりを照らさない", "        if got != [list(o) for o in onsets]:", "        if False:"),
     ("cr_common.py", "公開版の件数の丸めを外す", "ps.COUNT_KEYS |= EXTRA_COUNT_KEYS", "ps.COUNT_KEYS = set()"),
 ]
 

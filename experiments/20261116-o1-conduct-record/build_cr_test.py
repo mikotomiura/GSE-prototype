@@ -43,4 +43,35 @@ with tempfile.TemporaryDirectory() as td:
         raise AssertionError("塩の照合が止めなかった")
     except SystemExit:
         pass
+    # 逸脱 1: 知らない行の型だけを除いた写しで回し、写しの停滞の始まりが元の中間と一致しなければ止める
+    fake = os.path.join(td, "fake_replay")
+    open(fake, "w").write(f"""#!{sys.executable}
+import json, sys
+text = open(sys.argv[1]).read()
+for t in ("probe_frame", "day_question"):
+    if '"type": "' + t + '"' in text:
+        sys.stderr.write("Error: unknown variant `" + t + "`, expected one of `meta`, `key` at line 3 column 9\\n")
+        sys.exit(1)
+if "--features" in sys.argv:
+    print(json.dumps({{"rows": [{{"stall_onset": {{"is_onset": True, "s_ms": 10, "t0_ms": 20}}}},
+                               {{"stall_onset": {{"is_onset": False, "s_ms": None, "t0_ms": None}}}}]}}))
+else:
+    print(json.dumps([{{"timestamp": 1, "p_stuck": 0.1, "ewma_x": 0.2}}]))
+""")
+    os.chmod(fake, 0o755)
+    nd = os.path.join(td, "x.ndjson")
+    open(nd, "w").write('{"type": "meta"}\n{"type": "key", "t": 1}\n{"type": "probe_frame", "t": 2}\n'
+                        '{"type": "day_question", "t": 3}\n{"type": "probe_frame", "t": 4}\n')
+    feat, stripped = bc.replay_feat(fake, nd, [[10, 20]], td)
+    assert feat == [[1, 0.1, 0.2]] and stripped == {"probe_frame": 2, "day_question": 1}, (feat, stripped)
+    assert not os.path.exists(os.path.join(td, "stripped.ndjson"))  # 一時の写しは消す
+    try:
+        bc.replay_feat(fake, nd, [[10, 21]], td)
+        raise AssertionError("停滞の始まりの食い違いで止めなかった")
+    except RuntimeError as e:
+        assert str(e) == "onsets"
+    assert not os.path.exists(os.path.join(td, "stripped.ndjson"))
+    ok = os.path.join(td, "ok.ndjson")
+    open(ok, "w").write('{"type": "key", "t": 1}\n')
+    assert bc.replay_feat(fake, ok, [], td) == ([[1, 0.1, 0.2]], {})  # 知らない型が無ければ写しを作らない
 print("build_cr test ok")
