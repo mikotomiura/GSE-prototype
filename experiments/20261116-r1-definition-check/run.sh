@@ -14,9 +14,15 @@ X11="$REPO_ROOT/experiments/20261106-findings-paper1-exploration/results/explore
 want_hold=a5a32fcefeb97b038afd170e2672262fd5a71230d5e851319eaa076b606bdc47
 got_hold=$(shasum -a 256 "$HOLD" | cut -d' ' -f1)
 [ "$got_hold" = "$want_hold" ] || { echo "holdout.json の SHA-256 が違う" >&2; exit 2; }
-for d in "$WORK" "${WORK}_q995" "${WORK}_w15" "${WORK}_w60"; do
-  "$PY" -I -c 'import json,sys; s=json.load(open(sys.argv[1]+"/build_summary.json")).get("holdout_sha256"); sys.exit(0 if s=="028f2256d4f0bb8223c17887925a54483822e6cbda8d642e970b4bf8a20afd77" else 3)' "$d" \
-    || { echo "$d の holdout_sha256 が違う" >&2; exit 3; }
+"$PY" -I -c 'import json,sys; s=json.load(open(sys.argv[1]+"/build_summary.json")).get("holdout_sha256"); sys.exit(0 if s=="028f2256d4f0bb8223c17887925a54483822e6cbda8d642e970b4bf8a20afd77" else 3)' "$WORK" \
+  || { echo "$WORK の holdout_sha256 が違う" >&2; exit 3; }
+# 変種の中間（build-variants.sh の出力）は build_summary を持たない。書き手と課題の対応が主と同一で、作り直しが全件成功したことを見る
+for d in "${WORK}_q995" "${WORK}_w15" "${WORK}_w60"; do
+  for f in writers.json units.json; do
+    cmp -s "$WORK/$f" "$d/$f" || { echo "$d/$f が主の中間と違う" >&2; exit 3; }
+  done
+  "$PY" -I -c 'import json,sys; r=json.load(open(sys.argv[1]+"/rebuild_summary.json")); sys.exit(0 if r["failed"]==0 and r["ok"]==r["units"]==438 and r["stderr_nonempty"]==0 else 3)' "$d" \
+    || { echo "$d の作り直しの要約が全件成功でない" >&2; exit 3; }
 done
 
 mkdir -p "$EXP_DIR/results"
