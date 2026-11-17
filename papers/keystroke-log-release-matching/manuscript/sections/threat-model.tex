@@ -100,14 +100,11 @@ closed world holds only if the hidden essays are among the held texts. The autho
 (personal communication) that the competition data were drawn from the KLiCKe corpus before it was released; they did
 not say whether all the competition essays, or only some, are in the released corpus, which passed a
 selection~\cite{tian2025klicke}. We did not check this against either release, and we did not examine whether the two
-releases share essays (see the ethical considerations). For a hidden essay that is in the released corpus, the text
-and a log of its writing are public, whether that log is the same recording without the masking or another one; a
-party that holds both releases holds the text, and the masking no longer keeps the competition log apart from it.
-What such a party can still learn is which records of the two releases correspond, and with them any column that
-differs between the releases, such as a score. It could find the correspondence by comparing the two logs with each
-other, without the texts. That is a link across releases, which the attacker of this study does not use
-(Section~\ref{sec:threat-model:attacker}), so the closed-world accuracy reported here does not measure the risk in
-this case.
+releases share essays (see the ethical considerations). For a hidden essay that is in the released corpus, a party
+that holds both releases holds the text, and what it can still learn is which records of the two releases correspond, with any column such as a score,
+which it could find by comparing the logs with each other; that link across releases is not used by the attacker of
+this study (Section~\ref{sec:threat-model:attacker}), so the closed-world accuracy does not measure the risk in this
+case.
 
 \paragraph{Classrooms.}
 Teachers, teaching assistants and classmates may hold the texts of a class, with names, without holding the
@@ -150,7 +147,8 @@ competition essays were drawn from a corpus to be released later with its texts 
 the goal may have been meant to hold only until then, which we do not know. Under our reading, a
 form that lets a log be matched to its text does not keep them apart for a party that holds the texts. The evaluation
 measures this link directly, in the setting of texts on the same prompts; the preregistration states (a) as learning
-the content of a hidden text and names this link as the quantity that underlies (a) and (b). A further harm, (b), arises where the writer of a text is known, as in the
+the content of a hidden text and names this link as the quantity that underlies (a) and (b), and we use (a) for the
+link itself. A further harm, (b), arises where the writer of a text is known, as in the
 classroom and published-essay settings: the log is then linked to a named person. We know of no release in which (b)
 has occurred, and we state it as a consequence that would follow if logs were released in those settings. The study
 does not identify writers.

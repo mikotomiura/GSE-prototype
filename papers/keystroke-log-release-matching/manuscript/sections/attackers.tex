@@ -19,11 +19,8 @@ other characters separate words.
 
 \paragraph{Logs.}
 In a log, segments are counted from the key categories alone. A letter or digit press adds 1, a BackSpace press
-subtracts 1, and a space, punctuation or Enter press closes the segment. If the next press after a Control or Meta
-press, other than a modifier, is a letter or digit, it is a shortcut and is neither counted nor a separator; whether
-Control is still held cannot be read, because the corpus gives modifier presses an action time of zero. Navigation,
-other modifiers, mouse, Delete and other presses are neither counted nor separators, and a trailing open segment is
-kept if it contains a counted press. Deletion of a selection, paste and replacement cannot be seen in the categories
+subtracts 1, and a space, punctuation or Enter press closes the segment; shortcuts, navigation and other presses are
+neither counted nor separators (Appendix~\ref{app:attackers}). Deletion of a selection, paste and replacement cannot be seen in the categories
 and are counted by this rule as they are, so the value of a segment can differ from the length of the word it became.
 
 \paragraph{Error of the rule.}
@@ -94,11 +91,8 @@ A0 is the baseline that every other attacker is compared with: it chooses the ca
 the number of characters that the log leaves.
 
 \paragraph{A1 and A1$'$: the final draft.}
-A1 rebuilds the final draft from the columns that R0, R1, R2, R5 and R6 release. A1$'$ uses only the category column:
-a character press inserts at the cursor, BackSpace deletes to the left and Delete to the right, ArrowLeft, ArrowRight,
-Home and End move the cursor, with lines separated by Enter, and other navigation and mouse presses put the cursor at
-the end, since their effect cannot be known. After a Control press, Home and End move to the start and the end of the
-document and the arrows are treated as unknown; shortcuts are ignored. Both attackers align the word lengths of the
+A1 rebuilds the final draft from the columns that R0, R1, R2, R5 and R6 release. A1$'$ replays the category column alone,
+with the cursor rules in Appendix~\ref{app:attackers}. Both attackers align the word lengths of the
 draft with those of each candidate over the full text and choose the candidate with the lowest cost.
 
 \paragraph{A2 and A2-b: segments.}

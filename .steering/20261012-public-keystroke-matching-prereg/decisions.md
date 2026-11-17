@@ -801,3 +801,14 @@ Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LL
 ## 判断 93 の追記 2: Dr. Tian の返事（2026-11-17）
 
 11/14 の返信への返事（研究者が会話に貼った。逐語の要旨）: "I am comfortable with you reporting both points as personal communications from me, and I appreciate your offer to acknowledge my assistance." 更新版を送ってよい。→ 倫理の節の personal communication の 2 点（IRB と同意・競技会のデータの出どころ）と、プレプリントの版の謝辞はそのまま。原稿は変えない。下書き 8 から名前の可否を問う文を外し、同意へのお礼にした。送るのは研究者（PDF は判断 93 の追記のもの）。
+
+## 判断 94: attack-me round 4（原稿の全体）への対応（研究者・AskUserQuestion 1 回・3 問と会話・2026-11-17）
+
+記録は `.steering/20261020-public-keystroke-matching-manuscript/attack-me/manuscript-matching/round-4/verdict.md`。判定は major revision（R1 minor・R2 major・R3 major・E 直してから回す・Codex major）。偽陽性 0。中心は 5 役が挙げた C2 の要約の「within four times chance」（登録に無い事後の切り・登録の二次 λ = 4 で R4(4) 4.5%・全員で R4(4) 0.65%）。
+研究者の選択:
+1. C2 は値で書き、主の解析（全文・N = 1,000・λ = 8）・登録の二次（λ = 4）・探索の 3 段を分ける（推奨）。「4 倍」の語は要約から外す。
+2. 名指しした公開の主催者への通知の文（R3 M2）は判断 91 のまま書かない（推奨は 1 文足すだった）。
+3. 新しい計算（探索の変種の陰性対照・学習用の prompt での λ の選び直し）: 研究者「時間による。数時間かかるなら限界にしよう」。見積もり（分析 7 の約 1/16 で約 40 コア時間・Mac に打鍵のデータとキャッシュが無い・台本と検査に半日）で数時間を超えるので、計算せず限界として書く。
+4. 持ち帰りに足す: 余裕の大きい照合は当たる（R7(0.25) の上位 10% で 57.2%）・得点との関係の変化（R7(0.25) で平均ポーズと得点の相関 −0.11 → −0.36）。
+5. Dr. Tian へは原稿が完成してから送る（研究者・会話）。
+他: PoPETs 2027 の規程を 2026-11-17 に取り直し、査読中のプレプリントは "While not expressly forbidden, we discourage authors from publicly posting pre-prints of their submissions while under review" と確かめた（判断 88 の確かめていないこと）。プレプリントの時期は投稿の段で研究者に改めて問う。

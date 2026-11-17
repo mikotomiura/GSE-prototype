@@ -4,6 +4,17 @@
 % Moved from Sections 4.1, 5.3, 5.4, 6.1 and 6.5 of the main body on 24 October 2026, without changing the
 % procedure.
 
+\paragraph{The segment rule and the replay of A1$'$.}
+% Moved from Section 5 of the main body on 17 November 2026, without changing the procedure.
+In the segment rule, if the next press after a Control or Meta press, other than a modifier, is a letter or digit, it
+is a shortcut and is neither counted nor a separator; whether Control is still held cannot be read, because the corpus
+gives modifier presses an action time of zero. Navigation, other modifiers, mouse, Delete and other presses are
+neither counted nor separators, and a trailing open segment is kept if it contains a counted press. In the replay of
+A1$'$, a character press inserts at the cursor, BackSpace deletes to the left and Delete to the right, ArrowLeft,
+ArrowRight, Home and End move the cursor, with lines separated by Enter, and other navigation and mouse presses put the
+cursor at the end, since their effect cannot be known. After a Control press, Home and End move to the start and the
+end of the document and the arrows are treated as unknown; shortcuts are ignored.
+
 \paragraph{The KeyTAR model.}
 KeyTAR reconstructs typed text from keystroke intervals with a fine-tuned language model~\cite{qiu2026keytar}. We use
 its public artifact as released (Zenodo record 17254163), with the checkpoint trained on intervals recorded from typing

@@ -66,8 +66,7 @@ count together), R3~$-$~R3-u (separators) and R3~$-$~R3-t($w$) (rounding of time
 at once. The last two change one column, but the available attackers change too: in R3-u, A2-b replaces A1$'$ and A2 and
 A3 uses the combined score, and in R3-t the likelihood of A3 uses rounding intervals. These differences therefore
 contain both the column and the attacker. Attackers that do not use times give a difference of zero between R3 and
-R3-t, so the difference of A3 is also reported. No form drops all times; the coarsest rounding, $w = 1{,}000$\,ms,
-stands in for it.
+R3-t, so the difference of A3 is also reported. No form drops all times.
 
 \paragraph{Secondary quantities.}
 The rank of the true text, the distribution of accuracy per writer to its 90th percentile and the other secondary
@@ -81,9 +80,7 @@ measures of the KLiCKe paper~\cite{tian2025klicke}: mean P-burst length (bursts 
 R-burst length, mean pause (intervals over 200\,ms), mean within-word and between-word pauses, mean deletion length,
 deletion proportion, mean insertion length, insertion proportion, and the variance of the production rate over ten equal
 intervals (named as in that paper and computed as a standard deviation, below). The definitions follow that paper and are computed with our own formulas, the same code for every form. The
-paper gives no operational definition of the ``task maximum'' to which the production rate is related; we divide the
-production rate of each interval by the maximum interval rate over all writers of the same prompt, which is the same
-denominator for every form, and take the standard deviation over the ten intervals. Characters are counted as character
+denominator of the production rate is given in Appendix~\ref{app:results}. Characters are counted as character
 presses, word boundaries as separator presses and pauses as intervals between presses, in the unprocessed log as well.
 
 Before any data were seen, we fixed whether each measure is computed on each form with the same
@@ -101,9 +98,7 @@ matching cells of the same sample.
 
 The registered plan included a check of our formulas against the values computed by Inputlog for 50 writers. The corpus
 does not distribute these values, and we did not run Inputlog ourselves, so the check could not be done and our
-formulas are not verified against Inputlog. One consequence is that our deletion and insertion runs are broken by rows
-of modifier keys between them, as the registered wording reads; this may differ from what the KLiCKe paper counts as
-one deletion activity.
+formulas are not verified against Inputlog (Appendix~\ref{app:results}).
 
 \subsection{Summary table and figure}
 \label{sec:protocol:summary}
@@ -171,5 +166,5 @@ section.
 
 \paragraph{Deviations and predictions.}
 Four deviations are recorded with their times and reasons, and none changed the released columns or a registered
-value. Predictions of the strongest attacker's accuracy were registered before any data were acquired; the
+value; the registered check against Inputlog could not be done (\S\ref{sec:protocol:utility}). Predictions of the strongest attacker's accuracy were registered before any data were acquired; the
 registration states that a miss does not change the conclusions. Both are given in Appendix~\ref{app:checks}.
