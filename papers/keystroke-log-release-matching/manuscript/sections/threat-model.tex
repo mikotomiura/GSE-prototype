@@ -101,7 +101,7 @@ closed world holds only if the hidden essays are among the held texts. The autho
 not say whether all the competition essays, or only some, are in the released corpus, which passed a
 selection~\cite{tian2025klicke}. We did not check this against either release, and we did not examine whether the two
 releases share essays (see the ethical considerations). For a hidden essay that is in the released corpus, a party
-that holds both releases holds the text, and what it can still learn is which records of the two releases correspond, with any column such as a score,
+that holds both releases holds the text, and what it can still learn is which records of the two releases correspond, with any column that differs between them, such as a score,
 which it could find by comparing the logs with each other; that link across releases is not used by the attacker of
 this study (Section~\ref{sec:threat-model:attacker}), so the closed-world accuracy does not measure the risk in this
 case.
@@ -138,7 +138,7 @@ candidate set and the training data). One attacker in this study, the public Key
 contains a public language model; it is reported as a reference outside this threat model.
 
 \paragraph{Goals and harms.}
-The main harm is (a): a processed log is linked to its text by a party that holds the text, so that every other
+The main harm is the link: a processed log is linked to its text by a party that holds the text, so that every other
 column of the log (the times, the revision process and, where released, the score) is linked to that text. The
 releasing party stated its goal as preventing the reproduction of the text from the log, and it does not name the
 writers' privacy. A party that holds candidate texts does not need to reproduce a text; it needs only to choose among
@@ -146,9 +146,8 @@ them. We read the stated goal as keeping the text apart from the rest of the log
 competition essays were drawn from a corpus to be released later with its texts (Section~\ref{sec:threat-model:settings}),
 the goal may have been meant to hold only until then, which we do not know. Under our reading, a
 form that lets a log be matched to its text does not keep them apart for a party that holds the texts. The evaluation
-measures this link directly, in the setting of texts on the same prompts; the preregistration states (a) as learning
-the content of a hidden text and names this link as the quantity that underlies (a) and (b), and we use (a) for the
-link itself. A further harm, (b), arises where the writer of a text is known, as in the
+measures this link directly, in the setting of texts on the same prompts; the preregistration states harm (a) as learning
+the content of a hidden text and names this link as the quantity that underlies (a) and (b). A further harm, (b), arises where the writer of a text is known, as in the
 classroom and published-essay settings: the log is then linked to a named person. We know of no release in which (b)
 has occurred, and we state it as a consequence that would follow if logs were released in those settings. The study
 does not identify writers.

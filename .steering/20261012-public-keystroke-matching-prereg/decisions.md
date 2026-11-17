@@ -812,3 +812,11 @@ Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LL
 4. 持ち帰りに足す: 余裕の大きい照合は当たる（R7(0.25) の上位 10% で 57.2%）・得点との関係の変化（R7(0.25) で平均ポーズと得点の相関 −0.11 → −0.36）。
 5. Dr. Tian へは原稿が完成してから送る（研究者・会話）。
 他: PoPETs 2027 の規程を 2026-11-17 に取り直し、査読中のプレプリントは "While not expressly forbidden, we discourage authors from publicly posting pre-prints of their submissions while under review" と確かめた（判断 88 の確かめていないこと）。プレプリントの時期は投稿の段で研究者に改めて問う。
+
+## 判断 94 の追記: /cross-review（2026-11-17）
+
+範囲は `bf0d2450..2110e504 -- papers`（13 ファイル・+113/−101）。Codex（run-codex-review.sh・本線から・rc 0）と Claude（code-reviewer）。.steering と .codex は送っていない。一次で確かめ、全部採った:
+- 両者一致: 抄録・結論・考察の「Matching fell only with the process measures」が強すぎる（Claude は R2 → R3 で照合が 98.6% → 86.7% に下がり中央値は 0.92 のままの反例を表で示した）。→ 「主の解析で、ほかの形に支配されない形の上で」に限った。図 1 の見出しも「主の解析で、指標を計算する形の最低は 2.2%」に。
+- Codex のみ: 害 (a) を登録と別の意味に使っていた → 本文の主な害を「the link」と呼び、登録の (a) と分けた。探索の値は選んだ標本の記述（評価した記録の上で選び、陰性対照なし）と明記。余裕の文を「正しい照合が余裕の大きい所に集まった」に（上位 10% でも 42.8% は誤り）。
+- Claude のみ: §7.2「R4(4) did (4.5%)」が逆に読める → 「A2 gained on R4(4) (4.5% against 0.35% for A0)」。抄録と序論の探索に R4(4) の 48.2% を戻した（R7 だけを書いていた）。全員の R4(4) の A0 からの利得を main_all.json の `all.strongest["full|R4(4)|1000"]` で確かめた（0.15 ポイント [0.0, 0.40]・下限 0 なので付録 E の「one changes」は正しい）→ 本文と付録 E に添えた。付録 E に移した Inputlog の文の因果を直し、段落を「Formulas of the process measures」に分けた。「with 0.70」の語順・倫理の「as preregistered」の掛かり（登録の文言どおり、停止の条件と待たずに取得することを並べた）・探索の 2.4% の区分・「do not try to undo」→「do not model the suppressed presses」・抄録の 4,992 を戻す・「that differs between them」・「in addition」・「No form drops all times」の理由・区切りの規則に Delete。
+確かめ: 投稿版 エラー 0・未定義 0・overfull 2・31 頁・倫理は p12。プレプリントの版 エラー 0・overfull 0。文体の門 違反 0。本文 10,975 語・抄録 324 語。新しい数値 0.15 [0.0, 0.40] は main_all.json と照らした（生成表には無い・make_tables.py の止める条件の外）。
