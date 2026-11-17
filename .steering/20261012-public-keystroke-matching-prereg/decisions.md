@@ -874,3 +874,11 @@ Dr. Tian への下書き 8: 11/12 の版からのやりとりに関わる変更�
 ## 判断 97 の追記: 投稿版の PDF に手元のパスが入っていた（2026-11-17）
 
 投稿版の PDF の埋め込みを洗ったところ、テンプレートの CC BY のロゴ（`cc-by-4.pdf`）の取り込みで pdfTeX が `PTEX.FileName` にテンプレートの置き場の絶対パスを書いていた（ユーザー名と作業の repo の名が読める）。二重盲検の漏れなので、`build.sh` で `\pdfsuppressptexinfo=-1` を付けてビルドするようにした（原稿の tex は変えない）。直した後の PDF は本文の抽出テキストが前と同一・31 頁・エラー 0。埋め込み（展開した stream を含む）に `/Users/`・`/private/`・`/tmp/`・名前・GSE・Y5R7N・PTEX が無いことを確かめた。プレプリントの版はロゴを取り込まないので該当しない。
+
+## 判断 97 の追記 2: /cross-review（2026-11-18）
+
+範囲は `247fdee4..61a08d1d -- papers/keystroke-log-release-matching/manuscript`（3 ファイル）。Codex（本線から wrapper・rc 0・papers の diff だけ）と Claude（cross-reviewer）。両者一致は無し。付録 C のコミットの時刻（1eb10cf3・8c124a11・f0da031d）は git の記録と一致、study repository の用法も他の節と矛盾しないことを Claude 側が確かめた。採ったもの:
+- Codex のみ: 付録 C の「committed to the same repository」が曖昧 → 「the authors' working repository」と繰り返した。
+- Codex のみ: 匿名化の回帰の検査が無い → build.sh がビルドの後に PDF（圧縮の stream を展開）を調べ、`PTEX.FileName`・`PTEX.InfoDict`・原稿・テンプレート・出力先のパスがあれば exit 1。陽性対照: 抑止の行を外した変異で exit 1（テンプレートのパスと PTEX を検出）、通常のビルドと著者名入りの版で「pdf: no local paths」。
+- Claude のみ: `\input{$here/main.tex}` に変えたので `$here` にも TeX の特殊文字と空白の検査を足した（`/a b/x`・`/a%b` を拒み `/ok/path` を通すことを確かめた）。
+ビルド: 投稿版 エラー 0・overfull 2・31 頁・倫理は p12。文体の門 違反 0。

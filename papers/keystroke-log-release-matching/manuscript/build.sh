@@ -51,6 +51,13 @@ export TEXINPUTS="${here}:${template}:"
 export BSTINPUTS="${template}:"
 export BIBINPUTS="${here}:"
 
+# The manuscript is read with \input{$here/main.tex}, so its path must not hold characters that TeX reads specially.
+case "$here" in
+  *[%#{}~\\\ ]*)
+    echo "build.sh: the path of the manuscript may not contain % # { } ~ \\ or a space" >&2
+    exit 2 ;;
+esac
+
 job=main
 if [ -n "$authors" ]; then
   authors=$(realpath "$authors")
@@ -95,3 +102,23 @@ latex
 log="$out/$job.log"
 echo "$job: $(grep -c '^!' "$log" || true) errors, $(grep -c 'LaTeX Warning: Reference' "$log" || true) undefined references, $(grep -c 'Warning: Citation' "$log" || true) undefined citations, $(grep -c '^Overfull' "$log" || true) overfull boxes"
 echo "bibtex: $(grep -c '^Warning--' "$out/$job.blg" || true) warnings"
+
+# The PDF must not carry local paths (PTEX.FileName or the directories of the build), which would identify the
+# authors in the anonymous version. Compressed streams are expanded before searching.
+python3 -I - "$out/$job.pdf" "$here" "$template" "$out" <<'PY' || exit 1
+import re, sys, zlib
+pdf, *dirs = sys.argv[1:]
+data = open(pdf, "rb").read()
+parts = [data]
+for m in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", data, re.S):
+    try:
+        parts.append(zlib.decompress(m.group(1)))
+    except zlib.error:
+        pass
+needles = [b"PTEX.FileName", b"PTEX.InfoDict"] + [d.encode() for d in dirs]
+found = sorted({n.decode() for n in needles for p in parts if n in p})
+if found:
+    print("build.sh: the PDF holds local information: " + ", ".join(found), file=sys.stderr)
+    sys.exit(1)
+print("pdf: no local paths")
+PY
