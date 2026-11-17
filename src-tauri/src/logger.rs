@@ -172,12 +172,14 @@ impl ProbeStratum {
     }
 }
 
-/// `activity_label` の行動カテゴリ (ADR-031 **D3**)。★ **固定 6 択**。
+/// `activity_label` の行動カテゴリ (ADR-031 **D3**・ADR-055)。固定 7 択。
 ///
-/// ★ 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
-/// 「**熟考・詰まり・外部資料・会話・離席・回答不能**」に対応する。
+/// 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
+/// 「熟考・詰まり・外部資料・会話・離席・回答不能」に、ADR-055 が「作業」を足した。
+/// 本人の段 1 の配布物（タグ v0.1.42）は 6 択で、`working` を持たない（並べ方は ADR-055 D4）。
+/// `working` の不在から版を推さない（7 択でも選ばれなければ現れない・ADR-055 D5）。
 ///
-/// ⚠️★★★ **1 つも足さない。** ★ 足すには**別 ADR** が要る（`data-privacy` ルール 7 条件 i）。
+/// 足すには別 ADR が要る（`data-privacy` ルール 7 条件 i）。
 /// ⚠️★★★ `ExternalMaterial` / `Conversation` は、**計器由来なら** ADR-014 D4 が禁じている
 /// 役割カテゴリ（`editor` / `terminal` / `browser`）と**意味的に等価**である。
 /// ★ **自己申告経由に限って**許可されており、条件（自由記述を置かない / 相手・アプリ・URL を
@@ -194,6 +196,8 @@ pub enum ActivityCategory {
     Conversation,
     /// 離席: その場を離れていた。
     Away,
+    /// 作業: 手を動かして作業を進めていた（入力・編集・単純作業を含む）。ADR-055。
+    Working,
     /// 回答不能: 思い出せない・当てはまらない。
     CannotAnswer,
 }
@@ -206,6 +210,7 @@ impl ActivityCategory {
             Self::ExternalMaterial => "external_material",
             Self::Conversation => "conversation",
             Self::Away => "away",
+            Self::Working => "working",
             Self::CannotAnswer => "cannot_answer",
         }
     }
@@ -217,22 +222,24 @@ impl ActivityCategory {
             "external_material" => Some(Self::ExternalMaterial),
             "conversation" => Some(Self::Conversation),
             "away" => Some(Self::Away),
+            "working" => Some(Self::Working),
             "cannot_answer" => Some(Self::CannotAnswer),
             _ => None,
         }
     }
 
-    /// ★ 6 択の全列挙（⚠️ **テストと UI がここを単一の出所にする**）。
+    /// 7 択の全列挙（テストがここを単一の出所にする。UI の並びは `src/probeTypes.ts` が同じ順で持つ）。
     ///
     /// ⚠️★★★ **variant を足したら `exhaustive_marker` が非網羅で *コンパイルエラー* になる**
     /// （2026-09-14・security-checker LOW）。★ 旧版は `[Self; 6]` の長さしか言わず、
     /// **7 個目を足して `ALL` に入れ忘れると検査を素通り**した。
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Deliberating,
         Self::Stuck,
         Self::ExternalMaterial,
         Self::Conversation,
         Self::Away,
+        Self::Working,
         Self::CannotAnswer,
     ];
 
@@ -248,7 +255,8 @@ impl ActivityCategory {
             Self::ExternalMaterial => 2,
             Self::Conversation => 3,
             Self::Away => 4,
-            Self::CannotAnswer => 5,
+            Self::Working => 5,
+            Self::CannotAnswer => 6,
         }
     }
 }
@@ -4241,11 +4249,23 @@ mod tests {
         }
         assert_eq!(ActivityCategory::parse("bogus"), None);
         assert_eq!(ActivityCategory::parse(""), None);
-        // ⚠️ 6 択であることそのものを固定する (★ 増やすには ADR-031 D3 条件 i の改訂が要る)。
-        assert_eq!(ActivityCategory::ALL.len(), 6);
+        // 7 択であることそのものを固定する（増やすには ADR-031 D3 条件 i を改める別 ADR が要る・ADR-055）。
+        assert_eq!(ActivityCategory::ALL.len(), 7);
+        // 本人の段 1 の 6 択の記録と並べるため、既存の 6 つの綴りは変えない（ADR-055 D4）。
+        for (c, s) in [
+            (ActivityCategory::Deliberating, "deliberating"),
+            (ActivityCategory::Stuck, "stuck"),
+            (ActivityCategory::ExternalMaterial, "external_material"),
+            (ActivityCategory::Conversation, "conversation"),
+            (ActivityCategory::Away, "away"),
+            (ActivityCategory::Working, "working"),
+            (ActivityCategory::CannotAnswer, "cannot_answer"),
+        ] {
+            assert_eq!(c.as_str(), s);
+        }
         // ⚠️★★★ **`ALL` が全 variant を覆っていること** (2026-09-14・security-checker LOW)。
         //   ★ `exhaustive_marker` は網羅 `match` なので、variant を足すと**コンパイルが落ちる**。
-        //   ★ ここで印が 0..6 を過不足なく埋めることを見て、`ALL` 側の抜けも捕まえる。
+        //   ★ ここで印が 0..7 を過不足なく埋めることを見て、`ALL` 側の抜けも捕まえる。
         let mut marks: Vec<usize> = ActivityCategory::ALL
             .iter()
             .map(|c| c.exhaustive_marker())
@@ -4253,7 +4273,7 @@ mod tests {
         marks.sort_unstable();
         assert_eq!(
             marks,
-            (0..6).collect::<Vec<_>>(),
+            (0..7).collect::<Vec<_>>(),
             "ALL が全 variant を覆っていない"
         );
 
@@ -4266,6 +4286,31 @@ mod tests {
         }
         assert_eq!(ProbeStratum::parse("p_stuck"), None);
         assert_eq!(ProbeStratum::parse(""), None);
+    }
+
+    /// 画面の選択肢（`src/probeTypes.ts` の `ACTIVITY_CHOICES`）が `ActivityCategory::ALL` と
+    /// 値と並びで一致すること（ADR-055 D3・/cross-review C2）。
+    ///
+    /// ずれると画面から送った値が `record_probe_response` の `parse` で拒まれ、回答が落ちる。
+    /// 並び（既存 5 つの位置と、回答不能が最後）は研究者が決めた計器の一部なので並びも見る。
+    #[test]
+    fn frontend_activity_choices_match_all_in_order() {
+        let ts = include_str!("../../src/probeTypes.ts");
+        let start = ts
+            .find("export const ACTIVITY_CHOICES")
+            .expect("probeTypes.ts に ACTIVITY_CHOICES が無い");
+        let body = &ts[start..];
+        let end = body.find("];").expect("ACTIVITY_CHOICES の終わりが無い");
+        let values: Vec<&str> = body[..end]
+            .split("value: \"")
+            .skip(1)
+            .filter_map(|rest| rest.split('"').next())
+            .collect();
+        let expected: Vec<&str> = ActivityCategory::ALL.iter().map(|c| c.as_str()).collect();
+        assert_eq!(
+            values, expected,
+            "画面の選択肢と ActivityCategory::ALL が食い違う"
+        );
     }
 
     /// ⚠️★★★ **未回答は行を書かないのではなく `cannot_answer` で残す** (ADR-031 D7)。

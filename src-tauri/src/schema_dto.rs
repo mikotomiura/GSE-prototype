@@ -885,10 +885,11 @@ pub enum ProbeStratumDto {
     Resumption,
 }
 
-/// `activity_label` の行動カテゴリ (ADR-031 D3)。固定 6 択で、増やすには別 ADR が要る。
+/// `activity_label` の行動カテゴリ (ADR-031 D3・ADR-055)。固定 7 択で、増やすには別 ADR が要る。
 ///
 /// 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
-/// 「熟考・詰まり・外部資料・会話・離席・回答不能」に対応する。
+/// 「熟考・詰まり・外部資料・会話・離席・回答不能」に、ADR-055 が「作業」を足した。
+/// 本人の段 1 の配布物（タグ v0.1.42）の記録は `working` を持たない。`working` の不在から版を推さない (ADR-055 D5)。
 ///
 /// ⚠️ 同メモ `:236` は「外部参照 / 観測不能」という別語で同じ並びを書いているが、
 /// そちらは**解析側の混同率のカテゴリ**であって被験者に出す選択肢ではない (ADR-031 Context-1)。
@@ -909,6 +910,8 @@ pub enum ActivityCategoryDto {
     Conversation,
     /// 離席: その場を離れていた。
     Away,
+    /// 作業: 手を動かして作業を進めていた（入力・編集・単純作業を含む）。ADR-055。
+    Working,
     /// 回答不能: 思い出せない・当てはまらない。
     CannotAnswer,
 }
