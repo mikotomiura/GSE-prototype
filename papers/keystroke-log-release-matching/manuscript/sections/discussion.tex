@@ -5,8 +5,8 @@
 % written before them, from the preregistration ("What is not concluded") and Section 3.5.
 
 Applied to KLiCKe, the masking of the competition kept no log apart from its text at $N = 1{,}000$, because the
-lengths and the editing keys remained, and in the main analysis no form that no other form dominates lowered matching without losing process
-measures (Section~\ref{sec:results}). We measured the accuracy of these attackers on these forms in a closed world;
+lengths and the editing keys remained, and in the main analysis no form that computes process measures brought
+matching below what the total length alone gave (Section~\ref{sec:results}). We measured the accuracy of these attackers on these forms in a closed world;
 the link to named writers (harm (b)), the rate of false matches for a holder of a single text and attackers stronger
 than the exploratory ones remain possible but untested (\S\ref{sec:discussion:limits}).
 
@@ -28,10 +28,10 @@ logs with much pasting~\cite{tian2025klicke}. The results on ENJA15 are not gene
 logs of input methods in general, and differences from KLiCKe are not attributed to language or input method, since
 the task, the input and the language differ at once. Our formulas for the process measures could not be verified
 against Inputlog (\S\ref{sec:protocol:utility}), and the utility axis covers only what Section~\ref{sec:protocol:summary}
-states. KeyTAR, run with the defaults of its artifact (\S\ref{sec:attackers:list}), is a reference, not a bound. On
+states. KeyTAR, run with the defaults of its artifact (Appendix~\ref{app:attackers}), is a reference, not a bound. On
 the coarse forms, the registered full-text attackers were weak; the exploratory attackers, which matched far more,
-were selected on the evaluated logs, mostly won with the lowest penalty tried and had no negative control, so they are
-not bounds either and their gains may be somewhat optimistic (\S\ref{sec:results:forms}).
+were selected on the evaluated logs, mostly won with the lowest penalty tried and had no negative control, so their
+values describe this sample and are not bounds either (\S\ref{sec:results:forms}).
 
 \subsection{Processing and agreements}
 \label{sec:discussion:agreements}
@@ -46,36 +46,36 @@ logs outside the terms; but they define who may use a release and for what, and 
 forms evaluated here; statistical disclosure control likewise balances the control in a licence against the
 detail and perturbation of the released data~\cite{hundepool2026handbook}. Processing and terms are also not the only choice: a releasing party can give the process
 measures instead of the logs, or give the logs only to those who apply for them, since what to release depends on who
-asks and for what purpose~\cite{borgman2018open}. These choices lie outside this evaluation. Whatever the form,
-processing protects a text only while no later release contains that text: if the essays of a release that hides
-texts are released again with their texts, as the competition data may have been
-(Section~\ref{sec:threat-model:settings}), the processing no longer keeps the two apart. A releasing party therefore
+asks and for what purpose~\cite{borgman2018open}. These choices lie outside this evaluation. Whatever the form, a
+later release of the same texts gives any party the candidates, and if it also releases logs of their writing, as the
+competition data may have been released again (Section~\ref{sec:threat-model:settings}), the records of the two
+releases may be linked to each other. A releasing party therefore
 also has to track where the data of a release come from and what else is released from the same source.
 
 \subsection{What a releasing party can take away}
 \label{sec:discussion:takeaways}
 
-The results are material for three choices, and none recommends a form. In the terms of statistical disclosure
+The results are material for the choices below, and none recommends a form. In the terms of statistical disclosure
 control~\cite{hundepool2026handbook}, R1 to R3-u recode the keys globally (R2 to R3-u also drop columns), and R3-t
 recodes the press times globally. R4 releases only a variable derived from each log, recoded globally when $w > 1$.
 R7 suppresses presses at random, not, as local suppression does, where a combination of values is unsafe. R5 and R6
 perturb the keys. \emph{Columns.} Masking letters and digits left
 100\% at $N = 1{,}000$ (R1), and the categories of the editing keys alone still left 86.7\% (R3); only merging the
 separators, coarsening the segment values or suppressing at least a quarter of the presses brought the strongest
-attacker below 40\%, and against the exploratory attackers, of the coarsened and suppressed forms only R4(8) and
-R7(0.5) stayed there (R3-u was not run against them). \emph{Coarseness.} Rounding the press times to one second left
+attacker below 40\%. \emph{Coarseness.} Rounding the press times to one second left
 86.7\% and lost five of the ten measures; suppressing a quarter of the presses left 14.3\%, with a median correlation
-of 0.81, against the registered attackers, which do not model the suppressed presses (62.3\% against the exploratory
-ones), and the mean pause then correlated with the score at $-0.36$ against $-0.11$ in R0; segment values with
-$w \geq 4$ computed no measure, and their low full-text values reflected the attacker for $w = 4$ (4.5\% with the
-registered $\lambda = 4$, 48.2\% in the exploration) more than for $w = 8$ (2.4\% in the exploration). Every main form from R2 on
+of 0.81 (51.2\% with the registered lighter penalty), with attackers that do not model the suppressed presses, and
+three measures then moved in their correlation with the score; segment values compute no measure, and coarsening them
+to $w \geq 4$ left the main attackers at the total length (with the registered lighter penalty, 4.5\% for $w = 4$).
+Against the exploratory attackers, of the coarsened and suppressed forms only R4(8) and R7(0.5) stayed below 40\%, and
+R3-u was not run against them. Every main form from R2 on
 approximated or dropped the R-burst and insertion measures, and the approximations changed how measures relate to the
 human scores, so a release would need to state which measures are approximated. \emph{Confidence.} Correct matches
 concentrated where the margin between the best and the second-best candidate was large, the quantity behind the
 eccentricity of~\cite{narayanan2008robust}: on R7(0.25), the tenth of logs and draws with the largest margin were
 matched in 57.2\%, against 14.3\% overall (exploratory). \emph{Setting.} The size of the candidate set changes the choice: at $N = 10$, as in a class, the total
 length alone chose the true text in 61.6\% of draws on the forms that keep it exactly, and every form except R4(4) and
-R4(8) left the strongest attacker at about 51\% or more (the exploratory attackers raised R4(4) to 78.1\%); at $N = 1{,}000$, the few matches on R4(2) and R7(0.5)
+R4(8) left the strongest attacker at about 51\% or more; at $N = 1{,}000$, the few matches on R4(2) and R7(0.5)
 concentrated on a few writers (exploratory). \emph{Windows.}
 Windows of five segments were matched in 65.8\% of draws at $N = 1{,}000$ on R0 to R3, with one window per decoy, and
 the utility of windows was not evaluated.

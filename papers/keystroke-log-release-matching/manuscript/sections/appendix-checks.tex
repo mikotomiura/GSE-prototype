@@ -45,15 +45,19 @@ preceding press, ignoring Shift, Alt and CapsLock, is not Control.
 \label{app:checks:deviations}
 
 % Moved from Sections 6.8 and 7.5 of the main body on 29 October 2026, without changing the text of the
-% deviations. The list follows the deviations D1 to D4 of the record of the main computation (notes.md).
-Four deviations are recorded with their times and reasons. The escaped characters of the distributed logs are undone
+% deviations. The list follows the deviations D1 to D4 and D6 of the record of the main computation (notes.md).
+Five deviations are recorded with their times and reasons. The escaped characters of the distributed logs are undone
 when the logs are read (\S\ref{sec:data:corpora}). Three processing functions were changed so that they no longer
 remove a column that the reading of KLiCKe had already dropped, which had stopped a trial run. The KeyTAR model ran out
 of GPU memory on the longest chunks, and the four chunks of one writer were generated on the CPU with the same model
-and settings; since the two can give different reconstructions, KeyTAR is reported with and without that writer. After
+and settings; since the two can give different reconstructions, KeyTAR is reported with all writers, with the largest change without that writer. After
 a restart of the computer stopped the main computation, it was made to keep each finished result and resume; on
-synthetic logs its output was identical byte for byte with and without resuming. None of these changed the released
-columns or a registered value, and no value of matching or utility had been computed before any of them. Details that
+synthetic logs its output was identical byte for byte with and without resuming. None of these four changed the
+released columns or a registered value, and no value of matching or utility had been computed before any of them. The
+fifth was found while revising the paper: the registration lists A2 with $\lambda = 4$ and 16 as a secondary analysis
+without restricting the forms, but the main computation ran it on R3 and R4($w$) only and left R7 out. Its values for R7
+come from the sixth exploratory analysis, which runs the same function with the same sample and resamples, and were
+computed after the main results (Appendix~\ref{app:exploratory}). Details that
 the registration left open were decided before the data were opened or before any value of matching was seen, and are
 recorded with the code.
 

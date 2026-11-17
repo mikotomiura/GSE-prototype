@@ -88,7 +88,8 @@ inputs and formula as in R0 (ok), from other inputs by approximation rules (appr
 approximation rules are: the number of characters is the number of character presses; a deletion is one character per
 BackSpace or Delete press; an insertion is a character press while the cursor of the A1$'$ replay is not at the end; a
 word boundary is a separator press; and counts in R7 are scaled by $1/(1-p)$. The random processing of R5, R6 and R7
-is applied once per log, and the same processed logs are used for matching and for utility.
+is applied once per log, and the same processed logs are used for matching and for utility; intervals are
+conditional on this one draw of the processing.
 
 For each measure and form we report the Spearman correlation with the value in R0; the median and the 10th and 90th
 percentiles of the ratio to the value in R0, leaving out writers whose R0 value is zero or undefined (with their
@@ -165,6 +166,8 @@ changed; the registered files, their SHA-256 and how each random choice derives 
 section.
 
 \paragraph{Deviations and predictions.}
-Four deviations are recorded with their times and reasons, and none changed the released columns or a registered
-value; in addition, the registered check against Inputlog could not be done (\S\ref{sec:protocol:utility}). Predictions of the strongest attacker's accuracy were registered before any data were acquired; the
+Five deviations are recorded with their times and reasons: escaped characters are undone when reading, processing
+functions no longer drop a column twice, one writer's KeyTAR chunks were generated on the CPU, the main computation
+was made to resume, and it left R7 out of the registered secondary analysis with $\lambda = 4$ and 16, which was
+computed later. None changed the released columns or a registered value; in addition, the registered check against Inputlog could not be done (\S\ref{sec:protocol:utility}). Predictions of the strongest attacker's accuracy were registered before any data were acquired; the
 registration states that a miss does not change the conclusions. Both are given in Appendix~\ref{app:checks}.

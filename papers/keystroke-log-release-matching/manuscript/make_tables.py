@@ -186,13 +186,21 @@ def a4_main_row(ref, n):
     return [f"A4 on R0 to R3-t & \\multicolumn{{7}}{{l}}{{{text}}} \\\\"]
 
 
+A4_WITHOUT_MAX_POINTS = 0.12  # the text states that no accuracy changed by more than this without the CPU writer
+
+
 def a4_tables(ref, ref_wo):
-    """KeyTAR on full texts at every N and on windows, with all 500 writers and without the CPU writer."""
+    """KeyTAR on full texts at every N and on windows, with all 500 writers. The values without the CPU writer are
+    not tabulated (their difference would give one writer's values); only their largest change is checked."""
     if set(ref) != set(ref_wo):
         raise SystemExit("the cells of main_a4_without_cpu_writer.json differ from reference_A4 of main_a4.json")
+    diffs = [abs(ref[k]["acc"] - ref_wo[k]["acc"]) * 100 for k in ref
+             if isinstance(ref[k], dict) and ref[k].get("acc") is not None]
+    if not diffs or max(diffs) > A4_WITHOUT_MAX_POINTS:
+        raise SystemExit(f"KeyTAR without the CPU writer changed an accuracy by more than {A4_WITHOUT_MAX_POINTS} points")
     full, win = [], []
     for name, fs in A4_GROUPS:
-        for r in (ref, ref_wo):
+        for r in (ref,):
             writers = str(a4_cell(r, "full", fs, "1000")["writers"])
             cells = [a4_cell(r, "full", fs, n) for n in ("10", "100", "1000")]
             full.append(" & ".join([form_tex(name), writers] + [f"{pct(v['acc'])} {ci(v['ci'])}" for v in cells])
@@ -200,6 +208,23 @@ def a4_tables(ref, ref_wo):
             wc = [a4_cell(r, "window", fs, f"{n}|{k}") for n in ("1000", "10") for k in ("5", "10", "20", "50")]
             win.append(" & ".join([form_tex(name), writers] + [pct(v["acc"]) for v in wc]) + " \\\\")
     return full, win
+
+
+SCORE_SHIFT_TEXT = {"R2": 2, "R3": 2, "R7(0.25)": 3, "R7(0.5)": 4}  # stated in Section 7.3
+
+
+def check_score_shift(m):
+    """The text counts, for some forms, the measures whose correlation with the human score moved by 0.1 or more
+    from R0 (means over the prompts); stop if the aggregates give other counts."""
+    u = m["utility"]
+    for f, stated in SCORE_SHIFT_TEXT.items():
+        n = 0
+        for mk, _ in MEASURES:
+            a, b = u[f"{mk}|R0"]["spearman_score"], u[f"{mk}|{f}"]["spearman_score"]
+            if a and b and a.get("mean") is not None and b.get("mean") is not None:
+                n += abs(b["mean"] - a["mean"]) >= 0.1
+        if n != stated:
+            raise SystemExit(f"score shift on {f}: {n} measures, the text states {stated}")
 
 
 def utility_table(m, key):
@@ -523,6 +548,7 @@ def main():
     write(out, "windows.tex", window_table(m))
     write(out, "utility-r0.tex", utility_table(m, "spearman_r0"))
     write(out, "utility-score.tex", utility_table(m, "spearman_score"))
+    check_score_shift(m)
     ref = json.load(open(os.path.join(res, "main_a4.json"), encoding="utf-8"))["main500"]["reference_A4"]
     ref_wo = json.load(open(os.path.join(res, "main_a4_without_cpu_writer.json"), encoding="utf-8"))["reference_A4"]
     write(out, "main-a4-1000.tex", a4_main_row(ref, "1000"))

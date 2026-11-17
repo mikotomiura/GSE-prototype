@@ -47,8 +47,8 @@ did not try them. Reporting where the competition data come from is
 itself a disclosure. It tells readers that, for competition essays that are in the released KLiCKe corpus, the records
 of the two releases can be put in correspondence without our procedures, which would link the competition records,
 with any column found only there, to public texts. As far as we found, neither the paper that describes KLiCKe nor
-the winning write-up states this~\cite{tian2025klicke,inubushi2024first}. We report it because a party that relies on
-processing should know that a later release of the same texts undoes it, and because leaving out what we were told
+the winning write-up states this~\cite{tian2025klicke,inubushi2024first}. We report it because parties that release logs
+with processing should know that a later release of the same texts can undo it, and because leaving out what we were told
 would misstate the release on which the evaluation is modelled. We state it as we were told it, without making the
 correspondence, and the authors of KLiCKe read this account before submission.
 
@@ -60,8 +60,7 @@ release made by another party under its own rules (above).
 \paragraph{Weighing harms and benefits.}
 We also weighed the study against the principles of the Menlo Report~\cite{dittrich2012menlo}. \emph{Respect for
 persons:} the participants agreed to the use of their data for research; this study evaluates how well the release of
-such data protects them, collects nothing new, identifies no one and publishes no result for an individual writer (with the
-one exception under the handling of the data) and no excerpt of a text or a log. \emph{Beneficence:} the harm is that the paper describes procedures that link processed
+such data protects them, collects nothing new, identifies no one and publishes no result for an individual writer and no excerpt of a text or a log. \emph{Beneficence:} the harm is that the paper describes procedures that link processed
 logs to texts; the benefit is that parties who release keystroke logs learn how much each processing step reduced
 matching by the attackers tried here, and how much of the standard process measures it kept, before they release more
 data. The attacks evaluated here are of known types (Section~\ref{sec:related}); what is new is their evaluation, on
@@ -78,11 +77,9 @@ needed (Section~\ref{sec:threat-model:settings}).
 \paragraph{Handling of the data.}
 The logs and texts of both corpora are public, but they are kept outside the study repository, on the authors'
 computers. Only aggregates are put in the repository and reported. Results per writer and excerpts of texts and logs
-are not published, with one exception: since KeyTAR is reported with and without one writer
-(Appendix~\ref{app:checks:deviations}), the difference gives that writer's aggregate values for KeyTAR, and the writer can
-be located in the sample drawn with the registered seed. We report both because the generation on the CPU could change
-that writer's reconstructions, and the comparison shows that it did not change the results. These values can also be recomputed from the public
-data, the code we publish and the public model. Logs and texts are not sent to any external language model or other external service. KeyTAR runs
+are not published. For KeyTAR, whose chunks for one writer were generated on the CPU
+(Appendix~\ref{app:checks:deviations}), we report only by how much the values change without that writer, not those
+values. Logs and texts are not sent to any external language model or other external service. KeyTAR runs
 on a local GPU, and its reconstructions are stored next to the logs and are not read, printed or published.
 
 \paragraph{Interests.}

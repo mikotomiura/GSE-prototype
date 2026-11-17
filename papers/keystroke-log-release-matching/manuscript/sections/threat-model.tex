@@ -165,7 +165,7 @@ candidate set from that corpus, whose texts are public, and not a setting of its
 Some assumptions favour the attacker: the true text is always among the candidates (the closed world, examined
 otherwise only as a diagnostic), the attacker trains on data collected in the same way as the evaluated logs, in
 windows the attacker knows where the window starts and ends and each decoy contributes a single window rather than
-every position of its text, so that an attacker searching every position would face far more candidates, and the strongest attacker, like the better of the two versions of A3 on R3-u, is chosen
+every position of its text, so that an attacker searching every position would face far more candidates, and the strongest attacker is chosen
 on the evaluated logs, which a real attacker could not do. Others limit it: the attackers within the threat model do
 not use language models, the writer's earlier texts or several releases, because the study measures what the processed
 columns themselves leave; they do not use the released scores, which a holder of scored texts would also hold and
@@ -174,7 +174,7 @@ processing, for example by estimating the noise from the dependence between neig
 available also differ by form: the finer forms admit an attacker that rebuilds the final draft, the coarser ones only
 simpler attackers, so a contrast between forms contains the difference in attackers as well as in columns and leans
 in favour of the coarser forms (\S\ref{sec:protocol:quantities}). On the matching side, this bias works against the
-finding that no form evaluated brought matching near chance while computing the measures, so that finding is
+finding that no form that computes the measures matched less than the total length alone, so that finding is
 conservative in this respect; it favours the low accuracy of a single coarse form. This is the weakness of evaluation that the survey
 quoted in Section~\ref{sec:related} notes~\cite{hanisch2021survey}, and it applies to this study. The direction of one assumption is unknown: the
 decoys are drawn uniformly from writers on the same prompt, who may be more or less alike than the members of one

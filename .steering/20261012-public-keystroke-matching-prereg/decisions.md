@@ -820,3 +820,19 @@ Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LL
 - Codex のみ: 害 (a) を登録と別の意味に使っていた → 本文の主な害を「the link」と呼び、登録の (a) と分けた。探索の値は選んだ標本の記述（評価した記録の上で選び、陰性対照なし）と明記。余裕の文を「正しい照合が余裕の大きい所に集まった」に（上位 10% でも 42.8% は誤り）。
 - Claude のみ: §7.2「R4(4) did (4.5%)」が逆に読める → 「A2 gained on R4(4) (4.5% against 0.35% for A0)」。抄録と序論の探索に R4(4) の 48.2% を戻した（R7 だけを書いていた）。全員の R4(4) の A0 からの利得を main_all.json の `all.strongest["full|R4(4)|1000"]` で確かめた（0.15 ポイント [0.0, 0.40]・下限 0 なので付録 E の「one changes」は正しい）→ 本文と付録 E に添えた。付録 E に移した Inputlog の文の因果を直し、段落を「Formulas of the process measures」に分けた。「with 0.70」の語順・倫理の「as preregistered」の掛かり（登録の文言どおり、停止の条件と待たずに取得することを並べた）・探索の 2.4% の区分・「do not try to undo」→「do not model the suppressed presses」・抄録の 4,992 を戻す・「that differs between them」・「in addition」・「No form drops all times」の理由・区切りの規則に Delete。
 確かめ: 投稿版 エラー 0・未定義 0・overfull 2・31 頁・倫理は p12。プレプリントの版 エラー 0・overfull 0。文体の門 違反 0。本文 10,975 語・抄録 324 語。新しい数値 0.15 [0.0, 0.40] は main_all.json と照らした（生成表には無い・make_tables.py の止める条件の外）。
+
+## 判断 95: attack-me round 5 を 1 回だけ回す・プレプリントは採否まで待つ（研究者・AskUserQuestion 1 回・2 問・2026-11-17）
+
+1. round 5 を 1 回だけ回す（推奨）。理由: round 4 の直しは C2 の言い方という主張に触れるので、直した版を独立に確かめる。minor 以下なら閉じ、major でも直しを 1 回入れて投稿へ進む（round 6 は回さない）。判定の推移は round 1〜4 とも major。
+2. プレプリントは採否まで待つ（推奨）。判断 88 の「投稿と同時に arXiv・OSF・repo（Zenodo）を公開」を改める。理由: PoPETs 2027 の規程（2026-11-17 に原文を取り直した）"While not expressly forbidden, we discourage authors from publicly posting pre-prints of their submissions while under review" と、公開しない共有を勧める文。査読中は OSF の登録を伏せたまま、repo は匿名の複製だけを示す。プレプリントの版の切り替え（OSF と repo のリンク・個人的な連絡の日付）は採否の後に作る。他の選択肢は「判断 88 のまま同時に公開」「Zenodo の制限つきで共有し公開は待つ」。
+
+## 判断 96: attack-me round 5（原稿の全体）への対応（研究者・AskUserQuestion 1 回・3 問・2026-11-17）
+
+記録は `.steering/20261020-public-keystroke-matching-manuscript/attack-me/manuscript-matching/round-5/verdict.md`。判定は minor revision（R1・R2・R3 minor・E 査読に回す・Codex major）。偽陽性 0。判定の推移 major ×4 → minor。判断 95 のとおり round 6 は回さない。
+研究者の選択（3 問とも推奨）:
+1. R1 の major（登録の λ = 4・16 の二次の解析を本計算が R7 で回していない）: 逸脱 D6 として記録し（notes.md）、R7 の λ = 4・16 の値（分析 6・同じ関数・同じ標本と抽出）を登録の二次として §7.2 に、抄録の 14.3% に「51.2% with the registered lighter penalty」を添えた。付録 D の「登録は抑制の下で λ を変えていない」は誤りだったので直した。論文の逸脱は 5 件に。
+2. 倫理の通知（R3 M1）: 出どころを書く理由の文を「処理して記録を公開する側一般が、後の公開がそれを崩しうると知るべき」に直し、主催者へ知らせたかは書かない（判断 91・94 のまま）。
+3. KeyTAR の 1 人を除いた値（R3 m6）: 表から外し、「除いても各セルの差は高々 0.12 ポイント」とだけ書いた（集計で最大 0.114）。倫理の節と open science の「一つの例外」の文を消した。make_tables.py は差の最大が 0.12 を超えたら止まる。⚠️ 論文用 repo を公開するとき、`results/main_a4_without_cpu_writer.json` を入れると差から 1 人の値が出るので、入れない（匿名の複製の段で確かめる）。
+ほかに入れたもの: 要約の「fell as the process measures were lost」（前線の定義から出る・R7 は指標を失わない）をやめ値で、R7(0.5) は「A0 が最も強い攻撃者」（Codex: A0 を含む最大は構造的に非負）。序論の途切れた文（私の round 4 の直しの誤り）。§7.2 の全員の値を C2 の段落の外へ・λ を明記・N = 10 の R4(8) の全員の変化。探索の列挙に R3・R4(1) の 98.5%、前線のうち探索でも主の値の近くに残ったのは R7(0.5) と R4(8) だけ、「largely」を「partly」に。§7.3 に得点との相関のずれの数（R0 から 0.1 以上ずれた指標: R2・R3 で 2・R7(0.25) で 3・R7(0.5) で 4。丸める前の値で数え、make_tables.py が照らして止まる。表の丸めた値で数えると R7(0.25) は 2 になり、検査が拾った）。図 1 の見出しは読み方だけに。§3.5 の未定義の near chance と R3-u・A3 の参照。後の公開の一般化を条件つきに。抽選 1 回に条件づけた区間。§6 に逸脱 5 件を列挙。抄録の "remained with others" → "existed outside the release"、segment values の語を外した。§8.3 の three・探索の値を 1 文に。KeyTAR の既定値の参照を付録 C に。
+採らなかったもの: ENJA の読みの規則を本文に（Codex 6・頁）、方法の細部のさらなる移動（E m5）、抄録の named student の条件（監査 2-C・would で足りる）。
+確かめ: 変異 3 通り（KeyTAR の上限・得点のずれの数 2 通り）でどれも exit 1。生成物は a4-full と a4-windows だけ変わった。投稿版 エラー 0・未定義 0・overfull 2・31 頁・倫理は p12。プレプリントの版 エラー 0・overfull 0。文体の門 違反 0。本文 11,077 語（+102）・抄録 325 語。
