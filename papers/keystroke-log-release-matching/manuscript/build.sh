@@ -67,8 +67,11 @@ if [ -n "$authors" ]; then
   job=main-authors
   source_tex="\\def\\authorfile{$authors}\\input{$here/main.tex}"
 else
-  source_tex="$here/main.tex"
+  source_tex="\\input{$here/main.tex}"
 fi
+# Keep the local paths of included files (such as the licence logo of the template) out of the PDF: pdfTeX writes
+# them as PTEX.FileName, which would show the build directory in the anonymous version.
+source_tex="\\pdfsuppressptexinfo=-1 $source_tex"
 
 latex() {
   if ! pdflatex -no-shell-escape -interaction=nonstopmode -halt-on-error -jobname="$job" -output-directory="$out" \
