@@ -12,7 +12,7 @@ interface S1ProbeCardProps {
 }
 
 /**
- * 段 1 のプローブのカード（3 問を 1 枚: 摩擦・前進・6 択）。
+ * 段 1 のプローブのカード（3 問を 1 枚: 摩擦・前進・7 択・ADR-055）。
  * ★ 判断は backend（どのカードを出すか・`stratum`・窓）。ここは答えを送るだけ。
  * ⚠️ 自由記述を置かない・理由を問わない（ADR-031 D3・data-privacy ルール 7）。
  */
@@ -136,7 +136,7 @@ const S1ProbeCard: React.FC<S1ProbeCardProps> = ({ probeId, onResize, onDone }) 
       <div style={{ fontSize: "0.82rem", marginTop: "0.4rem" }}>Q2. どれだけ前に進んでいる感覚ですか?</div>
       {slider(q2, setQ2, "進んでない", "とても進んだ", "Q2 前進")}
 
-      <div style={{ fontSize: "0.82rem", margin: "0.5rem 0 0.3rem" }}>Q3. 直前の30秒、何をしていましたか?</div>
+      <div style={{ fontSize: "0.82rem", margin: "0.5rem 0 0.3rem" }}>Q3. 直前の30秒、何をしていましたか?（いくつか当てはまるときは、いちばん長かったもの。同時にしていたときは、詰まっていたなら詰まり、そうでなく手が動いていたなら作業）</div>
       <div role="radiogroup" aria-label="Q3 何をしていたか" style={{ display: "grid", gap: "0.25rem" }}>
         {ACTIVITY_CHOICES.map((c) => (
           <label

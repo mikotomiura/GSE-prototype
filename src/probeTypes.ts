@@ -51,18 +51,20 @@ export interface S1ModeDto {
   consent: boolean;
 }
 
-/** 6 択の値（backend `logger::ActivityCategory` と同じ・ADR-031 D3 の固定 6 択）。 */
+/** 7 択の値（backend `logger::ActivityCategory` と同じ・ADR-031 D3 と ADR-055 の固定 7 択）。 */
 export type ActivityCategory =
   | "deliberating"
   | "stuck"
   | "external_material"
   | "conversation"
   | "away"
+  | "working"
   | "cannot_answer";
 
 /**
- * 6 択の表示の文（ADR-031 の「熟考・詰まり・外部資料・会話・離席・回答不能」と
- * `logger::ActivityCategory` の doc）。⚠️ 選択肢を足さない・自由記述を置かない（data-privacy ルール 7）。
+ * 7 択の表示の文（ADR-031 の「熟考・詰まり・外部資料・会話・離席・回答不能」に ADR-055 が「作業」を
+ * 足した。`logger::ActivityCategory` の doc）。並びは ADR-055 D3（既存 5 つの位置と、回答不能が最後を保つ）。
+ * ⚠️ 選択肢を足すには別 ADR が要る・自由記述を置かない（data-privacy ルール 7）。
  */
 export const ACTIVITY_CHOICES: ReadonlyArray<{
   value: ActivityCategory;
@@ -74,5 +76,7 @@ export const ACTIVITY_CHOICES: ReadonlyArray<{
   { value: "external_material", label: "外部資料", note: "本・書類・画面などを読んでいた" },
   { value: "conversation", label: "会話", note: "会話・通話・打ち合わせをしていた" },
   { value: "away", label: "離席", note: "その場を離れていた" },
+  { value: "working", label: "作業", note: "手を動かして作業を進めていた。入力・編集・単純作業を含む" },
+  // ↑ カードは説明を（）で包むので、括弧を二重にしない（同意文書とフォームは「〜（入力・編集・単純作業を含む）」）。
   { value: "cannot_answer", label: "回答不能", note: "思い出せない・当てはまらない" },
 ];
