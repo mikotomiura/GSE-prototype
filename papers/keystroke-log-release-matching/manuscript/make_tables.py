@@ -448,18 +448,33 @@ def stronger_attacker_tables(whole, lam, scan):
             raise SystemExit("exploratory_lambda/scan.json: a cell has another number of writers or failed resamples")
     every = {**mc, **lc, **sc}
     st = scan["strongest"]
+    if set(st) != {f"full|{f}|{n}" for f in EXPLORE_FORMS for n in ("10", "1000")}:
+        raise SystemExit("exploratory_scan.json: the pairs of form and N differ from the text")
     for k, v in st.items():
         _, f, n = k.split("|")
-        accs = {a: every[f"full|{f}|{a}|{n}"]["acc"] for a in scan["strongest_attackers"]
-                if f"full|{f}|{a}|{n}" in every}
+        # The candidates are built here, not read from the file: the main candidates of main.json, and the variants
+        # with lambda other than 8 (lambda 8 is the main attacker itself) on the forms each runs on.
+        expected = set(m["strongest"][k]["share_selected"]) | \
+            {f"A2scan.lam{la}" for la in LAMS} | {f"A2.lam{la}" for la in LAMS if la != 8} | \
+            ({f"A1p.lam{la}" for la in LAMS if la != 8} if f in A1P_FORMS else set())
+        if set(v["share_selected"]) != expected or any(f"full|{f}|{a}|{n}" not in every for a in expected):
+            raise SystemExit(f"exploratory_scan.json: the candidates at {k} differ from the expected ones")
+        accs = {a: every[f"full|{f}|{a}|{n}"]["acc"] for a in expected}
         if v["acc"] != max(accs.values()) or accs[v["attacker"]] != v["acc"] or lam["strongest"][k]["acc"] > v["acc"]:
             raise SystemExit(f"exploratory_scan.json: the strongest attacker at {k} is not the maximum")
+        if abs(v["diff_to_main"] - (v["acc"] - v["main_strongest"]["acc"])) > 1e-6 or \
+                abs(v["x_chance"] - v["acc"] * int(n)) > 1e-6 * int(n):
+            raise SystemExit(f"exploratory_scan.json: the difference or the multiple of 1/N at {k} is inconsistent")
     rose = {f for f in EXPLORE_FORMS if st[f"full|{f}|1000"]["diff_to_main_ci"][0] > 0}
     if rose != set(EXPLORE_FORMS) - {"R7(0.5)"} or \
             {st[f"full|R7(0.5)|{n}"]["attacker"] for n in ("10", "1000")} != {"A0"}:
         raise SystemExit(f"the forms above the main strongest attacker differ from the text: {sorted(rose)}")
     if min(st[f"full|{f}|1000"]["x_chance"] for f in EXPLORE_FORMS) <= 4:
         raise SystemExit("a form stayed within four times 1/N, unlike the text")
+    if {f for f in EXPLORE_FORMS if f != "R3" and st[f"full|{f}|1000"]["acc"] < 0.40} != {"R4(8)", "R7(0.5)"}:
+        raise SystemExit("the coarse forms below 40% at N = 1,000 differ from the text (Section 8.3)")
+    # The one win with lambda = 16 (R4(8), N = 1,000) is a near tie among the lambdas of A2-scan (2.3% to 2.4%); a
+    # change in how ties are broken would stop here, and the sentence of Appendix D would need checking.
     won = [v["attacker"].split(".lam")[1] for v in st.values() if ".lam" in v["attacker"]]
     if sorted(won) != ["16"] + ["2"] * 13:
         raise SystemExit(f"the lambdas of the exploratory winners differ from the text: {sorted(won)}")

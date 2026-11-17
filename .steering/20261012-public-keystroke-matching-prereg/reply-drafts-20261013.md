@@ -219,3 +219,23 @@ Thank you again for your help.
 
 Best regards,
 Mikoto
+
+## 8. Dr. Tian へ、補足の解析を入れた新しい版を送る（2026-11-17 に下書き・判断 93・送るのは研究者）
+
+2026-11-12 に「補足の解析が入ったら新しい版を送る」と約束した分。同じスレッドに返す。宛先は Dr. Tian だけ。添付はプレプリントの版の PDF（`build-preprint.sh` で作る。cross-review の直しの後の版。SHA-256 は送る版で取り直す）。
+送る前に確かめること: 11/14 の返信（personal communication の段落を残すが、望まなければ外す）に Dr. Tian から返事が来ていれば、その中身に合わせる（外してほしいと言われていれば、その段落と謝辞を直してから送る）。
+
+**Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
+
+Hi Yu,
+
+As I mentioned on 12 November, I have now added the supplementary analyses to the paper, and I attach the updated version.
+
+What is new: after seeing the main results, we tried stronger attackers on the coarser forms of processing (a lighter alignment penalty, and an attacker that aligns parts of a log anywhere in a text). They matched far more than the attackers of the preregistered analysis, so the paper now says that coarsening and suppression protect less than the main results alone suggested. These analyses are reported as exploratory, in Appendix D, with one sentence in the abstract, the results and the discussion.
+
+Since the version of 12 November, and following your reply, the passages about our correspondence have changed only as follows: the ethics section now says that you read a draft and raised no objection to these passages; Section 3.1 names the organisers of the competition; and the MIT License is cited from the KLiCKe repository rather than as a personal communication. I have also added a short acknowledgement thanking you for answering my questions and for reading a draft. If you would prefer not to be named there, or would like any of these passages worded differently, please let me know.
+
+Thank you again for your help.
+
+Best regards,
+Mikoto
