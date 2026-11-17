@@ -235,6 +235,8 @@ What is new: after seeing the main results, we tried stronger attackers on the c
 
 Since the version of 12 November, and following your reply, the passages about our correspondence have changed only as follows: the ethics section now says that you read a draft and raised no objection to these passages, and that I wrote to you a few hours before acquiring the data and you replied the next day, before the main computation; the reason given for reporting where the competition data come from now reads that parties that release logs with processing should know that a later release of the same texts can undo processing such as the masking; Section 3.1 names the organisers of the competition; and the MIT License is cited from the KLiCKe repository rather than as a personal communication. As you kindly agreed, I have also added a short acknowledgement thanking you for answering my questions and for reading a draft.
 
+I submitted this version to the Proceedings on Privacy Enhancing Technologies (2027, Issue 3) on 18 November. As the review is double-blind, I would be grateful if you could keep the draft confidential until the decision, which is expected in early February. If you notice anything that should be corrected, I can still revise the submission until 30 November.
+
 Thank you again for your help and for your good wishes.
 
 Best regards,
