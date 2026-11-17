@@ -1,5 +1,7 @@
 # 次のセッション（Mac）: 照合の論文 —— 探索的な分析 6・7 の結果を原稿に入れる
 
+**使用済み（2026-11-17）**: 分析 6・7 を原稿に入れた（判断 93・`37474346`・cross-review の直し `bf0d2450`）。送り状は reply-drafts-20261013.md の下書き 8。残りは `next-session-public-keystroke-matching-pre-submission.md` に移した。
+
 作成 2026-11-12（判断 90 の後・旧 `next-session-public-keystroke-matching-manuscript-exploratory-6-7-and-tian.md` から分けた）。この機械は Mac。G-GEAR の作業（分析 6・7 の計算）はこのセッションでしない。Dr. Tian の返事は 2026-11-14 に別の引き継ぎ（`next-session-public-keystroke-matching-tian-reply.md`・使用済み）で反映した（判断 91）。
 
 ## 新しいセッションで最初に打ち込む文
