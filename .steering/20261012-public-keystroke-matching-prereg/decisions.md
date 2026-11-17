@@ -896,3 +896,7 @@ metadata（研究者が選んだもの）: Topics は Information leakage, side-
 ## 判断 98 の追記: 提出（2026-11-18）
 
 研究者が ready for review に印を付けて提出した（2026-11-18 00:38 JST ごろに確認）。#55 のページは「This submission is ready for review. You do not need to take further action」と表示し、PDF は `26c50fc4` のまま。締切（2026-12-01 06:59:59 EST）までは変更できる。投稿と同時の公開はしない（判断 95）。attack-me の `round-*/tmp/`（git の外・105 ファイル・7 か所）を消した。プレプリントの版の切り替えは採否の後（判断 95）。Dr. Tian への下書き 8 は未送付（送るのは研究者）。
+
+## 判断 98 の追記 2: Dr. Tian へ下書き 8 を送った（2026-11-18）
+
+研究者が 2026-11-18 に下書き 8（研究者の構成で短くした版・`reply-drafts-20261013.md` §8）を Dr. Tian に送った（G-GEAR のセッションで研究者が「送りました」と伝えた）。添付した PDF の SHA-256 は記録が無い（下書き 8 の指示はプレプリントの版を送る版で取り直すこと）。採否（2 月上旬）まで草稿を伏せるよう頼んだ。次は Dr. Tian の返事を待つ。The Learning Agency Lab への知らせ（下書き 5）は判断 91 でやめている。
