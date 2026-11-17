@@ -11,10 +11,12 @@
 - [x] 事前登録の草案
 - [x] data-privacy ルール 7・glossary・設計地図
 - [x] cargo test・clippy・tsc・gse-replay の golden
-- [ ] gse-dataset との parity（差は `working` の 1 項目だけと確かめた。gse-dataset 側の更新は研究者に確かめてから）
+- [x] gse-dataset との parity（gse-dataset の枝 chore/schema-q3-working で OK・gse-dataset PR #10）
 - [x] /cross-review 1 巡目（Codex を含む・判断 10）
 - [x] /cross-review 2 巡目（判断 11・12）
-- [ ] push と PR を研究者に確かめる
+- [x] push と PR（研究者に確かめた・GSE-prototype PR #426）
+- [ ] CI を見て merge（研究者に確かめてから・gse-dataset #10 と並べて）
+- [ ] 研究者が同意文書を承認して印を入れ直し、ADR-055 を Accepted にする
 
 ## 場面ごとの対応
 
