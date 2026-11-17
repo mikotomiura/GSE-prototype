@@ -24,7 +24,7 @@
    - 公開 repo に `.steering` と GSE の docs を入れない（memory）。打鍵の記録・本文・書き手ごとの値も入れない（判断 88）。中身は SHA-256 で照合する。
    - 匿名の複製に著者の名前・所属・GitHub のアカウント名が出ないことを確かめる（コミットの作者・LICENSE の著作権者・README）。
 2. **Dr. Tian へ送る**: 送り状の下書き（`.steering/20261012-public-keystroke-matching-prereg/reply-drafts-20261013.md`）を最新の版に合わせ、プレプリントの版の PDF を作る。送るのは研究者。
-3. **投稿**（研究者が HotCRP で押す）: 前に投稿版の PDF を研究者に見てもらう（memory「投稿の Submit の前に校正刷りを見てもらう」）。metadata の抄録は LaTeX のコマンドなし。投稿と同時の公開はしない（判断 95）。
+3. **投稿**（研究者が PoPETs の投稿サイト submit.petsymposium.org で押す。サイトは HotCRP で動いている。2026-11-17 にトップは "PoPETs 2027.2" だったので、Issue 3 のページが開いているかを先に確かめる）: 前に投稿版の PDF を研究者に見てもらう（memory「投稿の Submit の前に校正刷りを見てもらう」）。metadata の抄録は LaTeX のコマンドなし。投稿と同時の公開はしない（判断 95）。
 4. attack-me の `round-*/tmp/`（接地の本文・git に入らない）を消す。
 
 ## 守ること
