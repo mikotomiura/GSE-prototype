@@ -16,6 +16,13 @@ in the terms of Table~\ref{tab:forms}, are:
     Position and word count: as is. Times: as is.
 \end{itemize}
 
+\paragraph{The forms in the terms of statistical disclosure control.}
+% Moved from Section 8.3 of the main body on 17 November 2026, without change.
+In the terms of statistical disclosure control~\cite{hundepool2026handbook}, R1 to R3-u recode the keys globally (R2 to
+R3-u also drop columns), and R3-t recodes the press times globally. R4 releases only a variable derived from each log,
+recoded globally when $w > 1$. R7 suppresses presses at random, not, as local suppression does, where a combination of
+values is unsafe. R5 and R6 perturb the keys.
+
 \paragraph{Formulas of the process measures.}
 % Moved from Section 6 of the main body on 17 November 2026, without change of procedure.
 The KLiCKe paper gives no operational definition of the ``task maximum'' to which the production rate is related; we
@@ -53,7 +60,8 @@ the main body on 24 October 2026, without change.
 
 \paragraph{Secondary quantities.}
 We also report the rank of the true text (top-5 accuracy and mean reciprocal rank); the distribution of accuracy per
-writer, at its 10th, 50th and 90th percentiles; A2 with $\lambda = 4$ and $16$ ($N = 1{,}000$, full text); accuracy
+writer, at its 10th, 50th and 90th percentiles; A2 with $\lambda = 4$ and $16$ ($N = 1{,}000$, full text; on R7 computed after the main results, a deviation,
+Table~\ref{tab:app:lambda-1000}); accuracy
 separately for writers whose rebuilt draft matches the distributed text and writers whose draft does not; and the
 numbers of candidates without an alignment path.
 
@@ -67,7 +75,7 @@ reported in Table~\ref{tab:main} are not repeated for the strongest attacker.
   \caption{Every attacker on full texts, 500 writers, at $N = 10$, $100$ and $1{,}000$: forms R0 to R3-t. On R3-u,
   A3 (mean) and A3 (sum) are the two versions of the timing term and A3 (length) the length term alone; the better
   version, A3 (mean), is the one in Table~\ref{tab:main}. A2 with $\lambda = 4$ and $16$ is the secondary analysis of the
-  penalty.}
+  penalty; its values on R7 are in Table~\ref{tab:app:lambda-1000}.}
   \label{tab:app:cells}
   \small
   \begin{tabular}{llrrr}

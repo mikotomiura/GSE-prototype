@@ -836,3 +836,13 @@ Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LL
 ほかに入れたもの: 要約の「fell as the process measures were lost」（前線の定義から出る・R7 は指標を失わない）をやめ値で、R7(0.5) は「A0 が最も強い攻撃者」（Codex: A0 を含む最大は構造的に非負）。序論の途切れた文（私の round 4 の直しの誤り）。§7.2 の全員の値を C2 の段落の外へ・λ を明記・N = 10 の R4(8) の全員の変化。探索の列挙に R3・R4(1) の 98.5%、前線のうち探索でも主の値の近くに残ったのは R7(0.5) と R4(8) だけ、「largely」を「partly」に。§7.3 に得点との相関のずれの数（R0 から 0.1 以上ずれた指標: R2・R3 で 2・R7(0.25) で 3・R7(0.5) で 4。丸める前の値で数え、make_tables.py が照らして止まる。表の丸めた値で数えると R7(0.25) は 2 になり、検査が拾った）。図 1 の見出しは読み方だけに。§3.5 の未定義の near chance と R3-u・A3 の参照。後の公開の一般化を条件つきに。抽選 1 回に条件づけた区間。§6 に逸脱 5 件を列挙。抄録の "remained with others" → "existed outside the release"、segment values の語を外した。§8.3 の three・探索の値を 1 文に。KeyTAR の既定値の参照を付録 C に。
 採らなかったもの: ENJA の読みの規則を本文に（Codex 6・頁）、方法の細部のさらなる移動（E m5）、抄録の named student の条件（監査 2-C・would で足りる）。
 確かめ: 変異 3 通り（KeyTAR の上限・得点のずれの数 2 通り）でどれも exit 1。生成物は a4-full と a4-windows だけ変わった。投稿版 エラー 0・未定義 0・overfull 2・31 頁・倫理は p12。プレプリントの版 エラー 0・overfull 0。文体の門 違反 0。本文 11,077 語（+102）・抄録 325 語。
+
+## 判断 96 の追記: /cross-review（2026-11-17）
+
+範囲は `b5493db2..ebfff80e -- papers`。Codex（run-codex-review.sh・本線から・rc 0）と Claude（code-reviewer）。一次で確かめ、全部採った:
+- 両者一致: 私が足した「no form that computes process measures brought matching below what the total length alone gave」は、最も強い攻撃者が A0 を含む最大なので定義から常に成り立つ（round 5 で外した型と同じ）。→「about 2.2% or more, about 22 times chance」に（R7(0.5) は 21.9 倍）。§3.5 も同じ。make_tables.py の新しい検査が欠損・非有限・境界を見逃す → 欠損と非有限で止め、0.1 の境目（±1e-6）で止め、「0.1 を超える」で数える。本文も「by more than 0.1」。
+- Codex のみ: 公開物で 1 人の値が戻る道（`main_a4_without_cpu_writer.json` を公開すると差から出る）→ 本 repo は private。論文用 repo を公開する段でこのファイルを入れない（判断 96 に書いた）。
+- Claude のみ: §7.2 の「A2 gained on R4(4) and R7(0.25)」は R7(0.25) が主の解析で既に A0 を超えているので論理が合わない → R4(4) だけ。「R7(0.5) and R4(8) stayed near their main values」は R4(8) が 0.14 → 2.4 で偽 → 値で。抄録の「outperformed on both counts」は図の支配の定義とずれ、「In the main analysis」が落ちていた → 戻した。登録の二次の R7 の値に「computed after the main results」を抄録・序論・考察に。付録 D の A1′ の λ ≠ 8 は登録の外。付録 E の副次の量と表の注に R7 の行き先。§7.2 の段落の順（主の R7 を先に）と全員の文の「in the main analysis」を外した。「partly」→「largely（差 48〜88 ポイント）」。KeyTAR の検査に人数の陽性対照（除いた版は 499）と群の一致を戻した。倫理の「can undo it」→「can undo processing such as the masking」。考察の as 節。抄録の用語を segment values に戻した。98.5% に区間。§6 の「None of the first four … the fifth added values computed after the main results」。付録 B のコメントに D5 が論文の逸脱でない理由。
+頁: 直した後に本文が 13 頁目にあふれたので、§8.3 の統計的開示制御の対応づけを付録 E へ移し（本文は参照 1 文）、§8.1 の Inputlog の重複を 1 句にまとめた。
+確かめ: make_tables.py は生成物を変えず exit 0、変異（人数の対照）で exit 1。投稿版 エラー 0・overfull 2・31 頁・倫理は p12（12 頁目を画像で見た）。プレプリントの版 エラー 0・overfull 0。文体の門 違反 0。本文 11,054 語・抄録 335 語。
+attack-me はここで閉じる（判断 95）。tmp/ は匿名の複製の段の後に消す。

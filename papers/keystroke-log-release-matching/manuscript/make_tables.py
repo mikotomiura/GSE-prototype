@@ -10,6 +10,7 @@ into <output dir> (sections/generated). The tables are included by the sections;
 Accuracies are printed in percent.
 """
 import json
+import math
 import os
 import sys
 
@@ -194,8 +195,16 @@ def a4_tables(ref, ref_wo):
     not tabulated (their difference would give one writer's values); only their largest change is checked."""
     if set(ref) != set(ref_wo):
         raise SystemExit("the cells of main_a4_without_cpu_writer.json differ from reference_A4 of main_a4.json")
-    diffs = [abs(ref[k]["acc"] - ref_wo[k]["acc"]) * 100 for k in ref
-             if isinstance(ref[k], dict) and ref[k].get("acc") is not None]
+    diffs = []
+    for k in ref:
+        a, b = ref[k].get("acc") if isinstance(ref[k], dict) else None, ref_wo[k].get("acc") if isinstance(ref_wo[k], dict) else None
+        if a is None or b is None or not (math.isfinite(a) and math.isfinite(b)):
+            raise SystemExit(f"KeyTAR cell {k} has no finite accuracy with or without the CPU writer")
+        diffs.append(abs(a - b) * 100)
+    for name, fs in A4_GROUPS:  # the group check and a control that the second file lacks exactly one writer
+        w, w_wo = a4_cell(ref, "full", fs, "1000")["writers"], a4_cell(ref_wo, "full", fs, "1000")["writers"]
+        if w_wo != w - 1:
+            raise SystemExit(f"KeyTAR without the CPU writer has {w_wo} writers on {name}, not {w - 1}")
     if not diffs or max(diffs) > A4_WITHOUT_MAX_POINTS:
         raise SystemExit(f"KeyTAR without the CPU writer changed an accuracy by more than {A4_WITHOUT_MAX_POINTS} points")
     full, win = [], []
@@ -221,8 +230,13 @@ def check_score_shift(m):
         n = 0
         for mk, _ in MEASURES:
             a, b = u[f"{mk}|R0"]["spearman_score"], u[f"{mk}|{f}"]["spearman_score"]
-            if a and b and a.get("mean") is not None and b.get("mean") is not None:
-                n += abs(b["mean"] - a["mean"]) >= 0.1
+            if not (a and b and a.get("mean") is not None and b.get("mean") is not None
+                    and math.isfinite(a["mean"]) and math.isfinite(b["mean"])):
+                raise SystemExit(f"score correlation of {mk} missing on R0 or {f}")
+            d = abs(b["mean"] - a["mean"])
+            if abs(d - 0.1) < 1e-6:
+                raise SystemExit(f"score shift of {mk} on {f} is at the 0.1 boundary; the count is not robust")
+            n += d > 0.1
         if n != stated:
             raise SystemExit(f"score shift on {f}: {n} measures, the text states {stated}")
 
