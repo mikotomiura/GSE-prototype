@@ -1,35 +1,19 @@
 # 設計
 
-## 実装アプローチ
+## アプローチ
 
-採用する方針と、その理由。
+`/literature-review` の 1 ラウンド。下位の問い 1〜4（引き継ぎの案のまま）を、問いごとに 2 本（うち 1 本は反証の向き）の angle に分け、Sonnet のサブエージェント 8 本を並列で回す（入れ子なし・各 25 分）。共通の依頼文は scratchpad の common-brief.md に置き、登録済みの照合は main と未マージの各枝の references.md を書き出して grep させた。
+
+メインは、サブエージェントが保存した全文のテキストで逐語を照合し、書誌を Crossref・DataCite・arXiv で確かめてから採番した。3 票はメインが 3 つの視点（内的妥当性 / GSE への外挿 / 網の粗さ）で付けた（S-3C と同じ逸脱）。
 
 ## 変更対象
 
-### 修正するファイル
-- `path/to/file1.rs` — 何を変えるか
-- `path/to/file2.rs` — 何を変えるか
+- docs/literature/20261117-expression-audit-precedent.md（新規・カード 4）
+- docs/references.md（P555〜P585 を append）
+- docs/literature/_index.md（1 行）
+- 議題 1b（`.steering/_handoff/next-session-gse-research-meta-after-run1.md`・本線のチェックアウトの未追跡のファイル）に 1 段落
 
-### 新規作成するファイル
-- `path/to/new_file.rs` — 役割
+## 検証
 
-### 削除するファイル
-- ...
-
-## 影響範囲
-
-この変更が影響する箇所と、その対処。
-
-## 既存パターンとの整合性
-
-既存のコードベースのどのパターンに従うか。
-
-## テスト戦略
-
-- 単体テスト: 何をテストするか
-- 統合テスト: 何をテストするか
-- E2E テスト: 必要か
-
-## ロールバック計画
-
-変更が問題を起こした場合の戻し方。
+- scripts/check_citations.py が「違反なし」
+- /cross-review（Codex には設計の抜粋と文献の書誌だけを送る）
