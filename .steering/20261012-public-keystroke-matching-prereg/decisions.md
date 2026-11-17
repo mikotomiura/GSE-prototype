@@ -797,3 +797,7 @@ Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LL
 - 採らなかったもの: R7(0.5) の差の区間 [0.0, 0.0]（Codex・再標本の約 2% だけが探索側なので 97.5 百分位は 0 で整合）。謝辞の名前（Claude）は送り状で Dr. Tian に可否を問う。
 確かめ: 新しい変異 5 通り（セルの欠け・候補の欠け・差・倍数・40% 未満）と前の 12 通りがどれも exit 1、正しい写しは exit 0 で生成物は変わらない。投稿版エラー 0・未定義 0・overfull 2・31 頁・本文は p12 右段。プレプリントの版エラー 0・overfull 0。文体の門 違反 0。
 送る PDF: `~/Downloads/keystroke-log-release-matching-draft-20261117.pdf`（プレプリントの版・SHA-256 `c1343059396f259374b5301971ab3add8642ab23e0c18845c5448514e87bb4c3`）。送り状は reply-drafts-20261013.md の下書き 8。
+
+## 判断 93 の追記 2: Dr. Tian の返事（2026-11-17）
+
+11/14 の返信への返事（研究者が会話に貼った。逐語の要旨）: "I am comfortable with you reporting both points as personal communications from me, and I appreciate your offer to acknowledge my assistance." 更新版を送ってよい。→ 倫理の節の personal communication の 2 点（IRB と同意・競技会のデータの出どころ）と、プレプリントの版の謝辞はそのまま。原稿は変えない。下書き 8 から名前の可否を問う文を外し、同意へのお礼にした。送るのは研究者（PDF は判断 93 の追記のもの）。
