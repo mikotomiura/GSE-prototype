@@ -227,17 +227,21 @@ Mikoto
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
 
+（2026-11-18 に研究者の指示で短くした。構成は研究者の案: 残りの分析を入れて完成 → 主な変更 → 提出と伏せるお願い → お礼と自己紹介・今後）
+
 Hi Yu,
 
-As I mentioned on 12 November, I have now added the supplementary analyses to the paper, and I attach the updated version.
+I have finished the paper, now including the remaining analyses, and I attach the final version. The main changes since 12 November:
 
-What is new: after seeing the main results, we tried stronger attackers on the coarser forms of processing (a lighter alignment penalty, and an attacker that aligns parts of a log anywhere in a text). They matched far more than the attackers of the preregistered analysis, so the paper now says that coarsening and suppression protect less than the main results alone suggested. These analyses are reported as exploratory, in Appendix D, with one sentence in the abstract, the results and the discussion. While revising, I also found that the main computation had not run one registered secondary analysis (the lighter penalty for the suppression forms); its values are now reported, computed after the main results, and the omission is listed as a fifth deviation from the preregistration.
+- Stronger attackers tried after the main results (Appendix D, reported as exploratory) matched far more on the coarser forms, so the paper now says those forms protect less than the main results alone suggest.
+- One registered secondary analysis that had not been run is now reported and listed as a deviation.
+- As you agreed, the ethics section notes that you read a draft, and I added a short acknowledgement.
 
-Since the version of 12 November, and following your reply, the passages about our correspondence have changed only as follows: the ethics section now says that you read a draft and raised no objection to these passages, and that I wrote to you a few hours before acquiring the data and you replied the next day, before the main computation; the reason given for reporting where the competition data come from now reads that parties that release logs with processing should know that a later release of the same texts can undo processing such as the masking; Section 3.1 names the organisers of the competition; and the MIT License is cited from the KLiCKe repository rather than as a personal communication. As you kindly agreed, I have also added a short acknowledgement thanking you for answering my questions and for reading a draft.
+I submitted it to PoPETs (2027, Issue 3) on 18 November. As the review is double-blind, I would be grateful if you could keep the draft confidential until the decision in early February.
 
-I submitted this version to the Proceedings on Privacy Enhancing Technologies (2027, Issue 3) on 18 November. As the review is double-blind, I would be grateful if you could keep the draft confidential until the decision, which is expected in early February. If you notice anything that should be corrected, I can still revise the submission until 30 November.
+Thank you so much for taking the time to help a beginner like me. I am actually 18 and in my first year of research, working as an independent researcher, and I could not have done this study on my own. I plan to continue working on keystroke research, so I would be very happy if we had a chance to collaborate someday, and to stay in touch.
 
-Thank you again for your help and for your good wishes.
+Thank you again.
 
 Best regards,
 Mikoto
