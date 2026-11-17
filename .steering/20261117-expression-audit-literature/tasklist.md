@@ -11,4 +11,4 @@
 - [x] check_citations.py が違反なし
 - [x] コミット（1 ラウンド 1 コミット）
 - [x] /cross-review（Codex を含む・判断 4）
-- [ ] push と PR を研究者に確かめる
+- [x] push と PR を研究者に確かめる（push だけ・PR はメタな整理の後）
