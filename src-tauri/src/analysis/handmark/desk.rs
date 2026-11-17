@@ -40,7 +40,9 @@ pub type Result<T> = std::result::Result<T, String>;
 
 /// 道具の版（表のヘッダに書く）。窓・特徴・対象の規則を変えたら上げる。
 /// hm-desk-2（2026-11-16）: 感度分析の日（conditions.md C7）の印 `sens` と要約を足した。主の窓・特徴・対象は変えていない。
-pub const DESK_VERSION: &str = "hm-desk-2";
+/// hm-desk-3（2026-11-17）: 再起動のときの `session_end` の遅れによる記録の重なりを解く（[`resolve_overlaps`]）。
+/// 使う行が重ならない記録だけ終わりを切る。窓の定義・特徴・対象は変えていない。
+pub const DESK_VERSION: &str = "hm-desk-3";
 /// 窓の長さ（ADR-051 D3）。
 pub const WINDOW_MS: u64 = 30_000;
 /// 区間の始まりから捨てる長さ（状態が 0 から立ち上がる間）。
@@ -143,6 +145,9 @@ pub struct DeskFile {
     pub session_start: u64,
     /// 記録の終わり（`meta.session_end` か、時刻を持つ行の最大）。
     pub end: u64,
+    /// この道具が使う行（`key`・`pointer_bin`・`feat`・`recording_pause`・`handmark_day`）と
+    /// `session_start` の時刻の最大。`session_end` は含めない（[`resolve_overlaps`] が使う）。
+    pub last_event: u64,
     pub hmm_version: Option<String>,
     /// `key` 行で `press = true` の時刻（昇順）。
     pub presses: Vec<u64>,
@@ -359,6 +364,7 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
         }
     }
     f.session_start = start.ok_or_else(|| format!("{name}: meta.session_start が無い"))?;
+    f.last_event = max_t.max(f.session_start);
     f.end = session_end.unwrap_or(max_t).max(f.session_start);
     if f.end - f.session_start > MAX_FILE_SPAN_MS {
         return Err(format!(
@@ -385,6 +391,39 @@ pub fn parse_file(name: &str, text: &str) -> Result<DeskFile> {
         f.pauses.push((a, f.end.max(a)));
     }
     Ok(f)
+}
+
+/// 時刻の順に並べた記録の、隣どうしの重なりを解く。返り値は終わりを切った記録の数。
+///
+/// アプリを再起動すると、前の記録の `session_end` が次の記録の `session_start` より少し後に書かれることが
+/// ある（段 1 の記録で 1 ms〜3 秒・`.steering/20261117-stage1-self-run1/decisions.md` 判断 1）。前の記録の
+/// 使う行が次の記録の始まりより前に終わっているときだけ、前の記録の終わり（と開いたままの一時停止）を次の
+/// 始まりで切る。使う行が次の始まり以後にもあれば（始まりと同じ ms の行を含む）、本当に重なっているので止める
+/// （fail-closed）。切る幅に上限は置かない（使う行が重ならない限り窓の中身は変わらないため。幅の上限は
+/// `MAX_FILE_SPAN_MS` だけ）。重なりの判定は `end` と `last_event` の遅い方で見る（`session_end` が行より前に
+/// 書かれた記録でも、行の重なりを見逃さない）。
+pub fn resolve_overlaps(files: &mut [DeskFile]) -> Result<usize> {
+    let mut clamped = 0;
+    for i in 1..files.len() {
+        let next_start = files[i].session_start;
+        let prev = &mut files[i - 1];
+        if next_start >= prev.end.max(prev.last_event) {
+            continue;
+        }
+        if prev.last_event >= next_start {
+            return Err(format!(
+                "inputs #{} and #{} (in time order) overlap",
+                i,
+                i + 1
+            ));
+        }
+        prev.end = next_start;
+        for p in &mut prev.pauses {
+            p.1 = p.1.min(next_start).max(p.0);
+        }
+        clamped += 1;
+    }
+    Ok(clamped)
 }
 
 /// 日 `day` の始まり（UTC の ms）。`local_day(day_start(d)) == d`。
@@ -1113,6 +1152,124 @@ mod tests {
             end,
             ..DeskFile::default()
         }
+    }
+
+    fn file_ev(start: u64, last_event: u64, end: u64) -> DeskFile {
+        DeskFile {
+            last_event,
+            ..file(start, end)
+        }
+    }
+
+    #[test]
+    fn resolve_overlaps_clamps_only_a_late_session_end() {
+        // 前の記録の行は 5_000 で終わり、session_end（12_000）だけが次の始まり（10_000）より後
+        let mut fs = vec![
+            file_ev(1_000, 5_000, 12_000),
+            file_ev(10_000, 20_000, 20_000),
+        ];
+        fs[0].pauses = vec![(4_000, 12_000)];
+        assert_eq!(resolve_overlaps(&mut fs), Ok(1));
+        assert_eq!(fs[0].end, 10_000);
+        assert_eq!(fs[0].pauses, vec![(4_000, 10_000)]);
+        assert_eq!(fs[1].end, 20_000);
+    }
+
+    #[test]
+    fn resolve_overlaps_stops_when_rows_overlap() {
+        // 前の記録に次の始まり以後の行がある（本当の重なり）。始まりちょうどの行も重なりとみなす
+        for last in [10_000, 11_000] {
+            let mut fs = vec![
+                file_ev(1_000, last, 12_000),
+                file_ev(10_000, 20_000, 20_000),
+            ];
+            assert!(resolve_overlaps(&mut fs).is_err(), "last_event {last}");
+            assert_eq!(fs[0].end, 12_000);
+        }
+    }
+
+    #[test]
+    fn resolve_overlaps_catches_rows_after_an_early_session_end() {
+        // session_end（8_000）が行（15_000）より前に書かれた記録: end だけ見ると重ならないが行は重なる
+        let mut fs = vec![
+            file_ev(1_000, 15_000, 8_000),
+            file_ev(10_000, 20_000, 20_000),
+        ];
+        assert!(resolve_overlaps(&mut fs).is_err());
+    }
+
+    #[test]
+    fn resolve_overlaps_handles_a_chain_of_three() {
+        let mut fs = vec![
+            file_ev(1_000, 5_000, 10_500),
+            file_ev(10_000, 12_000, 20_300),
+            file_ev(20_000, 25_000, 25_000),
+        ];
+        assert_eq!(resolve_overlaps(&mut fs), Ok(2));
+        assert_eq!(fs[0].end, 10_000);
+        assert_eq!(fs[1].end, 20_000);
+        assert!(fs.windows(2).all(|w| w[0].end <= w[1].session_start));
+    }
+
+    #[test]
+    fn resolve_overlaps_leaves_disjoint_files() {
+        let mut fs = vec![
+            file_ev(1_000, 5_000, 10_000),
+            file_ev(10_000, 20_000, 20_000),
+        ];
+        assert_eq!(resolve_overlaps(&mut fs), Ok(0));
+        assert_eq!(fs[0].end, 10_000);
+    }
+
+    #[test]
+    fn parse_file_last_event_ignores_session_end() {
+        let t = 1_800_000_000_000u64;
+        let text = format!(
+            "{{\"type\":\"meta\",\"session_start\":{t}}}\n{{\"type\":\"key\",\"t\":{},\"press\":true}}\n{{\"type\":\"meta\",\"session_end\":{}}}",
+            t + 1_000,
+            t + 9_000
+        );
+        let f = parse_file("x", &text).unwrap();
+        assert_eq!(f.last_event, t + 1_000);
+        assert_eq!(f.end, t + 9_000);
+    }
+
+    #[test]
+    fn parse_file_last_event_counts_every_used_row_type() {
+        let t = 1_800_000_000_000u64;
+        let rows = [
+            format!("{{\"type\":\"key\",\"t\":{},\"press\":true}}", t + 7_000),
+            format!(
+                "{{\"type\":\"pointer_bin\",\"t\":{},\"moved\":1,\"buttons\":0,\"wheel\":0}}",
+                t + 7_000
+            ),
+            format!(
+                "{{\"type\":\"feat\",\"t\":{},\"p_flow\":0.2,\"p_inc\":0.3,\"p_stuck\":0.5}}",
+                t + 7_000
+            ),
+            format!(
+                "{{\"type\":\"recording_pause\",\"t\":{},\"paused\":true}}",
+                t + 7_000
+            ),
+            format!(
+                "{{\"type\":\"handmark_day\",\"t\":{},\"day\":0}}",
+                t + 7_000
+            ),
+        ];
+        for row in &rows {
+            let text = format!(
+                "{{\"type\":\"meta\",\"session_start\":{t}}}\n{row}\n{{\"type\":\"meta\",\"session_end\":{}}}",
+                t + 9_000
+            );
+            let f = parse_file("x", &text).unwrap_or_else(|e| panic!("{row}: {e}"));
+            assert_eq!(f.last_event, t + 7_000, "{row}");
+        }
+        // 使う行が無い記録は session_start
+        let text = format!(
+            "{{\"type\":\"meta\",\"session_start\":{t}}}\n{{\"type\":\"meta\",\"session_end\":{}}}",
+            t + 9_000
+        );
+        assert_eq!(parse_file("x", &text).unwrap().last_event, t);
     }
 
     fn cfg() -> DeskConfig {

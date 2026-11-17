@@ -2303,15 +2303,8 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
     let mut files: Vec<desk::DeskFile> = order.iter().map(|&i| files[i].clone()).collect();
     let mut recomputed: Vec<Vec<desk::Feat>> =
         order.iter().map(|&i| recomputed[i].clone()).collect();
-    for (i, w) in files.windows(2).enumerate() {
-        if w[1].session_start < w[0].end {
-            return Err(format!(
-                "inputs #{} and #{} (in time order) overlap",
-                i + 1,
-                i + 2
-            ));
-        }
-    }
+    // 再起動のときの session_end の遅れだけを解き、行が重なれば止める（desk::resolve_overlaps）
+    let ends_clamped = desk::resolve_overlaps(&mut files)?;
     // 対象の元を差し替える（recomputed）か、照合の相手にする（recorded）
     if args.hm_labels_recomputed {
         for (f, r) in files.iter_mut().zip(recomputed.iter_mut()) {
@@ -2458,6 +2451,7 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         "segments": out.segments,
         "segments_recorded_t0": out.segments_recorded_t0,
         "overflow_days": out.overflow_days,
+        "ends_clamped": ends_clamped,
         "label_check": label_check,
         "sensitivity": out.sens,
         "redactions_given": args.hm_redactions_path.is_some(),
