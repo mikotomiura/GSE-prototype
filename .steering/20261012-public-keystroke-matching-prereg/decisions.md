@@ -892,3 +892,7 @@ metadata（研究者が選んだもの）: Topics は Information leakage, side-
 登録: 研究者が Register を押し、#55 になった。このとき PDF が届いておらず（選択した後の欄が送信に乗らなかった）、私が上げ直して「The submission is ready for review」の印を外したまま Save draft を押した（研究者の許可は「提出直前まで」）。サーバーの表示は `keystroke-log-release-matching-submission-20261117.pdf (635kB)`・`26c50fc4`（渡した PDF の SHA-256 の先頭と一致）。保存の後に読み直し、題・抄録 337 語・著者・Topics 3 つ・成果物・AI の印と開示の文・学生賞なし・PC conflicts なし・ready なしを確かめた。
 
 残り: ready for review に印を付けて Save and submit を押すのは研究者。締切 2026-12-01 06:59:59 EST（JST 12-01 20:59）。提出の後に日時をここに書き、memory に足し、attack-me の `round-*/tmp/` を消す。
+
+## 判断 98 の追記: 提出（2026-11-18）
+
+研究者が ready for review に印を付けて提出した（2026-11-18 00:38 JST ごろに確認）。#55 のページは「This submission is ready for review. You do not need to take further action」と表示し、PDF は `26c50fc4` のまま。締切（2026-12-01 06:59:59 EST）までは変更できる。投稿と同時の公開はしない（判断 95）。attack-me の `round-*/tmp/`（git の外・105 ファイル・7 か所）を消した。プレプリントの版の切り替えは採否の後（判断 95）。Dr. Tian への下書き 8 は未送付（送るのは研究者）。
