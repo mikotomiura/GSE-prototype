@@ -5,7 +5,7 @@
 <results dir> is experiments/20261012-public-keystroke-matching/results. The script reads main.json,
 main_a4.json and main_a4_without_cpu_writer.json (the KeyTAR rows), main_all.json (the appendix on all writers),
 enja15_main.json and
-exploratory_{unicity,dp,dp_utility_r0,tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
+exploratory_{unicity,dp,dp_utility_r0,tail,margin,score_band,lambda,scan}.json (aggregates only) and writes one .tex file per table
 into <output dir> (sections/generated). The tables are included by the sections; values are never typed by hand.
 Accuracies are printed in percent.
 """
@@ -32,6 +32,11 @@ MEASURES = [
 ATTACKER_TEX = {"A0": "A0", "A1": "A1", "A1p": "A1$'$", "A2": "A2", "A2b": "A2-b", "A3": "A3",
                 "A3-mean": "A3 (mean)", "A3-sum": "A3 (sum)", "A3-len": "A3 (length)",
                 "A2-lam4": "A2 ($\\lambda{=}4$)", "A2-lam16": "A2 ($\\lambda{=}16$)"}
+LAMS = (2, 4, 8, 16)  # the grid of exploratory analyses 6 and 7
+for _lam in LAMS:
+    ATTACKER_TEX[f"A2.lam{_lam}"] = f"A2 ($\\lambda{{=}}{_lam}$)"
+    ATTACKER_TEX[f"A1p.lam{_lam}"] = f"A1$'$ ($\\lambda{{=}}{_lam}$)"
+    ATTACKER_TEX[f"A2scan.lam{_lam}"] = f"A2-scan ($\\lambda{{=}}{_lam}$)"
 
 
 def form_tex(f):
@@ -398,6 +403,95 @@ def all_writers_table(full, m):
         raise SystemExit(f"gains above zero differ from the text: new {sorted(new_gain)}, lost {sorted(lost_gain)}")
     return rows
 
+EXPLORE_FORMS = ["R3", "R4(1)", "R4(2)", "R4(4)", "R4(8)", "R7(0.1)", "R7(0.25)", "R7(0.5)"]
+A1P_FORMS = {"R3", "R7(0.1)", "R7(0.25)", "R7(0.5)"}  # the forms on which A1' runs in the main computation
+
+
+def stronger_attacker_tables(whole, lam, scan):
+    """Exploratory analyses 6 (the grid of lambda for A2 and A1') and 7 (A2-scan): the accuracy of every variant
+    at N = 10 and 1,000, and the strongest attacker with the exploratory variants beside the main one. Stops if the
+    header of either file differs from main.json, if analysis 7 did not read the cache of analysis 6, if a positive
+    control fails (A2 and A1' at lambda 8 equal the main cells at both N, and A2 at lambda 4 and 16 equals A2-lam4 and
+    A2-lam16 on R3 and R4(w) at N = 1,000), if the main strongest attacker in either file differs from main.json,
+    if a cell has another number of writers than 500 or a failed resample, if the strongest attacker is not the
+    maximum of the point accuracies over its candidates, and if the statements of the text do not hold: at
+    N = 1,000 every form except R7(0.5) rose above the main strongest attacker (lower bound of the difference above
+    zero) and R7(0.5) stayed at A0 at both N, no form stayed within four times 1/N, and lambda = 2 gave 13 of the 14
+    form and N pairs that an exploratory attacker won, lambda = 16 the other."""
+    m = whole["main500"]
+    for k in ("config_sha256", "seed_file_sha256", "sample_sizes", "source"):
+        if not whole[k] == lam[k] == scan[k]:
+            raise SystemExit(f"exploratory_lambda/scan.json: {k} differs from main.json")
+    if scan["caches"]["analysis6"] != lam["caches"]["this"] or scan["caches"]["main500"] != lam["caches"]["main500"]:
+        raise SystemExit("exploratory_scan.json: not computed from the cache of analysis 6")
+    mc, lc, sc = m["cells"], lam["cells"], scan["cells"]
+    compared = 0
+    for f in EXPLORE_FORMS:
+        for n in ("10", "1000"):
+            pairs = [("A2", 8, "A2")] + ([("A1p", 8, "A1p")] if f in A1P_FORMS else [])
+            if n == "1000" and not f.startswith("R7"):
+                pairs += [("A2", 4, "A2-lam4"), ("A2", 16, "A2-lam16")]
+            for a, la, ref in pairs:
+                if lc[f"full|{f}|{a}.lam{la}|{n}"] != mc[f"full|{f}|{ref}|{n}"]:
+                    raise SystemExit(f"positive control: {a} at lambda {la} differs from {ref} on {f} at N = {n}")
+                compared += 1
+    if compared != 34:
+        raise SystemExit(f"positive control: {compared} cells compared, expected 34")
+    for j in (lam, scan):
+        for k, v in j["strongest"].items():
+            ms = m["strongest"][k]
+            if (v["main_strongest"]["acc"], v["main_strongest"]["attacker"], v["main_strongest"]["ci"]) != \
+                    (ms["acc"], ms["attacker"], ms["ci"]):
+                raise SystemExit(f"the main strongest attacker at {k} differs from main.json")
+    for v in list(lc.values()) + list(sc.values()):
+        if v["writers"] != 500 or v["nan_resamples"]:
+            raise SystemExit("exploratory_lambda/scan.json: a cell has another number of writers or failed resamples")
+    every = {**mc, **lc, **sc}
+    st = scan["strongest"]
+    for k, v in st.items():
+        _, f, n = k.split("|")
+        accs = {a: every[f"full|{f}|{a}|{n}"]["acc"] for a in scan["strongest_attackers"]
+                if f"full|{f}|{a}|{n}" in every}
+        if v["acc"] != max(accs.values()) or accs[v["attacker"]] != v["acc"] or lam["strongest"][k]["acc"] > v["acc"]:
+            raise SystemExit(f"exploratory_scan.json: the strongest attacker at {k} is not the maximum")
+    rose = {f for f in EXPLORE_FORMS if st[f"full|{f}|1000"]["diff_to_main_ci"][0] > 0}
+    if rose != set(EXPLORE_FORMS) - {"R7(0.5)"} or \
+            {st[f"full|R7(0.5)|{n}"]["attacker"] for n in ("10", "1000")} != {"A0"}:
+        raise SystemExit(f"the forms above the main strongest attacker differ from the text: {sorted(rose)}")
+    if min(st[f"full|{f}|1000"]["x_chance"] for f in EXPLORE_FORMS) <= 4:
+        raise SystemExit("a form stayed within four times 1/N, unlike the text")
+    won = [v["attacker"].split(".lam")[1] for v in st.values() if ".lam" in v["attacker"]]
+    if sorted(won) != ["16"] + ["2"] * 13:
+        raise SystemExit(f"the lambdas of the exploratory winners differ from the text: {sorted(won)}")
+
+    variants = []
+    for f in EXPLORE_FORMS:
+        for a in ("A2", "A1p", "A2scan"):
+            if a != "A1p" or f in A1P_FORMS:
+                variants.append((f, a))
+    grid = {}
+    for n in ("10", "1000"):
+        rows = []
+        for f, a in variants:
+            src = sc if a == "A2scan" else lc
+            cells = [f"{pct(src[f'full|{f}|{a}.lam{la}|{n}']['acc'])} {ci(src[f'full|{f}|{a}.lam{la}|{n}']['ci'])}"
+                     for la in LAMS]
+            name = {"A2": "A2", "A1p": "A1$'$", "A2scan": "A2-scan"}[a]
+            rows.append(" & ".join([form_tex(f), name] + cells) + " \\\\")
+        grid[n] = rows
+    best = []
+    for f in EXPLORE_FORMS:
+        cells = []
+        for n in ("10", "1000"):
+            v = st[f"full|{f}|{n}"]
+            ms = v["main_strongest"]
+            cells += [pct(ms["acc"]), f"{pct(v['acc'])} {ci(v['ci'])}", attacker(v)]
+        d = st[f"full|{f}|1000"]
+        cells.append(f"{pct(d['diff_to_main'])} {ci(d['diff_to_main_ci'])}")
+        best.append(" & ".join([form_tex(f)] + cells) + " \\\\")
+    return grid["10"], grid["1000"], best
+
+
 def main():
     res, out = sys.argv[1], sys.argv[2]
     os.makedirs(out, exist_ok=True)
@@ -445,6 +539,12 @@ def main():
     full = json.load(open(os.path.join(res, "main_all.json"), encoding="utf-8"))
     rows = all_writers_table(full, whole)
     write(out, "all-writers.tex", rows)
+    lam = json.load(open(os.path.join(res, "exploratory_lambda.json"), encoding="utf-8"))
+    scan = json.load(open(os.path.join(res, "exploratory_scan.json"), encoding="utf-8"))
+    g10, g1000, best = stronger_attacker_tables(whole, lam, scan)
+    write(out, "explore-lambda-scan-10.tex", g10)
+    write(out, "explore-lambda-scan-1000.tex", g1000)
+    write(out, "explore-strongest.tex", best)
 
 
 if __name__ == "__main__":
