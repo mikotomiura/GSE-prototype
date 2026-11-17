@@ -5,11 +5,14 @@
 #   [1] 組み立てと launcher: 本人用の印（s1.mode の中身 audience=self）を段 1 の分岐の中で両 OS に書く／
 #       eh3.mode を書かない／段 1 の launcher がプローブを止める環境変数を付けない・BOM・CRLF・chcp が先。
 #   [2] リリースタグ: 段 1 の実装（s1.rs・s1_driver.rs）を含むタグがあり、その後にコードが動いていない。
+#       そのタグが手跡（ADR-051）の実装（handmark_store.rs・handmark_driver.rs）も含む。
 #   [3] 同意: 本人用（--audience self）は段 1 の同意文書の承認を求めない（計画の判断 5）。
 #       他の参加者向け（--audience participants）は承認の印を求める。
 #   [4] 配布物（--dist ごと・フォルダか zip）: o1.mode と s1.mode があり g1.mode と eh3.mode が無い
 #       （計画の判断 7）／s1.mode の中身が audience に合う（本人用の配布物を他の参加者向けの門で弾く）／
-#       .bat がプローブを止める環境変数を付けない／gse-next の実体が段 1 を知っている。
+#       .bat がプローブを止める環境変数を付けない／gse-next の実体が段 1 と手跡を知っている／
+#       根に手跡の割付の表（handmark_assignment.json）と .sha256 があり、SHA-256 が合う
+#       （表は参加者ごとに置くもので共通の zip には入らない。zip だけを渡すと赤。表を置いたフォルダを渡す）。
 #
 # 使い方:
 #   bash scripts/check-s1-release-readiness.sh --audience self --dist <Windows の zip> --dist <macOS の zip>
@@ -23,6 +26,8 @@
 #   アプリは s1.mode の中身を読まないので、本人用の配布物をこの門を通さずに他の人へ渡すことや、
 #   中身を書き換えて渡すことは防げない（`audience=` はラベル。防ぐのは門を通す運用）。
 #   配布物のバイナリが [2] のタグから作られたことは確かめない（実体に段 1 の文字列があることだけを見る）。
+#   手跡も実体の文字列で見るだけで、帯が描かれるかは見ない（Windows の手跡の表示が通ったかは ADR-052 D5 の運用で守る）。
+#   割付の表は SHA-256 と JSON として読めることだけを見て、中身の妥当性（アプリの validate）は見ない。
 # Windows では git-bash から実行すること。
 
 set -uo pipefail
@@ -127,7 +132,7 @@ PY
 # （2026-11-07 点検 両者一致の HIGH: 途中で落ちると後ろの検査が緑に倒れていた）。
 dist_facts_ () {
   python3 - "$1" "${DP_WORD}" "${LAUNCHER}" "${SETUP_MAC}" <<'PY'
-import os, re, stat, sys, unicodedata, zipfile
+import hashlib, json, os, re, stat, sys, unicodedata, zipfile
 p, word = sys.argv[1], sys.argv[2].lower()
 want_bat = open(sys.argv[3], "rb").read() if os.path.isfile(sys.argv[3]) else None
 want_setup = open(sys.argv[4], "rb").read() if os.path.isfile(sys.argv[4]) else None
@@ -138,6 +143,34 @@ def esc(n):
 MARKERS = ("o1.mode", "s1.mode", "g1.mode", "eh3.mode")
 MAX_MEMBER = 1 << 30          # 1 GiB を超えるメンバーは読まない（壊れた・悪い zip で門が落ちないように）
 LITS = (b"s1.mode", b"GSE_S1_MODE")
+# 手跡（ADR-051）の表の名前。v0.1.41（手跡なし）の実体では 0 回、v0.1.42 では 1 回ずつ（2026-11-17 実測）。
+HM_TABLE = "handmark_assignment.json"
+HM_SHA = "handmark_assignment.sha256"
+HM_LITS = (HM_TABLE.encode(), HM_SHA.encode())
+# アプリ（handmark_store.rs の MAX_FILE_BYTES）は 64 KiB を超える表・.sha256 を読まない。
+HM_MAX = 64 * 1024
+# アプリの Table（deny_unknown_fields）の欄と型。JSON として読めても、この形でなければアプリは表を壊れたとみなす。
+def hm_table_ok(o):
+    def uint(x, bits):
+        return type(x) is int and 0 <= x < (1 << bits)
+    def sint(x):
+        return type(x) is int and -(1 << 63) <= x < (1 << 63)
+    return (type(o) is dict
+            and set(o) == {"version", "s1_start_day", "early_days", "late_start_day", "days"}
+            and uint(o["version"], 32) and sint(o["s1_start_day"]) and uint(o["early_days"], 32)
+            and sint(o["late_start_day"]) and type(o["days"]) is list
+            and all(type(d) is bool for d in o["days"]))
+# serde_json は重複キー（derive の duplicate field）と整数欄の -0（浮動小数として読む）を拒否する。
+# Python の json は後勝ちで受け、-0 を int の 0 にするので、ここで拒否する（/cross-review 2 巡目 両者一致・Claude）。
+def hm_no_dup(pairs):
+    keys = [k for k, _ in pairs]
+    if len(keys) != len(set(keys)):
+        raise ValueError("duplicate key")
+    return dict(pairs)
+def hm_int(t):
+    if t.startswith("-") and int(t) == 0:
+        raise ValueError("negative zero")
+    return int(t)
 def norm(name):
     # Windows と macOS の既定は大文字小文字を区別しない。Windows は末尾の点と空白を落とす。
     # macOS は濁点・半濁点を分解した形（NFD）で名前を持つので NFC にそろえる（実物の zip で誤って赤になった）。
@@ -160,7 +193,7 @@ def scan(fh):
         if not chunk:
             break
         buf = tail + chunk
-        for lit in LITS:
+        for lit in LITS + HM_LITS:
             if lit in buf:
                 found.add(lit)
         tail = buf[-32:]
@@ -262,14 +295,58 @@ try:
     print("BAT_DIFFER=" + ",".join(sorted(differ))[:300])
     bins = [by[k] for k in ("gse-next.exe", "gse-next.app/contents/macos/gse-next") if k in by]
     print("BINS=%d" % len(bins))
-    lacks = []
+    lacks = []; hm_lacks = []
     for n, size, op in bins:
         if size > MAX_MEMBER:
-            lacks.append(n + ":too-big"); continue
+            lacks.append(n + ":too-big"); hm_lacks.append(n + ":too-big"); continue
         with op() as fh:
             found = scan(fh)
         lacks += ["%s:%s" % (n, l.decode()) for l in LITS if l not in found]
+        hm_lacks += ["%s:%s" % (n, l.decode()) for l in HM_LITS if l not in found]
     print("BIN_LACKS=" + ",".join(lacks))
+    print("HM_LACKS=" + ",".join(hm_lacks))
+    # 手跡の割付の表と .sha256（根）。読み方はアプリ（analysis/handmark/assignment.rs）に合わせる:
+    # 表は JSON（BOM 付きは serde_json が読めないので赤）・.sha256 は BOM を落とした最初の語が 64 桁の 16 進。
+    # 表はアプリの Table の欄と型まで見る（NaN・配列・余分な欄は赤・/cross-review 両者一致）。
+    # NaN・Infinity は Python では float になり、全部の欄の型の検査で赤になるので、parse_constant は使わない
+    # （入れても変異で外して緑のままだった＝働く場面のない守り・2026-11-17 実測）。
+    # .sha256 は全文を lossy で読む（アプリは from_utf8_lossy・先頭だけ読むと食い違う・/cross-review Codex）。
+    # HM_TABLE: ok / missing / big / json、HM_SHA: ok / missing / big / format / mismatch / skip（表が使えないとき）。
+    tbl = by.get(HM_TABLE); shf = by.get(HM_SHA)
+    tb = None
+    if tbl is None or tbl[1] == 0:
+        print("HM_TABLE=missing")
+    elif tbl[1] > HM_MAX:
+        print("HM_TABLE=big")
+    else:
+        with tbl[2]() as fh:
+            tb = fh.read()
+        try:
+            ok_t = hm_table_ok(json.loads(tb.decode("utf-8"), object_pairs_hook=hm_no_dup, parse_int=hm_int))
+        except ValueError:
+            ok_t = False
+        if ok_t:
+            print("HM_TABLE=ok")
+        else:
+            print("HM_TABLE=json"); tb = None
+    if tb is None:
+        print("HM_SHA=skip")
+    elif shf is None or shf[1] == 0:
+        print("HM_SHA=missing")
+    elif shf[1] > HM_MAX:
+        print("HM_SHA=big")
+    else:
+        with shf[2]() as fh:
+            st = fh.read().decode("utf-8", "replace").lstrip("\ufeff").split()
+        want = st[0] if st else ""
+        got = hashlib.sha256(tb).hexdigest()
+        if len(want) != 64 or not all(c in "0123456789abcdefABCDEF" for c in want):
+            print("HM_SHA=format")
+        elif want.lower() != got:
+            print("HM_SHA=mismatch")
+        else:
+            print("HM_SHA=ok")
+        print("HM_TABLE_SHA=" + got)
     print("DONE=1")
 except SystemExit:
     raise
@@ -412,6 +489,13 @@ $(printf '%s\n' "${stale}" | head -10 | sed 's/^/        /')"
     else
       ok "段 1 の実装を含むリリースタグがある（${s1_tag}）・その後に配布物のコードの変更なし"
     fi
+    # 手跡（ADR-051）。タグの選び方は変えない（手跡の無いタグを飛ばすと配布物の s1-release-tag.txt と食い違う）。
+    if git cat-file -e "${s1_tag}:src-tauri/src/handmark_store.rs" 2>/dev/null \
+       && git cat-file -e "${s1_tag}:src-tauri/src/handmark_driver.rs" 2>/dev/null; then
+      ok "リリースタグ ${s1_tag} が手跡の実装（handmark_store.rs・handmark_driver.rs）を含む"
+    else
+      ng "リリースタグ ${s1_tag} が手跡の実装（handmark_store.rs・handmark_driver.rs）を含まない（後期に手跡が出ない）"
+    fi
   fi
 fi
 
@@ -529,6 +613,29 @@ for d in "${DISTS[@]}"; do
   else
     ok "${label}: gse-next の実体に s1.mode と GSE_S1_MODE がある"
   fi
+  if [ "$(fact_ "${df_}" BINS)" -ge 1 ] 2>/dev/null; then
+    if [ -n "$(fact_ "${df_}" HM_LACKS)" ]; then
+      ng "${label}: gse-next の実体が手跡を知らない（無い文字列: $(fact_ "${df_}" HM_LACKS)・手跡の前の版を疑う）"
+    else
+      ok "${label}: gse-next の実体が手跡の表（handmark_assignment.json・.sha256）を知っている"
+    fi
+  fi
+  case "$(fact_ "${df_}" HM_TABLE)" in
+    ok) ok "${label}: 手跡の割付の表（handmark_assignment.json）が根にあり、アプリの表の形（5 つの欄と型）で読める" ;;
+    missing) ng "${label}: 手跡の割付の表（handmark_assignment.json）が根に無いか 0 バイト（表は参加者ごとに置く。共通の zip なら、表を置いたフォルダを --dist に渡す）" ;;
+    big) ng "${label}: 手跡の割付の表が 64 KiB を超える（アプリは読まない）" ;;
+    json) ng "${label}: 手跡の割付の表がアプリの表の形（5 つの欄と型）の JSON として読めない（BOM 付き・NaN・余分な欄も読めない・アプリは表を壊れたとみなす）" ;;
+    *) ng "${label}: 手跡の割付の表を判定できなかった" ;;
+  esac
+  case "$(fact_ "${df_}" HM_SHA)" in
+    ok) ok "${label}: 表の SHA-256 が handmark_assignment.sha256 と合う（$(fact_ "${df_}" HM_TABLE_SHA)・記録の値と照らす）" ;;
+    missing) ng "${label}: handmark_assignment.sha256 が根に無いか 0 バイト（アプリは手跡を出さない）" ;;
+    big) ng "${label}: handmark_assignment.sha256 が 64 KiB を超える（アプリは読まない）" ;;
+    format) ng "${label}: handmark_assignment.sha256 の最初の語が 64 桁の 16 進でない" ;;
+    mismatch) ng "${label}: 表の SHA-256 が handmark_assignment.sha256 と合わない（表 $(fact_ "${df_}" HM_TABLE_SHA)・取り違えか書き換えを疑う）" ;;
+    skip) : ;;
+    *) ng "${label}: 表の SHA-256 を判定できなかった" ;;
+  esac
 done
 # 渡した配布物の全体で両 OS を見たか（片方だけで「配ってよい」を出さない・/cross-review LOW）。
 case "${OS_ONLY}" in
@@ -559,6 +666,18 @@ selftest () {
   w_dir="$fix/dist/S1_実施用_Windows"
   m_dir="$fix/dist/S1_実施用_macOS"
 
+  # 手跡の表の名前（実行時に連結する）と、表と .sha256 を置く関数（アプリの道具と同じ「<hex>  <名前>」の形）。
+  local hm_t hm_s
+  hm_t="$(printf '%s%s' 'handmark_assignment' '.json')"
+  hm_s="$(printf '%s%s' 'handmark_assignment' '.sha256')"
+  hm_table_ () {
+    printf '{"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[true,false]}\n' > "$1/${hm_t}"
+    python3 - "$1/${hm_t}" "$1/${hm_s}" <<'PY2'
+import hashlib, os, sys
+h = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+open(sys.argv[2], "w").write("%s  %s\n" % (h, os.path.basename(sys.argv[1])))
+PY2
+  }
   make_dist_ () {
     rm -rf "${fix:?}/dist"
     mkdir -p "${w_dir}" "${m_dir}/gse-next.app/Contents/MacOS"
@@ -566,7 +685,7 @@ selftest () {
       : > "$x/o1.mode"
       printf '%s\n' "${self_body}" > "$x/s1.mode"
     done
-    printf 'MZ..%s..%s..\n' 's1.mode' 'GSE_S1_MODE' > "${w_dir}/gse-next.exe"
+    printf 'MZ..%s..%s..%s..%s..\n' 's1.mode' 'GSE_S1_MODE' "${hm_t}" "${hm_s}" > "${w_dir}/gse-next.exe"
     printf 'x\n' > "${w_dir}/gse-submit.exe"; printf 'k\n' > "${w_dir}/pubkey.txt"
     printf '{}\n' > "${w_dir}/g1-submit.json"; printf '{}\n' > "${m_dir}/g1-submit.json"
     printf 'x\n' > "${m_dir}/gse-next.app/Contents/MacOS/gse-submit"
@@ -574,7 +693,8 @@ selftest () {
     printf 'k\n' > "${m_dir}/gse-next.app/Contents/Resources/resources/pubkey.txt"
     cp "$repo/${SETUP_MAC}" "${m_dir}/"
     printf '%s\n' 'v9.9.9' > "${w_dir}/s1-release-tag.txt"; printf '%s\n' 'v9.9.9' > "${m_dir}/s1-release-tag.txt"
-    printf 'MACHO..%s..%s..\n' 's1.mode' 'GSE_S1_MODE' > "${m_dir}/gse-next.app/Contents/MacOS/gse-next"
+    printf 'MACHO..%s..%s..%s..%s..\n' 's1.mode' 'GSE_S1_MODE' "${hm_t}" "${hm_s}" > "${m_dir}/gse-next.app/Contents/MacOS/gse-next"
+    hm_table_ "${w_dir}"; hm_table_ "${m_dir}"
     cp "$repo/${LAUNCHER}" "${w_dir}/GSE_起動.bat"
     ( cd "$fix/dist" && python3 -c "
 import os, sys, zipfile
@@ -590,6 +710,8 @@ with zipfile.ZipFile('win.zip', 'w') as z:
     cp "$repo/${BUILD}" "$repo/${BUILD_G1}" "$repo/${LAUNCHER}" "$repo/${SETUP_MAC}" "$fix/w/${EXP}/"
     printf 'pub const MARKER_FILE_NAME: &str = "s1.mode";\n' > "$fix/w/src-tauri/src/s1.rs"
     printf '// driver\n' > "$fix/w/src-tauri/src/s1_driver.rs"
+    printf '// handmark store\n' > "$fix/w/src-tauri/src/handmark_store.rs"
+    printf '// handmark driver\n' > "$fix/w/src-tauri/src/handmark_driver.rs"
     git -C "$fix/w" init -q -b main 2>/dev/null || { git -C "$fix/w" init -q; git -C "$fix/w" checkout -q -b main; }
     commit_ "selftest"
     git -C "$fix/w" tag v9.9.9 > /dev/null 2>&1
@@ -889,6 +1011,94 @@ z = zipfile.ZipFile('mac.zip')
 assert not any(i.flag_bits & 0x800 for i in z.infolist())
 " ) && ARGS=(--audience self --dist "${w_dir}" --dist "$fix/dist/mac.zip")
   expect_rc 0 "UTF-8 の印の無い・NFD の名前の macOS の zip"
+
+  echo
+  echo "=== selftest 8: 手跡（ADR-051・2026-11-17）==="
+  # 表を書き換えた後に .sha256 を合わせ直す（表の中身だけを壊す対照のため）。
+  hm_fix_sha_ () {
+    python3 - "$1/${hm_t}" "$1/${hm_s}" <<'PY2'
+import hashlib, sys
+h = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+open(sys.argv[2], "w").write(h + "\n")
+PY2
+  }
+  build; expect_green "手跡の割付の表（handmark_assignment.json）が根にあり" "基準の表は緑"
+  expect_green "表の SHA-256 が handmark_assignment.sha256 と合う" "基準の .sha256 は緑"
+  expect_green "リリースタグ v9.9.9 が手跡の実装" "基準のタグは手跡を含む"
+  build; printf 'MZ..%s..%s..\n' 's1.mode' 'GSE_S1_MODE' > "${w_dir}/gse-next.exe"
+  expect_red "gse-next.exe:handmark_assignment.json" "手跡の前の実体（Windows・v0.1.41 の形）"
+  build; printf 'MACHO..%s..%s..%s..\n' 's1.mode' 'GSE_S1_MODE' "${hm_t}" > "${m_dir}/gse-next.app/Contents/MacOS/gse-next"
+  expect_red "gse-next:handmark_assignment.sha256" "macOS の実体に .sha256 の名前だけ無い"
+  build; rm -f "${m_dir}/${hm_t}"; expect_red "手跡の割付の表（handmark_assignment.json）が根に無い" "表を消す"
+  build; : > "${m_dir}/${hm_t}"; expect_red "手跡の割付の表（handmark_assignment.json）が根に無いか 0 バイト" "0 バイトの表"
+  build; rm -f "${w_dir}/${hm_s}"; ARGS=(--audience self --dist "${w_dir}" --os-only windows)
+  expect_red "handmark_assignment.sha256 が根に無い" ".sha256 を消す"
+  build; printf '{"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[false,false]}\n' > "${m_dir}/${hm_t}"
+  expect_red "表の SHA-256 が handmark_assignment.sha256 と合わない" "表を書き換える（.sha256 はそのまま）"
+  build; printf 'not-a-hash  x\n' > "${m_dir}/${hm_s}"
+  expect_red "最初の語が 64 桁の 16 進でない" ".sha256 の形が違う"
+  build; printf '{"version":\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "JSON として読めない" "壊れた JSON（SHA-256 は合う）"
+  # 正しい 5 欄の表に BOM だけを前置する（欄の不足で赤になると原因を切り分けられない・2 巡目 Codex）。
+  build; printf '\357\273\277{"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[]}\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "JSON として読めない" "BOM 付きの表（アプリの serde_json は読めない）"
+  # アプリの表の形でない JSON（SHA-256 は合わせる・/cross-review 両者一致）。
+  # NaN は挙動の確かめとして残す（型の検査で赤になる。parse_constant は働く場面が無いので使わない）。
+  build; printf '{"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[NaN]}\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "表の形（5 つの欄と型）" "NaN を含む表"
+  build; printf '{"version":0,"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[]}\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "表の形（5 つの欄と型）" "重複キーの表（serde は duplicate field）"
+  build; printf '{"version":1,"s1_start_day":20400,"early_days":-0,"late_start_day":20407,"days":[]}\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "表の形（5 つの欄と型）" "整数欄の -0（serde は浮動小数として拒否）"
+  build; printf '[1,2]\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "表の形（5 つの欄と型）" "配列の表"
+  build; printf '{"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[],"x":1}\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "表の形（5 つの欄と型）" "余分な欄のある表（deny_unknown_fields）"
+  build; printf '{"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[1]}\n' > "${m_dir}/${hm_t}"; hm_fix_sha_ "${m_dir}"
+  expect_red "表の形（5 つの欄と型）" "days に bool でない値"
+  build; python3 - "${m_dir}/${hm_t}" "${m_dir}/${hm_s}" <<'PY2'
+import hashlib, sys
+h = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+open(sys.argv[2], "w").write(" " * 4032 + h + "x\n")
+PY2
+  expect_red "最初の語が 64 桁の 16 進でない" "4 KiB の境で切れる .sha256（全文を読む・/cross-review Codex）"
+  build; python3 - "${m_dir}/${hm_t}" "${m_dir}/${hm_s}" <<'PY2'
+import hashlib, sys
+h = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+open(sys.argv[2], "w").write(h + "\n" + " " * (64 * 1024))
+PY2
+  expect_red "sha256 が 64 KiB を超える" "64 KiB を超える .sha256"
+  build; python3 - "${m_dir}/${hm_t}" <<'PY2'
+import sys
+open(sys.argv[1], "w").write('{"version":1,"s1_start_day":20400,"early_days":7,"late_start_day":20407,"days":[' + ",".join(["true"] * 20000) + ']}\n')
+PY2
+  hm_fix_sha_ "${m_dir}"; expect_red "表が 64 KiB を超える" "64 KiB を超える表"
+  # アプリと同じ読み方: BOM を落とした最初の語・大文字の 16 進も受ける。
+  build; python3 - "${m_dir}/${hm_t}" "${m_dir}/${hm_s}" <<'PY2'
+import hashlib, sys
+h = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest().upper()
+open(sys.argv[2], "wb").write(b"\xef\xbb\xbf" + h.encode() + b"\n")
+PY2
+  expect_green "表の SHA-256 が handmark_assignment.sha256 と合う" "BOM 付き・大文字の .sha256（アプリは受ける）"
+  build; ( cd "$fix/dist" && python3 - "${hm_t}" "${hm_s}" <<'PY2'
+import sys, zipfile
+src = zipfile.ZipFile('win.zip')
+with zipfile.ZipFile('win2.zip', 'w') as z:
+    for n in src.namelist():
+        if not n.endswith(('/' + sys.argv[1], '/' + sys.argv[2])):
+            z.writestr(n, src.read(n))
+PY2
+  mv win2.zip win.zip ); ARGS=(--audience self --dist "$fix/dist/win.zip" --os-only windows)
+  expect_red "win.zip: 手跡の割付の表（handmark_assignment.json）が根に無い" "表の無い共通の zip"
+  build; ARGS=(--audience self --dist "$fix/dist/win.zip" --os-only windows)
+  expect_rc 0 "表を入れた zip は通る"
+  build; mkdir -p "${w_dir}/sub"; mv "${w_dir}/${hm_t}" "${w_dir}/sub/"; ARGS=(--audience self --dist "${w_dir}" --os-only windows)
+  expect_red "根に無い" "下の階層の表は数えない（アプリは s1.mode の隣だけを読む）"
+  build; git -C "$fix/w" tag -d v9.9.9 > /dev/null 2>&1
+  git -C "$fix/w" rm -q src-tauri/src/handmark_driver.rs; commit_ "no handmark"; git -C "$fix/w" tag v9.9.9 > /dev/null 2>&1
+  git -C "$fix/w" push -q -f origin main 2>/dev/null; git -C "$fix/w" fetch -q origin 2>/dev/null
+  expect_red "手跡の実装（handmark_store.rs・handmark_driver.rs）を含まない" "手跡の無いタグ"
+  # 基準の門（selftest 0）は手跡の検査も含めて全部緑のまま（上の expect_rc 0 で兼ねる）。
 
   echo
   echo "────────────────────────────────────────"
