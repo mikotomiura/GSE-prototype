@@ -1,0 +1,28 @@
+# タスクリスト
+
+## 準備
+- [x] 引き継ぎ・ADR-054・素材・attack-me round 3 を読む
+- [x] 3 つの検査の今のコードを棚卸し（サブエージェント 3 本並列・要所を一次で照合 → inventory.md）
+
+## 設計で決めること（AskUserQuestion で 1 問ずつ）
+- [x] 1 道具の形（判断 1）
+- [x] 2 入力の形式（判断 2）
+- [x] 3 予測の面の判定（判断 3）
+- [x] 3' 定義・漏れの面の判定（判断 4・5）
+- [x] 4 出力（design §2.5）
+- [x] 5 完成の条件の検査（判断 6）
+- [x] 6 期間の区別（判断 7）
+
+## 設計書
+- [x] design.md の初案（v1）
+- [x] /reimagine で比べる（ハイブリッドを採用）
+- [x] codex-consult（7 件・§9）
+
+## レビュー（場面ごとの対応）
+- [x] /cross-review 1 巡目（Codex 1 回・cross-reviewer 本人が Claude 側・§10）
+- [x] 指摘への対応（design v3 に織り込み）
+- [x] /cross-review 2 巡目（code-reviewer＋Codex・§11）→ v4 に織り込み
+
+## 完了処理
+- [x] design.md の最終化（v4）
+- [x] git commit（push・PR は研究者に確かめる）
