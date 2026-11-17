@@ -12,3 +12,4 @@
 - [x] コミット（1 ラウンド 1 コミット）
 - [x] /cross-review（Codex を含む・判断 4）
 - [x] push と PR を研究者に確かめる（push だけ・PR はメタな整理の後）
+- [x] 2 巡目（判断 5）・/cross-review（判断 6）
