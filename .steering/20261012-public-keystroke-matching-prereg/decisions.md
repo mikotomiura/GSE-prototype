@@ -846,3 +846,27 @@ Dr. Tian の返事（2026-11-14 に研究者が貼った。本文は外部の LL
 頁: 直した後に本文が 13 頁目にあふれたので、§8.3 の統計的開示制御の対応づけを付録 E へ移し（本文は参照 1 文）、§8.1 の Inputlog の重複を 1 句にまとめた。
 確かめ: make_tables.py は生成物を変えず exit 0、変異（人数の対照）で exit 1。投稿版 エラー 0・overfull 2・31 頁・倫理は p12（12 頁目を画像で見た）。プレプリントの版 エラー 0・overfull 0。文体の門 違反 0。本文 11,054 語・抄録 335 語。
 attack-me はここで閉じる（判断 95）。tmp/ は匿名の複製の段の後に消す。
+
+## 判断 97: 匿名の複製と付録 C の直し（研究者・AskUserQuestion 3 回・2026-11-17）
+
+研究者の選択（どれも推奨）:
+1. 範囲: 匿名の複製 → 投稿の準備 → Dr. Tian への送り状、の順で全部。
+2. 匿名の複製: repo の更新と anonymous.4open.science の操作は Claude（Chrome）、GitHub アプリの許可は研究者。研究者が Anonymous GitHub Read-only を「Only select repositories」で `keystroke-log-release-matching` だけに設置した（Installed GitHub Apps の Configure で 1 repo・読み取りのみを確かめた）。
+3. 付録 C: 探索 1〜5 の手順のコミット先は GSE の repo で、論文用 repo（本文の study repository）は 10-12 が最後だった。「committed to the authors' working repository … the first two on 13 October 2026 and the other three on 20 October 2026 (UTC); the record of the computation in the study repository gives the time of each commit」に直した（3〜5 は 8c124a11 = 2026-10-20 15:57:45 UTC。前の文は 21 October で JST の日付だった）。6・7 も「committed to the same repository on 29 October 2026」。
+
+論文用 repo（private）: `dff2806`・`5ea8f12` を main に push した。
+- 入れたもの: 台本 45 本・集計 23 件・`config.json`（取得の 3 欄だけ違う）・`env.md`・`run.sh`・requirements 2 つ・`exploratory.json`・ENJA15 の SHA-256 の一覧、英語の README・data.md・notes.md（取得・検査・実装で決めたこと・探索の手順・実行の記録・D1〜D6）。
+- 入れないもの: `results/main_a4_without_cpu_writer.json`（判断 96）・`osf-registration-fields.md`・日本語の作業版。
+- notes の英訳はサブエージェント（Opus）に書かせ、メインが照らした: 数値は原文と機械で突き合わせ、欠けは書き手 1 人の値（D3 の標本の位置・塊の長さ・行数の最小最大など）だけ。作業の repo のコミットのハッシュは UTC の時刻に置き換えた（JST のままの日付が 5 つあり、66721d9d・ae1af253・e7d60504 は 10-12、8c124a11 は 10-20、335d41a9 は 10-19 に直した）。見出しの日付は作業の日（JST）と冒頭に断った。D3 の「論文の倫理の節でも書く」は判断 96 の扱い（差の最大だけ・499 人の版は公開しない）に直した。
+- 台本と集計の中の "decision 55/56/68/86" と "codex review" は書き換えない（`a4_generation.json` などの指紋のコードの SHA-256 と照らせなくなるため）。README と notes でラベルの意味を説明した。文体の門はこの 4 ラベルと run.sh の 2 行だけを internal-ref として出す（意図したもの）。
+- 照合: 公開した 76 ファイルが作業の repo とバイト一致。事前登録は `3b206fc3…` のまま。
+
+匿名の複製: https://anonymous.4open.science/r/keystroke-log-release-matching-3E48 （伏せる語: Mikoto Miura・mikotomiura・mmiura・Mikoto・Miura・三浦・Y5R7N。期限 2027-04-17 は無料の枠の上限。期限の後は内容を消す）。外から（ログインなしの curl）84 ファイルを取り、82 がバイト一致、README と notes は伏せた語の行だけが違うことを確かめた。名前・アカウント名・OSF の識別子は出ない。
+- ⚠️ 期限 2027-04-17 は大きな改訂で次の号に回ると足りない。その時は延ばす（有料）か作り直す。
+- ⚠️ repo を更新したら、ダッシュボードの「Force update」を押す（自動の更新は有料）。
+
+原稿: `open-science.tex` の角括弧を URL で埋めた。URL の中の `-` で行が折れて抽出で `-` が落ちたので、この URL だけ `/` でしか折らないようにした。投稿版 エラー 0・overfull 2・31 頁・倫理は p12・open science は p14（画像で見た）。プレプリントの版 エラー 0・overfull 0・35 頁。文体の門 違反 0。
+
+Dr. Tian への下書き 8: 11/12 の版からのやりとりに関わる変更の列挙に、11-17 の 2 つ（問い合わせが取得の数時間前で返事は翌日・本計算の前、出どころを書く理由の文）と、D6 の 1 文を足した。
+
+投稿サイト: submit.petsymposium.org/2027.3/ が開いている。締切 2026-12-01 06:59:59 EST（JST 12-01 20:59）。metadata の抄録（LaTeX なし・337 語）は作業の scratchpad に作った。
