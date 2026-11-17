@@ -882,3 +882,13 @@ Dr. Tian への下書き 8: 11/12 の版からのやりとりに関わる変更�
 - Codex のみ: 匿名化の回帰の検査が無い → build.sh がビルドの後に PDF（圧縮の stream を展開）を調べ、`PTEX.FileName`・`PTEX.InfoDict`・原稿・テンプレート・出力先のパスがあれば exit 1。陽性対照: 抑止の行を外した変異で exit 1（テンプレートのパスと PTEX を検出）、通常のビルドと著者名入りの版で「pdf: no local paths」。
 - Claude のみ: `\input{$here/main.tex}` に変えたので `$here` にも TeX の特殊文字と空白の検査を足した（`/a b/x`・`/a%b` を拒み `/ok/path` を通すことを確かめた）。
 ビルド: 投稿版 エラー 0・overfull 2・31 頁・倫理は p12。文体の門 違反 0。
+
+## 判断 98: HotCRP への登録と下書きの保存（研究者・AskUserQuestion 2 回・2026-11-18）
+
+研究者は投稿版の PDF を読み、直しは無しとした。Dr. Tian への下書き 8 はまだ送っていない（送るのは研究者）。
+
+metadata（研究者が選んだもの）: Topics は Information leakage, side-channels, correlation attacks／Privacy quantification and metrics／Differential privacy and private data processing。著者は単独（Mikoto Miura・Independent Researcher）。PC conflicts は無し。Research artifacts は「成果物があり、公開済みまたは公開予定」。AI の開示の印を付け、AI Disclosure の欄は本文の AI Use の節と同じ文（`\S\ref{sec:data:checks}` は PDF で確かめて「Appendix A.1」と書いた）。SoK・Resubmission は無し。Best Student Paper は一度印を付けたが、研究者が現地で発表できないので外した（賞の条件は学生が PETS 2027 で発表すること。CFP では現地での参加は論文集への掲載の条件ではない）。
+
+登録: 研究者が Register を押し、#55 になった。このとき PDF が届いておらず（選択した後の欄が送信に乗らなかった）、私が上げ直して「The submission is ready for review」の印を外したまま Save draft を押した（研究者の許可は「提出直前まで」）。サーバーの表示は `keystroke-log-release-matching-submission-20261117.pdf (635kB)`・`26c50fc4`（渡した PDF の SHA-256 の先頭と一致）。保存の後に読み直し、題・抄録 337 語・著者・Topics 3 つ・成果物・AI の印と開示の文・学生賞なし・PC conflicts なし・ready なしを確かめた。
+
+残り: ready for review に印を付けて Save and submit を押すのは研究者。締切 2026-12-01 06:59:59 EST（JST 12-01 20:59）。提出の後に日時をここに書き、memory に足し、attack-me の `round-*/tmp/` を消す。
