@@ -2969,7 +2969,7 @@ fn s1_answer_gate() -> Result<(), String> {
     Ok(())
 }
 
-/// 段 1 のプローブへの回答（3 問を 1 枚: 摩擦・前進・6 択）。★ `realtime_label` と `activity_label` を同じ `probe_id` で 2 行。
+/// 段 1 のプローブへの回答（3 問を 1 枚: 摩擦・前進・何をしていたかの選択肢＝7 択・ADR-055）。★ `realtime_label` と `activity_label` を同じ `probe_id` で 2 行。
 #[tauri::command]
 fn record_probe_response(
     app: tauri::AppHandle,

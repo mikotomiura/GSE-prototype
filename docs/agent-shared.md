@@ -201,7 +201,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜054**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜055**) の根拠を確認したい時 |
 | `docs/history/README.md` | 履歴へ移した・削除した文書の旧パスを辿る時（ADR に書かれた旧パスもここで引く）。履歴は現行の根拠に使わない |
 | `docs/mitou_submission/review-response-2026.md` | 2026 年度未踏の不採択コメントの論点ごとに、今の対応と状態を確かめる時（内部の追跡表） |
 | `docs/theory/README.md` | 理論（生成的返権論ほか・theory candidate）を読む時。⚠️ **SSOT の主張ではない**（RP §1 は問いとして参照するだけ） |
