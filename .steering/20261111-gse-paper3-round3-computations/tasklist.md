@@ -37,4 +37,15 @@
 - [x] /cross-review（Codex 込み）と採否（判断 25）→ 直して selftest 11 門・変異 8 を Mac で通す
 - [x] HP Z2 への引き継ぎ（next-session-gse-paper3-null-from-shared-run-on-hp-z2.md）・push は研究者に確かめる
 - [x] HP Z2 で回す（c89be93f）・notes・本文の 4.4 ほかを直す（判断 26・R2）
-- [ ] manuscript round 3
+- [x] manuscript round 3（major・判断 27・9ebccb21）
+
+## manuscript round 3 の直し（2026-11-19〜・判断 27）
+- [x] verdict §5 の 1〜9 の書き方の直し（要旨と結論で 2 つの値を分ける・比・限定・推奨を 2 つに・帰無の作り・本人側の割合・語の統一・細部を補足へ）
+- [x] 最頻値との比べを 4.4 に 1 文・108 と 146 の食い違いを整える
+- [x] 4.4 と 4.5 の入れ替え（方法の 3.5・3.6 も）・最初の帰無を 2 文・2 つ目の帰無の細部を S15 へ（outline.md の末尾に移した文を記録）
+- [x] 方法の例の図（作った数）・組んで目で見た
+- [x] 結論を 2 つに絞る・考察の第 1 段落に決定・Relation に Uto 型
+- [x] Step 3b の言い換えの点検（paper-write/rewording-check-r3.md）
+- [x] 語数を length-log に・警告 0
+- [x] 数値の独立の照合（判断 22 の形・判断 28）
+- [ ] round 4 を回すかを研究者に問う（attack-me Step 5）
