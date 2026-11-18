@@ -464,7 +464,7 @@ fn layer(cand: &str, secs: u64) {
     // SAFETY: 窓を作り、置き場を決める。終わったら DestroyWindow する。
     let (hwnd, origin) = unsafe {
         match cand {
-            "W" => {
+            "W" | "WL" => {
                 let Some(pm) = progman() else {
                     say!("FAIL Progman not found");
                     return;
@@ -500,7 +500,7 @@ fn layer(cand: &str, secs: u64) {
                 let ox = mon.left - pr.left;
                 let oy = mon.top - pr.top;
                 // 24H2 の Progman の下では、子に WS_EX_LAYERED が要るという報告がある。両方を試せるよう環境変数で切る。
-                let layered = std::env::var("SPIKE_W_LAYERED").is_ok();
+                let layered = cand == "WL";
                 let ex = if layered { WS_EX_LAYERED } else { WINDOW_EX_STYLE(0) };
                 let hwnd = match CreateWindowExW(
                     ex,
@@ -810,6 +810,6 @@ fn main() {
         Some("layer") => layer(args.get(2).map(String::as_str).unwrap_or("none"), secs(3, 60)),
         Some("strip") => strip(secs(2, 60)),
         Some("tree") => tree(),
-        _ => say!("usage: spike probe-pointer <label> [secs] | layer <W|B1|B2|T|none> [secs] | strip [secs] | tree"),
+        _ => say!("usage: spike probe-pointer <label> [secs] | layer <W|WL|B1|B2|T|none> [secs] | strip [secs] | tree"),
     }
 }
