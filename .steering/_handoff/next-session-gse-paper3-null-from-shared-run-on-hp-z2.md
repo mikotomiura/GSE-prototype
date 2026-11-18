@@ -68,3 +68,15 @@ bash run.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/null_from_shared_run.log"
 
 ## 7 HP Z2 での実行の記録（HP Z2 のセッションが追記する）
 
+
+記入: 2026-11-18（HP Z2 のセッション）。
+
+- 機械と版: HP Z2・Python 3.11.9・numpy 2.4.4・git-bash・`JOBS=16`。worktree `C:/Users/SDS02/GSE-prototype-paper3`、コードは `52eab98a`（`provenance.json` の `git_dirty_paths` は空）。`run_id` は `20261118T124517-101`（`summary.json` と `provenance.json` で同じ）。終了コード 0。結果のコミットは `c89be93f`。
+- 準備: この試験のディレクトリに `.gitattributes` が無く、`core.autocrlf=true` の HP Z2 では run.sh・SEED・scripts が CRLF で取り出されていた。§2 の 2 のとおり `git -c core.autocrlf=false checkout -- experiments/` で LF に取り出し直した（作業ツリーの変更は 0）。manifest の SHA-256 は `e0163f1b…` で一致。AC のスリープ・休止は 0、C: の空きは 227 GB。前の回の結果・npz の残りは無かった。
+- 時刻（各段の終わりはファイルの更新時刻）: 開始 12:45:17 → selftest 11 門緑（12:46:44）→ 変異 8 個（n1〜n8）すべて名指しの門が赤（12:58:25）→ manifest の照合（12:58:37・2,678 ファイル・外れ 0・余り 0）→ m0 の当てはめ（13:15:51）→ 門 12 本（14:26:55）→ 較正（15:16:24）→ 本計算 55 本（23:37:51）→ report → provenance → 終わり 23:37:58（約 10 時間 53 分）。
+- `m0_fit.json`: `checks` は 4 倍率（1・0.3・0.1・0.03）とも `shape`・`finite_nonneg`・`rows_sum_1` が true、`has_zero_cell` が false。`seconds` 1,033、`seconds_each` は 1: 952・0.3: 1,000・0.1: 1,028・0.03: 1,031。
+- `gate.json`: `chosen` は `"0.03"`、`seconds` 4,263。
+- `calibration.json`: 4 段とも `ok` が true（`seconds` 2,969）。
+- `plan.json`: `estimate_hours` 8.13、`cuts_applied` 0、`first_rep_seconds` 532。複製は 55 本（1 本 447〜625 秒）。
+- `git status`: 変わったのは `experiments/20261113-null-from-shared/results/` の下だけ。npz は repo に無い（`null_from_shared_m0.npz` は `DATA_DIR/landscape/` に書かれ、開いていない）。
+- 次から: Windows で取り出すなら、この試験のディレクトリにも `.gitattributes`（*.sh・SEED・*.py・*.json）を足すのを勧める（採否は研究者）。
