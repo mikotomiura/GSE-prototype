@@ -49,4 +49,13 @@
 - [x] 語数を length-log に・警告 0
 - [x] 数値の独立の照合（判断 22 の形・判断 28）
 - [x] round 4 を回すかを研究者に問う（判断 29・回す）
-- [ ] manuscript round 4（対象 d6587f21）
+- [x] manuscript round 4（対象 d6587f21・major・判断 30）
+
+## manuscript round 4 の直し（2026-11-19〜・判断 30・31）
+- [x] 書き方の直し 1〜11 を研究者に見せて承認（判断 31・全部）
+- [x] A 決定を固定の平滑に限り推奨 (2) の版と並べる・失う精度の文・発見を考察の冒頭と結論へ
+- [x] B 2 つ目の帰無の植えた差の下の振る舞いを 4.5 に
+- [x] C 要旨の推奨に範囲の語・post hoc の括弧を 1 つに
+- [x] Step 3b の点検（paper-write/rewording-check-r4.md）・語数を length-log に・警告 0
+- [x] 数値の独立の照合（判断 31）
+- [ ] manuscript round 5（本線の attack-me・round 4 の dir を土台に・Codex に既知の未決＋判断 30 の保留）
