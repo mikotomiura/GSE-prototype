@@ -206,3 +206,17 @@
 - 使わなかった直し: E N5（図 1 の範囲は判断 27 の 4 のまま）・題の「what remains of the gain」（監査役 3-5・軽微）・R1 N7（要旨冒頭の exploratory で覆う）・R1 N12（既知の未決 7）。
 - サブエージェント（Opus・読むだけ）が書き直した文を集計の記録と照らした（一致 33・不一致 2・言い方の注意 4・照らしていない 2）。直した 5 件: 実データの比を 0.56〜0.97（帰無の効き 7.378e-4 で割る。旧 0.55 は丸めた値どうし）とし k = 5・15 の 0.75・0.56 を添えた・「As in the real panel ... τ = 10^6」を実データの 10^6 と 3×10^5 に・smoothing effect の「costs」を「当て直さずに外したときの点の変わり方」に・最頻値が確率 0 を当てる 2 人の断りを 4.4 に戻した・結論の重ならない窓を k = 15 の全員に限った（k = 5 は 10/17）。残した注意: 4.4 の二分の「nearly every writer's choice sits at the edge of both grids」は k = 15 で選ぶ側の半分の 758/2,000 組が格子の中（旧版からの文・round 5 で出たら直す）。
 - 本文 7,013 語（+74）・要旨 250 語・17 頁・警告 0。
+
+## 判断 32（2026-11-19・manuscript round 5 の採否・AskUserQuestion）
+- 判定: major（R1 major・R2 minor・R3 minor・E「直してから回す」・Codex major）。推移 major ×5（R の推奨は major ×3 から major 1・minor 2 に下がった）。記録は `.steering/20261107-gse-paper3-per-person-learning/attack-me/manuscript-paper3/round-5/verdict.md`（commit 50404c7b）。
+- 中心の指摘（R1・R2・R3）: 考察の決定の段と結論の「共通に替えると約 5e-4 失う」は、書き手のデータを使わずに共通の平滑を軽くするだけで取り戻せる量（+1.6e-3・最頻値も +7.4e-4）と並んでいない。round 4 の直し（判断 30 A）から出た。
+- 研究者の選択（どれも推奨案）:
+  - A 5e-4 は共通の平滑を軽くするだけで取り戻せるので本人のデータの価値ではない、と 1 文。決定に意味のある比べは両側を同じ平滑にした版（3.4e-3〜5.2e-3・post hoc・合成で確かめていない）だけと書き、「確かめた／確かめていない」の段を決定の段の前に置く。
+  - B 重ならない窓: 4.2 の大きさの文（does not fall by two orders of magnitude）を外し、記号の数とパラメータの数の交絡・合成で確かめていないことを 1 文。結論の最後の文は「発見は重なる窓の記号に限られる」の解釈で閉じる。値は S13 のまま。
+  - C 要旨: 「The grids were extended, and two checks added, after seeing results」・2 桁に k = 5 と 15・CS1 に at the fixed smoothing・3e-2 に planted。語数は末尾の「a null matching ... not achieved」の節を外して空ける。
+  - D remainder の定義に「対称の当て直しでは構造を 3-state AR-HMM に固定」を 1 句足し、4.4 の only を「in the settings reported」程度に。advantage の語を gain / remainder にそろえる。
+  - E 推奨 (2) の版の τ と重みを保存済みの集計から引いて決定の段に 1 句（集計に無ければ限界にその旨）。
+  - verdict §5 の書き方の直し 1〜11 を全部入れる。
+  - 直した後に round 6 を回す。
+  - outline.md 冒頭の Target の行は今は残し、公開のアーカイブを作るときに外す（公開前の持ち物の確かめに載せる）。
+- 却下: 失う精度の文を外す・中央値を本文に出す・3〜7e-3 も要旨から外す・別の名で呼ぶ・重みを出さない・1〜10 だけ・メインの確かめで閉じる・Target の行を今外す / そのまま残す。
