@@ -48,4 +48,5 @@
 - [x] Step 3b の言い換えの点検（paper-write/rewording-check-r3.md）
 - [x] 語数を length-log に・警告 0
 - [x] 数値の独立の照合（判断 22 の形・判断 28）
-- [ ] round 4 を回すかを研究者に問う（attack-me Step 5）
+- [x] round 4 を回すかを研究者に問う（判断 29・回す）
+- [ ] manuscript round 4（対象 d6587f21）
