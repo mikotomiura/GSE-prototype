@@ -1,0 +1,50 @@
+{
+ "run_id": "20261118T124517-101",
+ "git_head": "52eab98a3a06a948529e725f925a9abc97bf3ce3",
+ "git_dirty_paths": [],
+ "jobs": 16,
+ "python": "3.11.9",
+ "numpy": "2.4.4",
+ "machine": "Windows-10-10.0.26200-SP0",
+ "scripts": {
+  "check_mutations.py": "6da150912578075154139a42e609c86909700470414b7828cb57178718bdeaf7",
+  "fit_m0.py": "b054c0f02cb099cc0264c5cc2ff93f81c7f4e6152442a424e11109cc1b4fec88",
+  "null.py": "4eebee382e8dd53c429bb226222818a5a265ce495e8b5cb49c5ca3e0662b4803",
+  "pinned6.py": "06b233754dd117d9fa97aa5825963d64b0951acd35ca8af0b31857d2c551ed19",
+  "selftest_null.py": "0eb3024069c526d9e9537d7001a77087c299ae8bc6ea29b1298386e814c6cbbf"
+ },
+ "run_sh": "46366fc37df316d0387707c6d46d6add809f326dd861569c393652fca16e2c44",
+ "conditions": "4d3b05025696c508215619be97e37c471b912efa5c278960705d12eb37bfa6c9",
+ "seed_file": "20c54ec65085a18aa01aaf67c8a8703cd4916c341a4c21450497a08b2b8bd37d",
+ "pinned": {
+  "20261112-sensitivity-ten-seeds\\scripts\\ten.py": "0071816b5d12b73e5a6a96641c579a80830116e0a9165bc890a8fe900fea289a",
+  "20261112-sensitivity-ten-seeds\\scripts\\pinned5.py": "7f8674c4fe13befe825bfbacff1309bd58234f13654f3bc8168e2783ab3b8574",
+  "20261111-sensitivity-mode-decomposition\\scripts\\decomp.py": "5e0f34e46ea26b91f271e9971ba443cd6024720a445201d428d22ddb51e48453",
+  "20261111-sensitivity-mode-decomposition\\scripts\\pinned2.py": "5ddb752fd33b550c7c6adfdb249a2cb25fa98eb2df4319228f45f4b34e12ceb9",
+  "20261106-tau-mode-candidate\\results\\summary.json": "b775d7cf08b9b826fac31a74a7d5048030aa67119da58e42ff19f9f358c18865",
+  "ten-seeds:synth.py": "41c60dd5ec954f6d1bd526560c318f96847641533e31f3826f099fb443d64ee3",
+  "ten-seeds:run_synth.py": "103ad29bcae6eee2b7c95fa117906a7098399effe494203b00775b7f2d951f5f",
+  "ten-seeds:pinned.py": "02317ec7174be93aa60c18a022ba411d5652cc1f97aab7fd1c0408e254ab8006",
+  "ten-seeds:analysis.py": "ce20b5855bbe89cbe635f6af40e6f5993f9cb0ff3e47d8771ccd7bbfdfb3f4ef",
+  "ten-seeds:results/calibration.json": "d8c8c55f05e03f70e6c44b49789af4b46c95f3d6f99bcd570851a8bb2fe3f18d",
+  "decomp:20261110-per-person-sensitivity\\scripts\\synth.py": "41c60dd5ec954f6d1bd526560c318f96847641533e31f3826f099fb443d64ee3",
+  "decomp:20261110-per-person-sensitivity\\scripts\\run_synth.py": "103ad29bcae6eee2b7c95fa117906a7098399effe494203b00775b7f2d951f5f",
+  "decomp:20261110-per-person-sensitivity\\scripts\\pinned.py": "02317ec7174be93aa60c18a022ba411d5652cc1f97aab7fd1c0408e254ab8006",
+  "decomp:20261110-per-person-sensitivity\\scripts\\analysis.py": "ce20b5855bbe89cbe635f6af40e6f5993f9cb0ff3e47d8771ccd7bbfdfb3f4ef",
+  "decomp:20261106-tau-mode-candidate\\scripts\\hmm2.py": "f0e0888f8212d5887c6356b7451771370c4d3117404a304f20ecddfb156dfa0a"
+ },
+ "b_code": {
+  "20261112-selection-split-and-smoothing\\scripts\\compute.py": "df2dcb291eb8b385d3d1c4492f40d60764c8132d725c66cd467ca3ccc1ecbd6b",
+  "20261112-selection-split-and-smoothing\\scripts\\ab.py": "6eb301ac3257083793056d098afb598b898aee0e1ce0f095a1a2d2f96b7508f0",
+  "20261112-selection-split-and-smoothing\\scripts\\pinned4.py": "fbc19b1e394147b48d9f209911ce84029600455046abd33bc2f71684d50c6b2c",
+  "20261104-timeseries-tau-extend\\scripts\\manifest.py": "7ac76ebf0887703c65afb44066f395f8df5206395e1224870b5ef26570f1a86b"
+ },
+ "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+ "m0_npz_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4",
+ "input_manifest_sha256": "e0163f1b48e94273a9d2e30fe6e6c76de642eae82311a6ca7c125896a3d74406",
+ "m0_fit_sha256": "c86493f05f913cde70ed7285c30db478f612fdf0eec6a504a3865a945b34390a",
+ "gate_sha256": "850c8a72140f2076d30c6dbff9b08d1084b07aec5c8302c608ee04580fbfbd16",
+ "calibration_sha256": "011b5b350d9a5ea02c6b06d6130a494d17063bb8de79d6fef268cb85a44f1fb6",
+ "plan_sha256": "e90149c2b7890f793cbd91b808ebfbe0b7396de16a3940cc72701af5e3537255",
+ "summary_sha256": "e62f95651e1abedbfc88f001b3e2dffa5e888843135af8cdd969436f4c7e4850"
+}

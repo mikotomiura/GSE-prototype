@@ -1,0 +1,571 @@
+{
+ "run_id": "20261118T124517-101",
+ "seed": 2026111001,
+ "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+ "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4",
+ "alpha": "0.03",
+ "m0_used_arr_sha256": "2412bbaee7904c70de55c9f05d3d20508410010ab884873a731a9b79adecddb5",
+ "budget_hours": 24.0,
+ "rows": [
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 0,
+   "no": 0
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 1,
+   "no": 1
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 2,
+   "no": 2
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 3,
+   "no": 3
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 4,
+   "no": 4
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 0,
+   "no": 5
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 1,
+   "no": 6
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 0,
+   "no": 7
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 1,
+   "no": 8
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 0,
+   "no": 9
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 1,
+   "no": 10
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 0,
+   "no": 11
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 1,
+   "no": 12
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 5,
+   "no": 33
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 6,
+   "no": 34
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 7,
+   "no": 35
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 8,
+   "no": 36
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 9,
+   "no": 37
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 10,
+   "no": 38
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 11,
+   "no": 39
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 12,
+   "no": 40
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 13,
+   "no": 41
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.0,
+   "seed": 14,
+   "no": 42
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 2,
+   "no": 43
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 3,
+   "no": 44
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 4,
+   "no": 45
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 5,
+   "no": 46
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 6,
+   "no": 47
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 7,
+   "no": 48
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 8,
+   "no": 49
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.001,
+   "seed": 9,
+   "no": 50
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 2,
+   "no": 51
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 3,
+   "no": 52
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 4,
+   "no": 53
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 5,
+   "no": 54
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 6,
+   "no": 55
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 7,
+   "no": 56
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 8,
+   "no": 57
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.003,
+   "seed": 9,
+   "no": 58
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 2,
+   "no": 59
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 3,
+   "no": 60
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 4,
+   "no": 61
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 5,
+   "no": 62
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 6,
+   "no": 63
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 7,
+   "no": 64
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 8,
+   "no": 65
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.01,
+   "seed": 9,
+   "no": 66
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 2,
+   "no": 67
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 3,
+   "no": 68
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 4,
+   "no": 69
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 5,
+   "no": 70
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 6,
+   "no": 71
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 7,
+   "no": 72
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 8,
+   "no": 73
+  },
+  {
+   "strand": "dose",
+   "shape": "coauthor",
+   "K": 3,
+   "g": 0.03,
+   "seed": 9,
+   "no": 74
+  }
+ ],
+ "reused": [],
+ "seconds": {
+  "0": 532.3857517242432,
+  "1": 535.2009170055389,
+  "2": 576.9280605316162,
+  "3": 491.9421355724335,
+  "4": 560.6162452697754,
+  "5": 519.4367184638977,
+  "6": 514.0558269023895,
+  "7": 468.6110420227051,
+  "8": 563.8658850193024,
+  "9": 512.1328165531158,
+  "10": 524.7515387535095,
+  "11": 548.8850214481354,
+  "12": 589.4956140518188,
+  "33": 502.78326201438904,
+  "34": 585.1957900524139,
+  "35": 536.6567969322205,
+  "36": 584.3300070762634,
+  "37": 528.3477082252502,
+  "38": 529.7567508220673,
+  "39": 548.9323241710663,
+  "40": 586.7841367721558,
+  "41": 455.71519351005554,
+  "42": 637.6775677204132,
+  "43": 583.773464679718,
+  "44": 531.4372756481171,
+  "45": 564.8301730155945,
+  "46": 472.565141916275,
+  "47": 559.0166018009186,
+  "48": 535.3367147445679,
+  "49": 589.6356735229492,
+  "50": 606.8957166671753,
+  "51": 522.0977966785431,
+  "52": 540.232861995697,
+  "53": 599.321615934372,
+  "54": 582.6319463253021,
+  "55": 625.3701648712158,
+  "56": 601.7949266433716,
+  "57": 447.4149160385132,
+  "58": 506.06555914878845,
+  "59": 583.8996431827545,
+  "60": 500.1673958301544,
+  "61": 538.2819592952728,
+  "62": 526.643303155899,
+  "63": 480.76462960243225,
+  "64": 563.0165388584137,
+  "65": 567.2850005626678,
+  "66": 608.4995412826538,
+  "67": 541.9002027511597,
+  "68": 644.4479932785034,
+  "69": 596.1297826766968,
+  "70": 530.3467409610748,
+  "71": 534.3145685195923,
+  "72": 543.5618348121643,
+  "73": 545.9382193088531,
+  "74": 477.6246726512909
+ },
+ "estimate_hours_full": 8.133671206898159,
+ "cuts_applied": 0,
+ "estimate_hours": 8.133671206898159,
+ "kept": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  33,
+  34,
+  35,
+  36,
+  37,
+  38,
+  39,
+  40,
+  41,
+  42,
+  43,
+  44,
+  45,
+  46,
+  47,
+  48,
+  49,
+  50,
+  51,
+  52,
+  53,
+  54,
+  55,
+  56,
+  57,
+  58,
+  59,
+  60,
+  61,
+  62,
+  63,
+  64,
+  65,
+  66,
+  67,
+  68,
+  69,
+  70,
+  71,
+  72,
+  73,
+  74
+ ],
+ "first_rep_seconds": 532.3857517242432,
+ "seconds_total_after_first": 29554.049889802933
+}

@@ -1,0 +1,481 @@
+{
+ "run_id": "20261118T124517-101",
+ "seed": 2026111001,
+ "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+ "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4",
+ "real_b": 0.00074,
+ "seeds": [
+  100,
+  101,
+  102
+ ],
+ "alphas": {
+  "1": {
+   "per_seed": [
+    {
+     "b": [
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0008626043332995437,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -0.0011677453916043024,
+      -Infinity,
+      -0.0011029460585922912,
+      -Infinity,
+      0.0005247467346650714,
+      -Infinity
+     ],
+     "median": -Infinity,
+     "n_neg_inf": 13,
+     "share_pos": 0.11764705882352941,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand0",
+      "nonconv": 5
+     },
+     "gate_seed": 100,
+     "no": 200,
+     "seconds": 334.8971891403198,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      -Infinity,
+      -Infinity,
+      0.0016866533849619891,
+      -Infinity,
+      -Infinity,
+      0.0013888949793841587,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0014771488190403192,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity
+     ],
+     "median": -Infinity,
+     "n_neg_inf": 14,
+     "share_pos": 0.17647058823529413,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand1",
+      "nonconv": 4
+     },
+     "gate_seed": 101,
+     "no": 201,
+     "seconds": 328.6855823993683,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      0.0018036728457855866,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.001394377422292592,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -0.0013965844238747471,
+      -Infinity,
+      -Infinity,
+      -Infinity
+     ],
+     "median": -Infinity,
+     "n_neg_inf": 14,
+     "share_pos": 0.11764705882352941,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand7",
+      "nonconv": 7
+     },
+     "gate_seed": 102,
+     "no": 202,
+     "seconds": 432.15024518966675,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    }
+   ],
+   "b_s": [
+    -Infinity,
+    -Infinity,
+    -Infinity
+   ],
+   "b_bar": -Infinity,
+   "all_positive": false
+  },
+  "0.3": {
+   "per_seed": [
+    {
+     "b": [
+      0.0019128260005660258,
+      0.0015032666821602758,
+      -Infinity,
+      -Infinity,
+      0.0014514463719481063,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0021392461377465755,
+      -Infinity,
+      -Infinity,
+      0.0017362725325842376,
+      0.0013164908599900271,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity
+     ],
+     "median": -Infinity,
+     "n_neg_inf": 11,
+     "share_pos": 0.35294117647058826,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand6",
+      "nonconv": 6
+     },
+     "gate_seed": 100,
+     "no": 203,
+     "seconds": 395.2491374015808,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      -Infinity,
+      0.0017505606891167202,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0017850286941728521,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0017231508597006506,
+      0.002077785170930324,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0011801270334182434
+     ],
+     "median": -Infinity,
+     "n_neg_inf": 12,
+     "share_pos": 0.29411764705882354,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand2",
+      "nonconv": 6
+     },
+     "gate_seed": 101,
+     "no": 204,
+     "seconds": 365.8129425048828,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      0.0017119722019867112,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0017650619325288441,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      -Infinity
+     ],
+     "median": -Infinity,
+     "n_neg_inf": 15,
+     "share_pos": 0.11764705882352941,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand4",
+      "nonconv": 3
+     },
+     "gate_seed": 102,
+     "no": 205,
+     "seconds": 331.5217480659485,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    }
+   ],
+   "b_s": [
+    -Infinity,
+    -Infinity,
+    -Infinity
+   ],
+   "b_bar": -Infinity,
+   "all_positive": false
+  },
+  "0.1": {
+   "per_seed": [
+    {
+     "b": [
+      -Infinity,
+      0.002084845698959281,
+      0.0018549762151293114,
+      0.0013448809245130144,
+      0.0012363968964705374,
+      -Infinity,
+      -Infinity,
+      0.0020746484641172014,
+      -Infinity,
+      0.001798447453151164,
+      0.0020674463419629308,
+      0.002109437483624077,
+      0.0018649568229204272,
+      0.0022061413772887506,
+      -Infinity,
+      -Infinity,
+      0.002100938165703947
+     ],
+     "median": 0.001798447453151164,
+     "n_neg_inf": 6,
+     "share_pos": 0.6470588235294118,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand5",
+      "nonconv": 3
+     },
+     "gate_seed": 100,
+     "no": 206,
+     "seconds": 278.9841048717499,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      -Infinity,
+      0.001118779425712535,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0013973609069386494,
+      -Infinity,
+      0.001450367938779784,
+      -Infinity,
+      -Infinity,
+      0.0006966524414158681,
+      0.0015772015563975672,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.001683597451294705,
+      -Infinity
+     ],
+     "median": -Infinity,
+     "n_neg_inf": 11,
+     "share_pos": 0.35294117647058826,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand7",
+      "nonconv": 7
+     },
+     "gate_seed": 101,
+     "no": 207,
+     "seconds": 435.05231046676636,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      0.0019744788786392187,
+      0.00146941495537245,
+      -Infinity,
+      0.0028832936477576343,
+      0.0014979501106346382,
+      0.0018110355059553496,
+      0.002474397894292657,
+      0.0022586124460128865,
+      0.0028103726855847055,
+      0.0017202359569967185,
+      0.002374044555485899,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.0015439946324677933,
+      -Infinity,
+      0.0024249306527197034
+     ],
+     "median": 0.0017202359569967185,
+     "n_neg_inf": 5,
+     "share_pos": 0.7058823529411765,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand2",
+      "nonconv": 4
+     },
+     "gate_seed": 102,
+     "no": 208,
+     "seconds": 290.1656448841095,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    }
+   ],
+   "b_s": [
+    0.001798447453151164,
+    -Infinity,
+    0.0017202359569967185
+   ],
+   "b_bar": 0.0017202359569967185,
+   "all_positive": false
+  },
+  "0.03": {
+   "per_seed": [
+    {
+     "b": [
+      0.001950419112590196,
+      0.0019366692678567943,
+      0.002533870656611148,
+      0.001760294777512661,
+      0.0016760757261761738,
+      0.002100090151211209,
+      -Infinity,
+      0.002357310440026572,
+      -Infinity,
+      0.002205690442920072,
+      0.0020582963234757057,
+      0.001383381182418597,
+      -Infinity,
+      -Infinity,
+      0.0016854958779601303,
+      0.0014484961970343546,
+      0.001859184946285286
+     ],
+     "median": 0.001760294777512661,
+     "n_neg_inf": 4,
+     "share_pos": 0.7647058823529411,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand1",
+      "nonconv": 4
+     },
+     "gate_seed": 100,
+     "no": 209,
+     "seconds": 365.16074776649475,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      -Infinity,
+      0.0018499365783780641,
+      -Infinity,
+      0.001745649616785916,
+      0.0025945963994167265,
+      0.0014910571726308164,
+      0.00192983247587597,
+      0.002052643005892252,
+      0.003464942835901541,
+      -Infinity,
+      0.0009537900895895124,
+      0.00203880016014496,
+      0.0019681185786455946,
+      0.002092294505242509,
+      -Infinity,
+      0.0018327267235759281,
+      0.0014508887128780734
+     ],
+     "median": 0.0018327267235759281,
+     "n_neg_inf": 4,
+     "share_pos": 0.7647058823529411,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand9",
+      "nonconv": 4
+     },
+     "gate_seed": 101,
+     "no": 210,
+     "seconds": 357.83562421798706,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    },
+    {
+     "b": [
+      -Infinity,
+      0.001835284962787287,
+      -Infinity,
+      0.002012419493394091,
+      0.0026149629538466668,
+      -Infinity,
+      0.001539856142049545,
+      -Infinity,
+      0.0019492213043763584,
+      0.001622241092289256,
+      -Infinity,
+      -Infinity,
+      -Infinity,
+      0.002260329533375849,
+      0.0013745985893106605,
+      0.0019805001432602887,
+      0.0016484777096366643
+     ],
+     "median": 0.001539856142049545,
+     "n_neg_inf": 7,
+     "share_pos": 0.5882352941176471,
+     "n": 17,
+     "full_diag": {
+      "winner": "rand1",
+      "nonconv": 5
+     },
+     "gate_seed": 102,
+     "no": 211,
+     "seconds": 347.84028029441833,
+     "seed": 2026111001,
+     "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+     "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+    }
+   ],
+   "b_s": [
+    0.001760294777512661,
+    0.0018327267235759281,
+    0.001539856142049545
+   ],
+   "b_bar": 0.001760294777512661,
+   "all_positive": true
+  }
+ },
+ "reused_parts": [],
+ "chosen": "0.03",
+ "seconds": 4263.4229300022125
+}

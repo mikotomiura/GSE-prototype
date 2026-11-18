@@ -1,0 +1,35 @@
+{
+ "b": [
+  -Infinity,
+  -Infinity,
+  0.0016866533849619891,
+  -Infinity,
+  -Infinity,
+  0.0013888949793841587,
+  -Infinity,
+  -Infinity,
+  -Infinity,
+  -Infinity,
+  -Infinity,
+  -Infinity,
+  0.0014771488190403192,
+  -Infinity,
+  -Infinity,
+  -Infinity,
+  -Infinity
+ ],
+ "median": -Infinity,
+ "n_neg_inf": 14,
+ "share_pos": 0.17647058823529413,
+ "n": 17,
+ "full_diag": {
+  "winner": "rand1",
+  "nonconv": 4
+ },
+ "gate_seed": 101,
+ "no": 201,
+ "seconds": 328.6855823993683,
+ "seed": 2026111001,
+ "code_hash": "8677d59d6f5419efebae43040d47da90f752e850aff595ba9c4de5c85e34b356",
+ "m0_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4"
+}

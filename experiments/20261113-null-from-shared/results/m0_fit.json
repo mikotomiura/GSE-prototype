@@ -1,0 +1,51 @@
+{
+ "alphas": [
+  "1",
+  "0.3",
+  "0.1",
+  "0.03"
+ ],
+ "struct": "ar3",
+ "seed": 2026110401,
+ "npz_sha256": "a4fbe2d6ca127547c451e2887ea271d3f48277b3cf51990a1cd6d3eb14761fb4",
+ "seconds": 1033.1600234508514,
+ "seconds_each": {
+  "1": 952.274646282196,
+  "0.3": 1000.1058270931244,
+  "0.1": 1027.7721016407013,
+  "0.03": 1031.2012357711792
+ },
+ "checks": {
+  "1": {
+   "shape": true,
+   "finite_nonneg": true,
+   "rows_sum_1": true,
+   "has_zero_cell": false
+  },
+  "0.3": {
+   "shape": true,
+   "finite_nonneg": true,
+   "rows_sum_1": true,
+   "has_zero_cell": false
+  },
+  "0.1": {
+   "shape": true,
+   "finite_nonneg": true,
+   "rows_sum_1": true,
+   "has_zero_cell": false
+  },
+  "0.03": {
+   "shape": true,
+   "finite_nonneg": true,
+   "rows_sum_1": true,
+   "has_zero_cell": false
+  }
+ },
+ "b_code": {
+  "20261112-selection-split-and-smoothing\\scripts\\compute.py": "df2dcb291eb8b385d3d1c4492f40d60764c8132d725c66cd467ca3ccc1ecbd6b",
+  "20261112-selection-split-and-smoothing\\scripts\\ab.py": "6eb301ac3257083793056d098afb598b898aee0e1ce0f095a1a2d2f96b7508f0",
+  "20261112-selection-split-and-smoothing\\scripts\\pinned4.py": "fbc19b1e394147b48d9f209911ce84029600455046abd33bc2f71684d50c6b2c",
+  "20261104-timeseries-tau-extend\\scripts\\manifest.py": "7ac76ebf0887703c65afb44066f395f8df5206395e1224870b5ef26570f1a86b"
+ },
+ "input_manifest_sha256": "e0163f1b48e94273a9d2e30fe6e6c76de642eae82311a6ca7c125896a3d74406"
+}
