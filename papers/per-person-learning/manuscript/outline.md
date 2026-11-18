@@ -92,3 +92,10 @@ The body no longer carries the following; the supplement sections must hold them
 - S16: because the choices sit at the edges of both grids, the grid extensions made after seeing results lie outside the writer split; at k = 12 and 15 a minority of pairs is not positive (values already listed above). The shrinkage-only row was not recomputed against the re-chosen own chain.
 - S11: per-person fits reached the same solution from different starts, but the dependence of the remainder on the shared model's starting point was not measured; no comparison with a shared model that includes the target writer's training units.
 - S13: non-overlapping windows, 15-session panel: per-person 3-state HMM with tau chosen on other writers minus the shared 3-state HMM, +0.043 at k = 5 and +0.096 at k = 15 (17 of 17 writers at k = 15), read for direction only (about one-thirtieth of the symbols).
+
+## Round 5 fixes: text moved out of the body (to write into the supplement)
+
+- S9: the prior mode gives zero probability to held-out symbols of 2 of the 17 writers; these are counted against the prior mode in the per-person minus prior mode comparison.
+- S15: synthetic CS1 values are not used to read the real panel because synthetic CS1 writers were mostly given tau = 10^6, whereas the real panel chose the shared model itself for every writer; the CS1 sensitivity rests on two seeds per level; a difference planted in 5 of 17 synthetic writers was not detected in the panel median.
+- S16: symmetric refit, 15-session panel: 12 to 17 of 17 writers favour the per-person fit at alpha = 0.03 (the share is not evidence of a difference).
+- S12: the list of later checks whose code is released (pseudo-residuals, structure compensation, synthetic sensitivity with its decomposition, its ten-seed extension and the null generated from the shared model, the prior mode, the choice objective, the pause share, the writer split and the smoothing checks).
