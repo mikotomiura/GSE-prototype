@@ -35,8 +35,8 @@ import {
 import type { RippleMessage, TraceMessage } from "./handmarkStageTrace";
 import { buildWorld, drawFrame, viewOf } from "./handmarkStageDraw";
 import type { RippleView, Shown, View, World } from "./handmarkStageDraw";
-import { applyIcons, clearIconLayer, drawIconsAtop, installIconsHook, makeIconLayer } from "./handmarkStageIcons";
-import type { IconsMessage } from "./handmarkStageIcons";
+import { clearIconLayer, drawIconsAtop, handleIconsMessage, installIconsHook, makeIconLayer } from "./handmarkStageIcons";
+import type { IconsHookMessage } from "./handmarkStageIcons";
 
 /** 状態を知らせるイベント名(src-tauri/src/handmark_stage.rs の STATE_EVENT)。閉じたときは null。 */
 const STATE_EVENT = "handmark-state";
@@ -306,8 +306,8 @@ export default function HandmarkStage() {
       .catch(() => {});
     // 開いた直後の最初の区画は状態より先に届くことがあるので、active を待たずに置く。閉じるときは Rust が
     // 先に送り手を止めてから null を送り、null で層を消す。次に開いた最初の区画は層を消してから置く(reset)。
-    const uninstallIcons = installIconsHook((msg: IconsMessage) => {
-      if (applyIcons(icons, msg) && active) kick();
+    const uninstallIcons = installIconsHook((msg: IconsHookMessage) => {
+      if (handleIconsMessage(icons, msg) && active) kick();
     });
 
     return () => {

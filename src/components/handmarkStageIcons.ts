@@ -28,13 +28,21 @@ export interface IconsMessage {
   tiles: IconTileMessage[];
 }
 
+/** 窓が閉じた知らせ。`closeGen` より前の世代の区画は、以後受けない。 */
+export interface IconsCloseMessage {
+  closeGen: number;
+}
+
+/** 受け口に届くもの。 */
+export type IconsHookMessage = IconsMessage | IconsCloseMessage;
+
 /** 受け口を置く窓の形(この窓の `window` に 1 つだけ置く)。 */
 interface IconsHookHost {
-  [ICONS_HOOK]?: (msg: IconsMessage) => void;
+  [ICONS_HOOK]?: (msg: IconsHookMessage) => void;
 }
 
 /** 受け口を置き、外す関数を返す。 */
-export function installIconsHook(handler: (msg: IconsMessage) => void): () => void {
+export function installIconsHook(handler: (msg: IconsHookMessage) => void): () => void {
   const host = window as unknown as IconsHookHost;
   host[ICONS_HOOK] = handler;
   return () => {
@@ -161,6 +169,26 @@ export function applyIcons(layer: IconLayer, msg: IconsMessage): boolean {
     changed = true;
   }
   return changed;
+}
+
+/** 閉じた知らせを受ける: 層を消し、`closeGen` より前の世代を以後受けない(閉じる前に一度も区画を受けていなくても効く)。 */
+export function closeIcons(layer: IconLayer, closeGen: number): void {
+  clearIconLayer(layer);
+  if (Number.isSafeInteger(closeGen) && closeGen > layer.minGen) {
+    layer.minGen = closeGen;
+  }
+}
+
+/** 受け口に届いたものを処理する。描き直しが要れば true。 */
+export function handleIconsMessage(layer: IconLayer, msg: IconsHookMessage): boolean {
+  if (typeof msg !== "object" || msg === null) {
+    return false;
+  }
+  if ("closeGen" in msg) {
+    closeIcons(layer, msg.closeGen);
+    return true;
+  }
+  return applyIcons(layer, msg);
 }
 
 /** 層を消す(窓が閉じたとき)。以後は、いまの番より新しい番の区画だけを受ける。 */

@@ -57,20 +57,31 @@ static LISTVIEW: AtomicIsize = AtomicIsize::new(0);
 static DIRTY: AtomicBool = AtomicBool::new(false);
 /// 動いている番の止める印（1 つだけ）。
 static KEEPER: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
-/// 番の世代。`start`・`stop` のたびに進む。共有の印（`LISTVIEW`・`DIRTY`・`LAYOUT_LOST`）に触れてよいのは、
-/// 世代が今の値と同じ番だけ（遅れて抜ける古い番が、新しい番の印を消さないように）。窓へ渡す区画にも付け、
-/// 窓は古い世代の区画を捨てる。
+/// 番の世代。`start`・`stop` のたびに進む。窓へ渡す区画にも付け、窓は古い世代と閉じた後の区画を捨てる。
+/// 番は各回の頭で世代を見て、今の世代でなければ抜ける。共有の印（`LISTVIEW`・`DIRTY`）は、止められた番が
+/// 次の回の頭までに 1 回分だけ触れうる（取りこぼした出来事は 5 秒の保険が埋める）。
 static GEN: AtomicU64 = AtomicU64::new(0);
-/// 開いた後にデスクトップの並びが崩れた（一覧が 3 秒見つからない）。背景の窓の様子を「出せなかった」にする。
-static LAYOUT_LOST: AtomicBool = AtomicBool::new(false);
-/// 一覧が見つからないまま、並びが崩れたとみなすまで。
-const LOST_AFTER_MS: u128 = 3_000;
+/// 開いた後にデスクトップの並びが崩れたと判じた番の世代（0 = 無い）。今の世代と同じときだけ効く
+/// （古い番が遅れて書いても、新しい番を「出せなかった」にしない）。
+static LOST_GEN: AtomicU64 = AtomicU64::new(0);
+/// 一覧が見つからないまま、並びが崩れたとみなすまで。explorer の再起動で一覧が戻るまでの数秒を誤って
+/// 数えないよう、余裕をとる（見失っている間は窓の層を空にさせるので、見え方は待っても崩れない。延びるのは、
+/// 見えていない時間を表示の量に数える誤差だけ）。一度判じたら、駆動役が閉じて 60 秒後に開き直すまで戻さない。
+const LOST_AFTER_MS: u128 = 10_000;
+/// 背景の窓の矩形を主画面と照らし合わせる間隔（回）。大きさ・倍率の変化に追う（冪等に直す）。
+const RECT_CHECK_EVERY: u32 = 16;
 /// 取り直しが続けて失敗したら、窓の層を消させる回数。
 const FAILS_BEFORE_CLEAR: u32 = 3;
 
 /// 開いた後にデスクトップの並びが崩れたか（背景の窓の層の `status` が読む）。
 pub fn layout_lost() -> bool {
-    LAYOUT_LOST.load(Ordering::Acquire)
+    let lost = LOST_GEN.load(Ordering::Acquire);
+    lost != 0 && lost == GEN.load(Ordering::Acquire)
+}
+
+/// 今の世代（窓を閉じたときに、窓の層へ「これより前の世代の区画を受けない」と伝える値）。
+pub fn current_gen() -> u64 {
+    GEN.load(Ordering::Acquire)
 }
 
 /// 区画を渡す口の形（世代・画面の幅・高さ・層を消してから置くか・区画）。
@@ -115,7 +126,6 @@ pub fn show_no_activate(hwnd: isize) {
 pub fn start(stage: isize, sink: Sink) {
     stop();
     let gen = GEN.fetch_add(1, Ordering::AcqRel) + 1;
-    LAYOUT_LOST.store(false, Ordering::Release);
     let flag = Arc::new(AtomicBool::new(false));
     let mine = Arc::clone(&flag);
     let spawned = std::thread::Builder::new()
@@ -375,6 +385,7 @@ fn run(stage: HWND, gen: u64, stop: &AtomicBool, sink: &Sink) {
     let mut last_capture = Instant::now() - Duration::from_millis(FALLBACK_MS as u64);
     let mut last_full = Instant::now();
     let mut last_size = primary_size();
+    let mut rect_tick = 0u32;
     let mut lv_missing_since: Option<Instant> = None;
     // 窓の層を空にさせた（一覧を見失った・取り直しが続けて失敗した）。戻ったら全部を送り直す。
     let mut cleared = false;
@@ -393,16 +404,33 @@ fn run(stage: HWND, gen: u64, stop: &AtomicBool, sink: &Sink) {
             warned_bottom = true;
             tracing::warn!("handmark desktop: Progman not found; stage placed at the bottom");
         }
-        // 主画面の大きさが変わった: 窓の大きさと、ポインタの写しの大きさを置き直し、全部を送り直す。
+        // 主画面の大きさが変わった: ポインタの写しの大きさを置き直し、全部を送り直す。
         let size = primary_size();
         if size != last_size && size.0 > 0 && size.1 > 0 {
             last_size = size;
-            let flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS;
-            // SAFETY: `stage` は背景の窓（頭で生きているかを見た）。非同期で送るので待たない。
-            let _ = unsafe { SetWindowPos(stage, None, 0, 0, size.0 as i32, size.1 as i32, flags) };
             (sink.on_resize)(size.0, size.1);
             prev.clear();
             last_capture = Instant::now() - Duration::from_millis(FALLBACK_MS as u64);
+            rect_tick = RECT_CHECK_EVERY;
+        }
+        // 窓の矩形を主画面と照らし合わせ、違えば直す（変わったときだけでなく繰り返し見る。倍率の変化で tao が
+        // 窓を置き直すのと前後しても、後から揃う）。
+        rect_tick += 1;
+        if rect_tick >= RECT_CHECK_EVERY {
+            rect_tick = 0;
+            let mut r = RECT::default();
+            // SAFETY: 背景の窓の矩形を問うだけ。
+            let ok = unsafe { GetWindowRect(stage, &mut r) }.is_ok();
+            let want = (0, 0, last_size.0 as i32, last_size.1 as i32);
+            if ok
+                && (r.left, r.top, r.right, r.bottom) != want
+                && last_size.0 > 0
+                && last_size.1 > 0
+            {
+                let flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS;
+                // SAFETY: `stage` は背景の窓（頭で生きているかを見た）。非同期で送るので待たない。
+                let _ = unsafe { SetWindowPos(stage, None, 0, 0, want.2, want.3, flags) };
+            }
         }
         let (sw, sh) = last_size;
         let lv = progman().and_then(listview);
@@ -433,7 +461,7 @@ fn run(stage: HWND, gen: u64, stop: &AtomicBool, sink: &Sink) {
                 prev.clear();
             }
             if since.elapsed().as_millis() >= LOST_AFTER_MS && current() {
-                LAYOUT_LOST.store(true, Ordering::Release);
+                LOST_GEN.store(gen, Ordering::Release);
                 if !warned_lost {
                     warned_lost = true;
                     tracing::warn!(

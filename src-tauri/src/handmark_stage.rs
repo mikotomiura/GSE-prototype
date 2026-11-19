@@ -159,7 +159,7 @@ mod imp {
                 // Windows: アイコンの写しの番も止め、窓の層を消させる（`close` と同じ）。
                 #[cfg(windows)]
                 {
-                    crate::handmark_desktop_windows::stop();
+                    stop_icons(&hide_target);
                     let _ = hide_target.emit_to(LABEL, STATE_EVENT, Option::<StageState>::None);
                 }
                 let _ = hide_target.hide();
@@ -265,6 +265,22 @@ mod imp {
         }
     }
 
+    /// 手跡の窓の WebView だけで、窓が置いた受け口を呼ぶ（他の窓には届かない・他の窓からは呼べない）。
+    /// 区画も「閉じた」の知らせも同じ口を通るので、窓の中で順に処理される。
+    #[cfg(windows)]
+    fn call_icons_hook(window: &tauri::WebviewWindow<Wry>, json: &str) {
+        let _ = window.eval(format!("window.{ICONS_HOOK}&&window.{ICONS_HOOK}({json})"));
+    }
+
+    /// 番を止め、窓の層に「この世代より前の区画を受けない・層を消す」と知らせる（区画と同じ口なので、閉じる前に
+    /// 番が送った区画より後に処理される）。
+    #[cfg(windows)]
+    fn stop_icons(window: &tauri::WebviewWindow<Wry>) {
+        crate::handmark_desktop_windows::stop();
+        let gen = crate::handmark_desktop_windows::current_gen();
+        call_icons_hook(window, &format!("{{\"closeGen\":{gen}}}"));
+    }
+
     /// 大きさ・クリックの透過・画面共有の除外を設定し、焦点を奪わずに出して、デスクトップの番を始める。
     /// どれかが失敗したら Err（出さない）。
     #[cfg(windows)]
@@ -311,8 +327,7 @@ mod imp {
                     // 手跡の窓の WebView だけで、窓が置いた受け口を呼ぶ（他の窓には届かない・他の窓からは呼べない）。
                     let payload = icons_payload(gen, sw, sh, reset, tiles);
                     if let Ok(json) = serde_json::to_string(&payload) {
-                        let _ = target
-                            .eval(format!("window.{ICONS_HOOK}&&window.{ICONS_HOOK}({json})"));
+                        call_icons_hook(&target, &json);
                     }
                 }),
                 // 開いている間に主画面の大きさが変わった: ポインタの写しの大きさを置き直す（窓の大きさは番が直す）。
@@ -360,9 +375,9 @@ mod imp {
         let _ = app.run_on_main_thread(move || {
             // 直前の `open` の `prepare`（メインスレッドに先に積まれた）が番を始めていても、ここで止める
             // （メインスレッドの待ち行列は順に走るので、開いてすぐ閉じても番が残らない）。
-            #[cfg(windows)]
-            crate::handmark_desktop_windows::stop();
             if let Some(w) = handle.get_webview_window(LABEL) {
+                #[cfg(windows)]
+                stop_icons(&w);
                 let _ = w.hide();
             }
         });
