@@ -1,12 +1,13 @@
 // 手跡の背景の窓に、デスクトップのアイコンの写しを重ねる層(Windows だけ・判断 9・10)。
 // Rust(src-tauri/src/handmark_desktop_windows.rs)が、デスクトップの一覧の絵のうち変わった 64×64 の区画だけを
-// 送る(`handmark-icons`)。ここは区画を画面の大きさの画面外の canvas に置き、模様を描いた後に
+// 手跡の窓の WebView だけで `window.__gseHandmarkIcons(...)` を呼んで渡す(イベントは使わない: Tauri のイベントは
+// 宛先を絞っても全窓から聞く listen に届き、他の窓から偽の区画も送れる)。ここは区画を画面の大きさの画面外の canvas に置き、模様を描いた後に
 // `source-atop` で重ねるだけ(模様のある画素にだけアイコンが乗る = 模様がアイコンの後ろを流れて見える)。
 // 模様の無い所には何も描かないので、本物のアイコンがそのまま見える(写しが二重にかからない)。
 // 受け取った画素は保存せず、送り返さず、窓が閉じたら消す。macOS では何も届かないので層は空のまま。
 
-/** アイコンの区画のイベント名(src-tauri/src/handmark_stage.rs の ICONS_EVENT)。 */
-export const ICONS_EVENT = "handmark-icons";
+/** アイコンの区画を受ける関数の名前(src-tauri/src/handmark_stage.rs の ICONS_HOOK)。 */
+export const ICONS_HOOK = "__gseHandmarkIcons";
 
 /** 区画 1 つ。`rgba` は straight の RGBA の base64。空なら消す。 */
 export interface IconTileMessage {
@@ -17,11 +18,28 @@ export interface IconTileMessage {
   rgba: string;
 }
 
-/** 画面の大きさ(物理ピクセル)と、変わった区画。 */
+/** 画面の大きさ(物理ピクセル)・層を消してから置くか・変わった区画。 */
 export interface IconsMessage {
   screenW: number;
   screenH: number;
+  reset: boolean;
   tiles: IconTileMessage[];
+}
+
+/** 受け口を置く窓の形(この窓の `window` に 1 つだけ置く)。 */
+interface IconsHookHost {
+  [ICONS_HOOK]?: (msg: IconsMessage) => void;
+}
+
+/** 受け口を置き、外す関数を返す。 */
+export function installIconsHook(handler: (msg: IconsMessage) => void): () => void {
+  const host = window as unknown as IconsHookHost;
+  host[ICONS_HOOK] = handler;
+  return () => {
+    if (host[ICONS_HOOK] === handler) {
+      delete host[ICONS_HOOK];
+    }
+  };
 }
 
 export interface IconLayer {
@@ -35,8 +53,8 @@ export function makeIconLayer(): IconLayer {
   return { canvas: null, ctx: null, any: false };
 }
 
-/** 画面の大きさの上限(物理ピクセル)。これを超える値は壊れているとみなす。 */
-const MAX_SIDE = 16384;
+/** 画面の大きさの上限(物理ピクセル・8K の幅)。これを超える値は壊れているとみなす。 */
+const MAX_SIDE = 8192;
 
 function validSide(v: number): boolean {
   return Number.isInteger(v) && v > 0 && v <= MAX_SIDE;
@@ -62,7 +80,13 @@ function decode(b64: string, n: number): Uint8ClampedArray | null {
 
 /** 区画を層に置く。何か変わったら true。壊れた区画は飛ばす。 */
 export function applyIcons(layer: IconLayer, msg: IconsMessage): boolean {
-  if (!validSide(msg.screenW) || !validSide(msg.screenH) || !Array.isArray(msg.tiles)) {
+  if (
+    typeof msg !== "object" ||
+    msg === null ||
+    !validSide(msg.screenW) ||
+    !validSide(msg.screenH) ||
+    !Array.isArray(msg.tiles)
+  ) {
     return false;
   }
   if (layer.canvas === null || layer.canvas.width !== msg.screenW || layer.canvas.height !== msg.screenH) {
@@ -78,7 +102,16 @@ export function applyIcons(layer: IconLayer, msg: IconsMessage): boolean {
     return false;
   }
   let changed = false;
+  // 送り手の要約が空から始まった(番が始まった・一覧が替わった・30 秒ごと): 前の写しを残さない。
+  if (msg.reset === true && layer.canvas !== null) {
+    ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+    layer.any = false;
+    changed = true;
+  }
   for (const t of msg.tiles) {
+    if (typeof t !== "object" || t === null) {
+      continue;
+    }
     const inside =
       Number.isInteger(t.x) &&
       Number.isInteger(t.y) &&

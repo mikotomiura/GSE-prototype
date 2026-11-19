@@ -106,6 +106,15 @@ B を足す理由: W は画面共有の除外が効かない見込みで、T は
 | `handmark_guard.rs` | 変 | Windows のファイルを検査に足す（下の 2.4） |
 | `Cargo.toml` | 変 | `windows` の feature に `Win32_Storage_Xps`（`PrintWindow`） |
 
+### 2.2b レビューの後に変えたこと（2026-11-19・code-reviewer と security-checker）
+
+- 画素の渡し方: `emit_to` のイベントをやめ、背景の窓の WebView だけで `eval` して受け口（`__gseHandmarkIcons`）を呼ぶ。イベントは宛先を絞っても全窓から聞く `listen` に届き、他の窓から偽の区画も送れる（tauri 2.10.2 `event/listener.rs` の `match_any_or_filter` を一次で確かめた）。
+- 番の止め方: `stop` は印を立てるだけで待たない（`PrintWindow` は explorer に同期で描かせるので、explorer が固まると番も止まる）。`close` はメインスレッドの閉包でも `stop` を呼ぶ（開いてすぐ閉じたときに番が残らない）。番は各回の頭で背景の窓が生きているか（`IsWindow`）を見る。
+- 写しの同期: 番の最初の送り・一覧が替わったとき・30 秒ごとは `reset`（窓の層を消してから置く）。一覧が隠れている（アイコンの表示を切った）ときは全部透明として送る。
+- 並び: 開くときに `Progman` の子に一覧が無ければ出さない（出せなかったと扱う）。
+- 軽さ: 絵の入れ物を持ち回す・出来事が止んでから 50ms・フックを一覧のスレッドに絞る・`GdiFlush`・画面の大きさを取り直しのたびに読む。切り出しは純関数 `crop_primary` にして、負の原点の対のテストを置いた。
+- 残すもの（未確認）: 倍率 250% 以上で canvas の上限（`devicePixelRatio` 2）のため写しがにじむおそれ・名前の文字が透明度 0 で描かれる環境・explorer が固まったとき・多画面。
+
 ### 2.3 アイコンの画素（判断 10）
 
 - 読むのは `PrintWindow(SysListView32, 0)` の画素だけ。名前の文字列・矩形（UI Automation）は読まない。

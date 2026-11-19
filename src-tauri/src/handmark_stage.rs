@@ -20,8 +20,11 @@ pub const STATE_EVENT: &str = "handmark-state";
 pub const TRACE_EVENT: &str = "handmark-trace";
 /// 波紋の種（押下が始まった正準の位置）を窓へ配るイベント名（手跡の窓だけ）。
 pub const RIPPLE_EVENT: &str = "handmark-ripple";
-/// デスクトップのアイコンの区画を窓へ配るイベント名（Windows の手跡の窓だけ・判断 10）。
-pub const ICONS_EVENT: &str = "handmark-icons";
+/// デスクトップのアイコンの区画を受ける、手跡の窓の中の関数の名前（Windows だけ・判断 10）。
+/// アイコンの画素はイベント（`emit_to`）で送らない: Tauri のイベントは宛先を絞っても、全窓から聞く `listen` の受け手には
+/// 届き、他の窓から同じ名前で偽の区画も送れる（tauri 2.10.2 `event/listener.rs` の `match_any_or_filter`）。
+/// 手跡の窓の WebView だけで `eval` して、この関数を呼ぶ。
+pub const ICONS_HOOK: &str = "__gseHandmarkIcons";
 
 #[cfg(any(target_os = "macos", windows))]
 mod imp {
@@ -150,6 +153,12 @@ mod imp {
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
+                // Windows: アイコンの写しの番も止め、窓の層を消させる（`close` と同じ）。
+                #[cfg(windows)]
+                {
+                    crate::handmark_desktop_windows::stop();
+                    let _ = hide_target.emit_to(LABEL, STATE_EVENT, Option::<StageState>::None);
+                }
                 let _ = hide_target.hide();
             }
         });
@@ -213,13 +222,14 @@ mod imp {
         rgba: String,
     }
 
-    /// 画面の大きさ（物理ピクセル）と、変わった区画。
+    /// 画面の大きさ（物理ピクセル）・層を消してから置くか・変わった区画。
     #[cfg(windows)]
     #[derive(Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct IconsPayload {
         screen_w: u32,
         screen_h: u32,
+        reset: bool,
         tiles: Vec<IconTilePayload>,
     }
 
@@ -227,12 +237,14 @@ mod imp {
     fn icons_payload(
         screen_w: u32,
         screen_h: u32,
+        reset: bool,
         tiles: Vec<crate::handmark_desktop::TileOut>,
     ) -> IconsPayload {
         use base64::Engine as _;
         IconsPayload {
             screen_w,
             screen_h,
+            reset,
             tiles: tiles
                 .into_iter()
                 .map(|t| IconTilePayload {
@@ -276,11 +288,20 @@ mod imp {
         let hwnd = window.hwnd().map_err(|e| format!("hwnd failed: {e}"))?;
         let hwnd = hwnd.0 as isize;
         crate::handmark_desktop_windows::check_excluded_from_capture(hwnd)?;
+        // デスクトップの並びが違う（24H2 より前・壁紙のアプリの WorkerW など）と、Progman のすぐ上は不透明な窓の
+        // 下になりうる。見えないのに出せた扱いにしないよう、出さない（駆動役は出せなかった理由を行に書く）。
+        if !crate::handmark_desktop_windows::desktop_layout_supported() {
+            return Err(
+                "desktop layout not supported (no SHELLDLL_DefView under Progman)".to_string(),
+            );
+        }
         crate::handmark_desktop_windows::show_no_activate(hwnd);
-        let app = window.app_handle().clone();
-        let (sw, sh) = (monitor.size().width, monitor.size().height);
-        crate::handmark_desktop_windows::start(hwnd, sw, sh, move |sw, sh, tiles| {
-            let _ = app.emit_to(LABEL, ICONS_EVENT, icons_payload(sw, sh, tiles));
+        let target = window.clone();
+        crate::handmark_desktop_windows::start(hwnd, move |sw, sh, reset, tiles| {
+            // 手跡の窓の WebView だけで、窓が置いた受け口を呼ぶ（他の窓には届かない・他の窓からは呼べない）。
+            if let Ok(json) = serde_json::to_string(&icons_payload(sw, sh, reset, tiles)) {
+                let _ = target.eval(format!("window.{ICONS_HOOK}&&window.{ICONS_HOOK}({json})"));
+            }
         });
         Ok(())
     }
@@ -315,12 +336,16 @@ mod imp {
 
     /// 窓を隠す。描画も止めさせる(状態に `null` を送る)。
     pub fn close(app: &AppHandle<Wry>) {
-        // Windows: 先にデスクトップの番を止める（アイコンの写しを送らなくなる・待つ）。前端は状態の null で写しを消す。
+        // Windows: 先にデスクトップの番を止める（印を立てるだけで待たない）。前端は状態の null で写しを消す。
         #[cfg(windows)]
         crate::handmark_desktop_windows::stop();
         let _ = app.emit_to(LABEL, STATE_EVENT, Option::<StageState>::None);
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
+            // 直前の `open` の `prepare`（メインスレッドに先に積まれた）が番を始めていても、ここで止める
+            // （メインスレッドの待ち行列は順に走るので、開いてすぐ閉じても番が残らない）。
+            #[cfg(windows)]
+            crate::handmark_desktop_windows::stop();
             if let Some(w) = handle.get_webview_window(LABEL) {
                 let _ = w.hide();
             }

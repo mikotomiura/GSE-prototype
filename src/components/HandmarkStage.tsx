@@ -8,7 +8,7 @@
 //   次の写しまで線形に寄せ、草 1 本・粒 1 つの位置で双一次補間して読むだけで、跡の値を積まない。
 //   場が 1 秒来なければ 0 にする。クリックの波紋は `handmark-ripple` で届き、6 枠に入れて 1.6 秒で消す。
 // - 霧: どの入力にも依らない基層(漂いは Rust の drift)。
-// - Windows だけ: デスクトップのアイコンの写しが `handmark-icons` で届き、模様のある画素にだけ重ねる
+// - Windows だけ: デスクトップのアイコンの写しが窓の受け口(`__gseHandmarkIcons`)に届き、模様のある画素にだけ重ねる
 //   (handmarkStageIcons.ts・模様がアイコンの後ろを流れて見える)。
 // 窓は何も保存せず、何も返さない。推定は受け取らない。数値・文字は描かない。
 // 描く部分は handmarkStageDraw.ts の純関数(机上の道具と同じ関数・手跡の PR 4)。この部品は受け取りと寄せと時計だけ。
@@ -35,7 +35,7 @@ import {
 import type { RippleMessage, TraceMessage } from "./handmarkStageTrace";
 import { buildWorld, drawFrame, viewOf } from "./handmarkStageDraw";
 import type { RippleView, Shown, View, World } from "./handmarkStageDraw";
-import { ICONS_EVENT, applyIcons, clearIconLayer, drawIconsAtop, makeIconLayer } from "./handmarkStageIcons";
+import { applyIcons, clearIconLayer, drawIconsAtop, installIconsHook, makeIconLayer } from "./handmarkStageIcons";
 import type { IconsMessage } from "./handmarkStageIcons";
 
 /** 状態を知らせるイベント名(src-tauri/src/handmark_stage.rs の STATE_EVENT)。閉じたときは null。 */
@@ -275,7 +275,6 @@ export default function HandmarkStage() {
     let unlisten: (() => void) | null = null;
     let unlistenTrace: (() => void) | null = null;
     let unlistenRipple: (() => void) | null = null;
-    let unlistenIcons: (() => void) | null = null;
     const win = getCurrentWebviewWindow();
     // listen に失敗したら背景は動かないだけ。
     win
@@ -305,17 +304,11 @@ export default function HandmarkStage() {
         else unlistenRipple = fn;
       })
       .catch(() => {});
-    win
-      .listen<IconsMessage>(ICONS_EVENT, (event) => {
-        // 開いた直後の最初の区画は状態より先に届くことがあるので、active を待たずに置く。閉じるときは Rust が
-        // 先に送り手を止めてから null を送り、null で層を消す(閉じた後に写しは残らない)。
-        if (applyIcons(icons, event.payload) && active) kick();
-      })
-      .then((fn) => {
-        if (disposed) fn();
-        else unlistenIcons = fn;
-      })
-      .catch(() => {});
+    // 開いた直後の最初の区画は状態より先に届くことがあるので、active を待たずに置く。閉じるときは Rust が
+    // 先に送り手を止めてから null を送り、null で層を消す。次に開いた最初の区画は層を消してから置く(reset)。
+    const uninstallIcons = installIconsHook((msg: IconsMessage) => {
+      if (applyIcons(icons, msg) && active) kick();
+    });
 
     return () => {
       disposed = true;
@@ -327,7 +320,7 @@ export default function HandmarkStage() {
       if (unlisten !== null) unlisten();
       if (unlistenTrace !== null) unlistenTrace();
       if (unlistenRipple !== null) unlistenRipple();
-      if (unlistenIcons !== null) unlistenIcons();
+      uninstallIcons();
       clearIconLayer(icons);
     };
   }, []);

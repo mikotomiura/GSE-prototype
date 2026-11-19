@@ -68,6 +68,40 @@ pub fn to_straight_rgba(px: u32) -> [u8; 4] {
     ]
 }
 
+/// 一覧の絵 `src`（`lw` × `lh`・左上が仮想画面の (`left`, `top`)）から、主画面（(0,0) から `sw` × `sh`）の分を
+/// `out` へ切り出す。主画面の外の画素は 0（透明）。多画面で一覧が負の座標から始まるときも、主画面より小さいときも扱う。
+/// `src` か `out` の長さが合わなければ `out` を 0 で塗って偽を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn crop_primary(
+    src: &[u32],
+    lw: u32,
+    lh: u32,
+    left: i32,
+    top: i32,
+    out: &mut [u32],
+    sw: u32,
+    sh: u32,
+) -> bool {
+    out.fill(0);
+    if src.len() != (lw as usize) * (lh as usize) || out.len() != (sw as usize) * (sh as usize) {
+        return false;
+    }
+    for y in 0..sh as i64 {
+        let sy = y - i64::from(top);
+        if !(0..i64::from(lh)).contains(&sy) {
+            continue;
+        }
+        for x in 0..sw as i64 {
+            let sx = x - i64::from(left);
+            if (0..i64::from(lw)).contains(&sx) {
+                out[(y as usize) * (sw as usize) + x as usize] =
+                    src[(sy as usize) * (lw as usize) + sx as usize];
+            }
+        }
+    }
+    true
+}
+
 /// 区画の数（横・縦）。
 pub fn tile_grid(w: u32, h: u32) -> (u32, u32) {
     (w.div_ceil(TILE), h.div_ceil(TILE))
@@ -195,6 +229,43 @@ mod tests {
         assert_eq!(to_straight_rgba(0x0000_0000), [0, 0, 0, 0]);
         // 色が透明度を超える画素は抑えてから直す（白を超えない）。
         assert_eq!(to_straight_rgba(0x40FF_FFFF), [0xFF, 0xFF, 0xFF, 0x40]);
+    }
+
+    #[test]
+    fn crop_handles_a_virtual_screen_starting_at_negative_coordinates() {
+        // 左に 2 の画面がある多画面: 一覧は (-2, -1) から 5 × 3。主画面は 3 × 2。
+        let (lw, lh) = (5u32, 3u32);
+        let src: Vec<u32> = (0..lw * lh).collect();
+        let mut out = vec![99u32; 6];
+        assert!(crop_primary(&src, lw, lh, -2, -1, &mut out, 3, 2));
+        // 主画面の (0,0) は一覧の (2,1) = 1 * 5 + 2 = 7。
+        assert_eq!(out, vec![7, 8, 9, 12, 13, 14]);
+    }
+
+    #[test]
+    fn crop_leaves_transparent_where_the_list_does_not_cover() {
+        // 一覧が主画面より小さく、右下へずれている。
+        let src = vec![0xFF00_0001u32; 4];
+        let mut out = vec![7u32; 9];
+        assert!(crop_primary(&src, 2, 2, 1, 1, &mut out, 3, 3));
+        assert_eq!(
+            out,
+            vec![
+                0,
+                0,
+                0,
+                0,
+                0xFF00_0001,
+                0xFF00_0001,
+                0,
+                0xFF00_0001,
+                0xFF00_0001
+            ]
+        );
+        // 長さが合わなければ全部透明にして偽。
+        let mut out = vec![7u32; 9];
+        assert!(!crop_primary(&src, 3, 2, 0, 0, &mut out, 3, 3));
+        assert!(out.iter().all(|&v| v == 0));
     }
 
     fn frame(w: u32, h: u32) -> Vec<u32> {
