@@ -1,5 +1,7 @@
 # 引き継ぎ —— 手跡の Windows 版（ADR-051 D1・ADR-050 の条件 (a)）
 
+> **使用済み（2026-11-19）**: このメモから `.steering/20261119-handmark-windows/`（枝 `feature/handmark-windows`）を始め、PR #428 で main に入れた（merge 2f39fcbf）。CI の無料分が尽きていたので、研究者の決定で self-hosted の check（G-GEAR・Mac）の緑と、手元の frontend-check 全 37 段の緑で merge した（frontend-check は無料分が戻ったら main で回し直す）。同じ日に CI の負荷を軽くする PR #429（`.steering/20261119-ci-selfhosted-light/`）も入れた。
+
 > 作成: 2026-11-08（`.steering/20261108-handmark-to-main-plan/` 判断 P）。研究者「とりま mac だけ入れといて、windows は適宜作ってから入れる感じにしよう」。Windows 版の手跡は、まだ何も書かれていない。このメモは、ばらばらにあった材料を集めたものである。
 >
 > 始めるきっかけ: 確認の段の参加者に Windows の人がいると分かったとき。または研究者が始めると決めたとき。
