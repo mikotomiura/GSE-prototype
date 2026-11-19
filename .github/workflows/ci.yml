@@ -360,43 +360,60 @@ jobs:
       # 起こされるので、低い優先度を継ぐ（Windows: 親が BelowNormal なら子は既定でそれを継ぐ。Unix: nice を継ぐ）。
       # この段自身は下げる前に起こされたので通常のまま。継いだかは次の段で確かめる。
       # 下げられなくても CI は止めない（警告だけ。止めると CI が研究者の機械の都合で赤になる）。
+      # Actions は powershell に ErrorActionPreference=stop を、bash に -e -o pipefail を付けるので、
+      # 3 つの段とも失敗を自分で受け止めて exit 0 で終える（powershell は try/catch・bash は set +e）。
+      # CPU の優先度だけを下げる。メモリ・ディスクの I/O は対象外（並列は CARGO_BUILD_JOBS: 2 で絞っている）。
       - name: Lower job priority (self-hosted Windows)
         if: runner.environment == 'self-hosted' && runner.os == 'Windows'
         shell: powershell
         run: |
-          $id = $PID
-          while ($id) {
-            $p = Get-CimInstance Win32_Process -Filter "ProcessId=$id"
-            if (-not $p) { break }
-            if ($p.Name -eq 'Runner.Worker.exe') {
-              (Get-Process -Id $id).PriorityClass = 'BelowNormal'
-              Write-Output "Runner.Worker ($id) -> BelowNormal"
-              exit 0
+          try {
+            $id = $PID
+            for ($depth = 0; $id -and $depth -lt 16; $depth++) {
+              $p = Get-CimInstance Win32_Process -Filter "ProcessId=$id"
+              if (-not $p) { break }
+              if ($p.Name -eq 'Runner.Worker.exe') {
+                (Get-Process -Id $id).PriorityClass = 'BelowNormal'
+                Write-Output "Runner.Worker ($id) -> BelowNormal"
+                exit 0
+              }
+              $id = $p.ParentProcessId
             }
-            $id = $p.ParentProcessId
+            Write-Output "::warning::Runner.Worker not found; job priority unchanged"
+          } catch {
+            Write-Output "::warning::could not lower job priority: $($_.Exception.Message)"
           }
-          Write-Output "::warning::Runner.Worker not found; job priority unchanged"
+          exit 0
       - name: Lower job priority (self-hosted macOS)
         if: runner.environment == 'self-hosted' && runner.os == 'macOS'
         shell: bash
         run: |
+          set +e +o pipefail
           pid=$$
-          while [ "${pid:-0}" -gt 1 ]; do
-            comm="$(ps -o comm= -p "$pid")"
+          depth=0
+          while [ "${pid:-0}" -gt 1 ] && [ "$depth" -lt 16 ]; do
+            comm="$(ps -o comm= -p "$pid" 2>/dev/null)"
+            if [ -z "$comm" ]; then break; fi
             case "$comm" in
               *Runner.Worker)
-                renice -n 10 -p "$pid" >/dev/null
-                echo "Runner.Worker (${pid}) -> nice 10"
+                if renice -n 10 -p "$pid" >/dev/null 2>&1; then
+                  echo "Runner.Worker (${pid}) -> nice 10"
+                else
+                  echo "::warning::renice failed for Runner.Worker (${pid}); job priority unchanged"
+                fi
                 exit 0
                 ;;
             esac
-            pid="$(ps -o ppid= -p "$pid" | tr -d ' ')"
+            pid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+            depth=$((depth + 1))
           done
           echo "::warning::Runner.Worker not found; job priority unchanged"
+          exit 0
       - name: Confirm lowered priority (self-hosted)
         if: runner.environment == 'self-hosted'
         shell: bash
         run: |
+          set +e +o pipefail
           if [ "$RUNNER_OS" = "Windows" ]; then
             got="$(powershell -NoProfile -Command '(Get-Process -Id ((Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId)).PriorityClass')"
             got="$(printf '%s' "$got" | tr -d '\r')"
@@ -409,6 +426,7 @@ jobs:
           if [ "$got" != "$want" ]; then
             echo "::warning::job priority was not lowered (got ${got}, want ${want})"
           fi
+          exit 0
       - uses: actions/checkout@v4
       # ⚠️★★★ 2026-09-12 (R-4): `cargo test` (下方) の **env 前提** を、job の先頭で検査する。
       #
