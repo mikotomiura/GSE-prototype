@@ -188,6 +188,10 @@ struct Paint {
     keyed: bool,
     /// 取り込みの確かめのために、決まった場所に橙の四角を止めて描く。
     freeze_probe: bool,
+    /// 描かずに透かす矩形（デスクトップのアイコン・窓の中の座標）。B3 だけ。
+    holes: Vec<RECT>,
+    /// 穴を抜かずに 1 行おきに透かす（B4）。
+    faint_holes: bool,
 }
 
 thread_local! {
@@ -284,6 +288,87 @@ unsafe fn draw(hdc: HDC, p: &Paint) {
         );
     }
     let _ = DeleteObject(o);
+    if p.keyed && !p.holes.is_empty() {
+        let k = CreateSolidBrush(KEY);
+        for r in &p.holes {
+            if p.faint_holes {
+                // 1 行おきに透かす（模様は半分の濃さで残り、アイコンが透けて見える）。
+                let mut y = r.top;
+                while y < r.bottom {
+                    FillRect(hdc, &RECT { left: r.left, top: y, right: r.right, bottom: y + 1 }, k);
+                    y += 2;
+                }
+            } else {
+                FillRect(hdc, r, k);
+            }
+        }
+        let _ = DeleteObject(k);
+    }
+}
+
+// ---------------------------------------------------------------- デスクトップのアイコンの矩形（UI Automation）
+
+/// デスクトップのアイコンの一覧（DefView の下の SysListView32）の子の矩形だけを読む。名前は読まない。
+/// 返す矩形は画面の座標。
+fn icon_rects() -> Result<Vec<RECT>, String> {
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
+    use windows::Win32::UI::Accessibility::{CUIAutomation, IUIAutomation, TreeScope_Children};
+    let pm = progman().ok_or("Progman not found")?;
+    let dv = find(pm, HWND::default(), w!("SHELLDLL_DefView"))
+        .or_else(|| {
+            // 古い並び: DefView を持つトップレベルの WorkerW。
+            let mut t = find(HWND::default(), HWND::default(), w!("WorkerW"));
+            while let Some(h) = t {
+                if let Some(d) = find(h, HWND::default(), w!("SHELLDLL_DefView")) {
+                    return Some(d);
+                }
+                t = find(HWND::default(), h, w!("WorkerW"));
+            }
+            None
+        })
+        .ok_or("DefView not found")?;
+    let lv = find(dv, HWND::default(), w!("SysListView32")).ok_or("SysListView32 not found")?;
+    // SAFETY: このスレッドで COM を使い、UIA の要素から矩形だけを読む。
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        let uia: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER)
+            .map_err(|e| format!("CUIAutomation: {e}"))?;
+        let el = uia.ElementFromHandle(lv).map_err(|e| format!("ElementFromHandle: {e}"))?;
+        let cond = uia.CreateTrueCondition().map_err(|e| format!("TrueCondition: {e}"))?;
+        let arr = el
+            .FindAll(TreeScope_Children, &cond)
+            .map_err(|e| format!("FindAll: {e}"))?;
+        let n = arr.Length().map_err(|e| format!("Length: {e}"))?;
+        let mut v = Vec::new();
+        for i in 0..n {
+            if let Ok(e) = arr.GetElement(i) {
+                if let Ok(r) = e.CurrentBoundingRectangle() {
+                    if r.right > r.left && r.bottom > r.top {
+                        v.push(r);
+                    }
+                }
+            }
+        }
+        Ok(v)
+    }
+}
+
+fn icons_report() {
+    let t = Instant::now();
+    match icon_rects() {
+        Ok(v) => {
+            let mut u = RECT { left: i32::MAX, top: i32::MAX, right: i32::MIN, bottom: i32::MIN };
+            for r in &v {
+                u.left = u.left.min(r.left);
+                u.top = u.top.min(r.top);
+                u.right = u.right.max(r.right);
+                u.bottom = u.bottom.max(r.bottom);
+            }
+            let size = v.first().map(|r| format!("{}x{}", r.right - r.left, r.bottom - r.top)).unwrap_or("-".into());
+            say!("icons count={} first_size={size} union={} read_ms={}", v.len(), if v.is_empty() { "-".into() } else { rect_s(&u) }, t.elapsed().as_millis());
+        }
+        Err(e) => say!("icons FAIL {e}"),
+    }
 }
 
 fn register_class() -> PCWSTR {
@@ -448,7 +533,7 @@ fn layer(cand: &str, secs: u64) {
     let cls = register_class();
     let (mon, _) = primary_monitor();
     let (w, h) = (mon.right - mon.left, mon.bottom - mon.top);
-    let keyed = matches!(cand, "B1" | "B2" | "T");
+    let keyed = matches!(cand, "B1" | "B2" | "B3" | "B4" | "T");
     PAINT.with(|p| {
         *p.borrow_mut() = Paint {
             w,
@@ -535,7 +620,7 @@ fn layer(cand: &str, secs: u64) {
                 say!("  layered={layered} parent_ok={}", GetParent(hwnd).map(|p| p == parent).unwrap_or(false));
                 (hwnd, (mon.left, mon.top))
             }
-            "B1" | "B2" | "T" => {
+            "B1" | "B2" | "B3" | "B4" | "T" => {
                 let topmost = cand == "T";
                 let mut ex = WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED;
                 if topmost {
@@ -622,6 +707,51 @@ fn layer(cand: &str, secs: u64) {
     };
 
     let mut sec = 0u64;
+    let b3 = matches!(cand, "B3" | "B4");
+    PAINT.with(|p| p.borrow_mut().faint_holes = cand == "B4");
+    let refresh_holes = || {
+        if let Ok(v) = icon_rects() {
+            // 画面の座標 → 窓の中の座標（窓は主画面の原点に置いた）。アイコンの縁を 2px 広げる。
+            let holes: Vec<RECT> = v
+                .iter()
+                .map(|r| RECT {
+                    left: r.left - origin.0 - 2,
+                    top: r.top - origin.1 - 2,
+                    right: r.right - origin.0 + 2,
+                    bottom: r.bottom - origin.1 + 2,
+                })
+                .collect();
+            PAINT.with(|p| p.borrow_mut().holes = holes);
+        }
+    };
+    // B3: デスクトップ（Progman）のすぐ上にいなければ、置き直す。置き直した回数と、前面の窓の種類の変化を出す。
+    let mut follows = 0u32;
+    let mut last_fg = String::new();
+    let mut follow = |hwnd: HWND, t: u64| {
+        // SAFETY: z 順の問い合わせと自分の窓の置き直しだけ。名前は読まず、窓の種類（class）だけを見る。
+        unsafe {
+            let fg = class_name(GetForegroundWindow());
+            if fg != last_fg {
+                say!("  t={t:>3}s foreground_class={fg}");
+                last_fg = fg;
+            }
+            let Some(pm) = progman() else { return };
+            let Ok(prev) = GetWindow(pm, GW_HWNDPREV) else { return };
+            if prev == hwnd {
+                return;
+            }
+            // 自分より上で、Progman のすぐ上にいる窓の下へ。
+            KEEP_BELOW.with(|k| *k.borrow_mut() = Some(prev));
+            let r = SetWindowPos(hwnd, prev, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            follows += 1;
+            say!("  t={t:>3}s FOLLOW above Progman (was below class={}) ok={}", class_name(prev), r.is_ok());
+        }
+    };
+    if b3 {
+        refresh_holes();
+        let n = PAINT.with(|p| p.borrow().holes.len());
+        say!("  B3 icon holes={n}");
+    }
     pump_until(t0 + Duration::from_secs(3), || {});
     if cand != "none" {
         capture_check(hwnd, origin);
@@ -630,10 +760,19 @@ fn layer(cand: &str, secs: u64) {
     let t_anim = Instant::now();
     pump_until(t0 + Duration::from_secs(secs), || {
         sec += 1;
+        if b3 {
+            follow(hwnd, sec + 3);
+            if sec % 2 == 0 {
+                refresh_holes();
+            }
+        }
         if sec % 5 == 0 {
             report(hwnd, sec + 3);
         }
     });
+    if b3 {
+        say!("  B3 follows={follows}");
+    }
     let anim_s = t_anim.elapsed().as_secs_f64();
     let frames = PAINT.with(|p| p.borrow().frame);
     say!(
@@ -797,6 +936,320 @@ fn strip(secs: u64) {
     }
 }
 
+// ---------------------------------------------------------------- B5: アイコンを模様の上に描き直す
+
+/// 取り出したアイコン 1 つ（画面の座標の矩形と、乗算済みの BGRA の画素）。
+struct IconImg {
+    rect: RECT,
+    px: Vec<u32>,
+}
+
+/// 32bpp・上から下の DIB を作る。
+unsafe fn dib(hdc: HDC, w: i32, h: i32) -> Result<(windows::Win32::Graphics::Gdi::HBITMAP, *mut u32), String> {
+    use windows::Win32::Graphics::Gdi::{CreateDIBSection, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS};
+    let bi = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: w,
+            biHeight: -h,
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
+    let bmp = CreateDIBSection(hdc, &bi, DIB_RGB_COLORS, &mut bits, None, 0).map_err(|e| format!("CreateDIBSection: {e}"))?;
+    Ok((bmp, bits as *mut u32))
+}
+
+/// デスクトップのアイコンの一覧の窓を、黒と白の下地へ 2 回描かせ、差から色と透明度を取る。
+/// 戻り値: アイコンごとの画像と、アイコンの外の点の透明度の最大（0 なら下地を塗っていない＝取り出せた）。
+fn extract_icons() -> Result<(Vec<IconImg>, u8), String> {
+    use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
+    let rects = icon_rects()?;
+    let pm = progman().ok_or("Progman not found")?;
+    let dv = find(pm, HWND::default(), w!("SHELLDLL_DefView")).ok_or("DefView not found")?;
+    let lv = find(dv, HWND::default(), w!("SysListView32")).ok_or("SysListView32 not found")?;
+    // SAFETY: 自分の DIB に、一覧の窓を描かせて読むだけ。作った GDI の物は解放する。
+    unsafe {
+        let mut wr = RECT::default();
+        GetWindowRect(lv, &mut wr).map_err(|e| format!("GetWindowRect: {e}"))?;
+        let (w, h) = (wr.right - wr.left, wr.bottom - wr.top);
+        let sdc = GetDC(HWND::default());
+        let mut caps: Vec<Vec<u32>> = Vec::new();
+        for fill in [0x0000_0000u32, 0x00FF_FFFFu32] {
+            let mdc = CreateCompatibleDC(sdc);
+            let (bmp, bits) = dib(sdc, w, h)?;
+            let old = SelectObject(mdc, bmp);
+            let buf = std::slice::from_raw_parts_mut(bits, (w * h) as usize);
+            buf.fill(fill);
+            let flags: u32 = std::env::var("SPIKE_PW_FLAGS").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+            let target = if std::env::var("SPIKE_PW_TARGET").as_deref() == Ok("dv") { dv } else { lv };
+            let ok = PrintWindow(target, mdc, PRINT_WINDOW_FLAGS(flags)).as_bool();
+            let mid = buf[((h / 2) * w + w * 3 / 4) as usize];
+            if std::env::var("SPIKE_PW_DIAG").is_ok() {
+                say!("    fill={fill:06X} ok={ok} sample_mid_right={mid:08X}");
+                // アイコンの矩形の中の画素の透明度のバイトと色の分布（数だけ）。
+                let (mut a0c0, mut a0c, mut aff, mut apart) = (0u64, 0u64, 0u64, 0u64);
+                for r in &rects {
+                    for y in (r.top - wr.top).max(0)..(r.bottom - wr.top).min(h) {
+                        for x in (r.left - wr.left).max(0)..(r.right - wr.left).min(w) {
+                            let v = buf[(y * w + x) as usize];
+                            let a = v >> 24;
+                            let c = v & 0xFFFFFF;
+                            if a == 0 && c == 0 { a0c0 += 1 } else if a == 0 { a0c += 1 } else if a == 255 { aff += 1 } else { apart += 1 }
+                        }
+                    }
+                }
+                say!("    icons-area: alpha0_black={a0c0} alpha0_color={a0c} alpha255={aff} alpha_partial={apart}");
+            }
+            caps.push(buf.to_vec());
+            SelectObject(mdc, old);
+            let _ = DeleteObject(bmp);
+            let _ = DeleteDC(mdc);
+            if !ok {
+                ReleaseDC(HWND::default(), sdc);
+                return Err("PrintWindow failed".into());
+            }
+        }
+        ReleaseDC(HWND::default(), sdc);
+        // フラグ 0 の PrintWindow は、透明な下地（透明度 0）の上にアイコンだけを、透明度つきで描く（2026-11-19 に実測）。
+        // 1 回目（黒の下地）の画像をそのまま乗算済みの BGRA として使う。各チャンネルは透明度を超えないように切る。
+        let b = &caps[0];
+        let alpha_at = |i: usize| -> (u8, u32) {
+            let v = b[i];
+            let a = v >> 24;
+            let mut c = 0u32;
+            for s in [0, 8, 16] {
+                c |= ((v >> s) & 0xFF).min(a) << s;
+            }
+            (a as u8, (a << 24) | c)
+        };
+        // アイコンの外の点（画面の右半分の格子）で、下地が残っているか。
+        let mut outside_max = 0u8;
+        for y in (h / 10..h).step_by((h / 10).max(1) as usize) {
+            for x in (w / 2..w).step_by((w / 20).max(1) as usize) {
+                let inside = rects.iter().any(|r| x + wr.left >= r.left && x + wr.left < r.right && y + wr.top >= r.top && y + wr.top < r.bottom);
+                if !inside {
+                    outside_max = outside_max.max(alpha_at((y * w + x) as usize).0);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        for r in rects {
+            let (rw, rh) = (r.right - r.left, r.bottom - r.top);
+            let mut px = Vec::with_capacity((rw * rh) as usize);
+            for yy in 0..rh {
+                for xx in 0..rw {
+                    let (x, y) = (r.left - wr.left + xx, r.top - wr.top + yy);
+                    px.push(if x >= 0 && y >= 0 && x < w && y < h { alpha_at((y * w + x) as usize).1 } else { 0 });
+                }
+            }
+            out.push(IconImg { rect: r, px });
+        }
+        Ok((out, outside_max))
+    }
+}
+
+fn iconsnap() {
+    let t = Instant::now();
+    match extract_icons() {
+        Ok((v, outside)) => {
+            let (mut opaque, mut partial, mut total) = (0u64, 0u64, 0u64);
+            for i in &v {
+                for p in &i.px {
+                    let a = p >> 24;
+                    total += 1;
+                    if a >= 250 {
+                        opaque += 1;
+                    } else if a > 5 {
+                        partial += 1;
+                    }
+                }
+            }
+            say!(
+                "iconsnap icons={} pixels={total} opaque={:.1}% partial={:.1}% outside_alpha_max={outside} ms={}",
+                v.len(),
+                opaque as f64 * 100.0 / total.max(1) as f64,
+                partial as f64 * 100.0 / total.max(1) as f64,
+                t.elapsed().as_millis()
+            );
+        }
+        Err(e) => say!("iconsnap FAIL {e}"),
+    }
+}
+
+/// 最初の「見える」窓を Progman の上へたどる。見えない窓（IME など）は飛ばす。
+unsafe fn first_visible_above_progman(pm: HWND) -> Option<HWND> {
+    let mut cur = GetWindow(pm, GW_HWNDPREV).ok();
+    while let Some(c) = cur {
+        if IsWindowVisible(c).as_bool() {
+            return Some(c);
+        }
+        cur = GetWindow(c, GW_HWNDPREV).ok();
+    }
+    None
+}
+
+fn b5(secs: u64) {
+    use windows::Win32::Foundation::SIZE;
+    use windows::Win32::Graphics::Gdi::{AC_SRC_ALPHA, AC_SRC_OVER, BLENDFUNCTION};
+    let cls = register_class();
+    let (mon, _) = primary_monitor();
+    let (w, h) = (mon.right - mon.left, mon.bottom - mon.top);
+    say!("b5 primary={}", rect_s(&mon));
+    // SAFETY: 窓・DIB を作り、毎コマ UpdateLayeredWindow で出す。終わったら壊す。
+    unsafe {
+        let hwnd = CreateWindowExW(
+            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED,
+            cls,
+            w!("handmark spike B5"),
+            WS_POPUP,
+            mon.left,
+            mon.top,
+            w,
+            h,
+            HWND::default(),
+            HMENU::default(),
+            hinstance(),
+            None,
+        )
+        .expect("CreateWindowExW");
+        let sdc = GetDC(HWND::default());
+        let mdc = CreateCompatibleDC(sdc);
+        let (bmp, bits) = dib(sdc, w, h).expect("dib");
+        let old = SelectObject(mdc, bmp);
+        let buf = std::slice::from_raw_parts_mut(bits, (w * h) as usize);
+        let present = |hwnd: HWND| {
+            let blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: 255,
+                AlphaFormat: AC_SRC_ALPHA as u8,
+            };
+            let pos = POINT { x: mon.left, y: mon.top };
+            let size = SIZE { cx: w, cy: h };
+            let src = POINT { x: 0, y: 0 };
+            UpdateLayeredWindow(hwnd, sdc, Some(&pos), Some(&size), mdc, Some(&src), COLORREF(0), Some(&blend), ULW_ALPHA)
+        };
+        buf.fill(0);
+        let r = present(hwnd);
+        say!("  first UpdateLayeredWindow ok={}", r.is_ok());
+        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        let aff = SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+        say!("  exclude_from_capture={} readback={}", aff.is_ok(), affinity_s(hwnd));
+
+        let mut icons: Vec<IconImg> = Vec::new();
+        let refresh = |icons: &mut Vec<IconImg>| match extract_icons() {
+            Ok((v, _)) => *icons = v,
+            Err(e) => say!("  extract FAIL {e}"),
+        };
+        refresh(&mut icons);
+        say!("  icons={}", icons.len());
+
+        let orange: u32 = 0xFFFF_8000;
+        let t0 = Instant::now();
+        let cpu0 = cpu_ms();
+        let mut frame: u64 = 0;
+        let mut last_sec = 0u64;
+        let mut follows = 0u32;
+        let mut msg = MSG::default();
+        let mut extract_ms_max = 0u128;
+        while t0.elapsed() < Duration::from_secs(secs) {
+            while PeekMessageW(&mut msg, HWND::default(), 0, 0, PM_REMOVE).as_bool() {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            frame += 1;
+            // 模様: 横に動く 80x80 の四角と、縦に流れる高さ 4 の帯（試作の他の候補と同じ）。
+            buf.fill(0);
+            let span = (w - 80).max(1) as u64;
+            let x0 = (frame * 6 % span) as i32;
+            let y0 = h / 3;
+            let yy = (frame * 3 % h.max(1) as u64) as i32;
+            let mut fill_rect = |l: i32, t: i32, r: i32, b: i32| {
+                for y in t.max(0)..b.min(h) {
+                    let row = (y * w) as usize;
+                    buf[row + l.max(0) as usize..row + r.min(w) as usize].fill(orange);
+                }
+            };
+            fill_rect(x0, y0, x0 + 80, y0 + 80);
+            fill_rect(0, yy, w, yy + 4);
+            // アイコン: 模様のある画素にだけ、アイコンを上から重ねる（模様の無い所は透明のまま）。
+            for ic in &icons {
+                let r = ic.rect;
+                let (rw, rh) = (r.right - r.left, r.bottom - r.top);
+                for iy in 0..rh {
+                    let y = r.top - mon.top + iy;
+                    if y < 0 || y >= h {
+                        continue;
+                    }
+                    for ix in 0..rw {
+                        let x = r.left - mon.left + ix;
+                        if x < 0 || x >= w {
+                            continue;
+                        }
+                        let d = &mut buf[(y * w + x) as usize];
+                        if *d == 0 {
+                            continue;
+                        }
+                        let s = ic.px[(iy * rw + ix) as usize];
+                        let sa = s >> 24;
+                        if sa == 0 {
+                            continue;
+                        }
+                        let inv = 255 - sa;
+                        let mut o = 0u32;
+                        for sh in [0, 8, 16, 24] {
+                            let sc = (s >> sh) & 0xFF;
+                            let dc = (*d >> sh) & 0xFF;
+                            o |= ((sc + dc * inv / 255).min(255)) << sh;
+                        }
+                        *d = o;
+                    }
+                }
+            }
+            let _ = present(hwnd);
+            let sec = t0.elapsed().as_secs();
+            // デスクトップのすぐ上にいなければ置き直す（見えない窓は飛ばす）。毎コマ見る
+            // （1 秒ごとだと、デスクトップのクリックや Win+D のたびに 1 秒消える）。
+            if let Some(pm) = progman() {
+                if first_visible_above_progman(pm) != Some(hwnd) {
+                    if let Ok(prev) = GetWindow(pm, GW_HWNDPREV) {
+                        if prev != hwnd {
+                            let _ = SetWindowPos(hwnd, prev, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                            follows += 1;
+                            say!("  t={sec:>3}s FOLLOW (foreground_class={})", class_name(GetForegroundWindow()));
+                        }
+                    }
+                }
+            }
+            if sec != last_sec {
+                last_sec = sec;
+                if sec % 2 == 0 {
+                    let te = Instant::now();
+                    refresh(&mut icons);
+                    extract_ms_max = extract_ms_max.max(te.elapsed().as_millis());
+                }
+            }
+            std::thread::sleep(Duration::from_millis(16));
+        }
+        let wall = t0.elapsed().as_secs_f64();
+        say!(
+            "RESULT b5 frames={frame} fps={:.1} follows={follows} extract_ms_max={extract_ms_max} cpu_pct={:.2}%",
+            frame as f64 / wall,
+            (cpu_ms() - cpu0) / (wall * 1000.0) * 100.0
+        );
+        SelectObject(mdc, old);
+        let _ = DeleteObject(bmp);
+        let _ = DeleteDC(mdc);
+        ReleaseDC(HWND::default(), sdc);
+        let _ = DestroyWindow(hwnd);
+    }
+}
+
 // ---------------------------------------------------------------- main
 
 fn main() {
@@ -810,6 +1263,9 @@ fn main() {
         Some("layer") => layer(args.get(2).map(String::as_str).unwrap_or("none"), secs(3, 60)),
         Some("strip") => strip(secs(2, 60)),
         Some("tree") => tree(),
+        Some("icons") => icons_report(),
+        Some("iconsnap") => iconsnap(),
+        Some("b5") => b5(secs(2, 60)),
         _ => say!("usage: spike probe-pointer <label> [secs] | layer <W|WL|B1|B2|T|none> [secs] | strip [secs] | tree"),
     }
 }
