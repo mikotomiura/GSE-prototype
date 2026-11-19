@@ -1,4 +1,4 @@
-//! 手跡の下の縁の帯の窓（macOS だけ・ADR-051）。試作 `handmark_edge_strip.rs` の窓の作りと見張りを写した。
+//! 手跡の下の縁の帯の窓（macOS と Windows・ADR-051）。Windows の窓の作りは末尾の `imp`（判断 9）。試作 `handmark_edge_strip.rs` の窓の作りと見張りを写した。
 //!
 //! 主画面の下の縁に高さ 14 点の透明な窓を 1 枚出す。非アクティブの NSPanel・浮く層・全 Space・全画面の補助・
 //! クリック透過・焦点を取らない。背景の窓（`handmark_stage`）と同じく、開け閉めは駆動役の出来事
@@ -83,6 +83,14 @@ fn visibility_changed(last: Option<bool>, now: bool) -> bool {
     last != Some(now)
 }
 
+/// 帯の層の警告の唯一の出口（`flag` ごとに 1 回だけ・値や状態を渡さない）。macOS と Windows の `imp` が使う。
+#[cfg(any(target_os = "macos", windows))]
+fn warn_once(flag: &std::sync::atomic::AtomicBool, reason: &str) {
+    if !flag.swap(true, std::sync::atomic::Ordering::AcqRel) {
+        tracing::warn!("handmark: edge strip: {}", reason);
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
     use super::*;
@@ -114,13 +122,6 @@ mod imp {
     /// 帯の下端の高さ（点・f64 のビット）と主画面の高さ（点・f64 のビット）。近さの計算が読む。記録しない。
     static BOTTOM_BITS: AtomicU64 = AtomicU64::new(0);
     static SCREEN_H_BITS: AtomicU64 = AtomicU64::new(0);
-
-    /// 帯の層の警告の唯一の出口（`flag` ごとに 1 回だけ・値や状態を渡さない）。
-    fn warn_once(flag: &AtomicBool, reason: &str) {
-        if !flag.swap(true, Ordering::AcqRel) {
-            tracing::warn!("handmark: edge strip: {}", reason);
-        }
-    }
 
     /// 帯が出ていて見えているか（駆動役が刻みごとに読む）。閉じたら偽。
     pub fn visible() -> bool {
@@ -577,6 +578,399 @@ pub use imp::{close, emit_state, open, setup, spot, visible};
 // 近さを帯の窓へ送る口は crate の中だけ（呼べるのは `lib.rs` のポインタのスレッドだけ・検査が縛る）。
 #[cfg(target_os = "macos")]
 pub(crate) use imp::emit_near;
+
+/// Windows の帯（判断 4・9）。Mac 版と同じ約束（駆動役が開け閉めを決める・窓は何も返さない・帯は従）で、
+/// 窓の作りだけが違う: 最前面・クリック透過・焦点を取らない・作業領域の下端（全画面なら画面の下端）。
+/// 画面共有に写さないかは読み戻し、写るなら帯は出さない（背景は閉じない）。
+/// 見張りが読むのは作業領域・前面の窓の矩形とクラス名・入力のデスクトップの名前だけで、窓の題名は読まない。
+#[cfg(windows)]
+mod imp {
+    use super::*;
+    use crate::analysis::handmark::state::StageState;
+    use crate::handmark_pointer_thread::StripSpot;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::mpsc;
+    use std::time::Duration;
+    use tauri::{AppHandle, Emitter, Manager, Wry};
+    use windows::Win32::Foundation::{HWND, RECT};
+    use windows::Win32::System::StationsAndDesktops::{
+        CloseDesktop, GetUserObjectInformationW, OpenInputDesktop, DESKTOP_ACCESS_FLAGS,
+        DESKTOP_CONTROL_FLAGS, UOI_NAME,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetClassNameW, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId,
+        SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    };
+
+    /// 帯の高さ（論理 px）。
+    const HEIGHT: f64 = 14.0;
+    /// 見張りの間隔。
+    const PROBE_EVERY: Duration = Duration::from_millis(250);
+
+    static SHOWN: AtomicBool = AtomicBool::new(false);
+    static STRIP_SEEN: AtomicU64 = AtomicU64::new(0);
+    static BUILD_FAILED: AtomicBool = AtomicBool::new(false);
+    static WARNED: AtomicBool = AtomicBool::new(false);
+    static SESSION_WARNED: AtomicBool = AtomicBool::new(false);
+    static PROBE_RUNNING: AtomicBool = AtomicBool::new(false);
+    /// 帯の下端の高さ（物理ピクセル・主画面の下端から）と主画面の高さ（物理ピクセル）。近さの計算が読む。記録しない。
+    static BOTTOM_BITS: AtomicU64 = AtomicU64::new(0);
+    static SCREEN_H_BITS: AtomicU64 = AtomicU64::new(0);
+
+    /// 帯が出ていて見えているか（駆動役が刻みごとに読む）。閉じたら偽。
+    pub fn visible() -> bool {
+        SHOWN.load(Ordering::Acquire) && seen_of(STRIP_SEEN.load(Ordering::Acquire))
+    }
+
+    fn clear_seen() {
+        STRIP_SEEN.fetch_and(!1, Ordering::SeqCst);
+    }
+
+    fn set_seen_for(gen: u32, visible: bool) -> bool {
+        STRIP_SEEN
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |cur| {
+                write_if_gen(cur, gen, visible)
+            })
+            .is_ok()
+    }
+
+    /// 帯の置き場（出ていなければ `None`）。ポインタのスレッドが近さの計算にだけ使う（単位は物理ピクセル。
+    /// ポインタの一点も Windows では物理ピクセルなので揃う）。
+    pub fn spot() -> Option<StripSpot> {
+        if !SHOWN.load(Ordering::Acquire) {
+            return None;
+        }
+        let screen_h_pt = f64::from_bits(SCREEN_H_BITS.load(Ordering::Acquire));
+        if !screen_h_pt.is_finite() || screen_h_pt <= 0.0 {
+            return None;
+        }
+        Some(StripSpot {
+            bottom_pt: f64::from_bits(BOTTOM_BITS.load(Ordering::Acquire)),
+            screen_h_pt,
+        })
+    }
+
+    /// `setup()`（メインスレッド）から呼ぶ。窓を隠したまま作る。
+    pub fn setup(app: &tauri::App<Wry>) {
+        let window = match tauri::WebviewWindowBuilder::new(
+            app,
+            LABEL,
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("GSE")
+        .inner_size(800.0, HEIGHT)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .always_on_top(true)
+        // 覆われていても描画を絞らない（背景の窓と同じ）。
+        .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
+        .build()
+        {
+            Ok(w) => w,
+            Err(e) => {
+                BUILD_FAILED.store(true, Ordering::Release);
+                warn_once(
+                    &WARNED,
+                    &format!("unavailable: window could not be built: {e}"),
+                );
+                return;
+            }
+        };
+        let handle = app.handle().clone();
+        window.on_window_event(move |event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                hide_and_clear(&handle);
+            }
+        });
+    }
+
+    fn hide_and_clear(app: &AppHandle<Wry>) {
+        SHOWN.store(false, Ordering::SeqCst);
+        clear_seen();
+        if let Some(w) = app.get_webview_window(LABEL) {
+            let _ = w.hide();
+        }
+    }
+
+    /// 作業領域（物理ピクセル）。読めなければ None。
+    fn work_area() -> Option<RECT> {
+        let mut r = RECT::default();
+        // SAFETY: 書き込み先はこの関数の中の RECT で、SPI_GETWORKAREA はそこに主画面の作業領域を書くだけ。
+        unsafe {
+            SystemParametersInfoW(
+                SPI_GETWORKAREA,
+                0,
+                Some(&mut r as *mut RECT as *mut core::ffi::c_void),
+                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+            )
+        }
+        .ok()?;
+        Some(r)
+    }
+
+    /// 前面の窓が主画面の全体を覆っているか（他のプロセスの窓で、デスクトップではない）。
+    /// 読むのは前面の窓の矩形・持ち主の pid・クラス名だけ（題名は読まない）。
+    fn fullscreen_foreground(screen_w: f64, screen_h: f64) -> bool {
+        // SAFETY: 前面の窓を問うだけ（無ければ null）。
+        let fg = unsafe { GetForegroundWindow() };
+        if fg.is_invalid() {
+            return false;
+        }
+        let mut pid = 0u32;
+        // SAFETY: 持ち主の pid を問うだけ。
+        unsafe { GetWindowThreadProcessId(fg, Some(&mut pid)) };
+        if pid == std::process::id() {
+            return false;
+        }
+        if is_desktop_class(fg) {
+            return false;
+        }
+        let mut r = RECT::default();
+        // SAFETY: 矩形を問うだけ。
+        if unsafe { GetWindowRect(fg, &mut r) }.is_err() {
+            return false;
+        }
+        reaches_screen_bottom(
+            f64::from(r.left),
+            f64::from(r.top),
+            f64::from(r.right - r.left),
+            f64::from(r.bottom - r.top),
+            screen_w,
+            screen_h,
+        ) && r.top <= 0
+    }
+
+    /// デスクトップの窓（`Progman`・`WorkerW`）か。Win+D やデスクトップのクリックで前面になり、画面の全体を覆う。
+    fn is_desktop_class(h: HWND) -> bool {
+        let mut buf = [0u16; 32];
+        // SAFETY: クラス名を固定の長さの手元の配列に書かせるだけ。
+        let n = unsafe { GetClassNameW(h, &mut buf) };
+        let name = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        name == "Progman" || name == "WorkerW"
+    }
+
+    /// 画面がロックされているか（入力のデスクトップが `Default` でない）。読めなければ None。
+    fn read_locked() -> Option<bool> {
+        // SAFETY: 入力のデスクトップを読みの権限なしで開き、名前を手元の配列に読み、同じ関数で閉じる。
+        //   ロック中は開けない（Winlogon のデスクトップ）ことがあり、そのときは None を返す。
+        unsafe {
+            let desk =
+                OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_ACCESS_FLAGS(0)).ok()?;
+            let mut buf = [0u16; 64];
+            let mut needed = 0u32;
+            let read = GetUserObjectInformationW(
+                windows::Win32::Foundation::HANDLE(desk.0),
+                UOI_NAME,
+                Some(buf.as_mut_ptr() as *mut core::ffi::c_void),
+                (buf.len() * 2) as u32,
+                Some(&mut needed),
+            );
+            let _ = CloseDesktop(desk);
+            read.ok()?;
+            let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+            Some(String::from_utf16_lossy(&buf[..len]) != "Default")
+        }
+    }
+
+    /// 帯の下端（主画面の下端からの高さ・物理ピクセル）を決めて置く。メインスレッドから呼ぶ。
+    fn follow_work_area(
+        window: &tauri::WebviewWindow<Wry>,
+        fullscreen: bool,
+    ) -> Result<(), String> {
+        let monitor = window
+            .primary_monitor()
+            .map_err(|e| format!("primary_monitor failed: {e}"))?
+            .ok_or_else(|| "no primary monitor".to_string())?;
+        let size = *monitor.size();
+        let pos = *monitor.position();
+        let screen_h = f64::from(size.height);
+        let work_bottom = work_area().map_or(screen_h, |r| f64::from(r.bottom - pos.y));
+        // 作業領域の下端（主画面の下端からの高さ）。全画面なら 0（画面の下端）。
+        let lift = strip_bottom_pt(0.0, screen_h - work_bottom, fullscreen).max(0.0);
+        let height = (HEIGHT * monitor.scale_factor()).round().max(1.0) as u32;
+        BOTTOM_BITS.store(lift.to_bits(), Ordering::Release);
+        SCREEN_H_BITS.store(screen_h.to_bits(), Ordering::Release);
+        let y = pos.y + size.height as i32 - lift as i32 - height as i32;
+        let target_pos = tauri::PhysicalPosition::new(pos.x, y);
+        let target_size = tauri::PhysicalSize::new(size.width, height);
+        if window.outer_position().ok() != Some(target_pos) {
+            window
+                .set_position(target_pos)
+                .map_err(|e| format!("set_position failed: {e}"))?;
+        }
+        if window.outer_size().ok() != Some(target_size) {
+            window
+                .set_size(target_size)
+                .map_err(|e| format!("set_size failed: {e}"))?;
+        }
+        Ok(())
+    }
+
+    /// 大きさ・位置・クリックの透過・画面共有の除外を決めて、焦点を奪わずに出す（メインスレッドで行う）。
+    fn place_and_show(app: &AppHandle<Wry>) -> Result<(), String> {
+        let window = app
+            .get_webview_window(LABEL)
+            .ok_or_else(|| "window is not available".to_string())?;
+        follow_work_area(&window, false)?;
+        window
+            .set_ignore_cursor_events(true)
+            .map_err(|e| format!("set_ignore_cursor_events failed: {e}"))?;
+        window
+            .set_always_on_top(true)
+            .map_err(|e| format!("set_always_on_top failed: {e}"))?;
+        window
+            .set_content_protected(true)
+            .map_err(|e| format!("set_content_protected failed: {e}"))?;
+        let hwnd = window.hwnd().map_err(|e| format!("hwnd failed: {e}"))?.0 as isize;
+        crate::handmark_desktop_windows::check_excluded_from_capture(hwnd)?;
+        crate::handmark_desktop_windows::show_no_activate(hwnd);
+        Ok(())
+    }
+
+    /// 帯を出す。出せなくても背景は閉じない（理由を 1 行だけ警告に残す）。
+    pub fn open(app: &AppHandle<Wry>) {
+        if BUILD_FAILED.load(Ordering::Acquire) {
+            return;
+        }
+        let handle = app.clone();
+        let dispatched = app.run_on_main_thread(move || match place_and_show(&handle) {
+            Ok(()) => {
+                let _ = STRIP_SEEN.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |cur| {
+                    Some(next_open(cur))
+                });
+                SHOWN.store(true, Ordering::SeqCst);
+                start_probe(handle);
+            }
+            Err(e) => {
+                warn_once(&WARNED, &format!("unavailable: {e}"));
+                hide_and_clear(&handle);
+            }
+        });
+        if dispatched.is_err() {
+            warn_once(&WARNED, "unavailable: main thread is not available");
+        }
+    }
+
+    /// 帯を隠す。描画も止めさせる（状態に `null` を送る）。
+    pub fn close(app: &AppHandle<Wry>) {
+        SHOWN.store(false, Ordering::SeqCst);
+        clear_seen();
+        let _ = app.emit_to(
+            LABEL,
+            crate::handmark_stage::STATE_EVENT,
+            Option::<StageState>::None,
+        );
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            hide_and_clear(&handle);
+        });
+    }
+
+    /// 状態を帯の窓へ配る（背景の窓へ配るのと同じ値）。
+    pub fn emit_state(app: &AppHandle<Wry>, state: &StageState) {
+        let _ = app.emit_to(LABEL, crate::handmark_stage::STATE_EVENT, Some(*state));
+    }
+
+    /// カーソルの近さ（0〜10）を帯の窓だけへ配る。値は記録・tracing に出さない（ADR-050 D2）。
+    pub(crate) fn emit_near(app: &AppHandle<Wry>, near: u8) {
+        let _ = app.emit_to(LABEL, NEAR_EVENT, near);
+    }
+
+    fn start_probe(app: AppHandle<Wry>) {
+        if PROBE_RUNNING.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let spawned = std::thread::Builder::new()
+            .name("gse-handmark-strip-probe".to_string())
+            .spawn(move || probe_loop(app));
+        if spawned.is_err() {
+            PROBE_RUNNING.store(false, Ordering::Release);
+            warn_once(&WARNED, "unavailable: probe thread could not start");
+        }
+    }
+
+    /// 帯の置き場と見えているかを 250ms ごとに読み、見えているかが変わったときだけ窓へ知らせる（Mac 版と同じ形）。
+    fn probe_loop(app: AppHandle<Wry>) {
+        let mut last: Option<bool> = None;
+        let mut seen_gen = gen_of(STRIP_SEEN.load(Ordering::Acquire));
+        loop {
+            std::thread::sleep(PROBE_EVERY);
+            if !SHOWN.load(Ordering::Acquire) || crate::is_shutting_down() {
+                clear_seen();
+                PROBE_RUNNING.store(false, Ordering::SeqCst);
+                if SHOWN.load(Ordering::SeqCst)
+                    && !crate::is_shutting_down()
+                    && !PROBE_RUNNING.swap(true, Ordering::SeqCst)
+                {
+                    continue;
+                }
+                return;
+            }
+            let gen = gen_of(STRIP_SEEN.load(Ordering::Acquire));
+            if gen != seen_gen {
+                seen_gen = gen;
+                last = None;
+            }
+            let locked = read_locked();
+            if locked.is_none() {
+                warn_once(&SESSION_WARNED, "input desktop unavailable");
+            }
+            let screen_h = f64::from_bits(SCREEN_H_BITS.load(Ordering::Acquire));
+            let (tx, rx) = mpsc::channel();
+            let handle = app.clone();
+            let dispatched = app.run_on_main_thread(move || {
+                if !SHOWN.load(Ordering::Acquire) {
+                    return;
+                }
+                let Some(window) = handle.get_webview_window(LABEL) else {
+                    return;
+                };
+                let Ok(Some(monitor)) = window.primary_monitor() else {
+                    return;
+                };
+                let (sw, sh) = (
+                    f64::from(monitor.size().width),
+                    f64::from(monitor.size().height),
+                );
+                let fullscreen = fullscreen_foreground(sw, sh);
+                let placed = follow_work_area(&window, fullscreen).is_ok();
+                let _ = tx.send(placed && window.is_visible().unwrap_or(false));
+            });
+            if dispatched.is_err() || !screen_h.is_finite() || screen_h <= 0.0 {
+                set_seen_for(gen, false);
+                continue;
+            }
+            let Ok(shown) = rx.recv_timeout(PROBE_EVERY * 4) else {
+                set_seen_for(gen, false);
+                continue;
+            };
+            // 画面の眠りは読まない（Windows では眠ると描画も止まる）。ロックが読めなければ見えていない側に倒す。
+            let session = locked.map(|locked| SessionView {
+                locked,
+                on_console: true,
+            });
+            let visible = strip_seen(shown, session, false);
+            if !SHOWN.load(Ordering::Acquire) || !set_seen_for(gen, visible) {
+                continue;
+            }
+            if visibility_changed(last, visible) {
+                last = Some(visible);
+                let _ = app.emit_to(LABEL, VISIBLE_EVENT, visible);
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+pub(crate) use imp::emit_near;
+#[cfg(windows)]
+pub use imp::{close, emit_state, open, setup, spot, visible};
 
 #[cfg(test)]
 mod tests {

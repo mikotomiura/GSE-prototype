@@ -4,6 +4,9 @@ pub mod handmark_pointer;
 // macOS の読み（`NSEvent::mouseLocation`・`pressedMouseButtons` だけ）。
 #[cfg(target_os = "macos")]
 pub mod handmark_pointer_macos;
+// Windows の読み（`GetCursorPos`・`GetAsyncKeyState(VK_LBUTTON)` だけ）。
+#[cfg(windows)]
+pub mod handmark_pointer_windows;
 pub mod hook;
 pub mod ime;
 // ⚠️★ **OS 非依存**にしてあるので `#[cfg]` を付けない。

@@ -13,7 +13,7 @@ use crate::handmark_store::Evaluation;
 use crate::logger::LogEntry;
 
 /// 新しく足したファイルの本文（このファイル自身は含めない）。
-const FILES: [(&str, &str); 13] = [
+const FILES: [(&str, &str); 14] = [
     (
         "analysis/handmark/mod.rs",
         include_str!("analysis/handmark/mod.rs"),
@@ -60,9 +60,14 @@ const FILES: [(&str, &str); 13] = [
         "input/handmark_pointer_macos.rs",
         include_str!("input/handmark_pointer_macos.rs"),
     ),
+    // Windows の読み（手跡の Windows 版・ADR-050 D3）。添字 13。
+    (
+        "input/handmark_pointer_windows.rs",
+        include_str!("input/handmark_pointer_windows.rs"),
+    ),
 ];
 
-/// `FILES` のうちポインタの本文のファイル（末尾の 5 つ）。
+/// `FILES` のうちポインタの本文のファイル（末尾の 6 つ）。
 fn pointer_files() -> &'static [(&'static str, &'static str)] {
     &FILES[8..]
 }
@@ -528,7 +533,7 @@ const _: () =
 #[test]
 fn pointer_files_do_not_touch_the_recorders_files_network_or_the_estimator() {
     let files = pointer_files();
-    assert_eq!(files.len(), 5);
+    assert_eq!(files.len(), 6);
     // 記録・ログ・ファイル・ネットワーク・推定のどれも呼ばない。
     assert_clean(
         "ポインタの本文",
@@ -642,6 +647,7 @@ fn only_lib_and_the_pointer_thread_read_the_pointer() {
     let files = rs_sources();
     let names = [
         "handmark_pointer_macos::",
+        "handmark_pointer_windows::",
         "handmark_pointer::to_point",
         "to_point(",
     ];
@@ -650,6 +656,7 @@ fn only_lib_and_the_pointer_thread_read_the_pointer() {
         "handmark_pointer_thread.rs",
         "input/handmark_pointer.rs",
         "input/handmark_pointer_macos.rs",
+        "input/handmark_pointer_windows.rs",
     ];
     assert_eq!(
         rs_files_naming(&names, &allowed, &files),
@@ -2046,4 +2053,257 @@ fn the_strip_event_prefix_appears_only_in_the_strip_window() {
             "対照が赤にならない（{planted_name}）"
         );
     }
+}
+
+// ---- Windows（手跡の Windows 版・判断 9・10・ADR-050 D3） ----
+
+/// `VK_` で始まる識別子の一覧（本文から）。
+fn vk_names(src: &str) -> Vec<String> {
+    let b = body(src);
+    let bytes = b.as_bytes();
+    b.match_indices("VK_")
+        .filter(|(i, _)| *i == 0 || !ident(bytes.get(i - 1)))
+        .map(|(i, _)| {
+            b[i..]
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect()
+        })
+        .collect()
+}
+
+/// `GetAsyncKeyState(` の引数（閉じ括弧まで）の一覧。
+fn async_key_args(src: &str) -> Vec<String> {
+    let b = body(src);
+    let needle = ["GetAsyncKeyState", "("].concat();
+    b.match_indices(&needle)
+        .map(|(i, _)| {
+            let rest = &b[i + needle.len()..];
+            let mut depth = 1usize;
+            let mut end = rest.len();
+            for (j, c) in rest.char_indices() {
+                match c {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = j;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            rest[..end].to_string()
+        })
+        .collect()
+}
+
+/// `GetAsyncKeyState` の引数がすべて `VK_LBUTTON` を含み、数値の直書きを持たないか。
+fn async_key_args_ok(src: &str) -> bool {
+    let args = async_key_args(src);
+    !args.is_empty()
+        && args.iter().all(|a| {
+            a.contains("VK_LBUTTON")
+                && !a
+                    .replace("VK_LBUTTON", "")
+                    .replace(".0", "")
+                    .replace("i32::from", "")
+                    .chars()
+                    .any(|c| c.is_ascii_digit())
+        })
+}
+
+/// Windows の読みは、いまの位置と左のボタンだけを読む。キーボードの仮想キー・キーボードの状態・フック・
+/// Raw Input を持たない（ADR-050 D3: `GetAsyncKeyState` に渡すのはマウスの仮想キーだけ）。
+#[test]
+fn the_windows_read_touches_only_the_left_button() {
+    let win = FILES[13];
+    assert_eq!(win.0, "input/handmark_pointer_windows.rs");
+    assert_clean(
+        "Windows の読み",
+        &[win],
+        &[
+            "GetKeyState",
+            "GetKeyboardState",
+            "SetWindowsHookEx",
+            "RegisterRawInputDevices",
+            "GetRawInput",
+            "MapVirtualKey",
+            "ToUnicode",
+            "keybd_event",
+            "SendInput",
+        ],
+    );
+    let vks = vk_names(win.1);
+    assert!(!vks.is_empty(), "仮想キーが無い（検査が空回り）");
+    for v in &vks {
+        assert_eq!(v, "VK_LBUTTON", "左のボタン以外の仮想キー: {v}");
+    }
+    assert!(
+        async_key_args_ok(win.1),
+        "GetAsyncKeyState の引数が VK_LBUTTON だけでない"
+    );
+    assert!(body(win.1).contains("GetCursorPos"), "位置の読みが無い");
+    // 陽性対照 1: キーボードの仮想キーを足すと見つかる。
+    let planted = format!("{}\nfn x() {{ let _ = {}{}; }}", win.1, "VK_", "SHIFT");
+    assert!(vk_names(&planted).iter().any(|v| v == "VK_SHIFT"));
+    // 陽性対照 2: 数値の直書きの読み（0x10 = Shift）は引数の検査で赤になる。
+    let planted = format!(
+        "{}\nfn y() {{ let _ = unsafe {{ {}(0x10) }}; }}",
+        win.1, "GetAsyncKeyState"
+    );
+    assert!(!async_key_args_ok(&planted));
+    // 陽性対照 3: 引数に別の仮想キーを並べても赤になる。
+    let planted = format!(
+        "{}\nfn z() {{ let _ = unsafe {{ {}(i32::from({}{}.0)) }}; }}",
+        win.1, "GetAsyncKeyState", "VK_", "RBUTTON"
+    );
+    assert!(!async_key_args_ok(&planted));
+}
+
+/// アイコンの層の TS（Windows だけ届く・判断 10）。
+const ICONS_WINDOW: [(&str, &str); 1] = [(
+    "handmarkStageIcons.ts",
+    include_str!("../../src/components/handmarkStageIcons.ts"),
+)];
+
+const DESKTOP_RS: &str = include_str!("handmark_desktop.rs");
+const DESKTOP_WIN_RS: &str = include_str!("handmark_desktop_windows.rs");
+
+/// アイコンの写しを受ける TS は、保存・返送・外への送りを持たない（窓と同じ禁止の語）。
+#[test]
+fn the_icon_layer_does_not_store_send_back_or_talk_to_the_network() {
+    assert_clean("アイコンの層", &ICONS_WINDOW, &WINDOW_BANNED);
+    // 陽性対照
+    let planted = format!("{}\nlocalStorage.setItem('x', 'y');", ICONS_WINDOW[0].1);
+    assert!(!hits(&planted, &["localStorage"]).is_empty());
+}
+
+/// アイコンのイベント名を知ってよい TS は、背景の窓の部品とアイコンの層だけ。
+#[test]
+fn only_the_stage_window_knows_the_icons_event() {
+    let files = ts_sources();
+    let name = stage_event("ICONS_EVENT");
+    assert_eq!(name, "handmark-icons");
+    let allowed = [WINDOW[0], ICONS_WINDOW[0]];
+    assert_eq!(
+        ts_files_naming_except(&name, &files, &allowed),
+        Vec::<String>::new()
+    );
+    assert!(
+        body(ICONS_WINDOW[0].1).contains(name.as_str()),
+        "層がイベント名を持っていない"
+    );
+    assert!(
+        body(WINDOW[0].1).contains("ICONS_EVENT"),
+        "背景の窓が聞いていない"
+    );
+    for planted_name in ["Planted.tsx", "planted.js", "planted.html"] {
+        let mut planted = files.clone();
+        planted.push((planted_name.to_string(), format!("listen('{name}')")));
+        assert_eq!(
+            ts_files_naming_except(&name, &planted, &allowed),
+            vec![planted_name.to_string()],
+            "対照が赤にならない（{planted_name}）"
+        );
+    }
+}
+
+/// アイコンのイベント名を Rust で参照してよいのは `handmark_stage.rs` だけ。`PrintWindow`（アイコンの画素の読み）を
+/// 呼んでよいのは `handmark_desktop_windows.rs` だけ。
+#[test]
+fn only_the_desktop_keeper_reads_icon_pixels_and_only_the_stage_sends_them() {
+    let files = rs_sources();
+    let events = ["ICONS_EVENT", "handmark-icons"];
+    assert_eq!(
+        rs_files_naming(&events, &["handmark_stage.rs"], &files),
+        Vec::<String>::new()
+    );
+    let print = ["PrintWindow"];
+    assert_eq!(
+        rs_files_naming(&print, &["handmark_desktop_windows.rs"], &files),
+        Vec::<String>::new()
+    );
+    assert!(
+        body(DESKTOP_WIN_RS).contains("PrintWindow"),
+        "読みが無い（空回り）"
+    );
+    for (needles, allowed) in [
+        (&events[..], "handmark_stage.rs"),
+        (&print[..], "handmark_desktop_windows.rs"),
+    ] {
+        let mut planted = files.clone();
+        planted.push((
+            "planted.rs".to_string(),
+            format!("fn f() {{ {}(); }}", needles[0]),
+        ));
+        assert_eq!(
+            rs_files_naming(needles, &[allowed], &planted),
+            vec!["planted.rs".to_string()]
+        );
+    }
+}
+
+/// デスクトップの番は、記録・ファイル・ネットワーク・推定に触れず、窓へ直接送らず（送りは背景の窓の層の口だけ）、
+/// 名前の文字列（窓の題名・一覧の項目の名前・UI Automation）を読まない。tracing は値を持たない固定の文だけ。
+#[test]
+fn the_desktop_keeper_reads_no_names_and_records_nothing() {
+    let files = [
+        ("handmark_desktop.rs", DESKTOP_RS),
+        ("handmark_desktop_windows.rs", DESKTOP_WIN_RS),
+    ];
+    let banned = [
+        "LogEntry",
+        "log_tx",
+        "crate::logger",
+        "std::fs",
+        "fs::",
+        "OpenOptions",
+        "applog",
+        "std::net",
+        "reqwest",
+        "TcpStream",
+        "crate::analysis::engine",
+        "intervention",
+        "invitation",
+        "p_stuck",
+        "Emitter",
+        "emit",
+        "GetWindowText",
+        "LVM_GETITEM",
+        "SendMessage",
+        "UIAutomation",
+        "IUIAutomation",
+        "CurrentName",
+        "Serialize",
+        "Debug",
+    ];
+    assert_clean("デスクトップの番", &files, &banned);
+    // tracing は固定の文だけ（`{` を含まない・値を渡さない）。
+    let needle = ["tracing", "::"].concat();
+    let b = body(DESKTOP_WIN_RS);
+    let calls: Vec<&str> = b
+        .match_indices(needle.as_str())
+        // 呼び出しの頭から、最初の文字列の閉じる引用符まで（rustfmt が閉じ括弧を次の行へ送っても切れる）。
+        .map(|(i, _)| {
+            let rest = &b[i..];
+            let open = rest.find('"').map_or(rest.len(), |o| o + 1);
+            let close = rest[open.min(rest.len())..]
+                .find('"')
+                .map_or(rest.len(), |c| open + c);
+            &rest[..close]
+        })
+        .collect();
+    assert!(!calls.is_empty(), "tracing が無い（空回り）");
+    for c in &calls {
+        assert!(
+            c.contains("warn!(") && c.contains("\"handmark desktop:") && !c.contains('{'),
+            "値を持つかもしれない tracing: {c}"
+        );
+    }
+    assert!(body(DESKTOP_RS).matches(needle.as_str()).count() == 0);
+    // 陽性対照
+    let planted = format!("{DESKTOP_WIN_RS}\nfn x() {{ GetWindowTextW(); }}");
+    assert!(!hits(&planted, &["GetWindowText"]).is_empty());
 }

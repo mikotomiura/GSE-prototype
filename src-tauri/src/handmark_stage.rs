@@ -1,6 +1,8 @@
-//! 手跡の背景の層の窓（macOS だけ・ADR-051）。試作 `handmark_stage_spike.rs` の窓の作りを写した。
+//! 手跡の背景の層の窓（macOS と Windows・ADR-051）。macOS は試作 `handmark_stage_spike.rs` の窓の作りを写した。
 //!
 //! 主画面の全体に透明な窓をデスクトップの高さ（壁紙の上・アイコンと他の窓の下）で出す。窓はマウスを受けない。
+//! Windows はデスクトップのアイコンが `Progman` の子なので、トップレベルの窓を `Progman` のすぐ上に保ち
+//! （`handmark_desktop_windows`）、アイコンの画素をこの窓へ写して模様のある所にだけ重ねる（判断 9・10）。
 //! 開け閉めは駆動役の出来事（`handmark_driver::Effect`）だけが決める（環境変数の門は無い）。
 //! 窓は何も返さない（`invoke` の口も記録も無い）。受け取るのは状態（`StageState`）だけで、
 //! 推定（`engine`・`invitation`・`p_stuck`・`level`）を use しない。壁紙の画像を読まない・書かない。
@@ -18,16 +20,18 @@ pub const STATE_EVENT: &str = "handmark-state";
 pub const TRACE_EVENT: &str = "handmark-trace";
 /// 波紋の種（押下が始まった正準の位置）を窓へ配るイベント名（手跡の窓だけ）。
 pub const RIPPLE_EVENT: &str = "handmark-ripple";
+/// デスクトップのアイコンの区画を窓へ配るイベント名（Windows の手跡の窓だけ・判断 10）。
+pub const ICONS_EVENT: &str = "handmark-icons";
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod imp {
     use super::*;
     use crate::analysis::handmark::trace::{encode_cells, RipplePoint, TraceState};
     use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
     use tauri::{AppHandle, Emitter, Manager, Wry};
 
-    /// 主画面の大きさ（論理の point・f32 のビット）。窓を出すときに置き、ポインタのスレッドが
-    /// 一点を正準の箱へ写すのにだけ使う。記録・tracing・窓へは出さない（ADR-050 D2）。0 は未設定。
+    /// 主画面の大きさ（macOS は論理の point、Windows は物理ピクセル・f32 のビット）。窓を出すときに置き、
+    /// ポインタのスレッドが一点を正準の箱へ写すのと、Windows のアイコンの写しの大きさにだけ使う。記録・tracing・窓へは出さない（ADR-050 D2）。0 は未設定。
     static SCREEN_W_BITS: AtomicU32 = AtomicU32::new(0);
     static SCREEN_H_BITS: AtomicU32 = AtomicU32::new(0);
 
@@ -90,14 +94,17 @@ mod imp {
         }
     }
 
+    #[cfg(target_os = "macos")]
     // CGWindowLevelKey（CGWindowLevel.h）のデスクトップの層（アイコンの層 kCGDesktopIconWindowLevelKey より下）。
     const K_CG_DESKTOP_WINDOW_LEVEL_KEY: i32 = 2;
 
+    #[cfg(target_os = "macos")]
     #[link(name = "CoreGraphics", kind = "framework")]
     extern "C" {
         fn CGWindowLevelForKey(key: i32) -> i32;
     }
 
+    #[cfg(target_os = "macos")]
     fn ns_window(window: &tauri::WebviewWindow<Wry>) -> Result<&objc2_app_kit::NSWindow, String> {
         let ptr = window
             .ns_window()
@@ -149,6 +156,7 @@ mod imp {
     }
 
     /// 大きさ・層・Spaces・クリックの透過を設定して前に出す。どれかが失敗したら Err。
+    #[cfg(target_os = "macos")]
     fn prepare(window: &tauri::WebviewWindow<Wry>) -> Result<(), String> {
         let monitor = window
             .primary_monitor()
@@ -192,6 +200,91 @@ mod imp {
         Ok(())
     }
 
+    /// アイコンの区画の payload（Windows だけ・判断 10）。この型はこのファイルの外へ出さない。
+    /// `rgba` は straight の RGBA を base64 にしたもの。空なら「この区画を消す」。
+    #[cfg(windows)]
+    #[derive(Clone, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct IconTilePayload {
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        rgba: String,
+    }
+
+    /// 画面の大きさ（物理ピクセル）と、変わった区画。
+    #[cfg(windows)]
+    #[derive(Clone, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct IconsPayload {
+        screen_w: u32,
+        screen_h: u32,
+        tiles: Vec<IconTilePayload>,
+    }
+
+    #[cfg(windows)]
+    fn icons_payload(
+        screen_w: u32,
+        screen_h: u32,
+        tiles: Vec<crate::handmark_desktop::TileOut>,
+    ) -> IconsPayload {
+        use base64::Engine as _;
+        IconsPayload {
+            screen_w,
+            screen_h,
+            tiles: tiles
+                .into_iter()
+                .map(|t| IconTilePayload {
+                    x: t.x,
+                    y: t.y,
+                    w: t.w,
+                    h: t.h,
+                    rgba: base64::engine::general_purpose::STANDARD.encode(&t.rgba),
+                })
+                .collect(),
+        }
+    }
+
+    /// 大きさ・クリックの透過・画面共有の除外を設定し、焦点を奪わずに出して、デスクトップの番を始める。
+    /// どれかが失敗したら Err（出さない）。
+    #[cfg(windows)]
+    fn prepare(window: &tauri::WebviewWindow<Wry>) -> Result<(), String> {
+        let monitor = window
+            .primary_monitor()
+            .map_err(|e| format!("primary_monitor failed: {e}"))?
+            .ok_or_else(|| "no primary monitor".to_string())?;
+        // 作業領域ではなく画面の全体（タスクバーの下も壁紙がある）。座標は物理ピクセル（主画面は (0,0) から）。
+        window
+            .set_size(*monitor.size())
+            .map_err(|e| format!("set_size failed: {e}"))?;
+        window
+            .set_position(*monitor.position())
+            .map_err(|e| format!("set_position failed: {e}"))?;
+        set_screen_size_pt(
+            f64::from(monitor.size().width),
+            f64::from(monitor.size().height),
+        );
+        window
+            .set_ignore_cursor_events(true)
+            .map_err(|e| format!("set_ignore_cursor_events failed: {e}"))?;
+        // 画面の共有・収録・スクリーンショットに写さない。tao は SetWindowDisplayAffinity の戻り値を捨てるので
+        // 自分で読み戻し、WDA_EXCLUDEFROMCAPTURE でなければ出さない（fail-closed・Mac と同じ）。
+        window
+            .set_content_protected(true)
+            .map_err(|e| format!("set_content_protected failed: {e}"))?;
+        let hwnd = window.hwnd().map_err(|e| format!("hwnd failed: {e}"))?;
+        let hwnd = hwnd.0 as isize;
+        crate::handmark_desktop_windows::check_excluded_from_capture(hwnd)?;
+        crate::handmark_desktop_windows::show_no_activate(hwnd);
+        let app = window.app_handle().clone();
+        let (sw, sh) = (monitor.size().width, monitor.size().height);
+        crate::handmark_desktop_windows::start(hwnd, sw, sh, move |sw, sh, tiles| {
+            let _ = app.emit_to(LABEL, ICONS_EVENT, icons_payload(sw, sh, tiles));
+        });
+        Ok(())
+    }
+
     /// 窓を出す(メインスレッドで行う)。出せなくても何も返さない(警告だけ)。
     pub fn open(app: &AppHandle<Wry>) {
         STATUS.store(0, Ordering::Release);
@@ -222,6 +315,9 @@ mod imp {
 
     /// 窓を隠す。描画も止めさせる(状態に `null` を送る)。
     pub fn close(app: &AppHandle<Wry>) {
+        // Windows: 先にデスクトップの番を止める（アイコンの写しを送らなくなる・待つ）。前端は状態の null で写しを消す。
+        #[cfg(windows)]
+        crate::handmark_desktop_windows::stop();
         let _ = app.emit_to(LABEL, STATE_EVENT, Option::<StageState>::None);
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
@@ -283,8 +379,8 @@ mod imp {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use imp::{close, emit_state, open, setup, status};
 // 窓へ送る口と画面の大きさは crate の中だけ（呼べるのは `lib.rs` のポインタのスレッドだけ・検査が縛る）。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) use imp::{emit_ripple, emit_trace, screen_size_pt};
