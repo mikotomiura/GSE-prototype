@@ -208,10 +208,10 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
 
 | ファイル | 起動 | 役割 |
 |---|---|---|
-| `.github/workflows/ci.yml` | `push` (main / `feature/*`)・`pull_request` (main)・`v*` タグ・手動 | ビルド / テスト / 回帰 / リリース |
+| `.github/workflows/ci.yml` | `push` (main・★ 2026-11-19 から `feature/*` は外した)・`pull_request` (main)・`v*` タグ・手動 | ビルド / テスト / 回帰 / リリース |
 | ★ `.github/workflows/supply-chain.yml` | **週次 `schedule`**・手動・⚠️ **`paths` 限定の PR** | 供給網の検知 (F-1 / F-2) |
 
-GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `feature/*`)・`pull_request` (main)・`v*` タグで起動する:
+GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main・★ 2026-11-19 から `feature/*` は外した)・`pull_request` (main)・`v*` タグで起動する:
 
 - **`check` ジョブ**: matrix ビルド。⚠️★★★ **2026-09-01 訂正 —— runner は self-hosted 実機である。**
   macOS 側は `runs-on: [self-hosted, gse-mac]`、Windows 側は `decide-win-runner` が probe して
