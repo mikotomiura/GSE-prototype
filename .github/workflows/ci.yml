@@ -352,7 +352,10 @@ jobs:
     #   G-GEAR（self-hosted）では 30 分に収まっていた。runs_on が self-hosted 以外（強制・fallback・
     #   出力の欠落）は全部 hosted なので、「self-hosted でない Windows」を条件にする。
     #   記録: .steering/20261105-ci-win-force-hosted/ 判断 7
-    timeout-minutes: ${{ (matrix.runner == 'gse-win-selfhosted' && needs.decide-win-runner.outputs.runs_on != '["self-hosted","gse-win"]') && 60 || 30 }}
+    #   2026-11-19: G-GEAR では優先度を下げた（下の段）ので、通常の優先度の 13〜14 分（2026-10）が
+    #   約 20 分に延びた（実測 2 回）。研究者の計算と重なっても 30 分で赤にならないよう、self-hosted の
+    #   Windows は 45 分にする（.steering/20261119-ci-selfhosted-light/ 判断 2）。Mac は 6 分ほどなので 30 分のまま。
+    timeout-minutes: ${{ matrix.runner == 'gse-win-selfhosted' && (needs.decide-win-runner.outputs.runs_on != '["self-hosted","gse-win"]' && 60 || 45) || 30 }}
     steps:
       # self-hosted の機械（G-GEAR・Mac）は研究者が使っている機械なので、CI の処理の優先度を下げて
       # 研究者の作業（計算など）が常に先に CPU を取るようにする（2026-11-19・.steering/20261119-ci-selfhosted-light/）。

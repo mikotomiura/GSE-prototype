@@ -7,3 +7,8 @@
 - 採る（記録だけ・Codex）: CPU の優先度はメモリ・I/O を抑えない。ci.yml の注に書いた。
 - 保留（Codex・MEDIUM）: 優先度を下げると、研究者の計算と重なったときに 30 分の timeout に当たるかもしれない。G-GEAR で実測してから決める（tasklist）。
 - 採らない（LOW）: macOS の `taskpolicy -b`。子に継ぐかが別問題で、実測が先。
+
+## 判断 2: self-hosted の Windows の check の上限を 45 分にする（2026-11-19）
+
+- 実測: 優先度を下げた G-GEAR の check は 21.5 分（run 44478550904・登録し直した後の初回）と 20.1 分（2 回目）。2026-10 の G-GEAR（通常の優先度）は 13〜14 分（main の 4 run）。
+- 30 分の上限まで 10 分しか残らず、研究者の計算が重いときに赤になりうる（判断 1 で保留した Codex の MEDIUM）。→ self-hosted の Windows を 45 分にした。hosted へ回ったときの 60 分・Mac の 30 分は変えない。
