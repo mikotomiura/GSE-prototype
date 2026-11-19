@@ -43,3 +43,4 @@
 
 ## 完了処理
 - [ ] /finish-task（push → PR → CI 緑 → merge → main の CI）
+  - 2026-11-19: PR #428 を出した。macOS の check（self-hosted）は緑。Windows の check・frontend-check・audit は hosted で、GitHub の「支払いの失敗か使用額の上限」で始まらなかった（G-GEAR の self-hosted runner は一覧に無い）。止まる条件（CI が赤）に当たるので merge していない。手元では Windows の cargo test・clippy・tsc・test:handmark が緑。
