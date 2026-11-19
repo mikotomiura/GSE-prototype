@@ -8,6 +8,7 @@
 | `GSE_project_detail.pptx` | 詳細版（23 枚）。未踏の提案資料の 8 項目の順（なにをつくるか・出し方・斬新さと効果・進め方と予算・実績・特記事項・将来）。分からない項目は【要記入】 |
 | `GSE_project_findings.pptx` | 知見版（20 枚）。公開データ・本人の記録・合成入力から分かったことを、予測・定義・漏れの順に |
 | `GSE_project_tech.pptx` | 技術版（21 枚）。全体像・観測・推定・記録とプライバシー・再生・段 1 と手跡・これから作る道具 |
+| `GSE_handmark_design.pptx` | 手跡の整理と設計案（23 枚・2026-11-20）。手跡とは・今の手跡・文献で分かったこと（S-CX）・設計案（由来・他者性のつまみ・守り）・これから。`build_handmark.py` が組み、図は `figs3.py`。設計案は研究の決定ではない |
 | `deckkit.py` | 詳細版・知見版・技術版に共通の部品（build.py の部品を関数にまとめ直したもの） |
 | `build_detail.py`・`build_findings.py`・`build_tech.py` | 3 本をそれぞれ組む |
 | `tpl.pptx` | 元のテンプレート（`deck_temp_template-original.pptx` の写し）。背景画像・地の色・配色はここから取る |
@@ -24,6 +25,7 @@ python3 -m venv .venv && .venv/bin/pip install python-pptx Pillow lxml
 .venv/bin/python figs2.py    # 文字だけだったスライドの図とグラフ（2 巻目。論文 2 の図の数は data/paper2_score.csv）
 .venv/bin/python build.py    # GSE_project_overview.pptx を組み直す
 .venv/bin/python build_detail.py; .venv/bin/python build_findings.py; .venv/bin/python build_tech.py
+.venv/bin/python figs3.py; .venv/bin/python build_handmark.py   # 手跡の整理と設計案
 ```
 
 - フォントは手書き風の **Klee One**（SIL OFL）。`sketch.py` は `~/Library/Fonts/KleeOne-SemiBold.ttf` を読む（別の場所なら環境変数 `GSE_DECK_FONT`）。
