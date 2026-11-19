@@ -101,6 +101,28 @@ print("\n".join(p.extract_text() or "" for p in PdfReader(path).pages))
 ⚠️ 要旨・二次記述だけで採番したなら、`references.md` の備考に
 **「一次全文未取得」と明記する**（★ 黙って一次扱いにしない）。
 
+### 取れなかった本文は Chrome で読む（2026-11-20 研究者の指示）
+
+WebFetch やサブエージェントで本文が取れなかったもの（出版社のサイトの 403 が多い）は、
+抄録だけで済ませる前に、メインが Chrome（claude-in-chrome）で開いて読む。
+S-CX（`docs/literature/20261120-handmark-coexistence-concept.md`）では、Cell・SAGE・MDPI・ACM が
+WebFetch で 403 だったが、Chrome では 4 本とも本文が読めた。
+
+1. 先に `browser-verification` Skill を読む（`visibilityState` の確認を含む）。
+2. 何を取るかを先に決める。候補は「断定の根拠にする文献で、オープンアクセスの版がある（OpenAlex の
+   `best_oa_location` などで確かめる）のに、WebFetch では取れなかったもの」。
+   ⚠️ 有料の本文は使わない。人間確認（CAPTCHA）で止まったら、ユーザーに通してもらう（Claude は触らない）。
+3. 本文は `javascript_tool` で `document.body.innerText` を文に割り、必要な文だけを正規表現で抜く。
+   - スクリーンショットで読まない（高い）。
+   - 1 回の出力は約 1000 字で切れるので、問いを分けて何回かに分ける。
+   - `=`・`?`・`&` を含む出力は「Cookie/query string data」として塞がれるので、空白に置き換えて返す。
+4. 抜いた逐語と、Chrome で読んだことを `references.md` の備考とカードの検証状態に書く
+   （例: 「全文で照合・Chrome」）。書誌は Crossref / OpenAlex で別に確かめる。
+5. 終わったらタブを閉じる。
+
+⚠️ curl や urllib で `User-Agent` をブラウザに装って一括で落とすのはやめる（自動モードの分類器に
+止められた。2026-11-20）。
+
 ---
 
 ## Step 3: claim 抽出
