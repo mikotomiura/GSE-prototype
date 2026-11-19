@@ -9,6 +9,6 @@
 - [x] カード（名前の衝突の表を含む）
 - [x] references.md（P594〜）・_index.md
 - [x] check_citations.py が違反なし
-- [ ] コミット
+- [x] コミット
 - [ ] /cross-review と直し
 - [ ] push と PR は研究者に確かめてから
