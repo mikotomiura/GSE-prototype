@@ -3,7 +3,7 @@
 ## 準備
 - [x] grill（判断 1〜6）
 - [x] 材料を読む: 枝 `docs/tangibility-design` の handoff 4 本・ADR-050・ADR-051・Mac 版の `handmark_stage.rs`・`handmark_edge_strip.rs`・`handmark_pointer_thread.rs`・`handmark_guard.rs`・`wallpaper_windows.rs`
-- [ ] 必須 Skill: `architecture-rules`・`rust-standards`・`hook-constraints`・`data-privacy`・`typescript-standards`
+- [x] 必須 Skill: `rust-standards`・`hook-constraints` は要点を読んだ。`architecture-rules`・`data-privacy`・`typescript-standards` は SKILL.md を開かず、既存の手跡のファイルの作り（`handmark_stage.rs` の先例・`handmark_guard.rs` の検査）に合わせた（2026-11-19・正直な記録）
 
 ## 確かめ（使い捨ての試作・main に入れない）
 - [x] 確かめの design（試作の置き場・測り方・陽性対照）を design.md に書く
@@ -33,8 +33,8 @@
 - [x] 研究者が実機で手跡を目で確かめる
 
 ## レビュー
-- [ ] code-reviewer + security-checker（並列）
-- [ ] /cross-review（2 巡）
+- [x] code-reviewer + security-checker（並列・判断 12）
+- [x] /cross-review（2 巡・判断 13・14・Codex 52,064＋26,207 トークン）
 
 ## ドキュメント
 - [x] ADR-050 補訂（条件 (a)・アイコンの矩形と画素の読み＝判断 10）
