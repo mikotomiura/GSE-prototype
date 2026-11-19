@@ -72,79 +72,79 @@ B を足す理由: W は画面共有の除外が効かない見込みで、T は
 
 ---
 
-## §2 本番の実装の段
+## §2 本番の実装の段（/reimagine の後のハイブリッド）
 
-研究者の選択: 背景の層は B5（判断 9）。デスクトップのアイコンの画素を読むことを了承（判断 10）。帯は従（判断 4）。
+前提（固定）: 背景の層は B5（判断 9）。デスクトップのアイコンの画素を読むことは了承済み（判断 10）。帯は従（判断 4）。
 
-### 2.1 全体の形（v1）
+### 2.1 考え方
 
-Mac 版の駆動役（`handmark_driver`・OS 非依存）と、ポインタのスレッド（`handmark_pointer_thread::run_loop`）はそのまま使う。
-Windows で足すのは、OS に触る次の 4 つと、`lib.rs` の配線と、前端の 1 か所だけ。
+要件は「Mac 版と同じ約束（駆動役が開け閉めを決める・窓は何も返さない・画面共有に写さない・入力を記録しない）を、Windows で B5 の見え方で守る」こと。
+次の 3 つを分けて考える。
 
-| 部品 | ファイル | 中身 |
+1. **何を描くか**: 模様は Mac と同じ前端（WebView2）で描く。描画の論理を二重に持たない。
+2. **アイコンをどう模様の後ろに見せるか**: 模様のある所にだけアイコンの写しを重ねる（B5 の規則）。重ねるのは模様と同じ canvas の中でしかできない（模様の透明度を知っているのは canvas だけ）。別の窓に写しを出すと、模様の無い所で半透明の画素が二重にかかる。
+3. **いつ直すか（並びとアイコン）**: 時計で見回る（ポーリング）か、OS の知らせで動くか。
+
+3 について、**並びは時計、アイコンは知らせ**で直す（/reimagine のハイブリッド・`design-comparison.md`）。
+
+- 並び: 16ms ごとに見て直す（試作で確かめ済み・40 秒で 33 回直して研究者の目で消えなかった）。`GetWindow` を数回たどるだけで軽い。知らせの漏れが無い。
+- アイコン: explorer の pid に絞った WinEvent（`WINEVENT_OUTOFCONTEXT`）の `EVENT_OBJECT_CREATE`・`DESTROY`・`LOCATIONCHANGE`・`STATECHANGE`・`NAMECHANGE` を受けたら、50ms 待ってまとめて取り直す。保険で 5 秒ごと。カーソルを乗せた明るさ（hot）やアイコンの移動がすぐ写しに出て、取り直しは変わったときだけになる。
+- WinEvent のコールバックの引数には文字列が無い（`agent-shared.md` の制約 7 と同じ理由で、中身を運ばない）。コールバックの中は Atomic に印を立てるだけ（`hook-constraints`）。`NAMECHANGE` を受けても名前は読まない（取り直すだけ）。
+- WinEvent を登録できなければ、5 秒の保険だけで動く（1 行残す）。
+
+### 2.2 ファイル
+
+| ファイル | 新／変 | 中身 |
 |---|---|---|
-| ポインタの読み | `input/handmark_pointer_windows.rs`（新） | `GetCursorPos` と `GetAsyncKeyState(VK_LBUTTON)` だけ。仮想キーは `VK_LBUTTON` の定数 1 つ（ADR-050 D3）。左上が原点の物理ピクセルを、`PointerSample` の約束（左下が原点）へ `y = 画面の高さ − y` で直す。最初の読みの「前回から押された」ビットは使わない（最上位ビットだけ見る） |
-| 背景の窓 | `handmark_stage.rs`（`imp` を OS ごとに分ける） | Tauri の WebView2 の窓（Mac と同じ `LABEL`・同じ前端の描画）。透明・枠なし・タスクバーに出さない・クリック透過（`set_ignore_cursor_events(true)`）・主画面の全体。画面共有の除外は `set_content_protected(true)` の後に `GetWindowDisplayAffinity` で読み戻し、`WDA_EXCLUDEFROMCAPTURE`（0x11）でなければ出さない（Mac 版の fail-closed と同じ。tao 0.34.5 は戻り値を捨てるので自分で読み戻す） |
-| アイコンの写しと並びの番 | `handmark_desktop_windows.rs`（新・1 本のスレッド） | (1) 16ms ごとに z 順を見て、背景の窓を Progman のすぐ上に保つ。(2) 2 秒ごとに `PrintWindow(SysListView32, 0)` でアイコンの画素を取り、変わった区画だけを背景の窓へ送る |
-| 帯 | `handmark_edge_strip.rs`（`imp` を OS ごとに分ける） | 最前面・クリック透過・焦点を取らない・高さ 14（論理）。作業領域の下端、全画面（前面の窓が主画面の全体を覆う）なら画面の下端。画面共有の除外は同じく読み戻し（帯は従なので、失敗したら帯だけ出さず 1 行残す） |
-| 前端 | `src/components/HandmarkStage.tsx`・`handmarkStageDraw.ts` | 模様を描いた後に、アイコンの層（画面外の canvas）を `globalCompositeOperation = "source-atop"` で重ねる。模様のある画素にだけアイコンが乗る（試作 B5 と同じ規則）。Mac では何も届かないので、層は空のまま |
+| `input/handmark_pointer_windows.rs` | 新 | `GetCursorPos`・`GetAsyncKeyState(VK_LBUTTON)`。最上位ビットだけ見る。左上が原点の物理ピクセルを `PointerSample` の約束（左下が原点）へ直す |
+| `handmark_desktop.rs` | 新・OS 非依存 | 純関数: z 順の判定（`needs_restack(above_progman_visible: Option<Id>, stage: Id) -> bool`）・区画の差分（前回の hash と今回の画素から、送る区画の一覧）・premultiplied の抑え（各色 ≤ 透明度）。両 OS でテストが走る |
+| `handmark_desktop_windows.rs` | 新 | 1 本のスレッド（メッセージを汲む）: アイコンの WinEvent の登録・印の読み・16ms ごとの並びの直し（`SetWindowPos`・`SWP_ASYNCWINDOWPOS`）・`PrintWindow(SysListView32, 0)`・区画を背景の窓だけへ送る。開いている間だけ動く |
+| `handmark_stage.rs` | 変 | `imp` を macOS と Windows に分ける。Windows: 窓の作り（透明・枠なし・タスクバーなし・クリック透過・主画面の全体）、`set_content_protected(true)` の後 `GetWindowDisplayAffinity` で 0x11 を読み戻せなければ出さない（fail-closed）、デスクトップのスレッドの開始・停止 |
+| `handmark_edge_strip.rs` | 変 | `imp` を分ける。Windows: 最前面・クリック透過・焦点を取らない・高さ 14（論理）、作業領域の下端／全画面なら画面の下端、見えているかは入力のデスクトップが `Default` か（ロック中は違う）。置き場の計算は純関数で両 OS のテスト |
+| `lib.rs` | 変 | 手跡の `cfg(target_os = "macos")` を `any(macos, windows)` に広げ、ポインタの読みだけ OS で分ける |
+| `src/components/HandmarkStage.tsx`・`handmarkStageDraw.ts` | 変 | アイコンの層（画面外の canvas）。区画を受けて置き、模様を描いた後に `source-atop` で重ねる。届いたら 1 コマ描き直す。状態が `null` で消す |
+| `handmark_guard.rs` | 変 | Windows のファイルを検査に足す（下の 2.4） |
+| `Cargo.toml` | 変 | `windows` の feature に `Win32_Storage_Xps`（`PrintWindow`） |
 
-**アイコンを背景の窓の中で重ねる理由**（別の窓を上に重ねる案を捨てた）: 別の窓に写しを出すと、模様の無い所では写しが本物のアイコンの真上に重なる。半透明の画素（名前の文字の影・縁・取り込みの 9.2%）は二重にかかって濃くなる（透明度 0.5 の画素で、地との差の最大 25%）。背景の窓の中で `source-atop` で重ねれば、模様の無い所には何も描かないので、本物のアイコンがそのまま見える。研究者の目で 4 項目を満たした B5 と同じ見え方になる。
+### 2.3 アイコンの画素（判断 10）
 
-試作の B5 との違い: 試作は全画面を CPU で毎コマ合成した（CPU 5.78%）。本番は模様もアイコンの重ねも WebView2 の canvas（GPU）で行い、アイコンの画素は変わったときだけ送る。アイコンの矩形（UI Automation）は使わない。`PrintWindow` の画素はアイコンの外が透明度 0 なので（`iconsnap` の矩形の外の透明度の最大 0）、矩形で切り抜かなくてよい。読みはその分だけ狭くなる。
+- 読むのは `PrintWindow(SysListView32, 0)` の画素だけ。名前の文字列・矩形（UI Automation）は読まない。
+- 64×64 の区画の hash を比べ、変わった区画だけを `emit_to(背景の窓)` で送る（base64）。スレッドは hash だけを持ち、画素は送ったら捨てる。
+- 前端は受けた区画を canvas に置くだけ。送り返さない（capability は listen・unlisten のまま）。
+- 記録・tracing の値・ファイル・他の窓へは出さない。
 
-### 2.2 並びの番（z 順）
+### 2.4 検査（ADR-050 D3 の Windows への拡張と、判断 10）
 
-- 置き場: `GetWindow(Progman, GW_HWNDPREV)` から上へ、見えない窓（`IME` など）を飛ばしてたどる（試作の `first_visible_above_progman`）。背景の窓が最初に見える窓でなければ、Progman の 1 つ上の窓の下へ入れる。
-- 毎コマ（16ms）見る。1 秒ごとでは、デスクトップのクリックや Win+D のたびに最大 1 秒消えた（試作の 4 回目）。
-- 背景の窓は Tauri のメインスレッドが持つので、`SetWindowPos` に `SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE` を付け、番のスレッドを止めない。
-- Progman・SysListView32 が見つからない（OS の版で並びが変わった）: アイコンは送らず、背景の窓を `HWND_BOTTOM` に置く（B1 と同じ見え方）。理由を 1 行だけ警告に残す（クラス名だけ・窓の名前は出さない）。
-- 番は窓が開いている間だけ動く（駆動役の `OpenWindow`／`CloseWindow` で始め・止める）。
+陽性対照（植えたら赤になる）を毎回つける。
 
-### 2.3 アイコンの画素の扱い（判断 10・ADR-050 への追記）
+- `GetAsyncKeyState` の引数は `VK_LBUTTON` だけ。
+- ポインタの読みと写しを呼べるのは `lib.rs` だけ。
+- `PrintWindow` と `SetWinEventHook` を呼べるのは `handmark_desktop_windows.rs` だけ。
+- アイコンのイベント名を参照してよいのは `handmark_desktop_windows.rs` と前端の `HandmarkStage` だけ。そのファイルは `LogEntry`・`std::fs`・全窓への `emit(` を使わない。
 
-- 読むのは `PrintWindow(SysListView32, 0)` の画素だけ。名前の文字列（UI Automation・`LVM_GETITEMTEXT`）も矩形も読まない。
-- 画面を 64×64 の区画に分け、前回から変わった区画だけを、背景の窓だけへ送る（`emit_to(LABEL, …)`・全窓へ流す `emit` は使わない）。区画の画素は premultiplied の BGRA を各色を透明度で抑えてから送る（試作と同じ）。送り終えたら番の側は前回の画素の要約（区画ごとの hash）だけを持ち、画素は捨てる。
-- 前端は届いた区画を画面外の canvas に置くだけで、送り返さない（`invoke` しない・保存しない）。窓を閉じたら（状態が `null`）canvas を消す。
-- 記録・tracing（値）・ファイル・他の窓へは出さない。
-- 検査（`handmark_guard.rs`）を陽性対照つきで足す:
-  - `PrintWindow` を呼べるのは `handmark_desktop_windows.rs` だけ。
-  - アイコンのイベント名を参照してよいのは `handmark_desktop_windows.rs`（送る側）と前端の `HandmarkStage` だけ。
-  - `handmark_desktop_windows.rs` は `LogEntry`・`std::fs`・`emit(`（全窓）を使わない。
-  - `capabilities/handmark-stage.json` は listen・unlisten だけのまま（窓から何も返せない）。
-- 背景の窓は画面共有に写さない（読み戻しで fail-closed）ので、アイコンの写しも写らない。
+### 2.5 しくじったとき
 
-### 2.4 ADR-050 D3 の検査を Windows へ広げる
+- Progman・SysListView32 が見つからない: アイコンは送らず、背景の窓を `HWND_BOTTOM`（B1 の見え方）に置き、クラス名だけを 1 行残す。
+- WinEvent が登録できない: アイコンは 5 秒の保険だけで取り直す。1 行残す。
+- 画面共有の除外を読み戻せない: 背景は出さない（駆動役に失敗を返す・Mac と同じ）。
+- 帯が出せない: 背景だけ（判断 4）。
 
-- `input/handmark_pointer_windows.rs` を検査の対象のファイルに足す（Mac の読みと同じ扱い）。
-- 仮想キーの検査: `GetAsyncKeyState` の引数は `VK_LBUTTON` だけ（`VK_` の他の名前・数値の直書きを禁じる）。陽性対照: 他の仮想キーを植えたら赤になる。
-- 読みと写しを呼べるのは `lib.rs` だけ（Mac の検査と同じ形）。
+### 2.6 テスト
 
-### 2.5 `lib.rs` の配線
+- 純関数（z 順の判定・区画の差分・抑え・帯の置き場・y の向き）は両 OS で走る。OS ごとに規則が違うもの（y の向き）は対にする。
+- 実機（研究者の目）: アイコンの後ろを流れる・Win+D とデスクトップのクリックで消えない・窓の下・アイコンのずれ／ちらつき／明るさの遅れが無い・帯・画面共有の道具 1 つで写らない。CPU を測る。
 
-- `#[cfg(target_os = "macos")]` の門を `any(target_os = "macos", windows)` に広げる: `HANDMARK_POINTER_GATE`・`run_handmark_effects` の窓の出来事・`handmark_window_status`・`HandmarkWindowGuard`・`spawn_handmark_pointer`・`spawn_handmark_driver`・`setup` の窓の作成。
-- ポインタの読みだけ OS で分ける（`handmark_pointer_macos::read` ／ `handmark_pointer_windows::read`）。
-- Windows で手跡の行（`handmark_day`）が書かれ始める。行の形（schema）は変えない。
+### 2.7 危うい所
 
-### 2.6 帯の Windows
+- WebView2 の透明な窓を Progman のすぐ上に置いたとき、透過とクリックの透過が保たれるか（試作は素の Win32 の窓）。最初に確かめる。
+- `EVENT_OBJECT_LOCATIONCHANGE` は多く出うる（explorer の pid に絞っても）。印を立てるだけにし、取り直しは 50ms でまとめる。
+- 倍率が 100% でない画面は、この機械では確かめられない。
 
-- 置き場の読み: `SystemParametersInfoW(SPI_GETWORKAREA)` と `SHAppBarMessage(ABM_GETSTATE)`。全画面は前面の窓の矩形が主画面の全体を覆うか（試作の 3 回目と同じ）。
-- 見えているか（Mac の `strip_seen`）: 画面のロック中は入力のデスクトップが `Default` でない（`OpenInputDesktop` ＋ `GetUserObjectInformationW(UOI_NAME)`）。読めなければ見えていない側に倒す。純関数の部分は OS 非依存のまま対のテストを置く。
-- 多画面は主画面だけ（Mac と同じ）。確かめは画面 1 枚で、多画面は未確認として残す。
+### 2.8 しないこと
 
-### 2.7 テスト
+ホイール（ADR-050 D7）・配布・ADR-050 を Accepted にすること・多画面（主画面だけ）。
 
-- OS 非依存の純関数（写し・置き場の計算・z 順の判定・全画面の判定・見えているか）は両 OS で走るテストにする。OS ごとに規則が違うもの（y の向き・作業領域）は両 OS に対のテストを置く。
-- 窓・z 順・画面共有の除外は実機で研究者が目で確かめる（背景がアイコンの後ろを流れる・Win+D で戻る・窓の下・ちらつきなし・帯）。CPU を測る（WebView2 の背景とアイコンの重ね・並びの番）。
-- 画面共有の道具（Teams・Zoom など）で写らないかを 1 つ確かめる。
-
-### 2.8 危うい所
-
-- WebView2 の透明な窓を `SWP_ASYNCWINDOWPOS` で Progman のすぐ上に置いて、透過とクリックの透過が保たれるか（試作は素の Win32 の窓だった）。実装の最初に確かめる。
-- 背景の窓の描画は、場が静かなときに絞られる（`fieldLive`）。アイコンの区画が届いたら 1 コマ描き直す。
-- 倍率が 100% でない画面: canvas は `devicePixelRatio`（上限 2）で描くので、アイコンの層は物理ピクセルで受けて画面の大きさに縮めて重ねる。倍率 100% の 1 台でしか確かめられない。
-
-### 2.9 しないこと
-
-- ホイール（ADR-050 D7）。配布・リリース。ADR-050 を Accepted にすること。
-- 多画面の対応（主画面だけ）。
+## 設計判断の履歴
+- 実行回数: 1 回目
+- 採用: ハイブリッド（並びは v1 の 16ms の見回り・アイコンの取り直しは v2 の WinEvent＋5 秒の保険・純関数は v2 の OS 非依存のファイル）
+- 根拠: 研究者が推奨を選んだ（2026-11-19）。並びは試作で確かめた時計が確実で軽い。アイコンは知らせで直すと写しが新しく、読みが変わったときだけになる。
