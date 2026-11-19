@@ -1097,6 +1097,8 @@ fn b5(secs: u64) {
     use windows::Win32::Foundation::SIZE;
     use windows::Win32::Graphics::Gdi::{AC_SRC_ALPHA, AC_SRC_OVER, BLENDFUNCTION};
     let cls = register_class();
+    let icons_all = std::env::var("SPIKE_ICONS_ALL").is_ok();
+    say!("b5 icons_all={icons_all}");
     let (mon, _) = primary_monitor();
     let (w, h) = (mon.right - mon.left, mon.bottom - mon.top);
     say!("b5 primary={}", rect_s(&mon));
@@ -1192,7 +1194,8 @@ fn b5(secs: u64) {
                             continue;
                         }
                         let d = &mut buf[(y * w + x) as usize];
-                        if *d == 0 {
+                        // SPIKE_ICONS_ALL: 本番の形（アイコンの窓を別に重ねる）を真似て、模様の無い所にも写しを重ねる。
+                        if *d == 0 && !icons_all {
                             continue;
                         }
                         let s = ic.px[(iy * rw + ix) as usize];
@@ -1266,6 +1269,10 @@ fn main() {
         Some("icons") => icons_report(),
         Some("iconsnap") => iconsnap(),
         Some("b5") => b5(secs(2, 60)),
+        Some("b5all") => {
+            std::env::set_var("SPIKE_ICONS_ALL", "1");
+            b5(secs(2, 60))
+        }
         _ => say!("usage: spike probe-pointer <label> [secs] | layer <W|WL|B1|B2|T|none> [secs] | strip [secs] | tree"),
     }
 }
