@@ -1,0 +1,49 @@
+# タスクリスト
+
+## 準備
+- [x] grill（判断 1〜6）
+- [x] 材料を読む: 枝 `docs/tangibility-design` の handoff 4 本・ADR-050・ADR-051・Mac 版の `handmark_stage.rs`・`handmark_edge_strip.rs`・`handmark_pointer_thread.rs`・`handmark_guard.rs`・`wallpaper_windows.rs`
+- [x] 必須 Skill: `rust-standards`・`hook-constraints` は要点を読んだ。`architecture-rules`・`data-privacy`・`typescript-standards` は SKILL.md を開かず、既存の手跡のファイルの作り（`handmark_stage.rs` の先例・`handmark_guard.rs` の検査）に合わせた（2026-11-19・正直な記録）
+
+## 確かめ（使い捨ての試作・main に入れない）
+- [x] 確かめの design（試作の置き場・測り方・陽性対照）を design.md に書く
+- [x] 条件 (a): `GetCursorPos`・`GetAsyncKeyState(VK_LBUTTON)` を権限なしで読む（研究者の手のクリックで陽性対照）
+- [x] 背景の層の候補 1: WorkerW（W・WL）
+- [x] 背景の層の候補 2: 最前面でクリックを通す透過の窓
+- [x] 背景の層の候補 3: `IDesktopWallpaper`（成り立ちは EH3 で既知・測らず）
+- [x] 候補 B（B1・B2）と両方の良い所を取る B3〜B5（判断 9）
+- [x] 候補ごとに: 成り立ち・画面共有に写るか・CPU
+- [x] 帯（多画面は画面 1 枚で未確認）: タスクバーの上・全画面・自動で隠す設定・多画面
+- [x] results.md にまとめる（OS の版を明記）
+
+## 停止点
+- [x] 結果と推奨を研究者に出し、背景の層の候補を選んでもらう（decisions.md に記録）
+
+## 本番の実装
+- [x] design.md（本番の形）→ /reimagine
+- [x] `input/handmark_pointer_windows.rs`
+- [x] 背景の層の Windows の実装
+- [x] 帯の Windows の実装（従）
+- [x] `lib.rs` の配線（`run_handmark_effects`・ポインタのスレッド）
+- [x] ADR-050 D3 の境界の検査を Windows へ広げる（仮想キーの検査を含む・陽性対照）
+- [x] 両 OS に対のテスト
+
+## 確認
+- [x] cargo test・clippy・tsc（手元）
+- [x] 研究者が実機で手跡を目で確かめる
+
+## レビュー
+- [x] code-reviewer + security-checker（並列・判断 12）
+- [x] /cross-review（2 巡・判断 13・14・Codex 52,064＋26,207 トークン）
+
+## ドキュメント
+- [x] ADR-050 補訂（条件 (a)・アイコンの矩形と画素の読み＝判断 10）
+- [x] ADR-051 D1 補訂
+- [ ] 引き継ぎ（`next-session-gse-handmark-windows.md`）を使用済みにする
+
+## 完了処理
+- [ ] /finish-task（push → PR → CI 緑 → merge → main の CI）
+  - 2026-11-19: PR #428 を出した。macOS の check（self-hosted）は緑。Windows の check・frontend-check・audit は hosted で、GitHub の「支払いの失敗か使用額の上限」で始まらなかった（G-GEAR の self-hosted runner は一覧に無い）。止まる条件（CI が赤）に当たるので merge していない。手元では Windows の cargo test・clippy・tsc・test:handmark が緑。
+  - 2026-11-19（続き）: 無料分（GitHub Pro の Actions の月 3,000 分）を使い切っていた。主な原因は 11-05 からの `GSE_WIN_FORCE_HOSTED=1`（Windows の hosted は 2 倍）。G-GEAR の runner は登録が消えていたので研究者が登録し直し、変数を消した（研究者の決定・PR #429 `.steering/20261119-ci-selfhosted-light/`）。研究者の決定: frontend-check は無料分が戻るまで待つ・audit は hosted のまま（信号で門ではない）。
+  - frontend-check の全段を手元（G-GEAR・Windows・git-bash）で回した: 37 段すべて緑（pip の 3 段は手元に入っているので飛ばした）。CI の代わりにはしない。無料分が戻ったら #428 の CI を回し直し（Windows は G-GEAR へ）、緑なら merge。
+  - 2026-11-19（研究者の決定）: 無料分の戻りを待たずに進める。順番は (1) #429 を self-hosted の check（G-GEAR・Mac）の緑で merge（`src/` を触らないので frontend-check の対象の変更は無い・merge 545eb8aa）→ (2) #428 に main を取り込み（台帳 `.codex/budget.json` の衝突は和 174382 / 4 回で解いた）、G-GEAR と Mac の check を回す → (3) check が緑なら merge する。frontend-check は手元の 37 段の緑で代え、audit は信号として赤のまま進める。これは「CI が赤なら止まる」の例外で、今回だけの判断。無料分が戻ったら main の frontend-check を回し直す。

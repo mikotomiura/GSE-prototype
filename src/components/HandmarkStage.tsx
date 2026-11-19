@@ -8,6 +8,8 @@
 //   次の写しまで線形に寄せ、草 1 本・粒 1 つの位置で双一次補間して読むだけで、跡の値を積まない。
 //   場が 1 秒来なければ 0 にする。クリックの波紋は `handmark-ripple` で届き、6 枠に入れて 1.6 秒で消す。
 // - 霧: どの入力にも依らない基層(漂いは Rust の drift)。
+// - Windows だけ: デスクトップのアイコンの写しが窓の受け口(`__gseHandmarkIcons`)に届き、模様のある画素にだけ重ねる
+//   (handmarkStageIcons.ts・模様がアイコンの後ろを流れて見える)。
 // 窓は何も保存せず、何も返さない。推定は受け取らない。数値・文字は描かない。
 // 描く部分は handmarkStageDraw.ts の純関数(机上の道具と同じ関数・手跡の PR 4)。この部品は受け取りと寄せと時計だけ。
 import { useEffect, useRef } from "react";
@@ -33,6 +35,8 @@ import {
 import type { RippleMessage, TraceMessage } from "./handmarkStageTrace";
 import { buildWorld, drawFrame, viewOf } from "./handmarkStageDraw";
 import type { RippleView, Shown, View, World } from "./handmarkStageDraw";
+import { clearIconLayer, drawIconsAtop, handleIconsMessage, installIconsHook, makeIconLayer } from "./handmarkStageIcons";
+import type { IconsHookMessage } from "./handmarkStageIcons";
 
 /** 状態を知らせるイベント名(src-tauri/src/handmark_stage.rs の STATE_EVENT)。閉じたときは null。 */
 const STATE_EVENT = "handmark-state";
@@ -104,6 +108,8 @@ export default function HandmarkStage() {
     const fieldShown = makeField();
     const rippleSlots = makeRipples();
     const receiver = makeReceiver();
+    // デスクトップのアイコンの写し(Windows だけ届く)。
+    const icons = makeIconLayer();
     let traceRecvAt = performance.now();
     /** 最後に場を受け取った時刻。まだなら -Infinity(期限切れ扱い)。 */
     let lastTraceAt = -Infinity;
@@ -135,6 +141,7 @@ export default function HandmarkStage() {
         // 窓が閉じた: 状態も、場も波紋も消す(世代は次に開いたとき進んだ値が届く)。
         active = false;
         resetPointer();
+        clearIconLayer(icons);
         ctx.clearRect(0, 0, view.W, view.H);
         return;
       }
@@ -180,6 +187,7 @@ export default function HandmarkStage() {
       sweepPointer(now);
       lerpField(fieldFrom, fieldTo, (now - traceRecvAt) / TRACE_TICK_MS, fieldShown);
       drawFrame(ctx, world, view, shown, fieldShown, rippleViews(now), reduceMotion ? 0.3 : 1);
+      drawIconsAtop(ctx, icons, view.W, view.H);
       if (
         shown.speed > 0 ||
         to.speed > 0 ||
@@ -296,6 +304,11 @@ export default function HandmarkStage() {
         else unlistenRipple = fn;
       })
       .catch(() => {});
+    // 開いた直後の最初の区画は状態より先に届くことがあるので、active を待たずに置く。閉じるときは Rust が
+    // 先に送り手を止めてから null を送り、null で層を消す。次に開いた最初の区画は層を消してから置く(reset)。
+    const uninstallIcons = installIconsHook((msg: IconsHookMessage) => {
+      if (handleIconsMessage(icons, msg) && active) kick();
+    });
 
     return () => {
       disposed = true;
@@ -307,6 +320,8 @@ export default function HandmarkStage() {
       if (unlisten !== null) unlisten();
       if (unlistenTrace !== null) unlistenTrace();
       if (unlistenRipple !== null) unlistenRipple();
+      uninstallIcons();
+      clearIconLayer(icons);
     };
   }, []);
 
