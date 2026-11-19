@@ -2,7 +2,9 @@ name: CI / Release
 
 on:
   push:
-    branches: [main, "feature/*"]
+    # `feature/*` への push では走らせない（2026-11-19）。main への PR でも同じ CI が走るので、両方で走ると
+    # self-hosted の G-GEAR の Windows で直列に 2 回待っていた。PR を出す前の枝は手元で確かめる。
+    branches: [main]
     tags: ["v*"]
   pull_request:
     branches: [main]
@@ -350,8 +352,84 @@ jobs:
     #   G-GEAR（self-hosted）では 30 分に収まっていた。runs_on が self-hosted 以外（強制・fallback・
     #   出力の欠落）は全部 hosted なので、「self-hosted でない Windows」を条件にする。
     #   記録: .steering/20261105-ci-win-force-hosted/ 判断 7
-    timeout-minutes: ${{ (matrix.runner == 'gse-win-selfhosted' && needs.decide-win-runner.outputs.runs_on != '["self-hosted","gse-win"]') && 60 || 30 }}
+    #   2026-11-19: G-GEAR では優先度を下げた（下の段）ので、通常の優先度の 13〜14 分（2026-10）が
+    #   約 20 分に延びた（実測 2 回）。研究者の計算と重なっても 30 分で赤にならないよう、self-hosted の
+    #   Windows は 45 分にする（.steering/20261119-ci-selfhosted-light/ 判断 2）。Mac は 6 分ほどなので 30 分のまま。
+    timeout-minutes: ${{ matrix.runner == 'gse-win-selfhosted' && (needs.decide-win-runner.outputs.runs_on != '["self-hosted","gse-win"]' && 60 || 45) || 30 }}
     steps:
+      # self-hosted の機械（G-GEAR・Mac）は研究者が使っている機械なので、CI の処理の優先度を下げて
+      # 研究者の作業（計算など）が常に先に CPU を取るようにする（2026-11-19・.steering/20261119-ci-selfhosted-light/）。
+      # 下げるのは、この段を起こした Runner.Worker。後の段（cargo とその子の rustc・テスト）は Worker から
+      # 起こされるので、低い優先度を継ぐ（Windows: 親が BelowNormal なら子は既定でそれを継ぐ。Unix: nice を継ぐ）。
+      # この段自身は下げる前に起こされたので通常のまま。継いだかは次の段で確かめる。
+      # 下げられなくても CI は止めない（警告だけ。止めると CI が研究者の機械の都合で赤になる）。
+      # Actions は powershell に ErrorActionPreference=stop を、bash に -e -o pipefail を付けるので、
+      # 3 つの段とも失敗を自分で受け止めて exit 0 で終える（powershell は try/catch・bash は set +e）。
+      # CPU の優先度だけを下げる。メモリ・ディスクの I/O は対象外（並列は CARGO_BUILD_JOBS: 2 で絞っている）。
+      - name: Lower job priority (self-hosted Windows)
+        if: runner.environment == 'self-hosted' && runner.os == 'Windows'
+        shell: powershell
+        run: |
+          try {
+            $id = $PID
+            for ($depth = 0; $id -and $depth -lt 16; $depth++) {
+              $p = Get-CimInstance Win32_Process -Filter "ProcessId=$id"
+              if (-not $p) { break }
+              if ($p.Name -eq 'Runner.Worker.exe') {
+                (Get-Process -Id $id).PriorityClass = 'BelowNormal'
+                Write-Output "Runner.Worker ($id) -> BelowNormal"
+                exit 0
+              }
+              $id = $p.ParentProcessId
+            }
+            Write-Output "::warning::Runner.Worker not found; job priority unchanged"
+          } catch {
+            Write-Output "::warning::could not lower job priority: $($_.Exception.Message)"
+          }
+          exit 0
+      - name: Lower job priority (self-hosted macOS)
+        if: runner.environment == 'self-hosted' && runner.os == 'macOS'
+        shell: bash
+        run: |
+          set +e +o pipefail
+          pid=$$
+          depth=0
+          while [ "${pid:-0}" -gt 1 ] && [ "$depth" -lt 16 ]; do
+            comm="$(ps -o comm= -p "$pid" 2>/dev/null)"
+            if [ -z "$comm" ]; then break; fi
+            case "$comm" in
+              *Runner.Worker)
+                if renice -n 10 -p "$pid" >/dev/null 2>&1; then
+                  echo "Runner.Worker (${pid}) -> nice 10"
+                else
+                  echo "::warning::renice failed for Runner.Worker (${pid}); job priority unchanged"
+                fi
+                exit 0
+                ;;
+            esac
+            pid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+            depth=$((depth + 1))
+          done
+          echo "::warning::Runner.Worker not found; job priority unchanged"
+          exit 0
+      - name: Confirm lowered priority (self-hosted)
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          set +e +o pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            got="$(powershell -NoProfile -Command '(Get-Process -Id ((Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId)).PriorityClass')"
+            got="$(printf '%s' "$got" | tr -d '\r')"
+            want="BelowNormal"
+          else
+            got="$(ps -o nice= -p $$ | tr -d ' ')"
+            want="10"
+          fi
+          echo "step priority = ${got} (want ${want})"
+          if [ "$got" != "$want" ]; then
+            echo "::warning::job priority was not lowered (got ${got}, want ${want})"
+          fi
+          exit 0
       - uses: actions/checkout@v4
       # ⚠️★★★ 2026-09-12 (R-4): `cargo test` (下方) の **env 前提** を、job の先頭で検査する。
       #
@@ -846,7 +924,7 @@ jobs:
       #     (3) `supply-chain.yml` が **hosted であると証明できる** (★ 実機に鍵がある)
       #     (4) ⚠️ 走査 0 件は「違反なし」ではなく **exit 2**
       #   ⚠️★★ **走る範囲を正確に書く**: 本 job は `main` への PR と
-      #     `main` / `feature/*` への push で走る。★ **tag push / 手動発火では走らない**
+      #     `main` への push で走る（`feature/*` の push は 2026-11-19 から走らない）。★ **tag push / 手動発火では走らない**
       #     (⚠️ つまり `softprops/action-gh-release` が実際に動く実行では検査されない) ——
       #     ただしマージ経路は PR を必ず通るので、main に入る前には必ず 1 度検査される。
       # ⚠️ PyYAML は ubuntu-latest 同梱の保証が取れなかったので明示的に入れる

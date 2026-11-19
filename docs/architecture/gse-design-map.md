@@ -49,7 +49,7 @@
 
 | # | 要るもの | 待つもの | 機械と手 |
 |---|---|---|---|
-| R1 | 招待の配線の枝（`feature/nudge-default-off`・ADR-040 のコード）を main へ | 研究者の実機の確かめ（トレイ）・G-GEAR の空き（`feature/*` は self-hosted の CI が走る） | Mac（研究者の手）。push と PR は研究者に確かめてから |
+| R1 | 招待の配線の枝（`feature/nudge-default-off`・ADR-040 のコード）を main へ | 研究者の実機の確かめ（トレイ）・G-GEAR の空き（main への PR で self-hosted の CI が走る。2026-11-19 から `feature/*` の push では走らない） | Mac（研究者の手）。push と PR は研究者に確かめてから |
 | R2 | M5 の実装（§4）。頻度と閾値は探索用の仮の定数で作る | R1（`lib.rs` と `schema/current.json` の衝突を 1 回で済ませる・判断 6） | Mac で実装と検査。Windows の画面は CI と Windows の実機で確かめる（参加者が Windows のとき） |
 | R3 | gse-dataset の schema の同期 | R1・R2 の schema の変更 | Mac |
 | R4 | 段 1 の同意文書（ADR-043 Migration 3）と同意フォームの項目（ADR-031 M6 に当たる・文書と 1 対 1） | 判断 5（新しいモード）・判断 7（3 問）・判断 8（頻度の合計）・ADR-032 の計器を入れるか（ADR-043 D9）・手跡の後期の同意項目。最終版は R6′ の定数 | Mac（文書）。草案は R2 と並行で書ける。頻度の数値は実装の定数と一致させる（本人用は R2、確認用は R6′） |
