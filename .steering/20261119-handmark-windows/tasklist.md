@@ -44,3 +44,5 @@
 ## 完了処理
 - [ ] /finish-task（push → PR → CI 緑 → merge → main の CI）
   - 2026-11-19: PR #428 を出した。macOS の check（self-hosted）は緑。Windows の check・frontend-check・audit は hosted で、GitHub の「支払いの失敗か使用額の上限」で始まらなかった（G-GEAR の self-hosted runner は一覧に無い）。止まる条件（CI が赤）に当たるので merge していない。手元では Windows の cargo test・clippy・tsc・test:handmark が緑。
+  - 2026-11-19（続き）: 無料分（GitHub Pro の Actions の月 3,000 分）を使い切っていた。主な原因は 11-05 からの `GSE_WIN_FORCE_HOSTED=1`（Windows の hosted は 2 倍）。G-GEAR の runner は登録が消えていたので研究者が登録し直し、変数を消した（研究者の決定・PR #429 `.steering/20261119-ci-selfhosted-light/`）。研究者の決定: frontend-check は無料分が戻るまで待つ・audit は hosted のまま（信号で門ではない）。
+  - frontend-check の全段を手元（G-GEAR・Windows・git-bash）で回した: 37 段すべて緑（pip の 3 段は手元に入っているので飛ばした）。CI の代わりにはしない。無料分が戻ったら #428 の CI を回し直し（Windows は G-GEAR へ）、緑なら merge。
