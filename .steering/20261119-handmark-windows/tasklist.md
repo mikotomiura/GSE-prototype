@@ -20,25 +20,25 @@
 - [x] 結果と推奨を研究者に出し、背景の層の候補を選んでもらう（decisions.md に記録）
 
 ## 本番の実装
-- [ ] design.md（本番の形）→ /reimagine
-- [ ] `input/handmark_pointer_windows.rs`
-- [ ] 背景の層の Windows の実装
-- [ ] 帯の Windows の実装（従）
-- [ ] `lib.rs` の配線（`run_handmark_effects`・ポインタのスレッド）
-- [ ] ADR-050 D3 の境界の検査を Windows へ広げる（仮想キーの検査を含む・陽性対照）
-- [ ] 両 OS に対のテスト
+- [x] design.md（本番の形）→ /reimagine
+- [x] `input/handmark_pointer_windows.rs`
+- [x] 背景の層の Windows の実装
+- [x] 帯の Windows の実装（従）
+- [x] `lib.rs` の配線（`run_handmark_effects`・ポインタのスレッド）
+- [x] ADR-050 D3 の境界の検査を Windows へ広げる（仮想キーの検査を含む・陽性対照）
+- [x] 両 OS に対のテスト
 
 ## 確認
-- [ ] cargo test・clippy・tsc（手元）
-- [ ] 研究者が実機で手跡を目で確かめる
+- [x] cargo test・clippy・tsc（手元）
+- [x] 研究者が実機で手跡を目で確かめる
 
 ## レビュー
 - [ ] code-reviewer + security-checker（並列）
 - [ ] /cross-review（2 巡）
 
 ## ドキュメント
-- [ ] ADR-050 補訂（条件 (a)・アイコンの矩形と画素の読み＝判断 10）
-- [ ] ADR-051 D1 補訂
+- [x] ADR-050 補訂（条件 (a)・アイコンの矩形と画素の読み＝判断 10）
+- [x] ADR-051 D1 補訂
 - [ ] 引き継ぎ（`next-session-gse-handmark-windows.md`）を使用済みにする
 
 ## 完了処理

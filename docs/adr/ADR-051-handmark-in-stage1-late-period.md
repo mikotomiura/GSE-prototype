@@ -34,6 +34,7 @@
 
 - Windows 版は、後で作ってから入れる。それまで、Windows の参加者の「あり」の日は、日ごとの行に「出せなかった理由」を書く（D4）。
 - Windows 版の材料は `.steering/_handoff/next-session-gse-handmark-windows.md` にまとめる。ADR-050 の Accepted の条件 (a) は、Windows 版のときに補訂で扱う。
+- **補訂（2026-11-19）**: Windows 版を入れた（`.steering/20261119-handmark-windows/`）。背景の層は、画面共有に写さないトップレベルの窓をデスクトップのすぐ上に保ち、デスクトップのアイコンの写しを模様のある所にだけ重ねる形（判断 9）。帯は Mac と同じく従。ADR-050 の条件 (a) は ADR-050 補訂 2 で閉じた。Windows でも駆動役が動き、日ごとの行（`handmark_day`）が書かれる（それまでの Windows の版は駆動役を起こさず、行を書いていなかった）。窓を出せなかった日は `window_unavailable` になる。D7 の机上の道具の Windows の記録への適用と、Windows の参加者の日の解析での扱いは、この補訂では決めない。
 
 ### D2. 試作の部品は、ほぼ全部を入れる（判断 1・1b）
 
