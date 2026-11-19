@@ -19,7 +19,7 @@
 //! 止まる。待つと駆動役やメインスレッドまで止まる）。番は各回の頭と送る直前に印を見て、立っていれば何もせず抜ける。
 
 use crate::handmark_desktop::{changed_tiles, crop_primary, decide_restack, Restack, TileOut};
-use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use windows::core::{w, PCWSTR};
@@ -35,7 +35,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowDisplayAffinity, GetWindowRect, GetWindowThreadProcessId, IsWindow, IsWindowVisible,
     PeekMessageW, SetWindowPos, ShowWindow, TranslateMessage, EVENT_OBJECT_CREATE,
     EVENT_OBJECT_NAMECHANGE, GW_HWNDPREV, HWND_BOTTOM, MSG, PM_REMOVE, SM_CXSCREEN, SM_CYSCREEN,
-    SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_SHOWNOACTIVATE,
+    SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_SHOWNOACTIVATE,
     WDA_EXCLUDEFROMCAPTURE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
 };
 
@@ -57,6 +57,32 @@ static LISTVIEW: AtomicIsize = AtomicIsize::new(0);
 static DIRTY: AtomicBool = AtomicBool::new(false);
 /// 動いている番の止める印（1 つだけ）。
 static KEEPER: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+/// 番の世代。`start`・`stop` のたびに進む。共有の印（`LISTVIEW`・`DIRTY`・`LAYOUT_LOST`）に触れてよいのは、
+/// 世代が今の値と同じ番だけ（遅れて抜ける古い番が、新しい番の印を消さないように）。窓へ渡す区画にも付け、
+/// 窓は古い世代の区画を捨てる。
+static GEN: AtomicU64 = AtomicU64::new(0);
+/// 開いた後にデスクトップの並びが崩れた（一覧が 3 秒見つからない）。背景の窓の様子を「出せなかった」にする。
+static LAYOUT_LOST: AtomicBool = AtomicBool::new(false);
+/// 一覧が見つからないまま、並びが崩れたとみなすまで。
+const LOST_AFTER_MS: u128 = 3_000;
+/// 取り直しが続けて失敗したら、窓の層を消させる回数。
+const FAILS_BEFORE_CLEAR: u32 = 3;
+
+/// 開いた後にデスクトップの並びが崩れたか（背景の窓の層の `status` が読む）。
+pub fn layout_lost() -> bool {
+    LAYOUT_LOST.load(Ordering::Acquire)
+}
+
+/// 区画を渡す口の形（世代・画面の幅・高さ・層を消してから置くか・区画）。
+pub type SendTiles = Box<dyn Fn(u64, u32, u32, bool, Vec<TileOut>) + Send>;
+
+/// 番が窓へ渡す口。
+pub struct Sink {
+    /// 区画を背景の窓へ渡す。引数は 世代・画面の幅・高さ（物理ピクセル）・層を消してから置くか・区画。
+    pub send: SendTiles,
+    /// 開いている間に主画面の大きさが変わった（物理ピクセル）。窓の層がポインタの写しの大きさを置き直す。
+    pub on_resize: Box<dyn Fn(u32, u32) + Send>,
+}
 
 /// 窓の取り込みの除外を読み戻す。`WDA_EXCLUDEFROMCAPTURE` でなければ Err（fail-closed）。
 pub fn check_excluded_from_capture(hwnd: isize) -> Result<(), String> {
@@ -85,15 +111,16 @@ pub fn show_no_activate(hwnd: isize) {
     let _ = unsafe { ShowWindow(HWND(hwnd as _), SW_SHOWNOACTIVATE) };
 }
 
-/// 番を始める（動いていれば止めてから）。`send` はアイコンの区画を背景の窓へ送る口で、引数は
-/// 画面の幅・高さ（物理ピクセル）・層を消してから置くか・区画。
-pub fn start(stage: isize, send: impl Fn(u32, u32, bool, Vec<TileOut>) + Send + 'static) {
+/// 番を始める（動いていれば止めてから）。
+pub fn start(stage: isize, sink: Sink) {
     stop();
+    let gen = GEN.fetch_add(1, Ordering::AcqRel) + 1;
+    LAYOUT_LOST.store(false, Ordering::Release);
     let flag = Arc::new(AtomicBool::new(false));
     let mine = Arc::clone(&flag);
     let spawned = std::thread::Builder::new()
         .name("gse-handmark-desktop".to_string())
-        .spawn(move || run(HWND(stage as _), &mine, &send));
+        .spawn(move || run(HWND(stage as _), gen, &mine, &sink));
     match spawned {
         Ok(_) => {
             if let Ok(mut k) = KEEPER.lock() {
@@ -106,8 +133,10 @@ pub fn start(stage: isize, send: impl Fn(u32, u32, bool, Vec<TileOut>) + Send + 
     }
 }
 
-/// 番に止める印を立てる（待たない）。番は次の回の頭か、送る直前に抜ける。
+/// 番に止める印を立てる（待たない）。番は次の回の頭か、送る直前に抜ける。世代も進める（古い番は以後、共有の印にも
+/// 窓にも触れない）。
 pub fn stop() {
+    GEN.fetch_add(1, Ordering::AcqRel);
     let flag = KEEPER.lock().ok().and_then(|mut k| k.take());
     if let Some(f) = flag {
         f.store(true, Ordering::Release);
@@ -329,11 +358,13 @@ fn unhook(hook: &mut Option<HWINEVENTHOOK>) {
     }
 }
 
-fn run(stage: HWND, stop: &AtomicBool, send: &dyn Fn(u32, u32, bool, Vec<TileOut>)) {
+fn run(stage: HWND, gen: u64, stop: &AtomicBool, sink: &Sink) {
+    let current = || !stop.load(Ordering::Acquire) && GEN.load(Ordering::Acquire) == gen;
     let mut hook: Option<HWINEVENTHOOK> = None;
     let mut hooked_lv: isize = 0;
     let mut warned_bottom = false;
     let mut warned_hook = false;
+    let mut warned_lost = false;
     let mut prev: Vec<u64> = Vec::new();
     let mut canvas = Canvas {
         src: Vec::new(),
@@ -343,9 +374,14 @@ fn run(stage: HWND, stop: &AtomicBool, send: &dyn Fn(u32, u32, bool, Vec<TileOut
     // 最初の取り直しはすぐ（層を消してから置く）。
     let mut last_capture = Instant::now() - Duration::from_millis(FALLBACK_MS as u64);
     let mut last_full = Instant::now();
+    let mut last_size = primary_size();
+    let mut lv_missing_since: Option<Instant> = None;
+    // 窓の層を空にさせた（一覧を見失った・取り直しが続けて失敗した）。戻ったら全部を送り直す。
+    let mut cleared = false;
+    let mut fails = 0u32;
     DIRTY.store(false, Ordering::Relaxed);
     loop {
-        if stop.load(Ordering::Acquire) {
+        if !current() {
             break;
         }
         // SAFETY: 窓がまだあるかを問うだけ（壊れた後の再利用された HWND を動かさない）。
@@ -357,6 +393,18 @@ fn run(stage: HWND, stop: &AtomicBool, send: &dyn Fn(u32, u32, bool, Vec<TileOut
             warned_bottom = true;
             tracing::warn!("handmark desktop: Progman not found; stage placed at the bottom");
         }
+        // 主画面の大きさが変わった: 窓の大きさと、ポインタの写しの大きさを置き直し、全部を送り直す。
+        let size = primary_size();
+        if size != last_size && size.0 > 0 && size.1 > 0 {
+            last_size = size;
+            let flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS;
+            // SAFETY: `stage` は背景の窓（頭で生きているかを見た）。非同期で送るので待たない。
+            let _ = unsafe { SetWindowPos(stage, None, 0, 0, size.0 as i32, size.1 as i32, flags) };
+            (sink.on_resize)(size.0, size.1);
+            prev.clear();
+            last_capture = Instant::now() - Duration::from_millis(FALLBACK_MS as u64);
+        }
+        let (sw, sh) = last_size;
         let lv = progman().and_then(listview);
         let lv_id = lv.map_or(0, |h| h.0 as isize);
         // 一覧が替わった（explorer の再起動など）: 印の相手を替え、フックを張り直し、全部を送り直す。
@@ -376,6 +424,26 @@ fn run(stage: HWND, stop: &AtomicBool, send: &dyn Fn(u32, u32, bool, Vec<TileOut
             prev.clear();
             DIRTY.store(true, Ordering::Relaxed);
         }
+        // 一覧を見失った: 古い写しを残さない（空にさせる）。3 秒続けば並びが崩れたとみなす（窓の層が出せなかった扱いへ）。
+        if lv.is_none() {
+            let since = *lv_missing_since.get_or_insert_with(Instant::now);
+            if !cleared && current() && sw > 0 && sh > 0 {
+                (sink.send)(gen, sw, sh, true, Vec::new());
+                cleared = true;
+                prev.clear();
+            }
+            if since.elapsed().as_millis() >= LOST_AFTER_MS && current() {
+                LAYOUT_LOST.store(true, Ordering::Release);
+                if !warned_lost {
+                    warned_lost = true;
+                    tracing::warn!(
+                        "handmark desktop: desktop list lost; stage reported unavailable"
+                    );
+                }
+            }
+        } else {
+            lv_missing_since = None;
+        }
         // 出来事が来るたびに時刻を進める（止んでから 50ms で取り直す）。
         if DIRTY.swap(false, Ordering::Relaxed) {
             last_event = Some(Instant::now());
@@ -389,18 +457,25 @@ fn run(stage: HWND, stop: &AtomicBool, send: &dyn Fn(u32, u32, bool, Vec<TileOut
         if settled || due {
             last_event = None;
             last_capture = Instant::now();
-            let (sw, sh) = primary_size();
             if let (Some(l), true) = (lv, sw > 0 && sh > 0) {
                 if capture(l, sw, sh, &mut canvas) {
-                    // 要約が空（最初・一覧が替わった・30 秒ごと）なら、層を消してから置かせる。
+                    fails = 0;
+                    // 要約が空（最初・一覧が替わった・大きさが変わった・空にさせた後・30 秒ごと）なら、層を消してから置かせる。
                     let reset = prev.is_empty();
                     let tiles = changed_tiles(&mut prev, &canvas.out, sw, sh);
                     canvas.wipe();
-                    if !stop.load(Ordering::Acquire) && (reset || !tiles.is_empty()) {
-                        send(sw, sh, reset, tiles);
+                    if current() && (reset || !tiles.is_empty()) {
+                        (sink.send)(gen, sw, sh, reset, tiles);
+                        cleared = false;
                     }
                 } else {
                     canvas.wipe();
+                    fails = fails.saturating_add(1);
+                    if fails >= FAILS_BEFORE_CLEAR && !cleared && current() {
+                        (sink.send)(gen, sw, sh, true, Vec::new());
+                        cleared = true;
+                        prev.clear();
+                    }
                 }
             }
         }
@@ -408,6 +483,8 @@ fn run(stage: HWND, stop: &AtomicBool, send: &dyn Fn(u32, u32, bool, Vec<TileOut
     }
     unhook(&mut hook);
     canvas.wipe();
-    // 次の番が自分の一覧を置いた後なら消さない。
-    let _ = LISTVIEW.compare_exchange(hooked_lv, 0, Ordering::Relaxed, Ordering::Relaxed);
+    // 次の番が始まっていれば、共有の印に触れない。
+    if GEN.load(Ordering::Acquire) == gen {
+        LISTVIEW.store(0, Ordering::Relaxed);
+    }
 }

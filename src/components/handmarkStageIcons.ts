@@ -20,6 +20,8 @@ export interface IconTileMessage {
 
 /** 画面の大きさ(物理ピクセル)・層を消してから置くか・変わった区画。 */
 export interface IconsMessage {
+  /** 番の世代(番を始める・止めるたびに進む)。 */
+  gen: number;
   screenW: number;
   screenH: number;
   reset: boolean;
@@ -47,10 +49,28 @@ export interface IconLayer {
   ctx: CanvasRenderingContext2D | null;
   /** 何か描いてある(重ねる必要がある)。 */
   any: boolean;
+  /** いま受けている番の世代(0 = まだ)。 */
+  gen: number;
+  /** これより古い世代は受けない(窓が閉じたら、閉じる前の番の遅れた区画を捨てる)。 */
+  minGen: number;
 }
 
 export function makeIconLayer(): IconLayer {
-  return { canvas: null, ctx: null, any: false };
+  return { canvas: null, ctx: null, any: false, gen: 0, minGen: 0 };
+}
+
+/** この区画を受けるか。新しい番は層を消す区画(reset)から始まる。古い番・閉じた後に届いた前の番は捨てる。 */
+export function acceptGen(layer: IconLayer, msg: IconsMessage): boolean {
+  if (!Number.isSafeInteger(msg.gen) || msg.gen < layer.minGen || msg.gen < layer.gen) {
+    return false;
+  }
+  if (msg.gen > layer.gen) {
+    if (msg.reset !== true) {
+      return false;
+    }
+    layer.gen = msg.gen;
+  }
+  return true;
 }
 
 /** 画面の大きさの上限(物理ピクセル・8K の幅)。これを超える値は壊れているとみなす。 */
@@ -85,7 +105,8 @@ export function applyIcons(layer: IconLayer, msg: IconsMessage): boolean {
     msg === null ||
     !validSide(msg.screenW) ||
     !validSide(msg.screenH) ||
-    !Array.isArray(msg.tiles)
+    !Array.isArray(msg.tiles) ||
+    !acceptGen(layer, msg)
   ) {
     return false;
   }
@@ -142,7 +163,7 @@ export function applyIcons(layer: IconLayer, msg: IconsMessage): boolean {
   return changed;
 }
 
-/** 層を消す(窓が閉じたとき)。 */
+/** 層を消す(窓が閉じたとき)。以後は、いまの番より新しい番の区画だけを受ける。 */
 export function clearIconLayer(layer: IconLayer): void {
   if (layer.ctx !== null && layer.canvas !== null) {
     layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
@@ -150,6 +171,7 @@ export function clearIconLayer(layer: IconLayer): void {
   layer.canvas = null;
   layer.ctx = null;
   layer.any = false;
+  layer.minGen = layer.gen + 1;
 }
 
 /** 模様を描いた後に呼ぶ。模様のある画素にだけ、アイコンの写しを重ねる(`source-atop`)。 */

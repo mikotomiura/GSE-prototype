@@ -2234,6 +2234,30 @@ fn only_the_desktop_keeper_reads_icon_pixels_and_only_the_stage_sends_them() {
         body(DESKTOP_WIN_RS).contains("PrintWindow"),
         "読みが無い（空回り）"
     );
+    // WinEvent のフックを張ってよいのは、既存の打鍵・フォーカスの観測と、手跡のデスクトップの番だけ。
+    let hook = ["SetWinEventHook"];
+    let hook_allowed = [
+        "input/hook_windows.rs",
+        "input/observe_windows.rs",
+        "handmark_desktop_windows.rs",
+    ];
+    assert_eq!(
+        rs_files_naming(&hook, &hook_allowed, &files),
+        Vec::<String>::new()
+    );
+    assert!(
+        body(DESKTOP_WIN_RS).contains("SetWinEventHook"),
+        "フックが無い（空回り）"
+    );
+    let mut planted = files.clone();
+    planted.push((
+        "planted.rs".to_string(),
+        "fn f() { SetWinEventHook(); }".to_string(),
+    ));
+    assert_eq!(
+        rs_files_naming(&hook, &hook_allowed, &planted),
+        vec!["planted.rs".to_string()]
+    );
     let eval = [".", "eval", "("].concat();
     assert_eq!(
         rs_files_naming(&[eval.as_str()], &["handmark_stage.rs"], &files),

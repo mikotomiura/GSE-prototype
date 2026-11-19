@@ -91,6 +91,9 @@ mod imp {
     pub fn status() -> crate::handmark_driver::WindowStatus {
         use crate::handmark_driver::WindowStatus;
         match STATUS.load(Ordering::Acquire) {
+            // Windows: 開いた後にデスクトップの並びが崩れたら、見えない窓を出せた扱いにしない（駆動役が閉じる）。
+            #[cfg(windows)]
+            1 if crate::handmark_desktop_windows::layout_lost() => WindowStatus::Failed,
             1 => WindowStatus::Shown,
             2 => WindowStatus::Failed,
             _ => WindowStatus::Pending,
@@ -227,6 +230,8 @@ mod imp {
     #[derive(Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct IconsPayload {
+        /// 番の世代（窓は閉じた後の世代・古い世代の区画を捨てる）。
+        gen: u64,
         screen_w: u32,
         screen_h: u32,
         reset: bool,
@@ -235,6 +240,7 @@ mod imp {
 
     #[cfg(windows)]
     fn icons_payload(
+        gen: u64,
         screen_w: u32,
         screen_h: u32,
         reset: bool,
@@ -242,6 +248,7 @@ mod imp {
     ) -> IconsPayload {
         use base64::Engine as _;
         IconsPayload {
+            gen,
             screen_w,
             screen_h,
             reset,
@@ -297,12 +304,21 @@ mod imp {
         }
         crate::handmark_desktop_windows::show_no_activate(hwnd);
         let target = window.clone();
-        crate::handmark_desktop_windows::start(hwnd, move |sw, sh, reset, tiles| {
-            // 手跡の窓の WebView だけで、窓が置いた受け口を呼ぶ（他の窓には届かない・他の窓からは呼べない）。
-            if let Ok(json) = serde_json::to_string(&icons_payload(sw, sh, reset, tiles)) {
-                let _ = target.eval(format!("window.{ICONS_HOOK}&&window.{ICONS_HOOK}({json})"));
-            }
-        });
+        crate::handmark_desktop_windows::start(
+            hwnd,
+            crate::handmark_desktop_windows::Sink {
+                send: Box::new(move |gen, sw, sh, reset, tiles| {
+                    // 手跡の窓の WebView だけで、窓が置いた受け口を呼ぶ（他の窓には届かない・他の窓からは呼べない）。
+                    let payload = icons_payload(gen, sw, sh, reset, tiles);
+                    if let Ok(json) = serde_json::to_string(&payload) {
+                        let _ = target
+                            .eval(format!("window.{ICONS_HOOK}&&window.{ICONS_HOOK}({json})"));
+                    }
+                }),
+                // 開いている間に主画面の大きさが変わった: ポインタの写しの大きさを置き直す（窓の大きさは番が直す）。
+                on_resize: Box::new(|w, h| set_screen_size_pt(f64::from(w), f64::from(h))),
+            },
+        );
         Ok(())
     }
 
