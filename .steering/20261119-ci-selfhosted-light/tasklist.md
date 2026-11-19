@@ -7,6 +7,8 @@
 - [x] 変数 `GSE_WIN_FORCE_HOSTED` を消す（2026-11-19・PR #429）
 - [x] /cross-review 1 巡目・HIGH を直した（判断 1）
 - [x] PR・実際の run で G-GEAR と Mac の check が緑で、優先度が下がっていることをログで確かめる（run 44478550904: G-GEAR `Runner.Worker (35324) -> BelowNormal`・`step priority = BelowNormal`・21.5 分 / Mac `nice 10`・`step priority = 10`・6.2 分）
-- [ ] frontend-check は無料分が戻るまで始まらない（研究者の決定・待つ）。戻ったら回し直して merge
+- [ ] frontend-check は無料分が戻るまで始まらない（研究者の決定・待つ）
 - [x] 研究者の計算と重なったときの check の所要時間を測り、timeout-minutes（self-hosted 30 分）を判断する（判断 1 の保留 → 判断 2 で 45 分）
   - 1 回目（run 44478550904）: G-GEAR 21.5 分（30 分の上限に近い）。登録し直した後の初回のビルドで、手元の frontend-check の全段（最長 10 分の段あり）と重なった。2 回目は 20.1 分。
+- 3 回目（run 44484284109・上限 45 分の版）: G-GEAR 16.5 分で緑。Mac は "The self-hosted runner lost communication with the server" で 10 分で落ち（ステップの記録なし）、回し直して緑（15.7 分）。同じ設定で 1・2 回目と回し直しは通ったので、一度きり（Mac のスリープかネットワーク）と見る。続くなら Mac の nice を疑う。
+- [ ] 無料分が戻ったら、#429 の CI を回し直す（frontend-check を含めて緑）→ merge → main の CI。続けて #428 に main を取り込み、CI → merge
