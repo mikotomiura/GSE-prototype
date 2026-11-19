@@ -97,3 +97,7 @@
 1. 設計の判断 A〜F。
 2. 書き方の直し 1〜12 の承認。
 3. 直した後に round 7 を回すか（判定は 6 回続けて major。ただし R の推奨は minor 2・major 1 で、重い指摘は round 5 の直しから出た決定の段の書き方に集まっている）。
+
+## 8. 研究者の採否（2026-11-19・AskUserQuestion）
+
+A〜F・直し 1〜12・round 7 を回す、のすべてで推奨案を選んだ。中身は `.steering/20261111-gse-paper3-round3-computations/decisions.md` 判断 34。
