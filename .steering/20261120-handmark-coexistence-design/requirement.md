@@ -12,11 +12,11 @@
 - 既存の 4 本のスライドの変更
 
 ## 受け入れ条件
-- [ ] `.steering/20261120-handmark-coexistence-design/design-proposal.md`
-- [ ] `docs/slides/project-overview/build_handmark.py` で組んだ `GSE_handmark_design.pptx` と PDF
-- [ ] 描画を画像で見て、重なり・はみ出しを直した
-- [ ] Drive の slides に pptx と PDF を置いた
-- [ ] /cross-review（設計案とスライドの文の範囲）
+- [x] `.steering/20261120-handmark-coexistence-design/design-proposal.md`
+- [x] `docs/slides/project-overview/build_handmark.py` で組んだ `GSE_handmark_design.pptx` と PDF
+- [x] 描画を画像で見て、重なり・はみ出しを直した
+- [x] Drive の slides に pptx と PDF を置いた
+- [x] /cross-review（設計案とスライドの文の範囲）
 - [ ] push（S-CX の枝の上にあるので PR は S-EA・S-CX の後）
 
 ## 運用メモ

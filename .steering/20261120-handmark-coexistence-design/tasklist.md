@@ -6,4 +6,4 @@
 - [x] 図（figs3.py）と組み立て（build_handmark.py）
 - [x] 描画を見て直す
 - [x] PDF と Drive
-- [ ] コミット・/cross-review・push
+- [x] コミット・/cross-review・push

@@ -21,25 +21,26 @@ def tag(sk, x, y, w, h, label, col, size=22):
 def role():
     """打鍵とポインタから、推定（返さない）と手跡（行為の性質だけ返す）へ"""
     sk = Sk(1500, 600, 301)
-    laptop(sk, 40, 230, 170, INK)
-    sk.text(125, 420, "打鍵とポインタ", 24, INK, "mm")
-    harrow(sk, 230, 300, 330)
-    # 上: 推定
+    node(sk, 30, 110, 210, 110, "打鍵", INK, 28, sub="種類と時刻だけ", sub_size=18, fill=False)
+    node(sk, 30, 390, 210, 110, "ポインタ", INK, 28, sub="記録しない", sub_size=18, fill=False)
+    # 上: 推定（打鍵だけ）
     node(sk, 340, 70, 420, 150, "推定器", INDIGO, 30, sub="停滞の確率・状態（系の判断）", sub_size=20)
-    sk.arrow(250, 270, 335, 160, GRAY, 4, 16)
+    harrow(sk, 250, 165, 330)
     node(sk, 880, 70, 300, 150, "保留", GRAY, 30, sub="系が判断しない所", sub_size=20)
     harrow(sk, 770, 145, 870)
     sk.cross(1230, 145, 26, ORANGE, 6)
     sk.text(1270, 145, "手跡には返さない", 24, ORANGE, "lm")
-    # 下: 手跡
+    # 下: 手跡（打鍵とポインタ）
     node(sk, 340, 360, 420, 160, "行為の性質", TEAL, 30, sub="速さ・リズム・止まり・カーソルの動き", sub_size=20)
-    sk.arrow(250, 330, 335, 430, GRAY, 4, 16)
+    sk.arrow(250, 190, 335, 400, GRAY, 4, 16)
+    harrow(sk, 250, 445, 330)
+    sk.text(20, 560, "ポインタは推定に入れない（ADR-050 D2）", 19, GRAY, "lm")
     harrow(sk, 770, 440, 870)
     node(sk, 880, 360, 300, 160, "手跡", ORANGE, 32, sub="背景の窓と下の縁の帯", sub_size=20)
     harrow(sk, 1190, 440, 1260)
     sk.text(1280, 420, "本人が", 24, INK, "lm")
     sk.text(1280, 458, "感じ取る", 24, INK, "lm")
-    sk.text(750, 565, "保留の裏側の柱: 系が黙っている所に、判断の代わりに手の跡を置く（ADR-048）", 22, GRAY, "mm")
+    sk.text(1000, 565, "保留の裏側の柱: 系が黙っている所に、判断の代わりに手の跡を置く（ADR-048）", 20, GRAY, "mm")
     sk.save(OUT + "fig_hm_role.png")
 
 
@@ -109,12 +110,13 @@ def leak():
     node(sk, 340, 200, 220, 140, "描き直す", PLUM, 28, sub="同じ種・同じ刻み", sub_size=19)
     sk.arrow(570, 250, 650, 130, GRAY, 4, 16)
     sk.arrow(570, 290, 650, 410, GRAY, 4, 16)
-    node(sk, 660, 60, 420, 140, "予測器 A", TEAL, 28, sub="速さ・リズム・止まりの量だけ", sub_size=20)
+    node(sk, 660, 60, 420, 140, "予測器 A", TEAL, 28, sub="行為の量（打鍵＋ポインタの 1 秒の量）", sub_size=19)
     node(sk, 660, 340, 420, 140, "予測器 B", ORANGE, 28, sub="手跡の見た目（画素）", sub_size=20)
     sk.arrow(1090, 130, 1170, 250, GRAY, 4, 16)
     sk.arrow(1090, 410, 1170, 290, GRAY, 4, 16)
     node(sk, 1180, 190, 300, 160, "系の判断を当てる", INDIGO, 24, sub="停滞の確率 0.60 以上・3 状態", sub_size=18)
-    sk.text(750, 528, "B が A を上回らない = 手跡は、許した行為の情報を超えて判断を漏らさない（ADR-051 D3）", 22, INK, "mm")
+    sk.text(750, 510, "B が A を許す幅を超えて上回らないかを見る（区間推定・天井つき・ADR-051 D3）", 22, INK, "mm")
+    sk.text(750, 545, "ポインタは記録しないので 1 秒の量からの近似。「判断は一切読めない」とは主張しない", 19, GRAY, "mm")
     sk.save(OUT + "fig_hm_leak.png")
 
 
@@ -151,7 +153,7 @@ def collision():
 def variables():
     sk = Sk(1500, 600, 305)
     cols = [("遅れ", INDIGO, ["視覚の帰属では弱い", "Farrer 2008 ・ Kim 2024", "", "自己接触の輪では", "誰かがいる感じ", "Blanke 2014"], "課題で異なる"),
-            ("慣性", GRAY, ["慣性そのものを", "振った研究は無い", "", "遅れの結果からは", "決められない", ""], "未検証"),
+            ("慣性", GRAY, ["慣性そのものを振った", "研究は見つからない", "（この探索の範囲）", "遅れの結果からは", "決められない", ""], "未検証"),
             ("予測可能性", TEAL, ["応答の予測可能性に", "ちょうどよい所があり", "そこで生き物と感じる", "", "Bernardet 2017", ""], "効きがある"),
             ("空間のずれ", ORANGE, ["他者への帰属は", "空間のずれが", "大きいときに起きる", "", "Farrer 2008", ""], "効きがある")]
     w, gap = 340, 26
@@ -164,7 +166,7 @@ def variables():
                 sk.text(x + w / 2, 150 + k * 38, ln, 20, INK if "20" not in ln else GRAY, "mm")
         sk.rect(x + 40, 395, w - 80, 56, c, 3, fill=WHITE)
         sk.text(x + w / 2, 423, verdict, 23, c, "mm")
-    sk.text(750, 530, "どの変数でも「自分のもの」と「別の存在」の両方を測ったものは無い → 自前で比べる", 23, INK, "mm")
+    sk.text(750, 530, "どの変数でも「自分のもの」と「別の存在」の両方を測ったものは、この探索の範囲で見つからない → 自前で比べる", 21, INK, "mm")
     sk.save(OUT + "fig_hm_vars.png")
 
 
@@ -181,7 +183,7 @@ def chart_roomba():
         if v:
             sk.line(ox, y, 1040, y, (225, 220, 212), 1, passes=1)
     sk.text(ox - 18, oy - h - 34, "世帯", 20, GRAY, "rm")
-    bars = [(230, 19, "最初の 2 週", TEAL), (450, 12, "6 か月目", ORANGE)]
+    bars = [(230, 19, "6 か月の間に", TEAL), (450, 12, "6 か月目", ORANGE)]
     for x, v, lab, c in bars:
         y = oy - v / 30 * h
         sk.rect(x, y, 150, oy - y, c, 3, fill=PALE[c])
@@ -189,9 +191,9 @@ def chart_roomba():
         sk.text(x + 75, oy + 32, lab, 21, INK, "mm")
     sk.text(415, 70, "ロボットに話しかけた世帯（30 世帯中）", 23, INK, "mm")
     sk.arrow(390, 230, 455, 300, GRAY, 3, 12)
-    sk.text(700, 210, "名前を付けたのは 13 世帯で、", 21, INK, "la")
-    sk.text(700, 245, "ほとんど最初の 2 週のうち", 21, INK, "la")
-    sk.text(700, 280, "（その後の新しい名前は 6）", 21, GRAY, "la")
+    sk.text(700, 175, "名前を付けたのは最初の 2 週で", 21, INK, "la")
+    sk.text(700, 210, "13 世帯（その後の新しい名前は 6）", 21, INK, "la")
+    sk.text(700, 260, "どれも適応の時期にいちばん盛ん", 21, GRAY, "la")
     sk.text(700, 350, "減るが、消えない", 26, ORANGE, "la")
     sk.text(550, 565, "出典: Sung, Grinter & Christensen 2010（家庭の Roomba・30 世帯・6 か月）", 18, GRAY, "mm")
     sk.save(OUT + "chart_hm_roomba.png")
