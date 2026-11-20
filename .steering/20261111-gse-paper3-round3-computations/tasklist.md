@@ -72,4 +72,5 @@
 - [x] 削る（8,049 → 7,231 語・判断 41）
 - [x] context-B の「2 桁落ちない」を直した（round 8 の context-B）
 - [x] round 8（major・R は 3 人とも minor・判断 42）と直し 1〜19
-- [ ] round 9
+- [x] round 9（major・R は 2 回続けて全員 minor・判断 43）と直し 1〜18
+- [ ] round 10
