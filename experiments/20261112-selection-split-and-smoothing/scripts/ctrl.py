@@ -34,13 +34,27 @@ SYM_VALS_SHA = "8596a3c79c16377ba6239f5e79ef094b7b636e0755402ab6df1a7eae366fa32b
 
 
 # ---------------------------------------------------------------- 当てはめ（共通と最頻値）
-def job_excl_mode(job):
-    """w を除く共通（ar3・倍率 α）の評価と、その S̄ の最頻値の評価（ll_zero）。z1 は渡された倍率 1 の S̄ を使う。"""
+def job_pool_sb(job):
+    """1 段目: w を除く共通（ar3・倍率 α）の評価と S̄。"""
     r = SM.job_excl_sb(job)
-    sb = job["sb1"] if ("z1" in MUT and job.get("sb1") is not None) else r["sb"]
+    return dict(ll=r["ll"], sb=r["sb"])
+
+
+def job_mode(job):
+    """2 段目: 渡された S̄ の最頻値の評価（ll_zero）。z1 は渡された倍率 1 の S̄ を使う。
+    mode の本計算（fit_pool_excl → em_writer）と同じく、共通の当てはめとは別のジョブで評価する。同じジョブで
+    続けて評価すると、HP Z2 で倍率 1 の最頻値が mode の pickle と 1 ulp ずれた（S̄ と母数はビットまで同じ・
+    P-REPRO-MODE1 の診断 2026-11-20）。"""
+    sb = job["sb1"] if ("z1" in MUT and job.get("sb1") is not None) else job["sb"]
     m, zero = H.mode_of("ar", sb)
     ev = CP.eval_of(CP.writers_of(job)[job["w"]], ml.DATASETS[job["ds"]]["H"])
-    return dict(ll=r["ll"], mode=ev.ll_zero(m), zero_row=bool(H.zero_row_hit(zero, ev.D)), sb=r["sb"])
+    return dict(mode=ev.ll_zero(m), zero_row=bool(H.zero_row_hit(zero, ev.D)))
+
+
+def job_excl_mode(job):
+    """1 段目と 2 段目を続けて（合成の selftest 用）。"""
+    r = job_pool_sb(job)
+    return dict(ll=r["ll"], sb=r["sb"], **job_mode(dict(job, sb=r["sb"])))
 
 
 # ---------------------------------------------------------------- 集計
@@ -174,11 +188,13 @@ def main():
     with ProcessPoolExecutor(jobs, initializer=ml._init, initargs=({DS: coa}, SEED, [])) as ex:
         for a in ("1", ALPHA):
             full = ex.submit(CP.job_full, dict(ds=DS, s=AR3, alpha=float(a), seed=SEED)).result()
-            jl = [dict(ds=DS, w=w, start=full, alpha=float(a), sb1=(V["1"]["sb"][w] if a == ALPHA else None)) for w in ws]
-            res = dict(zip(ws, ex.map(job_excl_mode, jl, chunksize=1)))
+            jl = [dict(ds=DS, w=w, start=full, alpha=float(a)) for w in ws]
+            rp = dict(zip(ws, ex.map(job_pool_sb, jl, chunksize=1)))
+            jm = [dict(ds=DS, w=w, sb=rp[w]["sb"], sb1=(V["1"]["sb"][w] if a == ALPHA else None)) for w in ws]
+            rm = dict(zip(ws, ex.map(job_mode, jm, chunksize=1)))
             T["pool_%s_sec" % a] = time.time() - t0
-            V[a] = dict(pool={w: res[w]["ll"] for w in ws}, mode={w: res[w]["mode"] for w in ws},
-                        zero_row={w: res[w]["zero_row"] for w in ws}, sb={w: res[w]["sb"] for w in ws})
+            V[a] = dict(pool={w: rp[w]["ll"] for w in ws}, mode={w: rm[w]["mode"] for w in ws},
+                        zero_row={w: rm[w]["zero_row"] for w in ws}, sb={w: rp[w]["sb"] for w in ws})
             if a == "1":
                 cmp = [(V[a]["mode"][w], R[w]["em"]["mode"]["ar3"]) for w in ws] + \
                       [(V[a]["pool"][w], R[w]["em"]["pool"]["ar3"]) for w in ws]
