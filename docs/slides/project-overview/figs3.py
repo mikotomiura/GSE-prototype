@@ -202,9 +202,9 @@ def chart_roomba():
 # ---------------------------------------------------------------- 3 つの層
 def layers():
     sk = Sk(1500, 640, 307)
-    rows = [("層 3  守り", INDIGO, "足した部分を系の状態に依存させない（日の種）・漏れの検査を同じ手順で回す・真似にしない・育てない"),
-            ("層 2  他者性のつまみ", ORANGE, "新しく足す候補（決めていない）: A 慣性 ・ B 自律の基層 ・ C 空間のずれ を比べる"),
-            ("層 1  由来", TEAL, "今のまま: カーソルの周りの倒れと寄せ、打鍵の速さ・リズム・止まり（即時の応答）")]
+    rows = [("層 3  守り", INDIGO, "日の種だけで動かす・漏れの検査・経過を運ばない（3 つの確かめ）・長さを返さない・育てない"),
+            ("層 2  他者性", ORANGE, "B 自律の動き: 手が止まっている間だけ見えてくる（ADR-056 Accepted）／ A 慣性・C 空間のずれは候補"),
+            ("層 1  由来", TEAL, "手が動いている間: カーソルの周りの倒れと寄せ、打鍵の速さ・リズム（即時の応答・今のまま）")]
     for i, (t, c, d) in enumerate(rows):
         y = 40 + i * 190
         sk.rect(60 + i * 30, y, 1380 - i * 60, 160, c, 4, fill=PALE[c])
@@ -245,20 +245,21 @@ def knobs():
             sk.ellipse(cx + 70, cy - 30, 55, 55, ORANGE, 4, fill=PALE[ORANGE])
             sk.arrow(cx - 40, cy + 5, cx + 20, cy - 20, GRAY, 3, 12)
             sk.text(x + w / 2, 380, "カーソル（黒）からずれた所に応答", 19, GRAY, "mm")
-    sk.text(750, 575, "文献の見立てでは B がいちばん「同居者」らしい見込み（確かめていない）", 22, INK, "mm")
+    sk.text(750, 575, "B は「手が止まっている間だけ見えてくる」形で ADR-056 に採った。A・C は候補のまま", 22, INK, "mm")
     sk.save(OUT + "fig_hm_knobs.png")
 
 
 # ---------------------------------------------------------------- 日の終わりの問い
 def daycard():
-    sk = Sk(1400, 700, 309)
-    sk.rect(330, 30, 1040, 580, INK, 3, fill=WHITE)
+    sk = Sk(1400, 820, 309)
+    sk.rect(330, 30, 1040, 700, INK, 3, fill=WHITE)
     sk.text(370, 75, "今日の作業について（手跡ありの日だけ足す項目の案）", 24, INK, "lm")
     items = [("由来の判断", TEAL, "今日の手跡の動きは、自分の作業から生まれたものだと思う"),
              ("感じ", ORANGE, "手跡が、そばにいる別の何かのように感じた"),
              ("反証（候補）", PLUM, "見張られているように感じた"),
-             ("反証（候補）", PLUM, "手跡が煩わしかった")]
-    sk.text(700, 660, "中心は上の 2 つ。日の問いは 2〜3 項目・10 秒ほど（ADR-048 D3）なので数を絞る。5 段の丸は例", 20, GRAY, "mm")
+             ("反証（候補）", PLUM, "手跡が煩わしかった"),
+             ("気づき（候補）", OLIVE, "今日は、手が止まっていることに自分で気づいた")]
+    sk.text(700, 775, "中心は上の 2 つ。下の 3 つは入れ替えで尋ねる候補（2〜3 項目・10 秒ほど・ADR-048 D3）。5 段の丸は例", 20, GRAY, "mm")
     for i, (lab, c, q) in enumerate(items):
         y = 140 + i * 115
         tag(sk, 30, y, 260, 70, lab, c, 24)
@@ -273,21 +274,22 @@ def daycard():
 # ---------------------------------------------------------------- 進める順
 def steps():
     sk = Sk(1500, 420, 310)
-    st = [("1", "回 1 の結果を見る", "守りが成り立つか", INDIGO),
-          ("2", "机上で A・B・C", "記録から描き直し、漏れを検査", TEAL),
-          ("3", "研究者自身で試す", "数日ずつ切り替え、問いに答える", OLIVE),
-          ("4", "段 1 の問いに足す", "ADR-051 D6 の変更", ORANGE)]
-    w, gap = 320, 50
+    st = [("1", "回 1 の結果", "守りが成り立つか", INDIGO),
+          ("2", "止まりの試作", "ADR-056 と案 B を机上で", TEAL),
+          ("3", "研究者が試す", "数日ずつ・問いに答える", OLIVE),
+          ("4", "日の問い", "項目の文を決める（PR 7）", ORANGE),
+          ("5", "段 2 の登録", "手跡と招待の扱い（D5）", PLUM)]
+    w, gap = 250, 45
     for i, (n, t, d, c) in enumerate(st):
         x = 30 + i * (w + gap)
         sk.rect(x, 60, w, 280, c, 3, fill=PALE[c])
         sk.ellipse(x + 50, 110, 30, 30, c, 3, fill=WHITE)
         sk.text(x + 50, 110, n, 28, c, "mm")
-        sk.text(x + w / 2, 190, t, 26, INK, "mm")
-        sk.text(x + w / 2, 260, d, 19, GRAY, "mm")
-        if i < 3:
+        sk.text(x + w / 2, 190, t, 25, INK, "mm")
+        sk.text(x + w / 2, 260, d, 17, GRAY, "mm")
+        if i < len(st) - 1:
             harrow(sk, x + w + 6, 200, x + w + gap - 6)
-    sk.text(750, 390, "2 と 3 は新しい被験者が要らない。4 で初めて参加者の画面が変わる", 21, INK, "mm")
+    sk.text(750, 390, "2 と 3 は新しい被験者が要らない。参加者の画面が変わるのは、段 1 の後期の配布物を作るとき", 21, INK, "mm")
     sk.save(OUT + "fig_hm_steps.png")
 
 
@@ -349,8 +351,73 @@ def reverse():
     sk.save(OUT + "fig_hm_reverse.png")
 
 
+# ---------------------------------------------------------------- 全体のコンセプト: 2 つの状態
+def twostate():
+    sk = Sk(1500, 620, 311)
+    # 左: 手が動いている
+    sk.rect(30, 60, 560, 420, TEAL, 4, fill=WHITE)
+    sk.text(310, 30, "手が動いている間", 28, TEAL, "mm")
+    for gx in range(70, 560, 34):
+        for gy in range(110, 450, 56):
+            dx = gx - 330
+            dy = gy - 270
+            r = math.hypot(dx, dy)
+            lean = 18 * math.exp(-r / 120) * (1 if dx > 0 else -1)
+            sk.line(gx, gy, gx + lean, gy - 30, TEAL, 2, passes=1)
+    sk.path([(330, 260), (330, 300), (341, 290), (351, 308), (358, 303), (348, 286), (362, 286), (330, 260)], INK, 3)
+    sk.text(310, 520, "自分の跡: 打鍵とカーソルで倒れ、寄る", 22, INK, "mm")
+    sk.text(310, 556, "「自分の手から生まれた」（由来）", 20, GRAY, "mm")
+    # 右: 手が止まっている
+    sk.rect(910, 60, 560, 420, OLIVE, 4, fill=WHITE)
+    sk.text(1190, 30, "手が止まっている間", 28, OLIVE, "mm")
+    for k in range(6):
+        pts = [(940 + j * 50, 120 + k * 62 + 16 * math.sin(j / 1.5 + k * 1.3)) for j in range(11)]
+        sk.curve(pts, OLIVE, 3)
+    sk.text(1190, 520, "自分の跡が引き、場の自律の動きが見えてくる", 22, INK, "mm")
+    sk.text(1190, 556, "「自分ではないもの」（同居者）・長さは返さない", 20, GRAY, "mm")
+    # 間の矢印
+    sk.arrow(610, 200, 890, 200, GRAY, 4, 16)
+    sk.text(750, 170, "打鍵が止まる", 22, INK, "mm")
+    sk.arrow(890, 330, 610, 330, GRAY, 4, 16)
+    sk.text(750, 365, "打てば、すぐ戻る", 22, INK, "mm")
+    sk.text(750, 600, "どちらの状態も、系の判断（推定）は運ばない", 22, INDIGO, "mm")
+    sk.save(OUT + "fig_hm_twostate.png")
+
+
+# ---------------------------------------------------------------- ADR-056: 止まったときの時間の流れ
+def stoptimeline():
+    sk = Sk(1500, 600, 312)
+    ox, oy, w = 120, 470, 1300
+    sk.arrow(ox, oy, ox + w, oy, INK, 3, 16)
+    sk.text(ox + w - 10, oy + 40, "時間", 20, GRAY, "rm")
+    for k in range(9):
+        sk.line(ox + 30 + k * 22, oy - 10, ox + 30 + k * 22, oy + 10, INK, 3, passes=1)
+    sk.text(ox + 120, oy + 45, "打鍵", 20, INK, "mm")
+    for k in range(5):
+        sk.line(ox + 1150 + k * 22, oy - 10, ox + 1150 + k * 22, oy + 10, INK, 3, passes=1)
+    sk.text(ox + 1195, oy + 45, "打鍵", 20, INK, "mm")
+    # 自分の跡（風）
+    wind = [(ox + 30 + k * 10, oy - 260 if k < 20 else oy - 260 * (0.90 ** (k - 20))) for k in range(0, 112)]
+    wind += [(ox + 1150, oy - 5), (ox + 1160, oy - 200), (ox + 1260, oy - 240)]
+    sk.curve(wind, TEAL, 4)
+    sk.text(ox + 40, oy - 300, "自分の跡（打鍵の風）", 22, TEAL, "lm")
+    # 自律の動きの見え方
+    onset = ox + 640
+    vis = [(ox + 30, oy - 15), (onset, oy - 15)]
+    vis += [(onset + k * 12, oy - 15 - 155 * min(1, k / 8)) for k in range(1, 9)]
+    vis += [(onset + 100 + k * 30, oy - 170 + 8 * math.sin(k)) for k in range(int((ox + 1140 - onset - 100) / 30))]
+    vis += [(ox + 1150, oy - 160), (ox + 1165, oy - 15), (ox + 1290, oy - 15)]
+    sk.path(vis, OLIVE, 4)
+    sk.text(onset + 120, oy - 215, "場の自律の動きが見えてくる（その後は同じ）", 21, OLIVE, "lm")
+    sk.line(onset, oy - 5, onset, oy - 330, GRAY, 2, passes=1)
+    sk.text(onset, oy - 350, "is_idle になる所（直前の打ち方で約 10〜50 秒）", 19, INK, "mm")
+    sk.text(ox + 840, oy + 45, "止まりの長さは見た目から読めない（記憶が短い）", 20, INK, "mm")
+    sk.text(750, 560, "起動の直後・戻した直後・記録の一時停止の間は、止まりを返さない（ADR-056 D7）", 20, GRAY, "mm")
+    sk.save(OUT + "fig_hm_stoptimeline.png")
+
+
 if __name__ == "__main__":
     for f in [role, field, leak, collision, variables, chart_roomba, layers, knobs, daycard, steps,
-              quadrant, reverse]:
+              quadrant, reverse, twostate, stoptimeline]:
         f()
     print("ok")
