@@ -66,5 +66,8 @@
 - [x] r7.py・selftest_r7.py・run_r7.sh を書き、Mac で selftest と変異を通す（2b1fc341）
 - [x] /cross-review（Claude と Codex）の直し（06fc7ec8・判断 39）
 - [x] HP Z2 の引き継ぎを書く（next-session-gse-paper3-round7-computations-run-on-hp-z2.md）
-- [ ] HP Z2 で run_r7.sh を回す
-- [ ] 結果 → notes → 本文の \PENDING → 数値の照合 → 削る → round 8
+- [x] HP Z2 で run_r7.sh を回す（da85da29・記録 569a42cb・照らしは全部通過）
+- [x] notes（B「残る」・A「担う」）と本文の \PENDING 5 か所・3.4 の数え（判断 40）
+- [x] 数値の照合（Opus・読むだけ）・指摘 7 点を直す（判断 40）
+- [ ] 削る（round 8 の前）・context-B の「2 桁落ちない」を直す
+- [ ] round 8
