@@ -108,3 +108,9 @@ The body no longer carries the following; the supplement sections must hold them
 - S16: own chain with its added value chosen on other writers: the joint choice beats it by +0.025 to +0.038 in CS1.
 - S3: scoring at sequence boundaries: each held-out CoAuthor session and each CS1 work block (a gap of 30 minutes or more) is a separate sequence in fitting and scoring; the hidden state starts from the fitted initial distribution pi; the first symbol is scored by pi times the emission distribution (3-state HMM) or the per-state first-symbol distribution (AR-HMM), and by the writer's first-symbol frequencies for the own chain; first symbols are included in the per-symbol average.
 - Round 6 fixes, A and C (values from the control run): the abstract was shortened to stay within 250 words (the panel definition "20 or more sessions" stays in Section 3.2; no claim was removed). Nothing moved to the supplement for A and C; the counts of writers per chosen tau and the per-writer weight median go to S16 together with the control values.
+
+## Round 7 fixes: text moved out of the body (to write into the supplement)
+
+- S7: interquartile ranges over writers for every reported cell (the body reports medians, shares and bootstrap intervals only).
+- S16: the symmetric refit's control values in full (prior mode at alpha = 0.03 minus shared at alpha = 0.03, prior mode at alpha = 1 minus shared at alpha = 0.03, per-person minus prior mode at alpha = 0.03 for all k), the writers with zero-probability held-out symbols counted as losses for the prior mode and as wins for the per-person fit (medians are not additive), and the counts of writers per chosen tau for all k.
+- Body grew from 7,502 to 7,770 words with the round 7 fixes; trim before round 8 (candidates: the non-overlapping paragraph in 4.2, repeated "not checked against synthetic writers").
