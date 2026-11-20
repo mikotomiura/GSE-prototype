@@ -411,8 +411,8 @@ def stoptimeline():
     sk.text(onset + 120, oy - 215, "場の自律の動きが見えてくる（その後は同じ）", 21, OLIVE, "lm")
     sk.line(onset, oy - 5, onset, oy - 330, GRAY, 2, passes=1)
     sk.text(onset, oy - 350, "is_idle になる所（直前の打ち方で約 10〜50 秒）", 19, INK, "mm")
-    sk.text(ox + 840, oy + 45, "止まりの長さは見た目から読めない（記憶が短い）", 20, INK, "mm")
-    sk.text(750, 560, "起動の直後・戻した直後・記録の一時停止の間は、止まりを返さない（ADR-056 D7）", 20, GRAY, "mm")
+    sk.text(ox + 840, oy + 45, "止まりの長さを読めないように作る（確かめは机上の道具で）", 20, INK, "mm")
+    sk.text(750, 560, "起動・戻し・一時停止の直後（最初の打鍵まで）と一時停止の間は、止まりを返さない", 20, GRAY, "mm")
     sk.save(OUT + "fig_hm_stoptimeline.png")
 
 
