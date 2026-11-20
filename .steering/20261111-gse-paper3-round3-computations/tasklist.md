@@ -59,3 +59,10 @@
 - [x] Step 3b の点検（paper-write/rewording-check-r4.md）・語数を length-log に・警告 0
 - [x] 数値の独立の照合（判断 31）
 - [ ] manuscript round 5（本線の attack-me・round 4 の dir を土台に・Codex に既知の未決＋判断 30 の保留）
+
+## manuscript round 7 の計算 A・B（2026-11-20〜・判断 37・38）
+- [x] A・B の設計を研究者に問う（判断 38・全部推奨案）
+- [ ] 条件を conditions.md に追記してコミット（コードより前）
+- [ ] r7.py・selftest_r7.py・run_r7.sh を書き、Mac で selftest と変異を通す
+- [ ] HP Z2 の引き継ぎを書く
+- [ ] 結果 → notes → 本文の \PENDING → 数値の照合 → 削る → round 8
