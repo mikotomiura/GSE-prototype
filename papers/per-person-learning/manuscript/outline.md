@@ -117,7 +117,7 @@ The body no longer carries the following; the supplement sections must hold them
 
 ## Round 8 preparation: text moved out of the body (to write into the supplement)
 
-- S3: EM starting points (the shared model and, for the per-person fit with no shrinkage, a random start; with shrinkage, that fit), stopping rule (objective per symbol changes by less than 1e-7 or 500 iterations), keep the start with the higher objective.
+- S3: EM starting points in full (for the per-person fit with no shrinkage, a random start; with shrinkage, the unshrunk fit).
 - S3: the choice objectives: in the fixed-structure rows a writer for whom the shared model itself is chosen has a difference of zero; in the joint choice no candidate gives zero against the own chain.
 - S13: non-overlapping windows: the per-person 3-state HMM with tau chosen on other writers beats the shared 3-state HMM for 17 of 17 writers at k = 15; parameter counts (2,033 for the 3-state AR-HMM, 83 for the 3-state HMM) against about one-thirtieth of the symbols.
 - S15: second null: the threshold relative to the smoothing effect is about 1.0; over 80% of synthetic writers given tau = 10^6 at k = 5 and 15; with a planted difference of 3e-2 the lowest seed at k = 5 left -9.8e-4, below every negative control; the ratio was not examined with planted differences.
