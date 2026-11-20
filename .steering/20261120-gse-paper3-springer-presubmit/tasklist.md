@@ -6,9 +6,9 @@
 - [x] 未決 3: Liu & Meng の雑誌版（抄録まで）・S1 に照合の断り
 - [x] 未決 4: 記録つきの検索（サブエージェント）・件数 2 本を検算・S1 の表・序論
 - [x] 未決 5: ハッシュを作る・陽性と陰性の対照・限界と S3 と README
-- [ ] 未決 6: Zenodo の DOI は予約済み。公開 repo を組む・公開する（研究者に進め方を聞く）
+- [ ] 未決 6: DOI は予約済み・URL は本文に。repo を組むのは別のセッション（next-session-gse-paper3-public-repo.md）
 - [x] 未決 7: Data availability の理由
-- [ ] 所属の市と国を本文と補足に入れる（研究者に聞く）
+- [x] 所属の市と国（Hiroshima, Japan・研究者の回答）
 - [x] 数値の照合（移行の前後の差分＋足した数を一次と）
 - [x] length-log・decisions（判断 46）
-- [ ] コミット（[skip ci]・budget.json を除く）・枝へ push
+- [x] コミット（[skip ci]・budget.json を除く）・枝へ push

@@ -354,3 +354,4 @@
 - 補足: 頭に Online Resource 1・題・誌名（\journalline・公開の写しでは外す）・著者・所属・連絡先。所属の市と国は研究者に確かめる（今は CITY-TO-CONFIRM）。
 - 数値の照合: 移行の前後で本文と補足の数の並びを機械で突き合わせた。本文で変わったのは図の座標・「Online Resource 1」・DOI だけで、結果の数値は 1 つも変わっていない。補足に足した数（検索の件数・Uto の 72 名と 45 分・ハッシュの件数と行数・875）は一次（log.md・Uto の全文・照合の JSON・計算の出力）と照らした。前の版の Opus の照合は全文に通してあるので、今回は差分に絞った（Opus のサブエージェントは回していない）。
 - Codex（/cross-review）は回さない（引き継ぎ: CoAuthor の記録も値も Codex に送らない）。
+- 所属: Independent Researcher, Hiroshima, Japan（研究者の回答・2026-11-20）。公開 repo は別のセッションで組む・名前は per-person-keystroke-models のまま（研究者の選択）。
