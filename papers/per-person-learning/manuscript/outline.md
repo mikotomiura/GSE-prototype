@@ -114,3 +114,12 @@ The body no longer carries the following; the supplement sections must hold them
 - S7: interquartile ranges over writers for every reported cell (the body reports medians, shares and bootstrap intervals only).
 - S16: the symmetric refit's control values in full (prior mode at alpha = 0.03 minus shared at alpha = 0.03, prior mode at alpha = 1 minus shared at alpha = 0.03, per-person minus prior mode at alpha = 0.03 for all k), the writers with zero-probability held-out symbols counted as losses for the prior mode and as wins for the per-person fit (medians are not additive), and the counts of writers per chosen tau for all k.
 - Body grew from 7,502 to 7,770 words with the round 7 fixes; trim before round 8 (candidates: the non-overlapping paragraph in 4.2, repeated "not checked against synthetic writers").
+
+## Round 8 preparation: text moved out of the body (to write into the supplement)
+
+- S3: EM starting points (the shared model and, for the per-person fit with no shrinkage, a random start; with shrinkage, that fit), stopping rule (objective per symbol changes by less than 1e-7 or 500 iterations), keep the start with the higher objective.
+- S3: the choice objectives: in the fixed-structure rows a writer for whom the shared model itself is chosen has a difference of zero; in the joint choice no candidate gives zero against the own chain.
+- S13: non-overlapping windows: the per-person 3-state HMM with tau chosen on other writers beats the shared 3-state HMM for 17 of 17 writers at k = 15; parameter counts (2,033 for the 3-state AR-HMM, 83 for the 3-state HMM) against about one-thirtieth of the symbols.
+- S15: second null: the threshold relative to the smoothing effect is about 1.0; over 80% of synthetic writers given tau = 10^6 at k = 5 and 15; with a planted difference of 3e-2 the lowest seed at k = 5 left -9.8e-4, below every negative control; the ratio was not examined with planted differences.
+- S16: symmetric refit: chosen tau for every k; the prior mode at alpha = 0.03 gives zero probability to some held-out symbols of two writers (counted as losses); the swap control's secondary comparison with the same S-bar (4.68e-3 and 2.52e-2) and the share of the 272 pairs in which the swap beat the writer's own fit (0.015 and 0.011).
+- Body after the round 7 computations: 8,049 words (sections intro to conclusion) trimmed to 7,231 before round 8.
