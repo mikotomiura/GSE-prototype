@@ -46,6 +46,17 @@ bash run_ctrl.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/selection_split_smoo
 
 （HP Z2 のセッションが記入する）
 
+**2026-11-20（HP Z2・Python 3.11.9・numpy 2.4.4・git-bash・JOBS=16）**
+
+- 1 回目（`2d24b148`）: selftest 5 門 緑・変異 5 個 名指しの門だけ赤・P-REPRO-SYMSUM 通過（7）。**P-REPRO-MODE1 が外れて止まった**（照らした数 34・最大の差 1.6653345369377348e-16）。版は条件どおり・CRLF なし。
+- 研究者の指示（「修正できるならこちらで修正してから実施して」）で、値を見ずに真偽だけで診断した（scratchpad の使い捨てスクリプト・repo に入れていない）:
+  - 倍率 1 の共通: 17 人とも mode の pickle とビットまで同じ。最頻値: 11 人が 1 ulp ずれ。
+  - 当て直した w を除く共通の母数と S̄: 保存済みの `tau_mode_candidate_pool_params.coauthor.npz` と 17 人・全鍵でビットまで同じ（メモリの並びも同じ）。
+  - 保存済みの S̄ から最頻値を作ると 17 人とも pickle と同じ（置き場所を 8 通りずらしても同じ）。
+  - 当てはめと**同じジョブ**で最頻値を作ると外れ（同じプロセスで pickle 往復しても外れ）、S̄ を親へ返して**別のジョブ**で作ると 17 人とも同じ。mode の本計算（`fit_pool_excl` → `em_writer`）も別ジョブ。
+- 直し（`41ceb5c2`）: `ctrl.py` の `job_excl_mode` を `job_pool_sb`（1 段目）と `job_mode`（2 段目）に分け、本計算は 2 段のジョブで回す。式・条件・門は変えていない。selftest 5 門 緑・変異 5 個 名指しの門だけ赤（`SELFTEST_ONLY=1`）。**Mac のセッションで、この直しを /cross-review などで確かめてほしい。**
+- 2 回目（run_id `20261120T135834-1287`・git_head `41ceb5c2`・dirty なし）: 入力 3 つの SHA-256 一致・selftest 5 門 緑・変異 5 個 名指しの門だけ赤・P-REPRO-SYMSUM 通過（7）・**P-REPRO-MODE1 通過（34・最大の差 0.0・1125 秒）**・**P-REPRO-B1 通過（34・最大の差 0.0）**・倍率 0.03 まで 2259 秒。`ctrl_summary.json` と `provenance_ctrl.json` の run_id は同じ。結果は `a35cc288`。値の中身は読んでいない。
+
 ## 6 Mac 側の状態（2026-11-19）
 
 - 条件は `927da1d7`（コードより前）。Mac（Python 3.14・numpy 2.5）で selftest 5 門が緑、変異 5 個がそれぞれ名指しの門だけを赤にした（`SELFTEST_ONLY=1`）。実データの読み込み・共通の当て直しは Mac では通していない（pickle が HP Z2 にしかない）。
