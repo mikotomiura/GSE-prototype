@@ -62,7 +62,9 @@
 
 ## manuscript round 7 の計算 A・B（2026-11-20〜・判断 37・38）
 - [x] A・B の設計を研究者に問う（判断 38・全部推奨案）
-- [ ] 条件を conditions.md に追記してコミット（コードより前）
-- [ ] r7.py・selftest_r7.py・run_r7.sh を書き、Mac で selftest と変異を通す
-- [ ] HP Z2 の引き継ぎを書く
+- [x] 条件を conditions.md に追記してコミット（コードより前・d98fde84）
+- [x] r7.py・selftest_r7.py・run_r7.sh を書き、Mac で selftest と変異を通す（2b1fc341）
+- [x] /cross-review（Claude と Codex）の直し（06fc7ec8・判断 39）
+- [x] HP Z2 の引き継ぎを書く（next-session-gse-paper3-round7-computations-run-on-hp-z2.md）
+- [ ] HP Z2 で run_r7.sh を回す
 - [ ] 結果 → notes → 本文の \PENDING → 数値の照合 → 削る → round 8
