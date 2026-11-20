@@ -291,7 +291,66 @@ def steps():
     sk.save(OUT + "fig_hm_steps.png")
 
 
+# ---------------------------------------------------------------- 価値: 2 つの読める度合い
+def quadrant():
+    """横 = 自分のものと分かる・縦 = 状態として読める。手跡は右下を狙う"""
+    sk = Sk(1500, 720, 307)
+    ox, oy, w, h = 230, 640, 1180, 580
+    sk.arrow(ox, oy, ox + w, oy, INK, 3, 16)
+    sk.arrow(ox, oy, ox, oy - h, INK, 3, 16)
+    sk.text(ox + w / 2, oy + 45, "自分の手のものと分かる →", 24, INK, "mm")
+    sk.text(ox - 25, oy - h + 10, "状態として", 22, INK, "rm")
+    sk.text(ox - 25, oy - h + 42, "読める ↑", 22, INK, "rm")
+    mx, my = ox + w / 2, oy - h / 2
+    sk.line(mx, oy - 10, mx, oy - h + 20, GRAY, 2, passes=1)
+    sk.line(ox + 10, my, ox + w - 20, my, GRAY, 2, passes=1)
+    cells = [
+        (ox + 30, oy - h + 40, "系の状態の表示", ["天気の比喩で状態を映す（WeatherTank）", "誰の手かは問わない"], GRAY),
+        (mx + 30, oy - h + 40, "自己追跡のグラフ・data double", ["自分のものと分かり、状態も読める", "判断を運ぶと「外の人の意見」（Ruckenstein 2014）"], INDIGO),
+        (ox + 30, my + 30, "装飾の壁紙・生成の作品", ["どちらも読めない"], GRAY),
+    ]
+    for x, y, t, lines, c in cells:
+        sk.text(x, y, t, 25, c, "la")
+        for k, ln in enumerate(lines):
+            sk.text(x, y + 44 + k * 34, ln, 19, GRAY, "la")
+    sk.rect(mx + 20, my + 20, w / 2 - 50, h / 2 - 45, ORANGE, 4, fill=PALE[ORANGE])
+    sk.text(mx + 45, my + 55, "手跡が狙う所", 28, ORANGE, "la")
+    sk.text(mx + 45, my + 100, "自分の手と分かるが、系の判断としては読めない", 21, INK, "la")
+    sk.text(mx + 45, my + 132, "（行為の量から読める分は、許した漏れ）", 18, GRAY, "la")
+    sk.text(mx + 45, my + 166, "両方を同じ研究で測ったもの: 2 ラウンド 0 件", 19, INK, "la")
+    sk.text(mx + 45, my + 194, "（S-TN・S-TN2・この探索の範囲）", 17, GRAY, "la")
+    sk.text(mx + 45, my + 230, "この中で、由来と他者性のあいだを動かす（層 2）", 19, TEAL, "la")
+    sk.save(OUT + "fig_hm_quadrant.png")
+
+
+# ---------------------------------------------------------------- 価値: 近い系譜と向きが逆
+def reverse():
+    sk = Sk(1500, 720, 308)
+    sk.text(330, 30, "近い系譜（既にある）", 25, INDIGO, "mm")
+    sk.text(1130, 30, "手跡（向きが逆）", 25, ORANGE, "mm")
+    rows = [("データ肖像", "推定をより正確にする・確かめて満足する", "Viégas 2004 ・ Viégas 2006（Themail）",
+             "系は判断を保留し、推定を見せない"),
+            ("personal informatics", "長く溜めて、振り返る", "Li 2010 ・ Elsden 2016",
+             "溜めない・8 秒で消える・育たない"),
+            ("状態の周辺表示・data double", "状態や判断を映す", "WeatherTank ・ Ruckenstein 2014",
+             "行為だけを映す・判断を運ばない"),
+            ("判断を返さない表現", "解釈を開く。読めるかは測っていない", "Affective Diary ・ Boehner 2005",
+             "読めるかを、漏れの検査で測る")]
+    for i, (t, d, src, ours) in enumerate(rows):
+        y = 70 + i * 150
+        sk.rect(30, y, 600, 128, INDIGO, 3, fill=WHITE)
+        sk.text(330, y + 32, t, 24, INK, "mm")
+        sk.text(330, y + 70, d, 20, INK, "mm")
+        sk.text(330, y + 104, src, 17, GRAY, "mm")
+        harrow(sk, 650, y + 64, 820)
+        sk.rect(840, y, 620, 128, ORANGE, 3, fill=PALE[ORANGE])
+        sk.text(1150, y + 64, ours, 23, INK, "mm")
+    sk.text(750, 690, "差は「空白」ではなく「向きが逆」（S4）。近い系譜があることを先に書く", 22, INK, "mm")
+    sk.save(OUT + "fig_hm_reverse.png")
+
+
 if __name__ == "__main__":
-    for f in [role, field, leak, collision, variables, chart_roomba, layers, knobs, daycard, steps]:
+    for f in [role, field, leak, collision, variables, chart_roomba, layers, knobs, daycard, steps,
+              quadrant, reverse]:
         f()
     print("ok")
