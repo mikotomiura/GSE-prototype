@@ -1,0 +1,740 @@
+dir,path,bytes,category,note,flags,public_candidate,action
+20261103-coauthor-per-person,SEED,9,input-pin,seed,,yes,
+20261103-coauthor-per-person,conditions.md,13546,conditions,,personal_path;gse_name;steering_or_decision;internal_process;japanese(2965 chars);perwriter_mention_pattern(3),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261103-coauthor-per-person,mutate.sh,947,code,,personal_path;gse_name;japanese(28 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換
+20261103-coauthor-per-person,notes.md,15162,notes,,gse_name;steering_or_decision;internal_process;japanese(3079 chars);perwriter_mention_pattern(1),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261103-coauthor-per-person,run.sh,3272,code,,personal_path;gse_name;internal_process;japanese(151 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / round N・attack-me・引き継ぎ等の語を除く
+20261103-coauthor-per-person,results/check_same.json,66,input-pin,provenance/consistency check,,yes,
+20261103-coauthor-per-person,results/pd2.json,123,input-pin,provenance/consistency check,,yes (要整理),
+20261103-coauthor-per-person,results/provenance.json,875,input-pin,provenance/consistency check,gse_name,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261103-coauthor-per-person,results/selftest.json,2884,other,self-test output,,optional,
+20261103-coauthor-per-person,results/summary.json,304092,result-aggregate,,steering_or_decision;japanese(24 chars),yes,文字列中の「判断 9」を除く
+20261103-coauthor-per-person,results/mutations/m1.json,971,other,mutation-test output,,optional,
+20261103-coauthor-per-person,results/mutations/m2.json,216,other,mutation-test output,,optional,
+20261103-coauthor-per-person,results/mutations/m3_em1.json,459,other,mutation-test output,,optional,
+20261103-coauthor-per-person,results/mutations/m3_pd2.json,125,other,mutation-test output,,optional,
+20261103-coauthor-per-person,results/mutations/m4.json,384,other,mutation-test output,,optional,
+20261103-coauthor-per-person,results/mutations/m5.json,383,other,mutation-test output,,optional,
+20261103-coauthor-per-person,results/mutations/m6.json,58,other,mutation-test output,,optional,
+20261103-coauthor-per-person,scripts/build_obs.py,4933,code,,gse_name;japanese(179 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換
+20261103-coauthor-per-person,scripts/check_mutations.py,1501,code,,japanese(83 chars),yes,日本語のコメント・メッセージを英訳
+20261103-coauthor-per-person,scripts/check_same.py,1692,code,,japanese(98 chars),yes,日本語のコメント・メッセージを英訳
+20261103-coauthor-per-person,scripts/hmm.py,8752,code,,japanese(377 chars),yes,日本語のコメント・メッセージを英訳
+20261103-coauthor-per-person,scripts/perperson.py,27358,code,,steering_or_decision;japanese(495 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261103-coauthor-per-person,scripts/selftest.py,10420,code,,steering_or_decision;japanese(164 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,.gitattributes,185,other,git attributes,steering_or_decision;japanese(22 chars),optional,日本語を含む
+20261104-coauthor-ml-improve,SEED,11,input-pin,seed,,yes,
+20261104-coauthor-ml-improve,conditions.md,20253,conditions,,personal_path;gse_name;steering_or_decision;internal_process;japanese(4492 chars);perwriter_mention_pattern(4),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261104-coauthor-ml-improve,mutate.sh,932,code,,steering_or_decision;japanese(82 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,notes.md,27242,notes,,gse_name;steering_or_decision;internal_process;machine_name;japanese(5335 chars);perwriter_mention_pattern(2),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261104-coauthor-ml-improve,run.sh,5891,code,,personal_path;gse_name;steering_or_decision;internal_process;japanese(314 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く / round N・attack-me・引き継ぎ等の語を除く
+20261104-coauthor-ml-improve,tables.md,158475,result-aggregate,,japanese(6176 chars);perwriter_mention_pattern(2),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261104-coauthor-ml-improve,results/check_same_coauthor.json,66,input-pin,provenance/consistency check,,yes,
+20261104-coauthor-ml-improve,results/check_same_cs1.json,103,input-pin,provenance/consistency check,,yes,
+20261104-coauthor-ml-improve,results/input_manifest_check.json,56,input-pin,provenance/consistency check,,yes,
+20261104-coauthor-ml-improve,results/provenance.json,3196,input-pin,provenance/consistency check,gse_name;internal_process,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261104-coauthor-ml-improve,results/selftest.json,4334,other,self-test output,,optional,
+20261104-coauthor-ml-improve,results/summary.json,3937256,result-aggregate,,japanese(8 chars),yes,
+20261104-coauthor-ml-improve,results/timing.json,3658,other,run metadata,,optional,
+20261104-coauthor-ml-improve,results/mutations/m1.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m1.json,1131,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m10.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m10.json,270,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m2.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m2.json,180,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m3.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m3.json,287,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m4.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m4.json,268,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m5.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m5.json,395,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m6.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m6.json,131,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m7.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m7.json,131,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m8.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m8.json,150,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m9.exit,2,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,results/mutations/m9.json,168,other,mutation-test output,,optional,
+20261104-coauthor-ml-improve,scripts/build_cs1_obs.py,6638,code,,gse_name;japanese(254 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換
+20261104-coauthor-ml-improve,scripts/check_mutations.py,1760,code,,steering_or_decision;japanese(136 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,scripts/check_same_cs1.py,5131,code,,japanese(332 chars),yes,日本語のコメント・メッセージを英訳
+20261104-coauthor-ml-improve,scripts/data.py,10539,code,,steering_or_decision;japanese(599 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,scripts/hmm2.py,13699,code,,steering_or_decision;japanese(863 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,scripts/hmm_b.py,8752,code,,japanese(377 chars),yes,日本語のコメント・メッセージを英訳
+20261104-coauthor-ml-improve,scripts/logit.py,8007,code,,japanese(518 chars),yes,日本語のコメント・メッセージを英訳
+20261104-coauthor-ml-improve,scripts/manifest.py,2005,code,,steering_or_decision;japanese(105 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,scripts/ml.py,30700,code,,gse_name;steering_or_decision;japanese(946 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,scripts/report.py,13684,code,,japanese(840 chars),yes,日本語のコメント・メッセージを英訳
+20261104-coauthor-ml-improve,scripts/selftest.py,21766,code,,steering_or_decision;japanese(446 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-coauthor-ml-improve,scripts/timing.py,7367,code,,steering_or_decision;japanese(435 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-cs1-landscape,SEED,9,input-pin,seed,,yes,
+20261104-cs1-landscape,conditions.md,10959,conditions,,personal_path;gse_name;steering_or_decision;japanese(2204 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261104-cs1-landscape,notes.md,22209,notes,,gse_name;steering_or_decision;internal_process;japanese(4997 chars);perwriter_mention_pattern(9),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261104-cs1-landscape,run.sh,3435,code,,personal_path;gse_name;internal_process;japanese(158 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / round N・attack-me・引き継ぎ等の語を除く
+20261104-cs1-landscape,results/build_summary_2019.json,601,other,run metadata,,optional,
+20261104-cs1-landscape,results/build_summary_2021.json,741,other,run metadata,,optional,
+20261104-cs1-landscape,results/counts.json,291,other,run metadata,,optional,
+20261104-cs1-landscape,results/cs1_landscape.json,23687,result-aggregate,,,yes,
+20261104-cs1-landscape,results/holdout_summary.json,161,other,run metadata,,optional,
+20261104-cs1-landscape,results/posthoc.json,1627,result-aggregate,,,yes,
+20261104-cs1-landscape,results/provenance.json,1083,input-pin,provenance/consistency check,gse_name;internal_process,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261104-cs1-landscape,scripts/analyze_cs1.py,18442,code,,japanese(782 chars),yes,日本語のコメント・メッセージを英訳
+20261104-cs1-landscape,scripts/build_cs1.py,16057,code,,gse_name;steering_or_decision;japanese(606 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く
+20261104-cs1-landscape,scripts/make_holdout_cs1.py,1309,code,,japanese(53 chars),yes,日本語のコメント・メッセージを英訳
+20261104-timeseries-tau-extend,.gitattributes,185,other,git attributes,steering_or_decision;japanese(22 chars),optional,日本語を含む
+20261104-timeseries-tau-extend,SEED,11,input-pin,seed,,yes,
+20261104-timeseries-tau-extend,conditions.md,13478,conditions,,personal_path;gse_name;steering_or_decision;internal_process;machine_name;japanese(3077 chars);perwriter_mention_pattern(1),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261104-timeseries-tau-extend,mutate.sh,1008,code,,steering_or_decision;japanese(96 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-timeseries-tau-extend,notes.md,37004,notes,,gse_name;steering_or_decision;internal_process;machine_name;japanese(7479 chars);perwriter_mention_pattern(2),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261104-timeseries-tau-extend,run.sh,6743,code,,personal_path;gse_name;steering_or_decision;internal_process;machine_name;japanese(382 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く / round N・attack-me・引き継ぎ等の語を除く / HP Z2 等の機械名を除く
+20261104-timeseries-tau-extend,tables.md,155261,result-aggregate,,japanese(10308 chars);perwriter_mention_pattern(2),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261104-timeseries-tau-extend,results/check_same_coauthor.json,66,input-pin,provenance/consistency check,,yes,
+20261104-timeseries-tau-extend,results/check_same_cs1.json,103,input-pin,provenance/consistency check,,yes,
+20261104-timeseries-tau-extend,results/input_manifest_check.json,56,input-pin,provenance/consistency check,,yes,
+20261104-timeseries-tau-extend,results/provenance.json,5091,input-pin,provenance/consistency check,gse_name;internal_process,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261104-timeseries-tau-extend,results/repro_check.json,100,input-pin,provenance/consistency check,,yes,
+20261104-timeseries-tau-extend,results/selftest.json,5821,other,self-test output,,optional,
+20261104-timeseries-tau-extend,results/summary.json,4312980,result-aggregate,,japanese(16 chars),yes,
+20261104-timeseries-tau-extend,results/timing.json,5342,other,run metadata,,optional,
+20261104-timeseries-tau-extend,results/mutations/m1.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m1.json,2396,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m11.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m11.json,276,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m12.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m12.json,208,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m13.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m13.json,225,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m14.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m14.json,243,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m15.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m15.json,681,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m2.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m2.json,179,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m3.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m3.json,287,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m6.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m6.json,131,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m7.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m7.json,149,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m8.exit,2,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,results/mutations/m8.json,150,other,mutation-test output,,optional,
+20261104-timeseries-tau-extend,scripts/build_cs1_obs.py,6638,code,,gse_name;japanese(254 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換
+20261104-timeseries-tau-extend,scripts/check_mutations.py,1810,code,,steering_or_decision;japanese(142 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-timeseries-tau-extend,scripts/check_same_cs1.py,5131,code,,japanese(332 chars),yes,日本語のコメント・メッセージを英訳
+20261104-timeseries-tau-extend,scripts/data.py,10539,code,,steering_or_decision;japanese(599 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-timeseries-tau-extend,scripts/hmm2.py,13790,code,,steering_or_decision;japanese(868 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-timeseries-tau-extend,scripts/hmm_b.py,8752,code,,japanese(377 chars),yes,日本語のコメント・メッセージを英訳
+20261104-timeseries-tau-extend,scripts/manifest.py,2005,code,,steering_or_decision;japanese(105 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-timeseries-tau-extend,scripts/ml.py,29054,code,,gse_name;steering_or_decision;japanese(1380 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く
+20261104-timeseries-tau-extend,scripts/report.py,10390,code,,japanese(614 chars),yes,日本語のコメント・メッセージを英訳
+20261104-timeseries-tau-extend,scripts/repro_check.py,5265,code,,internal_process;machine_name;japanese(263 chars),yes,日本語のコメント・メッセージを英訳 / round N・attack-me・引き継ぎ等の語を除く / HP Z2 等の機械名を除く
+20261104-timeseries-tau-extend,scripts/selftest.py,26147,code,,steering_or_decision;japanese(850 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261104-timeseries-tau-extend,scripts/subset_old.py,1263,code,,japanese(94 chars),yes,日本語のコメント・メッセージを英訳
+20261104-timeseries-tau-extend,scripts/timing.py,7664,code,,machine_name;japanese(420 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261106-tau-mode-candidate,.gitattributes,357,other,git attributes,steering_or_decision;machine_name;japanese(40 chars),optional,日本語を含む
+20261106-tau-mode-candidate,SEED,11,input-pin,seed,,yes,
+20261106-tau-mode-candidate,conditions.md,12930,conditions,,gse_name;steering_or_decision;internal_process;machine_name;japanese(2992 chars);perwriter_mention_pattern(2),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261106-tau-mode-candidate,mutate.sh,1217,code,,steering_or_decision;japanese(95 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,notes.md,28337,notes,,gse_name;steering_or_decision;internal_process;machine_name;japanese(5688 chars);perwriter_mention_pattern(2),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261106-tau-mode-candidate,run.sh,7223,code,,personal_path;gse_name;steering_or_decision;internal_process;machine_name;japanese(408 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く / round N・attack-me・引き継ぎ等の語を除く / HP Z2 等の機械名を除く
+20261106-tau-mode-candidate,tables.md,356684,result-aggregate,,steering_or_decision;japanese(16232 chars);perwriter_mention_pattern(2),yes,日本語の見出し: report.py を英訳して再生成するか除く / 「判断 10」を除き英語で作り直す
+20261106-tau-mode-candidate,results/check_same_coauthor.json,66,input-pin,provenance/consistency check,,yes,
+20261106-tau-mode-candidate,results/check_same_cs1.json,103,input-pin,provenance/consistency check,,yes,
+20261106-tau-mode-candidate,results/input_manifest_check.json,56,input-pin,provenance/consistency check,,yes,
+20261106-tau-mode-candidate,results/provenance.json,6997,input-pin,provenance/consistency check,gse_name;internal_process,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261106-tau-mode-candidate,results/repro_check.json,129,input-pin,provenance/consistency check,,yes,
+20261106-tau-mode-candidate,results/selftest.json,8711,other,self-test output,,optional,
+20261106-tau-mode-candidate,results/summary.json,8892159,result-aggregate,,japanese(16 chars),yes,
+20261106-tau-mode-candidate,results/timing.json,675,other,run metadata,,optional,
+20261106-tau-mode-candidate,results/mutations/m1.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m1.json,2397,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m11.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m11.json,277,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m12.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m12.json,207,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m13.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m13.json,225,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m14.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m14.json,243,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m15.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m15.json,681,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m16.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m16.json,290,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m17.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m17.json,587,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m18.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m18.json,186,other,mutation-test output,japanese(5 chars),optional,日本語を含む
+20261106-tau-mode-candidate,results/mutations/m19.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m19.json,370,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m2.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m2.json,180,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m20.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m20.json,260,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m21.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m21.json,223,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m22.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m22.json,173,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m23.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m23.json,184,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m24.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m24.json,245,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m25.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m25.json,371,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m26.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m26.json,174,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m27.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m27.json,371,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m3.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m3.json,285,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m6.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m6.json,131,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m7.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m7.json,131,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m8.exit,2,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,results/mutations/m8.json,149,other,mutation-test output,,optional,
+20261106-tau-mode-candidate,scripts/build_cs1_obs.py,6638,code,,gse_name;japanese(254 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換
+20261106-tau-mode-candidate,scripts/check_mutations.py,2086,code,,steering_or_decision;japanese(142 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,scripts/check_same_cs1.py,5131,code,,japanese(332 chars),yes,日本語のコメント・メッセージを英訳
+20261106-tau-mode-candidate,scripts/data.py,10539,code,,steering_or_decision;japanese(599 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,scripts/hmm2.py,16240,code,,steering_or_decision;japanese(1172 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,scripts/hmm_b.py,8752,code,,japanese(377 chars),yes,日本語のコメント・メッセージを英訳
+20261106-tau-mode-candidate,scripts/manifest.py,2005,code,,steering_or_decision;japanese(105 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,scripts/ml.py,39665,code,,gse_name;steering_or_decision;japanese(2415 chars),yes,日本語のコメント・メッセージを英訳 / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,scripts/report.py,14870,code,,steering_or_decision;japanese(900 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,scripts/repro_check.py,7137,code,,machine_name;japanese(390 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261106-tau-mode-candidate,scripts/same_old.py,1319,code,,japanese(107 chars),yes,日本語のコメント・メッセージを英訳
+20261106-tau-mode-candidate,scripts/selftest.py,43818,code,,steering_or_decision;japanese(1774 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261106-tau-mode-candidate,scripts/subset_old.py,1263,code,,japanese(94 chars),yes,日本語のコメント・メッセージを英訳
+20261106-tau-mode-candidate,scripts/timing.py,3949,code,,machine_name;japanese(302 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261107-unsmoothed-residual-check,.gitattributes,185,other,git attributes,steering_or_decision;japanese(22 chars),optional,日本語を含む
+20261107-unsmoothed-residual-check,SEED,11,input-pin,seed,,yes,
+20261107-unsmoothed-residual-check,build_mac.sh,2404,code,,personal_path;gse_name;machine_name;japanese(93 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / HP Z2 等の機械名を除く
+20261107-unsmoothed-residual-check,conditions.md,20050,conditions,,gse_name;steering_or_decision;internal_process;venue;machine_name;japanese(4495 chars);perwriter_mention_pattern(2),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261107-unsmoothed-residual-check,mutate.sh,965,code,,japanese(81 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,notes.md,18498,notes,,gse_name;steering_or_decision;internal_process;machine_name;japanese(3679 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261107-unsmoothed-residual-check,run.sh,8301,code,,personal_path;gse_name;internal_process;machine_name;japanese(348 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / round N・attack-me・引き継ぎ等の語を除く / HP Z2 等の機械名を除く
+20261107-unsmoothed-residual-check,results/check_same_coauthor.json,66,input-pin,provenance/consistency check,,yes,
+20261107-unsmoothed-residual-check,results/check_same_cs1.json,103,input-pin,provenance/consistency check,,yes,
+20261107-unsmoothed-residual-check,results/e2e_synth.json,499,other,self-test output,,optional,
+20261107-unsmoothed-residual-check,results/input_manifest_check.json,56,input-pin,provenance/consistency check,,yes,
+20261107-unsmoothed-residual-check,results/pin_check.json,43,input-pin,provenance/consistency check,,yes,
+20261107-unsmoothed-residual-check,results/provenance.json,7895,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261107-unsmoothed-residual-check,results/repro_check.json,129,input-pin,provenance/consistency check,,yes,
+20261107-unsmoothed-residual-check,results/selftest.json,3140,other,self-test output,,optional,
+20261107-unsmoothed-residual-check,results/selftest_inherited.json,3659,other,self-test output,,optional,
+20261107-unsmoothed-residual-check,results/summary.json,1842835,result-aggregate,,japanese(152 chars),yes,
+20261107-unsmoothed-residual-check,results/tables.md,54836,result-aggregate,,japanese(554 chars);perwriter_mention_pattern(15),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261107-unsmoothed-residual-check,results/timing.json,591,other,run metadata,,optional,
+20261107-unsmoothed-residual-check,results/u_gate.json,440,input-pin,provenance/consistency check,,yes (要整理),
+20261107-unsmoothed-residual-check,results/variant_manifest_check.json,64,input-pin,provenance/consistency check,,yes,
+20261107-unsmoothed-residual-check,results/mutations/m41.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m41.json,191,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m42.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m42.json,252,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m43.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m43.json,256,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m44.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m44.json,254,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m45.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m45.json,401,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m46.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m46.json,402,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m47.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m47.json,276,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m48.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m48.json,237,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m49.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m49.json,187,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m50.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m50.json,241,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m51.exit,2,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/mutations/m51.json,207,other,mutation-test output,,optional,
+20261107-unsmoothed-residual-check,results/parts/fit.coauthor.n.json,197875,result-aggregate,,japanese(8 chars),yes,
+20261107-unsmoothed-residual-check,results/parts/fit.coauthor.o.json,197225,result-aggregate,,japanese(8 chars),yes,
+20261107-unsmoothed-residual-check,results/parts/fit.coauthor.u.json,198574,result-aggregate,,japanese(8 chars),yes,
+20261107-unsmoothed-residual-check,results/parts/fit.cs1.n.json,133832,result-aggregate,,japanese(8 chars),yes,
+20261107-unsmoothed-residual-check,results/parts/fit.cs1.o.json,132229,result-aggregate,,japanese(8 chars),yes,
+20261107-unsmoothed-residual-check,results/parts/fit.cs1.u.json,132662,result-aggregate,,japanese(8 chars),yes,
+20261107-unsmoothed-residual-check,results/parts/res.coauthor.n.json,129333,result-aggregate,,,yes,
+20261107-unsmoothed-residual-check,results/parts/res.coauthor.o.json,131104,result-aggregate,,,yes,
+20261107-unsmoothed-residual-check,results/parts/res.coauthor.u.json,130950,result-aggregate,,,yes,
+20261107-unsmoothed-residual-check,results/parts/res.cs1.n.json,86038,result-aggregate,,,yes,
+20261107-unsmoothed-residual-check,results/parts/res.cs1.o.json,87130,result-aggregate,,,yes,
+20261107-unsmoothed-residual-check,results/parts/res.cs1.u.json,87108,result-aggregate,,,yes,
+20261107-unsmoothed-residual-check,scripts/build_variants.py,9380,code,,machine_name;japanese(396 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261107-unsmoothed-residual-check,scripts/check_mutations.py,1854,code,,japanese(148 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/e2e_synth.py,7510,code,,japanese(210 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/fit.py,15597,code,,japanese(635 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/kit_probe.py,1305,code,,japanese(62 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/load.py,2711,code,,japanese(211 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/pin_probe.py,503,code,,japanese(49 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/pinned.py,2219,code,,japanese(201 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/report.py,9056,code,,japanese(339 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/repro_check.py,8848,code,,machine_name;japanese(358 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261107-unsmoothed-residual-check,scripts/residual.py,11435,code,,japanese(732 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/same_ref.py,971,code,,japanese(54 chars),yes,日本語のコメント・メッセージを英訳
+20261107-unsmoothed-residual-check,scripts/selftest.py,18934,code,,steering_or_decision;japanese(685 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261107-unsmoothed-residual-check,scripts/timing.py,3309,code,,machine_name;japanese(231 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261110-per-person-sensitivity,SEED,11,input-pin,seed,,yes,
+20261110-per-person-sensitivity,conditions.md,22685,conditions,,gse_name;steering_or_decision;internal_process;japanese(4966 chars);perwriter_mention_pattern(4),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261110-per-person-sensitivity,mutate.sh,847,code,,japanese(69 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,notes.md,12255,notes,,steering_or_decision;internal_process;japanese(2544 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261110-per-person-sensitivity,run.sh,2677,code,,japanese(93 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,run_add.sh,2185,code,,japanese(23 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,checks/sampler_vs_hmm2.py,1033,code,,japanese(32 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,results/calibration.json,890,other,run metadata,,optional,
+20261110-per-person-sensitivity,results/plan.json,638,other,run metadata,,optional,
+20261110-per-person-sensitivity,results/plan_add.json,1283,other,run metadata,,optional,
+20261110-per-person-sensitivity,results/provenance.json,3520,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261110-per-person-sensitivity,results/provenance.pre.json,1573,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261110-per-person-sensitivity,results/provenance_add.json,3142,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261110-per-person-sensitivity,results/rerep_00.json,62351,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/run.log,1299,other,run log,japanese(120 chars),optional,日本語を含む
+20261110-per-person-sensitivity,results/run_add.log,356,other,run log,japanese(47 chars),optional,日本語を含む
+20261110-per-person-sensitivity,results/selftest.json,2547,other,self-test output,,optional,
+20261110-per-person-sensitivity,results/summary.json,269146,result-aggregate,,,yes,
+20261110-per-person-sensitivity,results/tables.md,21497,result-aggregate,,japanese(102 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261110-per-person-sensitivity,results/mutations/v1.exit,2,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v1.json,1774,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v1.log,134,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v2.exit,2,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v2.json,1760,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v2.log,133,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v3.exit,2,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v3.json,1749,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v3.log,133,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v4.exit,2,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v4.json,1744,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v4.log,133,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v5.exit,2,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v5.json,1774,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v5.log,133,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v6.exit,2,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v6.json,1743,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/mutations/v6.log,133,other,mutation-test output,,optional,
+20261110-per-person-sensitivity,results/replicates/00.json,62350,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/01.json,62353,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/02.json,62362,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/03.json,62339,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/04.json,62387,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/05.json,62952,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/06.json,62949,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/07.json,62944,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/08.json,62938,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/09.json,62942,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/10.json,62953,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/11.json,62891,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/12.json,62943,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/13.json,57872,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/14.json,57860,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/15.json,57875,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/16.json,58640,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/17.json,58677,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/18.json,58580,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/19.json,58613,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/20.json,62377,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/21.json,62375,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/22.json,62360,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/23.json,62886,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/24.json,62935,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/25.json,62495,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/26.json,62538,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/27.json,58666,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/28.json,58663,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/29.json,58638,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/30.json,58582,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/31.json,57861,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,results/replicates/32.json,57885,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261110-per-person-sensitivity,scripts/analysis.py,7288,code,,japanese(118 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,scripts/pinned.py,1074,code,,japanese(41 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,scripts/run_add.py,5750,code,,japanese(401 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,scripts/run_synth.py,9723,code,,japanese(414 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,scripts/sens_check_mutations.py,1567,code,,japanese(98 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,scripts/sens_report.py,4670,code,,japanese(285 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,scripts/sens_selftest.py,7201,code,,japanese(126 chars),yes,日本語のコメント・メッセージを英訳
+20261110-per-person-sensitivity,scripts/synth.py,6774,code,,japanese(340 chars),yes,日本語のコメント・メッセージを英訳
+20261111-mode-in-selection,.gitattributes,277,other,git attributes,machine_name;japanese(36 chars),optional,日本語を含む
+20261111-mode-in-selection,SEED,11,input-pin,seed,,yes,
+20261111-mode-in-selection,conditions.md,9702,conditions,,gse_name;steering_or_decision;internal_process;machine_name;japanese(2158 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261111-mode-in-selection,notes.md,7989,notes,,gse_name;steering_or_decision;internal_process;machine_name;japanese(1731 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261111-mode-in-selection,run.sh,2732,code,,personal_path;gse_name;machine_name;japanese(99 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / HP Z2 等の機械名を除く
+20261111-mode-in-selection,results/provenance.json,1674,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261111-mode-in-selection,results/repro_check.json,268,input-pin,provenance/consistency check,,yes,
+20261111-mode-in-selection,results/selftest.json,988,other,self-test output,,optional,
+20261111-mode-in-selection,results/summary.json,230361,result-aggregate,,,yes,
+20261111-mode-in-selection,results/tables.md,14818,result-aggregate,,japanese(575 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261111-mode-in-selection,results/mutations/n1.exit,2,other,mutation-test output,,optional,
+20261111-mode-in-selection,results/mutations/n1.json,1004,other,mutation-test output,,optional,
+20261111-mode-in-selection,results/mutations/n2.exit,2,other,mutation-test output,,optional,
+20261111-mode-in-selection,results/mutations/n2.json,1000,other,mutation-test output,,optional,
+20261111-mode-in-selection,results/mutations/n3.exit,2,other,mutation-test output,,optional,
+20261111-mode-in-selection,results/mutations/n3.json,1000,other,mutation-test output,,optional,
+20261111-mode-in-selection,results/mutations/n4.exit,2,other,mutation-test output,,optional,
+20261111-mode-in-selection,results/mutations/n4.json,1000,other,mutation-test output,,optional,
+20261111-mode-in-selection,scripts/check_mutations.py,986,code,,japanese(53 chars),yes,日本語のコメント・メッセージを英訳
+20261111-mode-in-selection,scripts/pinned3.py,1412,code,,japanese(40 chars),yes,日本語のコメント・メッセージを英訳
+20261111-mode-in-selection,scripts/sel.py,11632,code,,machine_name;japanese(554 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261111-mode-in-selection,scripts/selftest.py,6790,code,,japanese(274 chars),yes,日本語のコメント・メッセージを英訳
+20261111-objective-and-pause,.gitattributes,277,other,git attributes,machine_name;japanese(36 chars),optional,日本語を含む
+20261111-objective-and-pause,SEED,11,input-pin,seed,,yes,
+20261111-objective-and-pause,conditions.md,9391,conditions,,gse_name;steering_or_decision;internal_process;machine_name;japanese(2114 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261111-objective-and-pause,notes.md,5539,notes,,gse_name;steering_or_decision;internal_process;machine_name;japanese(1123 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261111-objective-and-pause,run.sh,2900,code,,personal_path;gse_name;machine_name;japanese(78 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / HP Z2 等の機械名を除く
+20261111-objective-and-pause,results/checks.json,340,input-pin,provenance/consistency check,,yes,
+20261111-objective-and-pause,results/provenance.json,2035,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261111-objective-and-pause,results/selftest.json,1050,other,self-test output,,optional,
+20261111-objective-and-pause,results/summary.json,477538,result-aggregate,,,yes,pause の min/max（パネルごとの端＝1 人の値）を除く
+20261111-objective-and-pause,results/tables.md,6250,result-aggregate,,japanese(395 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261111-objective-and-pause,results/mutations/o1.exit,2,other,mutation-test output,,optional,
+20261111-objective-and-pause,results/mutations/o1.json,1062,other,mutation-test output,,optional,
+20261111-objective-and-pause,results/mutations/o2.exit,2,other,mutation-test output,,optional,
+20261111-objective-and-pause,results/mutations/o2.json,1067,other,mutation-test output,,optional,
+20261111-objective-and-pause,results/mutations/o3.exit,2,other,mutation-test output,,optional,
+20261111-objective-and-pause,results/mutations/o3.json,1065,other,mutation-test output,,optional,
+20261111-objective-and-pause,scripts/check_mutations.py,961,code,,japanese(53 chars),yes,日本語のコメント・メッセージを英訳
+20261111-objective-and-pause,scripts/obj.py,11367,code,,machine_name;japanese(632 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261111-objective-and-pause,scripts/pinned4.py,1570,code,,japanese(62 chars),yes,日本語のコメント・メッセージを英訳
+20261111-objective-and-pause,scripts/selftest.py,3411,code,,japanese(93 chars),yes,日本語のコメント・メッセージを英訳
+20261111-sensitivity-mode-decomposition,SEED,11,input-pin,seed,,yes,
+20261111-sensitivity-mode-decomposition,conditions.md,12010,conditions,,gse_name;steering_or_decision;internal_process;japanese(2475 chars);perwriter_mention_pattern(1),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261111-sensitivity-mode-decomposition,mutate.sh,612,code,,japanese(39 chars),yes,日本語のコメント・メッセージを英訳
+20261111-sensitivity-mode-decomposition,notes.md,5835,notes,,gse_name;steering_or_decision;internal_process;machine_name;japanese(1319 chars);perwriter_mention_pattern(1),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261111-sensitivity-mode-decomposition,run.sh,2531,code,,japanese(45 chars),yes,日本語のコメント・メッセージを英訳
+20261111-sensitivity-mode-decomposition,results/provenance.json,2328,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261111-sensitivity-mode-decomposition,results/provenance.pre.json,1691,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261111-sensitivity-mode-decomposition,results/run.log,1278,other,run log,japanese(108 chars),optional,日本語を含む
+20261111-sensitivity-mode-decomposition,results/selftest.json,1705,other,self-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/summary.json,376062,result-aggregate,,japanese(55 chars),yes,
+20261111-sensitivity-mode-decomposition,results/tables.md,9295,result-aggregate,,japanese(206 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261111-sensitivity-mode-decomposition,results/mutations/u1.exit,2,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u1.json,1716,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u1.log,74,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u2.exit,2,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u2.json,1716,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u2.log,74,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u3.exit,2,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u3.json,1753,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u3.log,74,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u4.exit,2,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u4.json,1503,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u4.log,76,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u5.exit,2,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u5.json,1710,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/mutations/u5.log,75,other,mutation-test output,,optional,
+20261111-sensitivity-mode-decomposition,results/replicates/00.json,5434,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/01.json,5430,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/02.json,5432,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/03.json,5420,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/04.json,5428,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/05.json,5733,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/06.json,5741,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/07.json,5732,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/08.json,5733,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/09.json,5722,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/10.json,5721,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/11.json,5706,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/12.json,5727,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/20.json,5448,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/21.json,5435,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/22.json,5444,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/23.json,5724,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/24.json,5723,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/25.json,5504,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,results/replicates/26.json,5507,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261111-sensitivity-mode-decomposition,scripts/check_mutations.py,1020,code,,japanese(53 chars),yes,日本語のコメント・メッセージを英訳
+20261111-sensitivity-mode-decomposition,scripts/decomp.py,11033,code,,steering_or_decision;japanese(555 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く
+20261111-sensitivity-mode-decomposition,scripts/pinned2.py,2148,code,,japanese(87 chars),yes,日本語のコメント・メッセージを英訳
+20261111-sensitivity-mode-decomposition,scripts/run_decomp.py,9481,code,,japanese(521 chars),yes,日本語のコメント・メッセージを英訳
+20261111-sensitivity-mode-decomposition,scripts/selftest.py,6984,code,,japanese(279 chars),yes,日本語のコメント・メッセージを英訳
+20261112-selection-split-and-smoothing,.gitattributes,277,other,git attributes,machine_name;japanese(36 chars),optional,日本語を含む
+20261112-selection-split-and-smoothing,SEED,11,input-pin,seed,,yes,
+20261112-selection-split-and-smoothing,conditions.md,48211,conditions,,gse_name;steering_or_decision;internal_process;machine_name;japanese(10421 chars);perwriter_mention_pattern(4),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261112-selection-split-and-smoothing,notes.md,21035,notes,,steering_or_decision;internal_process;machine_name;japanese(4260 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261112-selection-split-and-smoothing,run.sh,4304,code,,personal_path;gse_name;steering_or_decision;machine_name;japanese(135 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,run_ctrl.sh,4767,code,,personal_path;gse_name;steering_or_decision;machine_name;japanese(144 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,run_r7.sh,5149,code,,personal_path;gse_name;steering_or_decision;internal_process;machine_name;japanese(152 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く / round N・attack-me・引き継ぎ等の語を除く / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,run_sym.sh,4778,code,,personal_path;gse_name;steering_or_decision;machine_name;japanese(188 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / 判断 N・.steering・ADR の参照を除く / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,results/ctrl_check.json,613,input-pin,provenance/consistency check,,yes,
+20261112-selection-split-and-smoothing,results/ctrl_summary.json,6667,result-aggregate,,japanese(24 chars),yes,
+20261112-selection-split-and-smoothing,results/ctrl_tables.md,1319,result-aggregate,,japanese(127 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261112-selection-split-and-smoothing,results/ctrl_timing.json,109,other,run metadata,,optional,
+20261112-selection-split-and-smoothing,results/input_manifest_check.json,56,input-pin,provenance/consistency check,,yes,
+20261112-selection-split-and-smoothing,results/provenance.json,2533,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261112-selection-split-and-smoothing,results/provenance_ctrl.json,2466,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261112-selection-split-and-smoothing,results/provenance_r7.json,3233,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261112-selection-split-and-smoothing,results/provenance_sym.json,2199,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261112-selection-split-and-smoothing,results/r7_check.json,968,input-pin,provenance/consistency check,,yes,
+20261112-selection-split-and-smoothing,results/r7_summary.json,7856,result-aggregate,,japanese(24 chars),yes,
+20261112-selection-split-and-smoothing,results/r7_tables.md,1514,result-aggregate,,internal_process;japanese(194 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く / 「round 7」を除き英語で作り直す
+20261112-selection-split-and-smoothing,results/r7_timing.json,339,other,run metadata,,optional,
+20261112-selection-split-and-smoothing,results/repro_check.json,614,input-pin,provenance/consistency check,,yes,
+20261112-selection-split-and-smoothing,results/selftest.json,1209,other,self-test output,,optional,
+20261112-selection-split-and-smoothing,results/selftest_ctrl.json,773,other,self-test output,,optional,
+20261112-selection-split-and-smoothing,results/selftest_r7.json,853,other,self-test output,,optional,
+20261112-selection-split-and-smoothing,results/selftest_sym.json,757,other,self-test output,,optional,
+20261112-selection-split-and-smoothing,results/summary.json,246411,result-aggregate,,japanese(64 chars),yes,
+20261112-selection-split-and-smoothing,results/sym_check.json,455,input-pin,provenance/consistency check,,yes,
+20261112-selection-split-and-smoothing,results/sym_summary.json,17551,result-aggregate,,japanese(16 chars),yes,
+20261112-selection-split-and-smoothing,results/sym_tables.md,1517,result-aggregate,,japanese(108 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261112-selection-split-and-smoothing,results/sym_timing.json,179,other,run metadata,,optional,
+20261112-selection-split-and-smoothing,results/tables.md,16214,result-aggregate,,japanese(686 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261112-selection-split-and-smoothing,results/timing.json,266,other,run metadata,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z1.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z1.json,785,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z2.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z2.json,784,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z3.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z3.json,784,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z4.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z4.json,784,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z5.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_ctrl/z5.json,784,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s1.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s1.json,1225,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s10.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s10.json,1223,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s2.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s2.json,1220,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s3.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s3.json,1240,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s4.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s4.json,1220,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s5.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s5.json,1241,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s6.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s6.json,1223,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s7.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s7.json,1220,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s8.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s8.json,1221,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s9.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations/s9.json,1222,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y1.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y1.json,768,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y2.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y2.json,769,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y3.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y3.json,770,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y4.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y4.json,768,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y5.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_sym/y5.json,768,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f1.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f1.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f2.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f2.json,865,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f3.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f3.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f4.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f4.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f5.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f5.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f6.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f6.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f7.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f7.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f8.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f8.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f9.exit,2,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,results/mutations_r7/f9.json,864,other,mutation-test output,,optional,
+20261112-selection-split-and-smoothing,scripts/ab.py,22068,code,,machine_name;japanese(996 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,scripts/check_mutations.py,1119,code,,japanese(53 chars),yes,日本語のコメント・メッセージを英訳
+20261112-selection-split-and-smoothing,scripts/compute.py,10847,code,,machine_name;japanese(491 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,scripts/ctrl.py,13039,code,,steering_or_decision;machine_name;japanese(727 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,scripts/pinned4.py,1532,code,,japanese(65 chars),yes,日本語のコメント・メッセージを英訳
+20261112-selection-split-and-smoothing,scripts/r7.py,23377,code,,steering_or_decision;internal_process;machine_name;japanese(1073 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く / round N・attack-me・引き継ぎ等の語を除く / HP Z2 等の機械名を除く
+20261112-selection-split-and-smoothing,scripts/selftest.py,13656,code,,japanese(366 chars),yes,日本語のコメント・メッセージを英訳
+20261112-selection-split-and-smoothing,scripts/selftest_ctrl.py,8644,code,,japanese(330 chars),yes,日本語のコメント・メッセージを英訳
+20261112-selection-split-and-smoothing,scripts/selftest_r7.py,12948,code,,internal_process;japanese(431 chars),yes,日本語のコメント・メッセージを英訳 / round N・attack-me・引き継ぎ等の語を除く
+20261112-selection-split-and-smoothing,scripts/selftest_sym.py,8589,code,,japanese(317 chars),yes,日本語のコメント・メッセージを英訳
+20261112-selection-split-and-smoothing,scripts/sym.py,13182,code,,steering_or_decision;machine_name;japanese(566 chars),yes,日本語のコメント・メッセージを英訳 / 判断 N・.steering・ADR の参照を除く / HP Z2 等の機械名を除く
+20261112-sensitivity-ten-seeds,.gitattributes,277,other,git attributes,machine_name;japanese(36 chars),optional,日本語を含む
+20261112-sensitivity-ten-seeds,SEED,11,input-pin,seed,,yes,
+20261112-sensitivity-ten-seeds,conditions.md,11081,conditions,,gse_name;steering_or_decision;internal_process;machine_name;japanese(2337 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261112-sensitivity-ten-seeds,notes.md,6751,notes,,steering_or_decision;internal_process;machine_name;japanese(1349 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261112-sensitivity-ten-seeds,run.sh,3298,code,,machine_name;japanese(110 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261112-sensitivity-ten-seeds,results/machine_check.json,4099,input-pin,provenance/consistency check,,yes,
+20261112-sensitivity-ten-seeds,results/plan.json,7980,other,run metadata,,optional,
+20261112-sensitivity-ten-seeds,results/provenance.json,1580,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261112-sensitivity-ten-seeds,results/provenance.pre.json,1409,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261112-sensitivity-ten-seeds,results/selftest.json,854,other,self-test output,,optional,
+20261112-sensitivity-ten-seeds,results/summary.json,67987,result-aggregate,,,yes,
+20261112-sensitivity-ten-seeds,results/tables.md,1519,result-aggregate,,japanese(210 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261112-sensitivity-ten-seeds,results/mutations/e1.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e1.json,865,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e2.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e2.json,865,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e3.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e3.json,865,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e4.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e4.json,865,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e5.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e5.json,868,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e6.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e6.json,866,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e7.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e7.json,866,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e8.exit,2,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/mutations/e8.json,865,other,mutation-test output,,optional,
+20261112-sensitivity-ten-seeds,results/replicates/00.json,62363,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/01.json,62370,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/02.json,62365,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/03.json,62328,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/04.json,62389,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/05.json,62949,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/06.json,62959,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/07.json,62957,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/08.json,62934,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/09.json,62927,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/10.json,62920,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/11.json,62881,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/12.json,62923,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/33.json,62351,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/34.json,62349,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/35.json,62382,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/36.json,62321,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/37.json,62329,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/38.json,62366,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/39.json,62312,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/40.json,62326,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/41.json,62315,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/42.json,62393,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/43.json,62979,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/44.json,62905,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/45.json,62921,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/46.json,62930,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/47.json,62950,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/48.json,62948,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/49.json,62918,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/50.json,62969,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/51.json,62906,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/52.json,62944,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/53.json,62968,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/54.json,62920,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/55.json,62844,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/56.json,62939,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/57.json,62920,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/58.json,62905,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/59.json,62887,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/60.json,62889,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/61.json,62886,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/62.json,62955,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/63.json,62905,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/64.json,62947,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/65.json,62895,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/66.json,62905,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/67.json,62882,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/68.json,62912,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/69.json,62869,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/70.json,62841,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/71.json,62908,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/72.json,62914,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/73.json,62905,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,results/replicates/74.json,62916,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261112-sensitivity-ten-seeds,scripts/check_mutations.py,1074,code,,japanese(53 chars),yes,日本語のコメント・メッセージを英訳
+20261112-sensitivity-ten-seeds,scripts/pinned5.py,2013,code,,japanese(80 chars),yes,日本語のコメント・メッセージを英訳
+20261112-sensitivity-ten-seeds,scripts/selftest10.py,5734,code,,internal_process;japanese(213 chars),yes,日本語のコメント・メッセージを英訳 / round N・attack-me・引き継ぎ等の語を除く
+20261112-sensitivity-ten-seeds,scripts/ten.py,12744,code,,japanese(591 chars),yes,日本語のコメント・メッセージを英訳
+20261113-null-from-shared,SEED,11,input-pin,seed,,yes,
+20261113-null-from-shared,conditions.md,19276,conditions,,gse_name;steering_or_decision;internal_process;machine_name;japanese(4016 chars);perwriter_mention_pattern(1),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261113-null-from-shared,notes.md,8224,notes,,steering_or_decision;internal_process;machine_name;japanese(1842 chars),no (英語で書き直した版なら可),内部文書: GSE・.steering・判断番号・日本語。公開するなら条件・結果の要点を英語で新たに書く
+20261113-null-from-shared,run.sh,6378,code,,personal_path;gse_name;machine_name;japanese(352 chars),yes,日本語のコメント・メッセージを英訳 / DATA_DIR の既定 $HOME/gse-public-data を外し必須の引数か環境変数に / gse-replay / GSE の名を kit の名に置換 / HP Z2 等の機械名を除く
+20261113-null-from-shared,results/calibration.json,861,other,run metadata,,optional,
+20261113-null-from-shared,results/gate.json,11280,result-aggregate,,,yes,
+20261113-null-from-shared,results/input_manifest_check.json,56,input-pin,provenance/consistency check,,yes,
+20261113-null-from-shared,results/m0_fit.json,1423,result-aggregate,,,yes,
+20261113-null-from-shared,results/plan.json,8174,other,run metadata,,optional,
+20261113-null-from-shared,results/provenance.json,3927,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261113-null-from-shared,results/provenance.pre.json,3581,input-pin,provenance/consistency check,,yes (要整理),provenance: git_dirty_paths・gse_replay の鍵名・klicke のパス表記を確認して整理
+20261113-null-from-shared,results/selftest.json,2799,other,self-test output,,optional,
+20261113-null-from-shared,results/summary.json,69522,result-aggregate,,,yes,
+20261113-null-from-shared,results/tables.md,2429,result-aggregate,,japanese(347 chars),yes,日本語の見出し: report.py を英訳して再生成するか除く
+20261113-null-from-shared,results/gate_parts/0.03_100.json,780,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.03_101.json,781,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.03_102.json,747,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.1_100.json,759,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.1_101.json,692,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.1_102.json,772,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.3_100.json,694,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.3_101.json,681,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/0.3_102.json,646,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/1_100.json,672,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/1_101.json,658,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/gate_parts/1_102.json,659,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/mutations/n1.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n1.json,2810,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n2.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n2.json,2836,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n3.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n3.json,2804,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n4.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n4.json,2810,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n5.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n5.json,2812,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n6.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n6.json,2811,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n7.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n7.json,2810,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n8.exit,2,other,mutation-test output,,optional,
+20261113-null-from-shared,results/mutations/n8.json,2810,other,mutation-test output,,optional,
+20261113-null-from-shared,results/replicates/00.json,81751,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/01.json,81699,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/02.json,81723,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/03.json,81678,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/04.json,81698,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/05.json,82244,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/06.json,82275,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/07.json,82261,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/08.json,82308,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/09.json,82262,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/10.json,82306,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/11.json,82600,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/12.json,82600,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/33.json,81744,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/34.json,81705,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/35.json,81679,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/36.json,81658,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/37.json,81656,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/38.json,81666,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/39.json,81743,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/40.json,81711,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/41.json,81688,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/42.json,81717,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/43.json,82188,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/44.json,82276,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/45.json,82257,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/46.json,82268,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/47.json,82299,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/48.json,82256,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/49.json,82253,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/50.json,82250,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/51.json,82295,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/52.json,82303,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/53.json,82291,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/54.json,82222,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/55.json,82303,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/56.json,82305,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/57.json,82319,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/58.json,82323,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/59.json,82284,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/60.json,82349,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/61.json,82254,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/62.json,82224,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/63.json,82355,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/64.json,82270,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/65.json,82307,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/66.json,82272,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/67.json,82528,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/68.json,82490,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/69.json,82501,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/70.json,82448,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/71.json,82730,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/72.json,82503,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/73.json,82618,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,results/replicates/74.json,82529,result-aggregate,SYNTHETIC per-synthetic-writer values,,yes,合成の書き手ごとの値（実在の書き手ではない）。入れてよいが README で合成と明記
+20261113-null-from-shared,scripts/check_mutations.py,1542,code,,japanese(129 chars),yes,日本語のコメント・メッセージを英訳
+20261113-null-from-shared,scripts/fit_m0.py,5139,code,,machine_name;japanese(234 chars),yes,日本語のコメント・メッセージを英訳 / HP Z2 等の機械名を除く
+20261113-null-from-shared,scripts/null.py,21581,code,,japanese(1143 chars),yes,日本語のコメント・メッセージを英訳
+20261113-null-from-shared,scripts/pinned6.py,2282,code,,japanese(114 chars),yes,日本語のコメント・メッセージを英訳
+20261113-null-from-shared,scripts/selftest_null.py,12803,code,,japanese(270 chars),yes,日本語のコメント・メッセージを英訳
