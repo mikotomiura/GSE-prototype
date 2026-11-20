@@ -49,7 +49,10 @@ for p in "$RAW.coauthor.pkl" "$BVALS" "$SVALS"; do
   [ "$("$PY" -I -c 'import os,sys;print(os.path.normcase(os.path.realpath(sys.argv[1])))' "$p")" != \
     "$("$PY" -I -c 'import os,sys;print(os.path.normcase(os.path.realpath(sys.argv[1])))' "$R7VALS")" ] || { echo "R7VALS が入力と同じ" >&2; exit 1; }
 done
-rm -f -- "$OUT/r7_summary.json" "$OUT/r7_tables.md" "$OUT/r7_check.json" "$OUT/r7_timing.json" "$OUT/provenance_r7.json" "$R7VALS"
+for p in "$R7VALS" "$R7VALS.partB"; do
+  "$PY" -I -c 'import os,sys;r=os.path.normcase(os.path.realpath(sys.argv[1]));p=os.path.normcase(os.path.realpath(sys.argv[2]));sys.exit(p.startswith(r+os.sep))' "$REPO_ROOT" "$p" || { echo "R7VALS が repo の中を指している" >&2; exit 1; }
+done
+rm -f -- "$R7VALS.partB" "$OUT/r7_summary.json" "$OUT/r7_tables.md" "$OUT/r7_check.json" "$OUT/r7_timing.json" "$OUT/provenance_r7.json" "$R7VALS"
 "$PY" -I -X utf8 "$SC/r7.py" "$COA" "$RAW" "$BVALS" "$SVALS" "$R7VALS" "$OUT" "$JOBS" --run-id "$RUN_ID"
 "$PY" -I -X utf8 - "$(git -C "$REPO_ROOT" rev-parse HEAD)" \
   "$(cd "$REPO_ROOT" && git status --porcelain -- experiments/20261112-selection-split-and-smoothing/scripts experiments/20261112-selection-split-and-smoothing/run_r7.sh experiments/20261112-selection-split-and-smoothing/conditions.md experiments/20261106-tau-mode-candidate/scripts)" \

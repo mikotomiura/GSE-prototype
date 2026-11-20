@@ -205,7 +205,8 @@ def a_cell(ws, k, picks, selfp, pool03, PAIR, rng):
     return dict(D=st([selfp[w] - sw[w] for w in ws]), Rs=st([selfp[w] - pool03[w] for w in ws]),
                 E=st([sw[w] - pool03[w] for w in ws]), Dp=st([dp[w] for w in ws]),
                 swap_neg_inf=int(sum(sw[w] == -np.inf for w in ws)),
-                pair_swap_beats_self_share=(beat / npair if npair else None),
+                pair_swap_beats_self_share=(beat / npair if npair else None),  # 分母は τ_w が有限の書き手の組だけ
+                pairs_finite_tau=int(npair), writers_inf_tau=int(sum(picks[w] == INF for w in ws)),
                 tau_counts={t: int(sum(picks[w] == t for w in ws)) for t in sorted(set(picks.values()), key=ml.tau_val)})
 
 
@@ -277,7 +278,7 @@ def write_tables(S, path):
     for k, C in S["A"]["cells"].items():
         L.append("| %s | %s | %s | %s | %s | %s | %s | %s |" % (
             k, AB.st(C["Rs"]), AB.st(C["D"]), AB.st(C["E"]), AB.st(C["Dp"]),
-            "—" if C["pair_swap_beats_self_share"] is None else "%.2f" % C["pair_swap_beats_self_share"],
+            "—" if C["pair_swap_beats_self_share"] is None else "%.2f（%d 組）" % (C["pair_swap_beats_self_share"], C["pairs_finite_tau"]),
             " ".join("%s:%d" % kv for kv in C["tau_counts"].items()), S["A"]["k_forms"][k]))
     L += ["", "パネルの形: %s（副 Dp: %s）・入れ替えの −∞: %s" % (
         S["A"]["panel_form"], S["A"]["panel_form_dp"], " ".join("k=%s:%d" % (k, C["swap_neg_inf"]) for k, C in S["A"]["cells"].items()))]
@@ -303,7 +304,7 @@ def main():
         i = argv.index("--run-id"); run_id = argv[i + 1]; argv = argv[:i] + argv[i + 2:]
     coa, raw, bvals, svals, rout, out, jobs = argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], int(argv[6])
     pkl = raw + "." + DS + ".pkl"
-    if not all(AB.outside_repo(p) for p in (pkl, bvals, svals, rout)):
+    if not all(AB.outside_repo(p) for p in (pkl, bvals, svals, rout, rout + ".partB")):
         sys.exit("書き手ごとの値が repo の中を指している")
     sha = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()  # noqa: E731
     rc = json.load(open(os.path.join(out, "repro_check.json")))
@@ -382,6 +383,13 @@ def main():
             C = S["B"][ver]["cells"]
             f = {k: b_form(C[k]["F"]["median"], C[k]["R"]["median"]) for k in C}
             S["B"][ver].update(k_forms=f, panel_form=panel_form(f))
+        # ---- B の値と結果を A の前に保存する（A の前で止まっても B が残る・/cross-review の指摘）
+        with open(rout + ".partB", "wb") as fp:
+            pickle.dump(dict(fix=FX, pool1=P1, sym=SY, pool03=PS), fp)
+        ck["r7_partB_values_sha256"] = sha(rout + ".partB")
+        AB.write_json(ck, os.path.join(out, "r7_check.json"))
+        AB.write_json(T, os.path.join(out, "r7_timing.json"))
+        AB.write_json(dict(S, partial="B only"), os.path.join(out, "r7_summary.json"))
         # ---- A: 時間の見積もり → 組の共通 272 個 → 入れ替えと本人''
         rounds = math.ceil(len(ws) * (len(ws) - 1) / jobs)
         per_round = T["excl_03_sec"] / math.ceil(len(ws) / jobs)
