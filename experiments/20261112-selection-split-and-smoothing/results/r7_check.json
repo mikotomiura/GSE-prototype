@@ -1,0 +1,38 @@
+{
+ "run_id": "20261120T164346-1717",
+ "pkl_sha256": "a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c",
+ "bvals_sha256": "8026fea11c04ecc4222f37f9b8de5f1c8ecffbcac3d24cb53c7d6eeb6a6b86c2",
+ "sym_values_sha256": "8596a3c79c16377ba6239f5e79ef094b7b636e0755402ab6df1a7eae366fa32b",
+ "p_repro_pool1": {
+  "passed": true,
+  "compared": 68,
+  "max_abs_diff": 0.0
+ },
+ "p_repro_fix": {
+  "passed": true,
+  "compared": 1122,
+  "max_abs_diff": 0.0
+ },
+ "p_repro_current": {
+  "passed": true,
+  "compared": 2,
+  "max_abs_diff": 0.0
+ },
+ "p_repro_pool03": {
+  "passed": true,
+  "compared": 17,
+  "max_abs_diff": 0.0
+ },
+ "p_repro_sym": {
+  "passed": true,
+  "compared": 272,
+  "max_abs_diff": 0.0
+ },
+ "p_repro_rs": {
+  "passed": true,
+  "compared": 2,
+  "max_abs_diff": 0.0
+ },
+ "r7_partB_values_sha256": "f9839718febd476e64741a4faa5ef1eeefbc90b6eab6dd147bad994d98ff7284",
+ "r7_values_sha256": "b6be5c428715597d25c17c01c6267c72295c471aebcdd5068599092e4edb386e"
+}

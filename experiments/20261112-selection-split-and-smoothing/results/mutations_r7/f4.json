@@ -1,0 +1,42 @@
+{
+ "run_id": "20261120T164346-1717",
+ "mutate": [
+  "f4"
+ ],
+ "P-HASH": {
+  "passed": true,
+  "hashes": {
+   "ml.py": "1cf816f8148066c5135867306fd5a8bc129b9dfc0e0705a158f9728cac47d265",
+   "hmm2.py": "f0e0888f8212d5887c6356b7451771370c4d3117404a304f20ecddfb156dfa0a",
+   "data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+   "hmm_b.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a",
+   "results/summary.json": "b775d7cf08b9b826fac31a74a7d5048030aa67119da58e42ff19f9f358c18865"
+  }
+ },
+ "P-NONFIRST": {
+  "passed": true
+ },
+ "P-REPLAYALL": {
+  "passed": true,
+  "compared": 128
+ },
+ "P-REPLAY03": {
+  "passed": true
+ },
+ "P-BPICK": {
+  "passed": false
+ },
+ "P-PAIRPOOL": {
+  "passed": true
+ },
+ "P-SWAP": {
+  "passed": true
+ },
+ "P-AGG": {
+  "passed": true
+ },
+ "P-FORMR7": {
+  "passed": true
+ },
+ "passed": false
+}
