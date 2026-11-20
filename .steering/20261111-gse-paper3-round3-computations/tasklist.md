@@ -70,5 +70,6 @@
 - [x] notes（B「残る」・A「担う」）と本文の \PENDING 5 か所・3.4 の数え（判断 40）
 - [x] 数値の照合（Opus・読むだけ）・指摘 7 点を直す（判断 40）
 - [x] 削る（8,049 → 7,231 語・判断 41）
-- [ ] context-B の「2 桁落ちない」を直す（round 8 の context-B で）
-- [ ] round 8
+- [x] context-B の「2 桁落ちない」を直した（round 8 の context-B）
+- [x] round 8（major・R は 3 人とも minor・判断 42）と直し 1〜19
+- [ ] round 9
