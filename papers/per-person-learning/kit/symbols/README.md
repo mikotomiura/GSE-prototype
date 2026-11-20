@@ -81,12 +81,14 @@ implementation. One row is produced for every second from `t0` to the last event
 ## Per-record hashes
 
 `hashes/coauthor_sha256.csv` and `hashes/cs1_2021_sha256.csv` give, for each of these sessions
-and assignments, the number of rows and two SHA-256 hashes: one of the symbols and one of the
+and assignments, the number of work blocks and of rows and two SHA-256 hashes: one of the symbols and one of the
 rows with x and y written bit for bit (`hashes/hashes.py` defines both). Records are keyed by the
 datasets' public identifiers (the CoAuthor session id; the CS1 SubjectID and AssignmentID). The
 column `in_analysis` marks the 875 CoAuthor sessions with a single observed interval, which the
-analyses use; CS1 uses all 177 assignments. The lists contain hashes only: no symbols, no
-per-writer values and no text. With the public data downloaded:
+analyses use; CS1 uses all 177 assignments. Besides these counts and flags,
+the lists contain hashes only: no symbols, no per-writer results and no text. They list the
+records the analyses read; the writers held out for later checks are not in them (the scripts
+redraw that set from the data and the seed). With the public data downloaded:
 
 ```
 cd hashes
