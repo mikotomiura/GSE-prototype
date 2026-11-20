@@ -75,9 +75,28 @@ implementation. One row is produced for every second from `t0` to the last event
 - In the author's own check on the raw datasets, the symbols of every CoAuthor session
   (1,157 sessions, 775,907 rows) and of every CS1 2021 assignment with at least two key
   presses (177 assignments, 2,794,277 rows) were identical to those of the original
-  implementation, including the bits of x and y. That check used the raw datasets, is not
-  part of this kit, and cannot yet be repeated by readers; per-record hashes of the
-  original symbol sequences are planned for that purpose.
+  implementation, including the bits of x and y. That check used the raw datasets and is not
+  part of this kit. Readers can repeat its outcome with the per-record hashes below.
+
+## Per-record hashes
+
+`hashes/coauthor_sha256.csv` and `hashes/cs1_2021_sha256.csv` give, for each of these sessions
+and assignments, the number of rows and two SHA-256 hashes: one of the symbols and one of the
+rows with x and y written bit for bit (`hashes/hashes.py` defines both). Records are keyed by the
+datasets' public identifiers (the CoAuthor session id; the CS1 SubjectID and AssignmentID). The
+column `in_analysis` marks the 875 CoAuthor sessions with a single observed interval, which the
+analyses use; CS1 uses all 177 assignments. The lists contain hashes only: no symbols, no
+per-writer values and no text. With the public data downloaded:
+
+```
+cd hashes
+python3 -I hashes.py check coauthor <path to the CoAuthor archive .zip> coauthor_sha256.csv
+python3 -I hashes.py check cs1 <path to keystrokes.csv of the 2021 release> cs1_2021_sha256.csv
+```
+
+Each prints the number of records and of mismatches and exits with 1 if any record differs.
+The hashes were produced by running this kit on the raw data and match the hashes of the symbol
+sequences read by the analysis code.
 
 ## Requirements
 

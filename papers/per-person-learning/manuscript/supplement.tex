@@ -1,4 +1,4 @@
-% Online Resource (supplementary information) for the manuscript in main.tex.
+% Online Resource 1 (supplementary information, file ESM_1.pdf) for the manuscript in main.tex.
 % Aggregate and synthetic values only; no per-writer values of real writers.
 \documentclass[10pt]{article}
 \usepackage[margin=0.9in]{geometry}
@@ -20,8 +20,10 @@
 \newcommand{\arthree}{\mbox{3-state} \mbox{AR-HMM}}
 \newcommand{\Ssec}[2]{\section*{S#1\texorpdfstring{\quad}{ } #2}\addcontentsline{toc}{section}{S#1\texorpdfstring{\quad}{ } #2}\label{S#1}}
 
-\title{Online Resource\\[2pt]\large Supplementary information for ``Per-person sequence models of keystroke behaviour: what remains of the gain against stronger comparisons''}
-\author{Mikoto Miura}
+% The journal line is required in the submitted file only; it is left out of public copies.
+\newcommand{\journalline}{Journal: User Modeling and User-Adapted Interaction\\}
+\title{Online Resource 1\\[2pt]\large Supplementary information for ``Per-person sequence models of keystroke behaviour: what remains of the gain against stronger comparisons''}
+\author{Mikoto Miura\\[2pt]\small Independent Researcher, CITY-TO-CONFIRM, COUNTRY-TO-CONFIRM\\ \small \journalline Corresponding author: Mikoto Miura, \texttt{mmiura.network@gmail.com}}
 \date{}
 
 \sloppy
@@ -39,9 +41,50 @@
 \begin{enumerate}
 \item \emph{Comparisons behind reported per-person gains.} Sub-questions: the baselines of studies in which a personalized model beats a general one; choosing structure and shrinkage on other people; sequence models against simple baselines, including searches for evidence that per-person gains survive. Fifteen new sources were registered and twelve claims were rated by three independent readings (6 confirmed, 3 confirmed with reservations, 3 undecided). Full texts were obtained from Europe PMC, PubMed Central, arXiv, JMLR, EDM proceedings and authors' pages. No study was found that chooses the shrinkage on other people with the full-pooling limit among the candidates and compares with a shared model of the same structure, nor one that compares an HMM with a first-order Markov chain by predictive likelihood on behavioural symbol sequences.
 \item \emph{Prior art for shrinkage toward a shared model.} Sub-questions: multilevel and mixed HMMs and MAP speaker adaptation; hierarchical and empirical-Bayes pooling and variance estimates at zero; personalized input language models; searches for counter-evidence. Twenty-four new sources were registered; fourteen claims were rated (6 confirmed, 5 confirmed with reservations, 1 undecided, 2 rejected). Full texts were obtained from the ACL Anthology, the ISCA archive, PsyArXiv/OSF, arXiv, bioRxiv, Europe PMC, EDM proceedings and authors' pages. A within-data comparison of an HMM with a first-order chain was found \citep{Shirley2010}; a comparison on later data of the same person was not. The search for clinical experience-sampling studies was run once and its coverage is limited.
-\item \emph{Keystroke user models and cold start.} Sources recorded for this round: OpenAlex, arXiv, the ACL Anthology, medRxiv, EDM proceedings, a Japanese educational-technology journal and general web search. No study was found that fits per-person sequence models to keystroke symbols and compares them with the person's own first-order chain and with a shared model chosen on other people; the nearest work is \citet{Uto2020}, whose evaluation design we do not describe.
+\item \emph{Keystroke user models and cold start.} Sources recorded for this round: OpenAlex, arXiv, the ACL Anthology, medRxiv, EDM proceedings, a Japanese educational-technology journal and general web search. No study was found that fits per-person sequence models to keystroke symbols and compares them with the person's own first-order chain and with a shared model chosen on other people; the nearest work is \citet{Uto2020} (Table~\ref{tab:prior}).
 \end{enumerate}
-The rounds recorded the sub-questions, the registered sources and the verification of each claim, but not the exact query strings or the number of records screened. ``Not found'' therefore means not found in these searches.
+The rounds recorded the sub-questions, the registered sources and the verification of each claim, but not the exact query strings or the number of records screened. The statement on \citet{LiuMeng2016} was checked against the arXiv version (arXiv:1510.08539v1); the journal version's abstract, the part we could access, states the same trade-off between relevance and robustness.
+
+\paragraph{Recorded search.} To make the statement in the introduction checkable, one further search was run on 20 November 2026 with the query strings, dates and counts recorded (Table~\ref{tab:search}). It asked for studies that fit per-person sequence models to keystroke behaviour and compare them, on the person's later data, with the person's own simple baseline or with a shared model. Within these searches no such study was found. The nearest were \citet{Uto2020}, who compare learner-dependent and shared HMMs on the same data (Table~\ref{tab:prior}), and \citet{Monaco2018}, who evaluate per-user HMMs on later sessions of the same users but compare them with other per-user models for identification and verification, not with the person's own simple baseline or a shared model. Google Scholar, Scopus, Web of Science, the ACM Digital Library and IEEE Xplore were not searched; EDM proceedings pages were screened by title only, and OpenAlex covers the EDM conference incompletely. ``Not found'' therefore means not found in these searches.
+
+\begin{small}
+\begin{longtable}{>{\raggedright}p{2.3cm}>{\raggedright}p{8.6cm}rr}
+\caption{Recorded search, 20 November 2026. Records: hits reported by the source. Screened: records whose title was read / records whose abstract was read (for hit lists longer than 50, the first 50 by relevance). No record answered the question.}\label{tab:search}\\
+\toprule
+Source & Query (verbatim) & Records & Screened \\
+\midrule\endfirsthead
+\toprule
+Source & Query (verbatim) & Records & Screened \\
+\midrule\endhead
+OpenAlex\footnotemark[1] & \texttt{keystroke AND ("hidden Markov" OR "Markov chain" OR "Markov model")} & 46 & 46 / 8 \\
+ & \texttt{(keystroke OR typing) AND (personalized OR individualized OR "person-specific" OR "user-specific" OR "learner-dependent") AND ("hidden Markov" OR "Markov chain" OR "sequence model" OR "sequential model")} & 162 & 50 / 1 \\
+ & \texttt{"writing process" AND (keystroke OR "keystroke logging") AND ("hidden Markov" OR "Markov chain" OR "Markov model")} & 3 & 3 / 3 \\
+ & \texttt{(programming OR coding) AND keystroke AND ("hidden Markov" OR "Markov" OR "sequence model")} & 10 & 10 / 1 \\
+ & \texttt{keystroke AND (personalized OR individualized OR "person-specific" OR "user-specific" OR "individual-level") AND (Markov OR "sequence model" OR "sequential model" OR "state-space")} & 2 & 2 / 2 \\
+ & \texttt{"keystroke logging" AND (Markov OR "sequential pattern" OR "latent state" OR "hidden state")} & 6 & 6 / 4 \\
+ & \texttt{"personalized language model" AND (typing OR keyboard OR "text entry" OR "text input")} & 4 & 4 / 1 \\
+ & \texttt{keystroke hidden Markov model individual user sessions} (free search) & 489 & 50 / 3 \\
+arXiv\footnotemark[2] & \texttt{abs:keystroke AND abs:"hidden Markov"} & 2 & 2 / 1 \\
+ & \texttt{abs:keystroke AND (abs:personalized OR abs:individualized OR abs:"user-specific" OR abs:"person-specific") AND (abs:Markov OR abs:sequence)} & 7 & 7 / 1 \\
+ & \texttt{abs:"writing process" AND (abs:keystroke OR abs:typing) AND (abs:Markov OR abs:"latent state")} & 0 & 0 / 0 \\
+ & \texttt{abs:typing AND abs:personalized AND (abs:"language model" OR abs:Markov) AND (abs:keyboard OR abs:"text entry")} & 2 & 2 / 1 \\
+ & \texttt{abs:keystroke AND abs:writing AND (abs:sequence OR abs:sequential OR abs:Markov OR abs:temporal)} & 7 & 7 / 1 \\
+ACL Anthology\footnotemark[3] & \texttt{(?i)(keystroke|key-?stroke|typing behaviou?r|keystroke log)} & 50 & 50 / 4 \\
+ & keystroke or typing behaviour together with \texttt{hidden markov}, \texttt{markov chain} or \texttt{HMM}, in either order & 1 & 1 / 1 \\
+ & keystroke, typing, text entry or keyboard together with personalized, individualized, user-specific or person-specific, in either order & 7 & 7 / 3 \\
+ & \texttt{writing process} together with \texttt{keystroke} or \texttt{keylog}, in either order & 7 & 7 / 1 \\
+EDM and JEDM\footnotemark[4] & \texttt{keystroke OR keystrokes OR "keystroke log"} & 3 & 3 / 2 \\
+ & \texttt{(keystroke OR "writing process" OR typing) AND (Markov OR HMM OR sequence)} & 8 & 8 / 1 \\
+ & \texttt{"hidden Markov" AND (individual OR individualized OR personalized OR "student-specific" OR "learner-specific")} & 1 & 1 / 0 \\
+ & proceedings pages 2019--2026, titles matching keystroke, key-stroke, typing, writing process or keylog, or Markov or HMM & 16 & 16 / 1 \\
+ & Zenodo communities of EDM 2022, 2025 and 2026, \texttt{q=keystroke} & 5 & 5 / 1 \\
+\bottomrule
+\end{longtable}
+\end{small}
+\noindent\footnotemark[1]{\footnotesize OpenAlex works API, \texttt{filter=title\_and\_abstract.search:} with the query, except the free search (\texttt{search=}).}
+\footnotemark[2]{\footnotesize arXiv API, \texttt{search\_query=} with the query; count from \texttt{opensearch:totalResults}.}
+\footnotemark[3]{\footnotesize Regular expressions over titles and abstracts of the full bibliography with abstracts (\texttt{anthology+abstracts.bib.gz}, 139,573 entries, 90,112 with abstracts; last updated in the file 19 November 2026); 65 distinct hits in all.}
+\footnotemark[4]{\footnotesize OpenAlex restricted to the EDM conference and JEDM sources (1,007 and 197 works), the proceedings pages at educationaldatamining.org, and the Zenodo communities named.}
 
 \paragraph{Prior evaluation designs.} Table~\ref{tab:prior} lists, for the works compared in Section~2 of the paper, what the per-person model was compared with and on which data.
 
@@ -70,7 +113,7 @@ Study & Domain & Comparison & Evaluation data & Reported \\
 \citet{Shirley2010} & alcohol treatment trial & HMM vs.\ first-order Markov chain & same data (DIC, posterior predictive checks) & HMM preferred \\
 \citet{Stoye2025} & animal movement & AR-HMM vs.\ HMM & information criteria (forecasting not evaluated) & HMM misses within-state autocorrelation \\
 \citet{Singer2014} & web navigation & Markov chains of several orders & likelihood ratio, information criteria, cross-validation & first order suffices at page level \\
-\citet{Uto2020} & writing processes & learner-dependent HMM over 30-s frames with 10-s step & --- & --- \\
+\citet{Uto2020} & writing processes, 72 learners, one 45-min task each & time- and learner-dependent HMM over 30-s frames with 10-s step vs.\ a standard HMM shared by all learners & same data (log-marginal likelihood) & learner- and time-dependent model fits better as the number of states grows (submitted version read in full) \\
 \bottomrule
 \end{longtable}
 \end{small}
@@ -113,7 +156,7 @@ both clipped to $[0,1]$. The first weights deletions, deletions followed by a pa
 
 \paragraph{Grid and the deletion-run symbol.} Each smoothed value is cut into five equal bins, and the symbol is $5\,x_{\text{bin}}+y_{\text{bin}}$ (0 to 24). A run of 14 or more consecutive deletions replaces the grid symbol at the next typing second by symbol 25.
 
-\paragraph{Kit.} The public kit contains adapters for one CoAuthor session and for one CS1 student-assignment (split into work blocks at gaps of 30 minutes or more), the symbolizer, the constants, the two variant symbolizations of S13, a self-test, and a conformance test that symbolizes 300 synthetic key-press sequences (fixed seed) and compares every row bit for bit with traces from the original implementation; the sequences contain no human data. The author's check on the raw data (CoAuthor: 1,157 sessions, 775,907 rows; CS1 2021: every assignment with at least two key presses, 177 assignments, 2,794,277 rows) found every row identical to the original implementation; it is not part of the kit, and per-record hashes of the original symbol sequences are not yet published. The kit uses the Python standard library only.
+\paragraph{Kit.} The public kit contains adapters for one CoAuthor session and for one CS1 student-assignment (split into work blocks at gaps of 30 minutes or more), the symbolizer, the constants, the two variant symbolizations of S13, a self-test, and a conformance test that symbolizes 300 synthetic key-press sequences (fixed seed) and compares every row bit for bit with traces from the original implementation; the sequences contain no human data. The author's check on the raw data (CoAuthor: 1,157 sessions, 775,907 rows; CS1 2021: every assignment with at least two key presses, 177 assignments, 2,794,277 rows) found every row identical to the original implementation; it is not part of the kit. Instead, the kit lists SHA-256 hashes of the symbol sequence of each of these sessions and assignments, keyed by the datasets' public identifiers (CoAuthor session id; CS1 subject and assignment ids), with the 875 CoAuthor sessions with one observed interval, the ones analysed, marked; a script recomputes them from the public data and reports mismatches. Running the kit on the raw data reproduced every hash, and hashes of the symbols read by the analysis code matched for every session and assignment. The lists contain hashes only, no symbols or per-writer values. The kit uses the Python standard library only.
 
 \paragraph{Data.} CoAuthor \citep{Lee2022}: the public release archive (SHA-256 \texttt{8d7380ca3811c671} \texttt{e774e43bfb9f5d32} \texttt{65e2a5d425788a06} \texttt{6a612831aa1e418b}). CS1 \citep{Edwards2023}: the 2021 release, Harvard Dataverse, doi:10.7910/DVN/BVOF7S, version 7.0 (keystroke file SHA-256 \texttt{950a587bb3a410ef} \texttt{c4aad0e64974d644} \texttt{2806345fddd13af7} \texttt{6676dfb8006a22b6}). Inserted text is used for its length only; no typed content enters any analysis.
 

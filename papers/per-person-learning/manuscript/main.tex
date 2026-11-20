@@ -1,9 +1,6 @@
-% Draft of the body. Article class with natbib for drafting; to be moved to the
-% Springer Nature template (sn-jnl) before submission.
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
+% Manuscript in the Springer Nature LaTeX template (sn-jnl, version 3.1, December 2024),
+% Basic Springer Nature reference style (author-year).
+\documentclass[pdflatex,sn-basic]{sn-jnl}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
@@ -12,11 +9,13 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepgfplotslibrary{groupplots}
-\usepackage[authoryear,round]{natbib}
-\usepackage[hidelinks]{hyperref}
-\usepackage{siunitx}
+\hypersetup{hidelinks,bookmarksdepth=2}
+\usepackage{array}
+% Lettering in figures at 8 pt (sn-jnl sets \footnotesize to 7 pt).
+\newcommand{\figfont}{\fontsize{8}{9.5}\selectfont}
 
-\newcommand{\Sref}[1]{Online Resource~S#1}
+% Supplementary sections S1--S13 are in one file, Online Resource 1.
+\newcommand{\Sref}[1]{Online Resource~1, S#1}
 % Structures are named in words in the text, tables and figures.
 \newcommand{\hmmthree}{\mbox{3-state} HMM}
 \newcommand{\hmmten}{\mbox{10-state} HMM}
@@ -24,25 +23,26 @@
 \newcommand{\artwo}{\mbox{2-state} \mbox{AR-HMM}}
 \newcommand{\arthree}{\mbox{3-state} \mbox{AR-HMM}}
 
-\title{Per-person sequence models of keystroke behaviour:\\ what remains of the gain against stronger comparisons}
-\author{Mikoto Miura\\ Independent Researcher}
-\date{Draft, November 2026}
-
+\raggedbottom
 \begin{document}
+
+\title[Per-person sequence models of keystroke behaviour]{Per-person sequence models of keystroke behaviour: what remains of the gain against stronger comparisons}
+
+\author*{\fnm{Mikoto} \sur{Miura}}\email{mmiura.network@gmail.com}
+\affil*{\orgname{Independent Researcher}, \orgaddress{\city{CITY-TO-CONFIRM}, \country{COUNTRY-TO-CONFIRM}}}
+
+\abstract{Whether a per-person model looks worthwhile depends on what it is compared with. Exploring public co-writing (CoAuthor) and programming (CS1) keystroke data, coded per second over overlapping 30-second windows, we scored models on each writer's later symbols. In CoAuthor, a per-writer three-state hidden Markov model beats a shared model of the same structure by up to 0.19 nats per symbol but loses to the writer's own first-order Markov chain. With a stronger structure and shrinkage chosen on other writers, about $5\times10^{-4}$ remains at five and fifteen training sessions in the 15-session panel at the fixed base smoothing, no more than the shared model improves when its smoothing is removed; synthetic writers without per-person differences left a similar remainder relative to that improvement (ratio not prespecified). When the smoothing chosen for the shared model is applied to both models with the structure fixed, $3.4\times10^{-3}$ and $5.2\times10^{-3}$ remain; this bears on a designer's decision but was not separated from closeness in time or the amount of data, nor checked synthetically. Neither value shows stable per-person differences; under the post hoc null at the fixed base smoothing, planted differences up to $3\times10^{-2}$ were not reliably detected. The synthetic writers, both-sides smoothing and wider grids came after seeing results. In CS1, mostly pauses, the shared model is chosen at the fixed base smoothing. For overlapping-window symbols, group-level decisions on per-person modelling should compare with both baselines, choose structure and shrinkage on other people, and apply the shared model's chosen smoothing to both models (tried for one structure).}
+
+\keywords{personalization, user modelling, keystroke logs, hidden Markov models, evaluation protocol, baselines}
+
 \maketitle
-
-\begin{abstract}
-Whether a per-person model looks worthwhile depends on what it is compared with. Exploring public co-writing (CoAuthor) and programming (CS1) keystroke data, coded per second over overlapping 30-second windows, we scored models on each writer's later symbols. In CoAuthor, a per-writer three-state hidden Markov model beats a shared model of the same structure by up to 0.19 nats per symbol but loses to the writer's own first-order Markov chain. With a stronger structure and shrinkage chosen on other writers, about $5\times10^{-4}$ remains at five and fifteen training sessions in the 15-session panel at the fixed base smoothing, no more than the shared model improves when its smoothing is removed; synthetic writers without per-person differences left a similar remainder relative to that improvement (ratio not prespecified). When the smoothing chosen for the shared model is applied to both models with the structure fixed, $3.4\times10^{-3}$ and $5.2\times10^{-3}$ remain; this bears on a designer's decision but was not separated from closeness in time or the amount of data, nor checked synthetically. Neither value shows stable per-person differences; under the post hoc null at the fixed base smoothing, planted differences up to $3\times10^{-2}$ were not reliably detected. The synthetic writers, both-sides smoothing and wider grids came after seeing results. In CS1, mostly pauses, the shared model is chosen at the fixed base smoothing. For overlapping-window symbols, group-level decisions on per-person modelling should compare with both baselines, choose structure and shrinkage on other people, and apply the shared model's chosen smoothing to both models (tried for one structure).
-\end{abstract}
-
-\noindent\textbf{Keywords:} personalization; user modelling; keystroke logs; hidden Markov models; evaluation protocol; baselines
 
 % ---------------------------------------------------------------------------
 \section{Introduction}\label{sec:intro}
 
 Adaptive systems that read behaviour logs often model each person separately: a model fitted to one learner's or writer's own history is expected to describe that person better than a model shared across people. Whether this is worth the cost of collecting enough data per person and of storing a model per person is usually judged by comparing the per-person model with a shared one. A per-person model can look strong because the shared model it is compared with is weak, or because the per-person model repairs a structure that is too simple for the data, and not because people differ in a way the model captures.
 
-This concern is known in other domains: comparisons with a population baseline rather than with the person's own average make mood and stress models look better than they are \citep{DeMasi2017}, and record-wise splits inflate accuracy \citep{Saeb2017}. For sequence models of keystroke behaviour, such as learner-dependent models fitted to keystroke features over 30-second frames \citep{Uto2020}, we found in our literature searches (\Sref{1}) no study that compared a per-person model with both a stronger shared model and the person's own simple baseline on the person's later data. In sequence models the concern is sharper: a shared model of the same structure is the natural comparison, but it is a weak one whenever that structure does not capture the dependence between consecutive symbols.
+This concern is known in other domains: comparisons with a population baseline rather than with the person's own average make mood and stress models look better than they are \citep{DeMasi2017}, and record-wise splits inflate accuracy \citep{Saeb2017}. For sequence models of keystroke behaviour, such as learner-dependent models fitted to keystroke features over 30-second frames \citep{Uto2020}, we found in recorded searches of OpenAlex, arXiv, the ACL Anthology and EDM proceedings (\Sref{1}) no study that compared a per-person model with both a stronger shared model and the person's own simple baseline on the person's later data. In sequence models the concern is sharper: a shared model of the same structure is the natural comparison, but it is a weak one whenever that structure does not capture the dependence between consecutive symbols.
 
 We ran this comparison on two public keystroke datasets. Each second of typing is coded as one of 26 symbols describing the rhythm of the preceding 30 seconds, and each model predicts a writer's next symbol from the earlier ones. A model is scored by the log-probability it gives to the symbols that actually follow, averaged per symbol, in nats (natural-log units; higher is better; Figure~\ref{fig:example}); a difference of 0.01 nats per symbol means about 1\% more probability per symbol, on average, and about 1\% lower perplexity (the average number of equally likely next symbols the model leaves open). We compared three models on each writer's later units: a per-person model fitted to the writer's earlier units; a shared model of the same structure fitted to other writers; and the writer's own first-order Markov chain, which predicts the next symbol from the current one only, using how often each symbol followed each other symbol in the writer's earlier units. The per-person model is pulled toward the shared model by an amount we call \emph{shrinkage}, and every model adds small counts to its estimates, called \emph{smoothing}, so that transitions not seen in its data keep some probability. We chose the model structure and the shrinkage on other writers, never on the held-out units of the writer being scored. All three models condition on the writer's recent symbols when predicting; the question is what fitting the model's parameters to the writer adds.
 
@@ -57,7 +57,7 @@ For a designer deciding whether a per-person model is worth its data and storage
 Reported per-person gains range from small to large, and the size tracks the comparison. In an idiographic (person-by-person) stress study, a person-mean baseline beat every general model for 89\% of participants, although for 80\% at least one personal model beat it \citep{Aalbers2023}; individualized knowledge tracing improves on the population model by small amounts \citep{Yudelson2013,Khajah2016}. Large gains have been reported against a single general model, or with splits that mix a person's records across training and test \citep{Weiss2012,Taylor2020,Meegahapola2022}. Such splits can inflate accuracy, and which split fits depends on the use case \citep{Saeb2017,Little2017}. When per-person models overtake pooled ones depends on the domain and the amount of data: a personal mood model overtook a hybrid after about 30 days \citep{LiKamWa2013}, and pooled models beat person-specific ones in experience-sampling data \citep{Leenaerts2024}.
 
 \paragraph{Keystroke-based user models.}
-Learner-dependent hidden Markov models (HMMs) have been fitted to keystroke features computed over 30-second frames with a 10-second step to analyse writing processes \citep{Uto2020}.
+Learner-dependent hidden Markov models (HMMs) have been fitted to keystroke features computed over 30-second frames with a 10-second step to analyse writing processes, and compared with a shared HMM on the same data \citep{Uto2020}.
 In keystroke dynamics, where typing behaviour is distinctive enough to identify users, per-person HMMs of keystroke timing improve when conditioned on the key sequence, with frequency-dependent smoothing toward less specific contexts \citep{Monaco2018}. Coarse symbols of typing rhythm may discard part of this individuality; we return to this in Section~\ref{sec:discussion}.
 
 \paragraph{Selection and assessment on other people.}
@@ -78,25 +78,25 @@ Figure~\ref{fig:example} shows the measurement on a made-up example before the d
 
 \begin{figure}[t]
 \centering
-\begin{tikzpicture}[font=\footnotesize,
+\begin{tikzpicture}[font=\figfont,
   sym/.style={draw, minimum width=7mm, minimum height=5mm, inner sep=1pt},
   bar/.style={fill=black!35, draw=black!70}]
   % (a) key presses over time
-  \node[anchor=west, font=\footnotesize\bfseries] at (-0.2,2.55) {(a) Key presses};
-  \draw[->] (0,1.9) -- (9.6,1.9) node[right, font=\scriptsize] {time};
+  \node[anchor=west, font=\figfont\bfseries] at (-0.2,2.55) {(a) Key presses};
+  \draw[->] (0,1.9) -- (9.6,1.9) node[right, font=\figfont] {time};
   \foreach \x in {0.3,0.55,0.75,1.0,1.4,1.65,2.6,2.8,3.05,3.3,3.5,5.9,6.15,6.4,6.6,6.85,7.1,8.2,8.45,8.7}
     \draw (\x,1.9) -- (\x,2.15);
   \draw (0,1.55) -- (9.0,1.55);
   \draw (0,1.45) -- (0,1.65); \draw (9.0,1.45) -- (9.0,1.65);
-  \node[font=\scriptsize] at (4.5,1.3) {each second summarizes the preceding 30 seconds (shortened here)};
+  \node[font=\figfont] at (4.5,1.3) {each second summarizes the preceding 30 seconds (shortened here)};
   % (b) symbols
-  \node[anchor=west, font=\footnotesize\bfseries] at (-0.2,0.75) {(b) One symbol per second (26 possible)};
+  \node[anchor=west, font=\figfont\bfseries] at (-0.2,0.75) {(b) One symbol per second (26 possible)};
   \foreach \s [count=\i] in {b3,b3,c3,c3,c4,c4}
     \node[sym] at (1.0+0.95*\i,0.2) {\s};
   \node[sym, dashed] at (1.0+0.95*7,0.2) {?};
-  \node[font=\scriptsize, anchor=west] at (8.1,0.2) {next symbol};
+  \node[font=\figfont, anchor=west] at (8.1,0.2) {next symbol};
   % (c) three models
-  \node[anchor=west, font=\footnotesize\bfseries] at (-0.2,-0.65) {(c) Probability each model gives to the symbol that follows (here c4)};
+  \node[anchor=west, font=\figfont\bfseries] at (-0.2,-0.65) {(c) Probability each model gives to the symbol that follows (here c4)};
   \foreach \lab/\p/\ll/\y in {Shared model (same structure)/0.30/$-1.20$/-1.25, Writer's own Markov chain/0.55/$-0.60$/-1.8, Per-person model/0.33/$-1.11$/-2.35}
   {
     \node[anchor=east] at (3.9,\y) {\lab};
@@ -115,19 +115,17 @@ Table~\ref{tab:data} gives the counts and one property that matters for reading 
 
 \begin{table}[t]
 \centering
-\caption{In CS1 most held-out symbols are pause seconds; in CoAuthor few are. Pause share: share of held-out symbols at seconds with no key press in the preceding 30\,s (all writers pooled; per-writer median and quartiles in brackets). Training symbols are per-writer medians.}
+\caption{In CS1 most held-out symbols are pause seconds; in CoAuthor few are. Pause share: share of held-out symbols at seconds with no key press in the preceding 30\,s (all writers pooled; per-writer median and quartiles in brackets). $k$: training units; training symbols are per-writer medians.}
 \label{tab:data}
-\small
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lrrrrl}
+\begin{tabular}{@{}l r r r r >{\raggedright\arraybackslash}p{2.0cm}@{}}
 \toprule
-Panel & Writers & $k$ (training units) & Training symbols & Held-out symbols & Pause share \\
+Panel & Writers & $k$ & Training symbols & Held-out symbols & Pause share \\
 \midrule
 CoAuthor, 15-session & 17 & 1--15 & 624--9,673 & 3,296 & 0.046 (0.029 [0.015, 0.046]) \\
 CoAuthor, 30-session & 9 & 1--30 & 642--19,427 & 3,318 & 0.042 (0.030 [0.011, 0.046]) \\
 CS1, five-assignment & 23 & 1--5 & 16,361--70,395 & 10,635 & 0.716 (0.727 [0.498, 0.841]) \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 \subsection{Symbol sequences}\label{sec:symbols}
@@ -155,18 +153,15 @@ Every second, five keystroke features are computed over the key events of the pr
 \begin{tikzpicture}[
   unit/.style={draw, minimum width=6mm, minimum height=5mm, inner sep=0pt},
   tr/.style={unit, fill=black!12}, ev/.style={unit, fill=black!55},
-  lab/.style={font=\footnotesize, anchor=east}, note/.style={font=\scriptsize, align=left, anchor=west}]
+  lab/.style={font=\figfont, anchor=east}, note/.style={font=\figfont, align=left, anchor=north west}]
   \node[lab] at (0.6,0) {Target writer $w$};
-  \foreach \x in {1.0,1.7,2.4} \node[tr] at (\x,0) {};
-  \node[font=\scriptsize] at (1.7,0.45) {$k$ training units};\node[font=\scriptsize] at (4.7,0.45) {held-out units};
-  \foreach \x in {4.0,4.7,5.4} \node[ev] at (\x,0) {};
+  \foreach \x in {1.0,1.6,2.2} \node[tr] at (\x,0) {};
+  \node[font=\figfont] at (1.6,0.45) {$k$ training units};\node[font=\figfont] at (4.1,0.45) {held-out units};
+  \foreach \x in {3.5,4.1,4.7} \node[ev] at (\x,0) {};
   \node[lab] at (0.6,-0.9) {Other writers $v$};
-  \foreach \x in {1.0,1.7,2.4} \node[tr] at (\x,-0.9) {};
-    \foreach \x in {4.0,4.7,5.4} \node[ev] at (\x,-0.9) {};
-  \node[note] at (6.0,0.15) {$w$'s $k$ training units: $w$'s per-person fit and own chain};
-  \node[note] at (6.0,-0.25) {$w$'s held-out units: evaluation only};
-  \node[note] at (6.0,-0.75) {$v$'s non-held-out units: shared model for $w$};
-  \node[note] at (6.0,-1.15) {$v$'s held-out units: choice for $w$};
+  \foreach \x in {1.0,1.6,2.2} \node[tr] at (\x,-0.9) {};
+    \foreach \x in {3.5,4.1,4.7} \node[ev] at (\x,-0.9) {};
+  \node[note] at (-1.75,-1.45) {$w$'s training units: $w$'s per-person fit and own chain\\ $w$'s held-out units: evaluation only\\ $v$'s non-held-out units: shared model for $w$\\ $v$'s held-out units: choice for $w$};
 \end{tikzpicture}
 \caption{Within the final protocol, the target writer's held-out units enter no fit and no choice (the candidate grids were extended after seeing results; Section~\ref{sec:eval}). Light: training units; dark: held-out units. The other writers' shared models, used in the choice for $w$, include $w$'s non-held-out units.}
 \label{fig:scheme}
@@ -175,7 +170,7 @@ Every second, five keystroke features are computed over the key events of the pr
 \subsection{Evaluation and status of the analyses}\label{sec:eval}
 For each writer, the held-out units are the last five sessions (CoAuthor) or the last assignment (CS1), and the training units are the $k$ units immediately preceding them. Each held-out session, and in CS1 each work block, is scored as its own sequence, one step ahead from the model's initial distribution (the probabilities of the hidden state at the start of a sequence); the first symbol of a sequence is scored by the initial distribution times each state's distribution of symbols (HMM) or of first symbols (AR-HMM), and by the writer's first-symbol frequencies for the own chain, and is counted; scoring without first symbols (post hoc) changes the remainders at $k=5$ and 15 (Section~\ref{sec:res-smooth}) by less than $10^{-4}$ (\Sref{4}). The measure is nats per symbol: per writer, the total log-likelihood over held-out symbols divided by their number. For each panel and $k$ (a \emph{cell}) we report, over writers, the median of the per-writer difference, the share of writers favouring the per-person fit and $n$; intervals are percentile bootstrap intervals over writers with their values fixed (no refitting or re-choosing): they describe the spread of values that are dependent through shared training data and the choice, not the uncertainty of the whole procedure (quartiles in \Sref{7}). We call per-person minus the same-structure shared model the \emph{gain} when the structure is fixed at the \hmmthree{}, and the \emph{remainder} when structure and shrinkage are chosen jointly; at the fixed base smoothing the joint choice picks the \arthree{} in every cell, and we also call remainder the same difference in the symmetric refit (Section~\ref{sec:checks-method}), which keeps that structure and chooses only $\tau$.
 
-The study consists of four analyses designed one after another and twelve later checks (\Sref{8}). For each, the conditions (rows, grids, readings) were committed to a version-controlled repository before its code or, for reanalyses of stored values, before its computation. Six changes were made after seeing results (\Sref{8}): the extensions of the $\tau$ grid and of the structure families, which bear on the main result (Section~\ref{sec:limits}), and four additions we mark \emph{post hoc} where they are reported: the symmetric refit (Section~\ref{sec:checks-method}), including its reading as the comparison bearing on a designer's decision, its controls, the second null (Section~\ref{sec:sens-method}) and the score without first symbols. Values that the conditions did not ask for are marked \emph{not prespecified}. All analyses are descriptive: we use no significance tests and no meaningful-difference threshold (the detection threshold of Section~\ref{sec:sens-method} is not one).
+The study consists of four analyses designed one after another and twelve later checks (\Sref{8}). For each, the conditions (rows, grids, readings) were committed to a version-controlled repository before its code or, for reanalyses of stored values, before its computation. Six changes were made after seeing results (\Sref{8}): the extensions of the $\tau$ grid and of the structure families, which bear on the main result (Section~\ref{sec:limits}), and four additions we mark \emph{post hoc} where they are reported: the symmetric refit (Section~\ref{sec:checks-method}), including its reading as the comparison bearing on a designer's decision, its controls, the second null (Section~\ref{sec:sens-method}) and the score without first symbols. Values that the conditions did not ask for are marked \emph{not prespecified}. All analyses are descriptive: we use no significance tests and no meaningful-difference threshold (the detection threshold of Section~\ref{sec:sens-method} is not one). AI tools assisted the literature searches (\Sref{1}), the writing of the analysis code and the editing of the text; the author checked every cited statement against its source and every reported value against the analysis records, and the code was checked by self-tests and mutation tests (\Sref{8}).
 
 \subsection{Checks of the choice and of the fixed base smoothing}\label{sec:checks-method}
 Three checks reuse the stored fits (\Sref{9}).
@@ -207,15 +202,15 @@ An own chain with its added value chosen on other writers is stronger, but the \
 \centering
 \begin{tikzpicture}
 \begin{groupplot}[group style={group size=2 by 1, horizontal sep=1.9cm},
-  width=0.42\textwidth, height=5.2cm, xlabel={$k$ (number of training units)},
-  xtick={1,2,3,5,8,12,15}, legend style={font=\scriptsize, at={(0.5,-0.32)}, anchor=north, legend columns=2},
-  every axis plot/.append style={thick, mark size=1.6pt}, tick label style={font=\scriptsize}, label style={font=\small}]
-\nextgroupplot[ymode=log, ylabel={nats per symbol (log scale)}, title={\footnotesize (a) vs.\ same-structure shared model}]
+  width=0.38\textwidth, height=5.2cm, xlabel={$k$ (number of training units)},
+  xtick={1,2,3,5,8,12,15}, legend style={font=\figfont, at={(0.5,-0.32)}, anchor=north, legend columns=2},
+  every axis plot/.append style={thick, mark size=1.6pt}, tick label style={font=\figfont}, label style={font=\small}]
+\nextgroupplot[ymode=log, ylabel={nats per symbol (log scale)}, title={\figfont (a) vs.\ same-structure shared model}]
 \addplot table[x=k, y=pp_minus_shared, col sep=comma] {figdata/fig2_p15_hmm3.csv};
 \addplot table[x=k, y=pp_minus_shared, col sep=comma] {figdata/fig2_p15_ar1.csv};
 \addplot table[x=k, y=pp_minus_shared, col sep=comma] {figdata/fig2_p15_ar3.csv};
 \addplot[dashed, mark=o] table[x=k, y=pp_minus_shared, col sep=comma] {figdata/fig2_p15_joint.csv};
-\nextgroupplot[ylabel={nats per symbol}, title={\footnotesize (b) vs.\ the own chain}]
+\nextgroupplot[ylabel={nats per symbol}, title={\figfont (b) vs.\ the own chain}]
 \addplot table[x=k, y=pp_minus_chain, col sep=comma] {figdata/fig2_p15_hmm3.csv};
 \addplot table[x=k, y=pp_minus_chain, col sep=comma] {figdata/fig2_p15_ar1.csv};
 \addplot table[x=k, y=pp_minus_chain, col sep=comma] {figdata/fig2_p15_ar3.csv};
@@ -240,10 +235,8 @@ The chosen shrinkage is strong. In the 15-session panel $\tau=10^6$ for every wr
 \centering
 \caption{Against a stronger structure with shrinkage chosen on other writers, per-person minus the same-structure shared model falls from a gain of about $0.2$ to a remainder far below it in the 15-session panel at the fixed base smoothing (symmetric refit: Table~\ref{tab:smooth}). Medians over writers of per-writer differences in nats per symbol (e$-4$ denotes $\times10^{-4}$; share of writers favouring the per-person fit; 95\% bootstrap interval of the median in brackets, conditional on the fits and the choice). Weight: the writer's overall share $N/(N+\tau)$ at the median number of training symbols.}
 \label{tab:main}
-\scriptsize
 \setlength{\tabcolsep}{3pt}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llllll}
+\begin{tabular}{@{}>{\raggedright}p{1.75cm} >{\raggedright}p{1.95cm} >{\raggedright}p{2.25cm} l >{\raggedright}p{2.9cm} >{\raggedright\arraybackslash}p{2.0cm}@{}}
 \toprule
 Row & Panel, $k$ & Chosen & Weight & Per-person $-$ shared & Per-person $-$ own chain \\
 \midrule
@@ -263,7 +256,7 @@ Joint choice & 15-session, 1 & \arthree, $10^6$ & 0.06\% & $+4.8$e$-4$ (1.00) [3
 \arone{} vs.\ own chain & 15-session, 5 & $10^6$ & 0.3\% & $+3.0$e$-4$ (1.00) & $+0.043$ (1.00) [0.033, 0.050] \\
  & 15-session, 15 & $3\times10^4$ & 24\% & $+0.002$ (0.82) & $+0.007$ (0.76) [0.003, 0.011] \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 \subsection{The remainder survives a writer split, vanishes when only the shared model's smoothing is lightened, and returns in a symmetric refit (post hoc)}\label{sec:res-smooth}
@@ -283,9 +276,8 @@ The smoothing effect shows the dependence on smoothing directly: the prior mode,
 \centering
 \caption{The median remainder stays positive when choice and report are split between writers, and returns in the symmetric refit. CoAuthor 15-session panel, joint choice; medians of per-person minus shared in nats per symbol (e$-4$ denotes $\times10^{-4}$). Split: median over 2,000 pairs [2.5\% and 97.5\% points] (share of pairs above zero). Shared-only and symmetric refit at $\alpha=0.03$: share of writers favouring the per-person fit and, at $k=5$ and 15, the 95\% bootstrap interval of the median (\Sref{9}).}
 \label{tab:smooth}
-\scriptsize
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{rllll}
+\begin{tabular}{@{}r >{\raggedright}p{1.5cm} >{\raggedright}p{3.75cm} l >{\raggedright\arraybackslash}p{2.9cm}@{}}
 \toprule
 $k$ & Fixed base smoothing & Split & Shared-only refit & Symmetric refit (post hoc) \\
 \midrule
@@ -337,7 +329,6 @@ Not evaluated here: a separate shrinkage per context, as in frequency-dependent 
 \item The synthetic check calibrates detection at the fixed base smoothing only. The second null was added after seeing results and is one construction; its smoothing effect is 2.4 times the real one, which may raise its threshold, lower its detection rates and enlarge its remainder, so we read remainders relative to the smoothing effect, assuming, without checking, that they scale with it. It generates symbols directly from one model, without windowing key presses, so apart from the planted transitions it has no variation between writers in record shape or topic and no drift between sessions; only transition differences were planted, and a threshold set by five negative controls is itself uncertain (\Sref{10}).
 \item Chosen on other writers, the base smoothing and the own chain's added value sit at or near the low end of their grids, and $\tau=10^6$ and the three-state structure at the high end (not prespecified). The symmetric refit covers only the \arthree{} in the 15-session panel (\Sref{9}); second-order chains were not fitted. Local optima of EM, which may move with the smoothing and with the starting point of the shared model, were not separated from the effects reported (\Sref{4}).
 \item The choice uses one objective for a whole panel and is not fixed before the target writer arrives; a nested design was not run, and the writer split does not cover the leak of the target writer's units into other writers' shared models.
-\item Readers can check the symbols only through the public kit's synthetic conformance test until per-record hashes of the original symbol sequences are published.
 \end{itemize}
 
 % ---------------------------------------------------------------------------
@@ -346,16 +337,20 @@ Not evaluated here: a separate shrinkage per context, as in frequency-dependent 
 For overlapping, smoothed keystroke symbols, a per-person sequence model's gain over a shared model of the same weak structure, up to 0.19 nats per symbol in CoAuthor, says little. Against a stronger structure, with structure and shrinkage chosen on other people, the remainder in the 15-session panel depends on the smoothing and does not show stable per-person differences at either. About $5\times10^{-4}$ remained at the fixed base smoothing, no larger than the smoothing effect, which uses none of the writer's data; synthetic writers without per-person differences (post hoc) left a remainder of similar relative size. In the symmetric refit (post hoc), which bears on a designer's decision, $3.4\times10^{-3}$ and $5.2\times10^{-3}$ remained at five and fifteen training sessions: the value of a writer's own recent data, whose source (stable differences, closeness in time or the amount of data) was not separated, which depends on a multiplier at the edge of its grid and was not checked against synthetic writers. Planted differences of up to $3\times10^{-2}$ could not be reliably detected at the fixed base smoothing. With non-overlapping windows the direction of a per-person gain returned, so studies should report the symbolization together with the comparison.
 
 % ---------------------------------------------------------------------------
-\section*{Statements and Declarations}
-\paragraph{Data availability.} CoAuthor \citep{Lee2022} and the CS1 keystroke data, 2021 release \citep{Edwards2023}, are public; archive links and versions are given in \Sref{3}. No per-writer values of real writers are released; aggregate and synthetic values are.
-\paragraph{Code availability.} The symbolization kit, the fitting code (EM, choice of structure and $\tau$, summaries) and the code of all later checks (listed in \Sref{8}) will be released in a public repository with an archived DOI on publication, and are available to the editor and reviewers on request during review.
-\paragraph{Use of AI tools.} AI tools assisted the literature searches (\Sref{1}) and the editing of the text; the author checked every cited statement against its source and every reported value against the analysis records, and takes responsibility for the content.
+\backmatter
+
+\bmhead{Supplementary information}
+Online Resource 1 (ESM\_1.pdf) contains sections S1--S13: the literature searches and prior evaluation designs, the panels, the symbolization and data sources, the models and fitting, the candidate grids, the smoothing effect, intervals, the status of the analyses, the checks of the choice and of the smoothing, the synthetic sensitivity check, results by structure, panel and $k$, the structure-compensation check, and other symbolizations.
+
+\section*{Declarations}
 \paragraph{Funding.} None.
 \paragraph{Competing interests.} The author declares no competing interests.
-\paragraph{Ethics approval.} Not applicable: secondary analysis of public, de-identified datasets; no new participants were recruited.
-\paragraph{Consent.} Not applicable: no new data were collected from people.
+\paragraph{Ethics approval and consent to participate.} Not applicable: secondary analysis of public, de-identified datasets; no new data were collected from people.
+\paragraph{Consent for publication.} Not applicable.
+\paragraph{Data availability.} CoAuthor \citep{Lee2022} and the CS1 keystroke data, 2021 release \citep{Edwards2023}, are public; archive links and versions are given in \Sref{3}. SHA-256 hashes of the symbol sequence of every CoAuthor session and CS1 assignment, keyed by the datasets' public identifiers, are in the code archive. Aggregate and synthetic values are released; per-writer values of real writers are not, because anyone can recompute them from the public data with the released code.
+\paragraph{Code availability.} The symbolization kit, the fitting code (EM, choice of structure and $\tau$, summaries), the code of all later checks (listed in \Sref{8}) and the aggregate and synthetic values are available at \url{https://github.com/mikotomiura/per-person-keystroke-models} and archived at \url{https://doi.org/10.5281/zenodo.24395569}.
+\paragraph{Use of AI tools.} Described in Section~\ref{sec:eval}.
 
-\bibliographystyle{plainnat}
 \bibliography{references}
 
 \end{document}
