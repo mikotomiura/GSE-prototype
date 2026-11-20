@@ -4,6 +4,6 @@
 - [x] 一次照合（メイン・TimeAware は原典の PDF。Chrome は不要だった）
 - [x] 追い 1 本（Breakaway の 224 件と慣れ）
 - [x] 3 票の検証・カード・references・_index
-- [ ] check_citations 違反なし・コミット・push
-- [ ] /cross-review 2 巡
+- [x] check_citations 違反なし・コミット・push
+- [x] /cross-review 2 巡
 - [x] 設計案とデッキへの還元（§1.2 の 4 行目・§8・デッキの対応表）
