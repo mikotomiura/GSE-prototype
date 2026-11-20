@@ -73,4 +73,6 @@
 - [x] context-B の「2 桁落ちない」を直した（round 8 の context-B）
 - [x] round 8（major・R は 3 人とも minor・判断 42）と直し 1〜19
 - [x] round 9（major・R は 2 回続けて全員 minor・判断 43）と直し 1〜18
-- [ ] round 10
+- [x] round 10（minor・判断 44）と直し・メインの確かめ・数値の照合で attack-me を閉じた
+- [ ] 補足資料 S1〜S16 を作り、本文の細部を移して予算に寄せる
+- [ ] attack-me の tmp/ を消す（研究者に確かめてから）
