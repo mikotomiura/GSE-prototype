@@ -88,3 +88,7 @@
 1. 設計の判断 A〜C。
 2. 書き方の直し 1〜13 の承認。
 3. 直した後に round 8 を回すか（判定は 7 回続けて major。R の推奨は minor 2・major 1 のまま）。
+
+## 8. 研究者の採否（2026-11-20・AskUserQuestion）
+
+A（入れ替えの対照を計算）・B（先頭の記号を除いて計算）・C（本文に要約と限界）・直し 1〜13・round 8 を回す、のすべてで推奨案を選んだ。中身は `.steering/20261111-gse-paper3-round3-computations/decisions.md` 判断 37。
