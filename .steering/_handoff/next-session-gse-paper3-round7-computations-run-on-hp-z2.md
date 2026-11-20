@@ -52,6 +52,14 @@ bash run_r7.sh 2>&1 | tee "C:/Users/SDS02/gse-public-data/selection_split_smooth
 
 （HP Z2 のセッションが記入する）
 
+**2026-11-20（HP Z2・Python 3.11.9・numpy 2.4.4・git-bash・JOBS=16）**
+
+- run_id `20261120T164346-1717`・git_head `9ac3a595`・dirty なし。16:43 に始めて 17:55 に終わった（exit 0）。コード・条件は変えていない。
+- 入力の SHA-256 一致。selftest 9 門 緑。変異 f1〜f9 はどれも exit 3 で、名指しの門だけが赤（ログの判定）。
+- P-REPRO-POOL1 通過（68・最大の差 0.0）・P-REPRO-FIX 通過（1122・0.0）・P-REPRO-CURRENT 通過（2・0.0）・P-REPRO-POOL03 通過（17・0.0）・P-REPRO-SYM 通過（272・0.0）・P-REPRO-RS 通過（2・0.0）。
+- `r7_timing.json` の秒: pool_1 1123・replay_1 1194・full_03 1037・excl_03 13・replay_03 2313・pair_pool の見積り 111・pair_pool 209・pair_fit 3861。
+- `r7_summary.json` と `provenance_r7.json` の run_id は同じ。結果は `da85da29`。値の中身は読んでいない。
+
 ## 6 Mac 側の状態（2026-11-20）
 
 - 条件は `d98fde84`（コードより前）、コードは `2b1fc341`、/cross-review（Claude と Codex）の直しは `06fc7ec8`（判断 39）。Mac（Python 3.14・numpy 2.5）で selftest 9 門が緑、変異 9 個がそれぞれ名指しの門を赤にした（f2 は P-REPLAY03 も赤）。集計と表の書き出しは合成の値で通した。実データの読み込み・当て直しは Mac では通していない（pickle が HP Z2 にしかない）。
