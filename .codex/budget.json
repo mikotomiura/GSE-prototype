@@ -39,8 +39,8 @@
   "_comment_merge_2026_11_19_handmark_windows": "2026-11-19: feature/handmark-windows に origin/main（PR #429 の merge 後）を取り込んだ際、台帳の today が衝突した。共通の起点（1aef2ad6）の today は 11-10 で、11-19 の記帳は両側とも起点の後に始まっている。和を採った: 本ブランチ 78271 / 2 回（手跡の /cross-review 2 巡の Codex） ＋ origin/main 96111 / 2 回（CI の優先度の /cross-review 2 巡の Codex） = 174382 / 4 回。",
   "today": {
     "date": "2026-11-20",
-    "tokens_used": 18719,
-    "invocations": 1
+    "tokens_used": 344163,
+    "invocations": 11
   },
   "history": [
     {
@@ -379,5 +379,6 @@
   "_comment_merge_2026_11_10_coauthor_ml": "2026-11-10: exp/gse-coauthor-ml-improve に origin/main（PR #403 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
   "_comment_merge_2026_11_10_tau_extend": "2026-11-10: exp/gse-timeseries-tau-extend に origin/main（PR #404 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
   "_comment_merge_2026_11_10_tau_mode": "2026-11-10: exp/gse-tau-mode-candidate に origin/main（PR #405 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
-  "_comment_merge_2026_11_10_structure_deficit": "2026-11-10: exp/gse-structure-deficit-test に origin/main（PR #406 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。"
+  "_comment_merge_2026_11_10_structure_deficit": "2026-11-10: exp/gse-structure-deficit-test に origin/main（PR #406 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
+  "_comment_merge_2026_11_21_handmark_stop_noticing": "2026-11-21: docs/handmark-stop-noticing-survey（S-EA → S-CX → 設計案 → S-SN を積んだ枝）に origin/main を取り込んだ際、台帳の today が衝突した。共通の起点（8a59fa1a）の today は 11-10 で、11-20 の記帳は両側とも起点の後に始まっている。和を採った: 本ブランチ 325444 / 10 回（S-CX・設計案・S-SN・ADR-056 の /cross-review の Codex） ＋ origin/main 18719 / 1 回 = 344163 / 11 回。history は origin/main のもの（11-19 を含む）を採った。"
 }
