@@ -1,0 +1,21 @@
+{
+ "run_id": "20261120T135834-1287",
+ "pkl_sha256": "a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c",
+ "bvals_sha256": "8026fea11c04ecc4222f37f9b8de5f1c8ecffbcac3d24cb53c7d6eeb6a6b86c2",
+ "sym_values_sha256": "8596a3c79c16377ba6239f5e79ef094b7b636e0755402ab6df1a7eae366fa32b",
+ "p_repro_symsum": {
+  "passed": true,
+  "compared": 7
+ },
+ "p_repro_mode1": {
+  "passed": true,
+  "compared": 34,
+  "max_abs_diff_finite": 0.0
+ },
+ "p_repro_b1": {
+  "passed": true,
+  "compared": 34,
+  "max_abs_diff": 0.0
+ },
+ "ctrl_values_sha256": "d994dced259db1be2b2609caeb670dca8c7c5a536ad1decbae2796dfea59b363"
+}

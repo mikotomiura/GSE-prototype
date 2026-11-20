@@ -1,0 +1,56 @@
+{
+ "run_id": "20261120T135834-1287",
+ "git_head": "41ceb5c2b012b6477cfc1c2371d58d471426be75",
+ "git_dirty_paths": [],
+ "python": "3.11.9",
+ "numpy": "2.4.4",
+ "machine": "Windows-10-10.0.26200-SP0",
+ "jobs": 16,
+ "scripts": {
+  "ab.py": "6eb301ac3257083793056d098afb598b898aee0e1ce0f095a1a2d2f96b7508f0",
+  "check_mutations.py": "493271ead513547f99f5ccc8d0c1b43de24d0608ad32aa69f1ae7dd675ec9f99",
+  "compute.py": "df2dcb291eb8b385d3d1c4492f40d60764c8132d725c66cd467ca3ccc1ecbd6b",
+  "ctrl.py": "e4bc19b8492d0d995581c0ac09931f6078a7d74ad75baf7f7929ed732a034000",
+  "pinned4.py": "fbc19b1e394147b48d9f209911ce84029600455046abd33bc2f71684d50c6b2c",
+  "selftest.py": "85a8f5c112003102c7e5adc7ad0814af9d616a22c810c554e4e0cabb03e68577",
+  "selftest_ctrl.py": "ea754fa1171b69acce42db47258fa363aa4a569d9e1bd6be6b5f40bad8ff8866",
+  "selftest_sym.py": "8ca67037666f06a6366fa859f89e646f73cfd6b9521798aa4777ea0b7fbd5b3c",
+  "sym.py": "89af1834356255c319c1b45b9b43e7995942692ce51a2ec90525718ea69e2a0d"
+ },
+ "run_ctrl_sh": "5499e0bb2873d4cdda9ffcb580c88acc951c24e8a75726f21a2d2ce72da6d37f",
+ "conditions": "3a24d5b2df075ef3f086a5214f1c2f0b1e9962a7bd97ea26420f56b6ef15c76f",
+ "pinned": {
+  "ml.py": "1cf816f8148066c5135867306fd5a8bc129b9dfc0e0705a158f9728cac47d265",
+  "hmm2.py": "f0e0888f8212d5887c6356b7451771370c4d3117404a304f20ecddfb156dfa0a",
+  "data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+  "hmm_b.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a",
+  "results/summary.json": "b775d7cf08b9b826fac31a74a7d5048030aa67119da58e42ff19f9f358c18865"
+ },
+ "ctrl_check": {
+  "run_id": "20261120T135834-1287",
+  "pkl_sha256": "a0d3627e281191a42e23d186034de79419931f73c02964f52e17d830d488f94c",
+  "bvals_sha256": "8026fea11c04ecc4222f37f9b8de5f1c8ecffbcac3d24cb53c7d6eeb6a6b86c2",
+  "sym_values_sha256": "8596a3c79c16377ba6239f5e79ef094b7b636e0755402ab6df1a7eae366fa32b",
+  "p_repro_symsum": {
+   "passed": true,
+   "compared": 7
+  },
+  "p_repro_mode1": {
+   "passed": true,
+   "compared": 34,
+   "max_abs_diff_finite": 0.0
+  },
+  "p_repro_b1": {
+   "passed": true,
+   "compared": 34,
+   "max_abs_diff": 0.0
+  },
+  "ctrl_values_sha256": "d994dced259db1be2b2609caeb670dca8c7c5a536ad1decbae2796dfea59b363"
+ },
+ "ctrl_timing": {
+  "run_id": "20261120T135834-1287",
+  "pool_1_sec": 1125.4855811595917,
+  "pool_0.03_sec": 2259.283543109894
+ },
+ "ctrl_summary_sha256": "ab848496d6cde2b299187a67e8cba7f68b3512f098973151f7fe625eaea03375"
+}
