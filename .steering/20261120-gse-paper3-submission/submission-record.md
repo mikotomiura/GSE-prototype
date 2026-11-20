@@ -10,3 +10,4 @@
 - 宣言: 方針の印・Competing interests No・Authorship の印・Third party No・Funding No は研究者が押した。Dual publication は Yes（研究者が選択）で、説明の欄にカバーレターと同じ中身（JEDM 1484・1486 との重なりは公開データと記号化の前段だけ）を私が入れた。Data availability は Yes で本文と同じ文＋コードの URL と DOI。
 - 校正刷り: システムが組んだ PDF（21 頁・406,081 バイト・pdfTeX）は、手元の manuscript.pdf と pdftotext で文字の差 0、60 dpi の画素で全 21 頁同じ。フォントはすべて埋め込み。開いたときに ~/Downloads/manuscript-source.pdf として保存された（意図しないダウンロード）。ESM_1.pdf も ~/Downloads に保存されタブが開いた（原因不明・中身は自分の補足）。
 - 最後の頁: Research Square のプレプリントは No（公開物に投稿先や状態を書かない方針）、規約の印と Submit は研究者の確認の後に私が押した。
+- プレプリント: Zenodo 10.5281/zenodo.24402361（2026-11-21・誌名と状態なし・判断 6）。
