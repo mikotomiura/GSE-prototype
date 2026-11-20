@@ -6,5 +6,5 @@
 - [x] CS1 の公開の範囲を著者に確かめる（判断 5）
 - [x] 投稿画面に貼る文の 1 枚
 - [x] 研究者がカバーレターを確かめる（このまま使う・2026-11-20）
-- [ ] 研究者が Editorial Manager で入力し、Submit の前に校正刷りの全頁を見る
-- [ ] 投稿後: 受付番号と日付を memory と記録に書き、返事を待つ引き継ぎを作る
+- [x] 投稿（SNAPP・Submission ID 1d92fbfb…・2026-11-21 JST・submission-record.md）
+- [x] 投稿後: memory と記録・返事を待つ引き継ぎ（_handoff/20261121-paper3-umuai-response.md）
