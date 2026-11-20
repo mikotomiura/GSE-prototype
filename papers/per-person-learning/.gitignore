@@ -8,3 +8,4 @@ manuscript/*.fdb_latexmk
 manuscript/*.out
 manuscript/*.pdf
 manuscript/build.log
+manuscript/*.toc

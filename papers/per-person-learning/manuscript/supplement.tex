@@ -1,0 +1,528 @@
+% Online Resource (supplementary information) for the manuscript in main.tex.
+% Aggregate and synthetic values only; no per-writer values of real writers.
+\documentclass[10pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\e}[2]{#1e$#2$}
+\newcommand{\hmmthree}{\mbox{3-state} HMM}
+\newcommand{\hmmten}{\mbox{10-state} HMM}
+\newcommand{\arone}{\mbox{1-state} \mbox{AR-HMM}}
+\newcommand{\artwo}{\mbox{2-state} \mbox{AR-HMM}}
+\newcommand{\arthree}{\mbox{3-state} \mbox{AR-HMM}}
+\newcommand{\Ssec}[2]{\section*{S#1\texorpdfstring{\quad}{ } #2}\addcontentsline{toc}{section}{S#1\texorpdfstring{\quad}{ } #2}\label{S#1}}
+
+\title{Online Resource\\[2pt]\large Supplementary information for ``Per-person sequence models of keystroke behaviour: what remains of the gain against stronger comparisons''}
+\author{Mikoto Miura}
+\date{}
+
+\sloppy
+\begin{document}
+\maketitle
+
+\noindent All values are medians over writers of per-writer differences in nats per symbol unless stated otherwise; ``share'' is the share of writers favouring the per-person fit; \e{4.8}{-4} denotes $4.8\times10^{-4}$. Panels: CoAuthor 15-session (17 writers), CoAuthor 30-session (9 writers), CS1 five-assignment (23 writers); $k$ is the number of training units. Structures: \hmmthree{}, \hmmten{}, and \arone{} to \arthree{} (the \arone{} is a first-order Markov chain). ``Own chain'' is the writer's own first-order Markov chain; ``shared'' is the shared model of the same structure fitted without the writer. Only aggregate and synthetic values are reported; no per-writer value of a real writer is given.
+
+\tableofcontents
+
+% ---------------------------------------------------------------------------
+\Ssec{1}{Literature searches and prior evaluation designs}
+
+\paragraph{Search record.} Three rounds of searches were made in November 2026, each split into sub-questions that were searched in parallel with AI-assisted search; every statement used in the paper was then checked by the author against the source's text (full text unless marked ``abstract'' below).
+\begin{enumerate}
+\item \emph{Comparisons behind reported per-person gains.} Sub-questions: the baselines of studies in which a personalized model beats a general one; choosing structure and shrinkage on other people; sequence models against simple baselines, including searches for evidence that per-person gains survive. Fifteen new sources were registered and twelve claims were rated by three independent readings (6 confirmed, 3 confirmed with reservations, 3 undecided). Full texts were obtained from Europe PMC, PubMed Central, arXiv, JMLR, EDM proceedings and authors' pages. No study was found that chooses the shrinkage on other people with the full-pooling limit among the candidates and compares with a shared model of the same structure, nor one that compares an HMM with a first-order Markov chain by predictive likelihood on behavioural symbol sequences.
+\item \emph{Prior art for shrinkage toward a shared model.} Sub-questions: multilevel and mixed HMMs and MAP speaker adaptation; hierarchical and empirical-Bayes pooling and variance estimates at zero; personalized input language models; searches for counter-evidence. Twenty-four new sources were registered; fourteen claims were rated (6 confirmed, 5 confirmed with reservations, 1 undecided, 2 rejected). Full texts were obtained from the ACL Anthology, the ISCA archive, PsyArXiv/OSF, arXiv, bioRxiv, Europe PMC, EDM proceedings and authors' pages. A within-data comparison of an HMM with a first-order chain was found \citep{Shirley2010}; a comparison on later data of the same person was not. The search for clinical experience-sampling studies was run once and its coverage is limited.
+\item \emph{Keystroke user models and cold start.} Sources recorded for this round: OpenAlex, arXiv, the ACL Anthology, medRxiv, EDM proceedings, a Japanese educational-technology journal and general web search. No study was found that fits per-person sequence models to keystroke symbols and compares them with the person's own first-order chain and with a shared model chosen on other people; the nearest work is \citet{Uto2020}, whose evaluation design we do not describe.
+\end{enumerate}
+The rounds recorded the sub-questions, the registered sources and the verification of each claim, but not the exact query strings or the number of records screened. ``Not found'' therefore means not found in these searches.
+
+\paragraph{Prior evaluation designs.} Table~\ref{tab:prior} lists, for the works compared in Section~2 of the paper, what the per-person model was compared with and on which data.
+
+\begin{small}
+\begin{longtable}{>{\raggedright}p{2.4cm}>{\raggedright}p{2.6cm}>{\raggedright}p{3.2cm}>{\raggedright}p{3.0cm}>{\raggedright\arraybackslash}p{3.6cm}}
+\caption{Evaluation designs of related studies (as read; ``---'' where the design was not recorded).}\label{tab:prior}\\
+\toprule
+Study & Domain & Comparison & Evaluation data & Reported \\
+\midrule\endfirsthead
+\toprule
+Study & Domain & Comparison & Evaluation data & Reported \\
+\midrule\endhead
+\citet{Aalbers2023} & momentary stress, 224 students & idiographic models vs.\ general models and the person's mean & last 20\% of each person's data & person mean beat all general models for 89\% of participants; a personal model beat it for 80\% \\
+\citet{DeMasi2017} & mood and stress from phone sensing & population baseline vs.\ the person's own mean & --- & models beat the population baseline but not the personal one \\
+\citet{LiKamWa2013} & mood from phone use, 32 people & personal, hybrid and all-user models; person's average & two months of data & personal overtook hybrid after about 30 days \\
+\citet{Leenaerts2024} & experience sampling, 120 patients & person-specific vs.\ pooled & nested cross-validation & pooled models better (preprint text and published abstract) \\
+\citet{Weiss2012} & activity recognition, 59 people & personal vs.\ impersonal & personal model on the person's own data & personal much better \\
+\citet{Taylor2020} & next-day mood, stress, health & multitask (personalized) vs.\ one general model & random split mixing a person's days & gain 11 to 21\% \\
+\citet{Meegahapola2022} & mood, 678 people in 8 countries & hybrid vs.\ general & stratified random split & large accuracy gain \\
+\citet{Yudelson2013} & knowledge tracing & individualized vs.\ standard parameters & held-out students & small improvement from individual learning rates \\
+\citet{Khajah2016} & knowledge tracing & extensions of BKT vs.\ deep knowledge tracing & --- & small differences \\
+\citet{Fowler2015} & touchscreen keyboard language model & background plus personal cache vs.\ background & later text of test users; weight chosen on development users & word error rate 5.7\% to 4.6\% \\
+\citet{Adhikary2023} & keyboard language model & personal cache with a strong background model & weight chosen on other users & gain remains with a stronger background \\
+\citet{Shao2020} & personalized language model & interpolation vs.\ background & time split & most users improve, some worsen \\
+\citet{Monaco2018} & keystroke dynamics & per-user HMM vs.\ partially observable HMM & goodness of fit; identification & HMM rejected for many users \\
+\citet{Shirley2010} & alcohol treatment trial & HMM vs.\ first-order Markov chain & same data (DIC, posterior predictive checks) & HMM preferred \\
+\citet{Stoye2025} & animal movement & AR-HMM vs.\ HMM & information criteria (forecasting not evaluated) & HMM misses within-state autocorrelation \\
+\citet{Singer2014} & web navigation & Markov chains of several orders & likelihood ratio, information criteria, cross-validation & first order suffices at page level \\
+\citet{Uto2020} & writing processes & learner-dependent HMM over 30-s frames with 10-s step & --- & --- \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+% ---------------------------------------------------------------------------
+\Ssec{2}{Panels and all-writer panels}
+
+Before any analysis, 30\% of the writers of each dataset were set aside at random and not read; all panels are drawn from the remaining writers. CoAuthor sessions with a single observed interval were used (43 writers; 28 with at least six sessions). CS1 assignments with at least two key presses were used (25 of 31 students with at least two assignments). A writer's units are ordered in time (CoAuthor sessions by start; CS1 assignments by first key press).
+
+\begin{table}[htbp]
+\centering\small
+\caption{Panels. Training and held-out symbols: medians over writers [quartiles].}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllll}
+\toprule
+Panel & Rule & $k$ & Training symbols & Held-out symbols \\
+\midrule
+CoAuthor 15-session & $\ge 20$ sessions (17) & 1, 2, 3, 5, 8, 12, 15 & 624 [595, 643] ($k=1$) to 9,673 [9,233, 10,262] ($k=15$) & 3,296 [3,048, 3,426] \\
+CoAuthor 30-session & $\ge 35$ sessions (9) & also 20, 30 & 642 [597, 650] to 19,427 [18,849, 20,027] & 3,318 [3,048, 3,426] \\
+CS1 five-assignment & $\ge 6$ assignments (23) & 1, 2, 3, 5 & 16,361 [7,921, 20,669] to 70,395 [51,191, 106,142] & 10,635 [2,965, 16,640] \\
+CoAuthor all-writer & $\ge k+5$ sessions & 1 to 30 & 624 [589, 650] ($k=1$) & 3,296 [2,983, 3,508] ($k=1$) \\
+CS1 all-writer & $\ge k+1$ assignments & 1 to 5 & 16,361 [8,040, 20,669] ($k=1$) & 9,880 [3,093, 16,491] ($k=1$) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The CoAuthor all-writer panel has 28, 28, 25, 21, 19, 18, 17, 12 and 9 writers at $k=1$, 2, 3, 5, 8, 12, 15, 20 and 30; the CS1 all-writer panel has 25 writers at $k=1$ and equals the five-assignment panel at $k\ge2$. Results for these panels are in S11. Infinite log-likelihoods arise only for the prior mode (S6); no reported median is infinite.
+
+% ---------------------------------------------------------------------------
+\Ssec{3}{Symbolization and data sources}
+
+\paragraph{Features.} Every second, over the key events of the preceding 30\,s: $f_1$ median flight time (press minus previous release, kept if below 2,000\,ms; 0 if none); $f_3$ share of presses that are deletions; $f_4$ mean burst length (a burst continues while the gap from the previous release is below 200\,ms); $f_5$ number of gaps of at least 2,000\,ms between consecutive presses; $f_6$ share of deletions followed by such a gap. A release is assumed 100\,ms after each press, or at the next press if earlier. Navigation, modifier and function keys are ignored; the buffer holds at most 600 events.
+
+\paragraph{Composite values.} With $\varphi(x)=\min(1,\max(0,(x-\beta)/(\kappa\beta)))$, $\kappa=2$ and $\beta=150$, 0.06, 5.0, 2.0 and 0.08 for $f_1,f_3,f_4,f_5,f_6$:
+\[ x=\varphi(f_3)\cdot0.30+\varphi(f_6)\cdot0.25+\varphi(f_1)\cdot0.25+\varphi(f_5)\cdot0.20,\qquad
+ y=\varphi(f_4)\cdot0.40+(1-\varphi(f_1))\cdot0.35+(1-\varphi(f_5))\cdot0.25, \]
+both clipped to $[0,1]$. The first weights deletions, deletions followed by a pause, flight time and pauses; the second weights burst length, short flight times and few pauses. Neither is read as a state.
+
+\paragraph{Smoothing and pauses.} During typing (a tick with $f_1>0$ and less than 2\,s of silence) each value is smoothed as $e\leftarrow0.3\,\text{raw}+0.7\,e$; during pauses the smoothing weight is 0.15, 0.18 or 0.25 after 0, 15 or 25\,s of silence. Initial values are $x=0.1$, $y=0.8$. In pauses the features are replaced by fixed functions of the silence, and the typing context is reset after a gap of more than 10\,s. All constants are fixed and published with the kit.
+
+\paragraph{Grid and the deletion-run symbol.} Each smoothed value is cut into five equal bins, and the symbol is $5\,x_{\text{bin}}+y_{\text{bin}}$ (0 to 24). A run of 14 or more consecutive deletions replaces the grid symbol at the next typing second by symbol 25.
+
+\paragraph{Kit.} The public kit contains adapters for one CoAuthor session and for one CS1 student-assignment (split into work blocks at gaps of 30 minutes or more), the symbolizer, the constants, the two variant symbolizations of S13, a self-test, and a conformance test that symbolizes 300 synthetic key-press sequences (fixed seed) and compares every row bit for bit with traces from the original implementation; the sequences contain no human data. The author's check on the raw data (CoAuthor: 1,157 sessions, 775,907 rows; CS1 2021: every assignment with at least two key presses, 177 assignments, 2,794,277 rows) found every row identical to the original implementation; it is not part of the kit, and per-record hashes of the original symbol sequences are not yet published. The kit uses the Python standard library only.
+
+\paragraph{Data.} CoAuthor \citep{Lee2022}: the public release archive (SHA-256 \texttt{8d7380ca3811c671} \texttt{e774e43bfb9f5d32} \texttt{65e2a5d425788a06} \texttt{6a612831aa1e418b}). CS1 \citep{Edwards2023}: the 2021 release, Harvard Dataverse, doi:10.7910/DVN/BVOF7S, version 7.0 (keystroke file SHA-256 \texttt{950a587bb3a410ef} \texttt{c4aad0e64974d644} \texttt{2806345fddd13af7} \texttt{6676dfb8006a22b6}). Inserted text is used for its length only; no typed content enters any analysis.
+
+% ---------------------------------------------------------------------------
+\Ssec{4}{Models, fitting and scoring}
+
+\paragraph{Parameters.} With $K$ hidden states: an HMM has an initial distribution $\pi$, a transition matrix $\Pi$ ($K\times K$) and emissions $B$ ($K\times26$); an AR-HMM has $\pi$, $\Pi$, first-symbol emissions $H$ ($K\times26$) and transition tables $A^{(j)}$ ($26\times26$ per state). The one-step predictive probability is $\sum_j p(z_t=j\mid y_{<t})\,B_{j y_t}$ (HMM) or $\sum_j p(z_t=j\mid y_{<t})\,A^{(j)}_{y_{t-1}y_t}$ (AR-HMM; $H_{j y_1}$ for the first symbol). Free parameters: 83 and 349 (HMM, $K=3$, 10); 675, 1,353 and 2,033 (AR-HMM, $K=1$, 2, 3).
+
+\paragraph{Base smoothing and prior.} Base pseudo-counts are 1 for every entry of $\pi$ and $\Pi$ and 0.5 for every entry of $B$, $H$ and $A^{(j)}$. In the per-person fit the prior count of entry $r$ is $c_r=\text{base}_r+\tau\bar S_r$, where $\bar S$ is the expected counts of the last E step of the shared model fitted without the writer, divided by the number of symbols (each parameter group sums to 1). The M step sets $\theta_r\propto$ expected count$_r+c_r$, and EM maximizes the log-likelihood plus $\sum_r c_r\log\theta_r$. The multiplier $\alpha$ of S9 scales the base pseudo-counts.
+
+\paragraph{Fitting.} Sequences are cut into chunks of 900 symbols for fitting (the state distribution restarts from $\pi$ at a cut; the AR-HMM keeps the true previous symbol); scoring is not chunked. The shared model of each structure is fitted to all writers' non-held-out units from ten starting points (Dirichlet(1) draws; for the AR-HMM, pooled first-symbol frequencies and a perturbed pooled chain) and the best objective is kept; the shared model without a target writer is refitted from that solution. Each per-person fit runs from two starting points, the shared model without the writer and either a random start ($\tau=0$) or the writer's unshrunk fit ($\tau>0$), and keeps the higher MAP objective on the training symbols. EM stops when the objective per symbol changes by less than $10^{-7}$ or after 500 iterations; non-convergence occurred only at $\tau=0$, and no decrease of the objective above $10^{-9}$ per symbol occurred. Changing the smoothing may move EM to a different local optimum; this was not separated from the effect of refitting. The shared model refitted without a target writer starts from a solution that used that writer's training units, which may steer the optimum it reaches.
+
+\paragraph{Scoring.} Each held-out CoAuthor session and each CS1 work block is a sequence, scored one step ahead from $\pi$. The first symbol is scored by $\pi B$ (HMM) or $\pi H$ (AR-HMM), and by the writer's first-symbol frequencies plus 0.5 for the own chain, whose transition counts also have 0.5 added. First symbols are counted in the per-symbol average. They are about 0.15\% of held-out symbols (median over writers). Scoring without them (post hoc; CoAuthor 15-session panel; the choice unchanged) gives:
+
+\begin{center}\small
+\begin{tabular}{lrrr}
+\toprule
+Smoothing & $k$ & All symbols & Without first symbols \\
+\midrule
+Fixed base & 5 & \e{5.53}{-4} (1.00) & \e{5.37}{-4} (1.00) \\
+Fixed base & 15 & \e{4.14}{-4} (0.94) & \e{4.29}{-4} (0.94) \\
+Symmetric refit & 5 & \e{3.38}{-3} (0.94) & \e{3.45}{-3} (0.94) \\
+Symmetric refit & 15 & \e{5.17}{-3} (0.88) & \e{5.21}{-3} (0.88) \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent Re-choosing on the scores without first symbols gives the same values. Later symbols still depend on the initial distribution.
+
+\paragraph{Choice objectives and ties.} For a target writer, the joint choice takes the (structure, $\tau$) pair with the best median, over the other writers of the panel and $k$, of per-person minus own chain on their held-out units; because a writer's own chain does not depend on the candidate, this is the median of each writer's held-out log-likelihood centred on their own chain. In the fixed-structure rows, $\tau$ is chosen by the median of per-person minus same-structure shared, so a writer for whom the shared model itself ($\tau=\infty$) is chosen has a difference of zero; in the joint choice no candidate gives zero against the own chain. The two objectives can pick different $\tau$ for the same structure: in the 15-session panel at $k=15$ the joint choice gives $3\times10^5$ to 16 of 17 writers and the fixed \arthree{} row $10^6$ to all. Ties favour the larger $\tau$ ($\infty$ largest) and, between structures, fewer free parameters. The objectives are not the target writer's accuracy, and a chosen per-person fit can lose to the shared model on the target.
+
+% ---------------------------------------------------------------------------
+\Ssec{5}{Candidate grids and their history}
+
+The final grid of $\tau$ is $\{0, 10^2, 10^3, 10^4, 3\times10^4, 10^5, 3\times10^5, 10^6, \infty\}$, where $\infty$ is the shared model itself without fitting, and the structures are the \hmmthree{} and the \arone{} to \arthree{} (36 candidate pairs). The grids were extended after seeing results (S8):
+\begin{enumerate}
+\item The first analysis fitted a \hmmthree{} per writer, without shrinkage, against a shared model and the own chain.
+\item The second analysis used HMMs with 3, 6 and 10 states and AR-HMMs with 1 to 3 states, and $\tau\in\{0,10^2,10^3,10^4\}$. The chosen $\tau$ for the AR-HMMs was $10^4$, the top of the grid, for nearly all writers.
+\item The third analysis extended the grid to $10^6$ and $\infty$ after seeing this, kept the \hmmthree{} and the AR-HMMs, and added the joint choice. Cells common to both grids were reproduced exactly. With the extended grid, CS1 chose $\infty$ for all writers in the AR-HMMs (except the \arone{} at $k=5$), and CoAuthor chose $10^6$ for the AR-HMMs at small $k$.
+\end{enumerate}
+The structure grid stops at three states for the AR-HMM; the \arthree{} was chosen by the joint choice for every writer in every cell.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Chosen $\tau$ (number of writers) with $\tau$ chosen on other writers.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+Panel, structure & $k$ & Chosen $\tau$ \\
+\midrule
+15-session, \hmmthree{} & 1; 2; 3, 5, 12, 15; 8 & $10^2$:9, $10^3$:8; $10^2$:9, 0:8; 0:17; $10^2$:9, 0:8 \\
+15-session, \arone{} & 1--5; 8; 12; 15 & $10^6$:17; $3\times10^5$:15, $10^5$:2; $3\times10^4$:15, $10^5$:2; $3\times10^4$:17 \\
+15-session, \artwo{}, \arthree{} & all & $10^6$:17 \\
+15-session, joint (\arthree{}) & 1--12; 15 & $10^6$:17; $3\times10^5$:16, $10^6$:1 \\
+30-session, \arthree{} & 1--20; 30 & $10^6$:9; $10^5$:8, $3\times10^4$:1 \\
+30-session, joint (\arthree{}) & 1--12; 15; 20; 30 & $10^6$:9; $10^6$:5, $3\times10^5$:4; $10^5$:7, $3\times10^5$:1, $3\times10^4$:1; $3\times10^4$:8, $10^5$:1 \\
+CS1, \hmmthree{} & 1; 2; 3; 5 & $3\times10^4$:23; $10^5$:23; $\infty$:23; $10^3$:22, 0:1 \\
+CS1, \arone{} & 1--3; 5 & $\infty$:23; $10^5$:12, $3\times10^4$:11 \\
+CS1, \artwo{}, \arthree{}, joint & all & $\infty$:23 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+% ---------------------------------------------------------------------------
+\Ssec{6}{Prior mode, smoothing effect, the mean objective and the pause share}
+
+\paragraph{Prior mode and smoothing effect.} The prior mode is the normalized $\bar S$ without the base smoothing, the limit of the per-person fit as $\tau\to\infty$. It is not a candidate in the main protocol and is not used as a stand-alone diagnostic of per-person value. The smoothing effect is the median of prior mode minus shared on held-out symbols; it does not depend on $k$.
+
+\begin{center}\small
+\begin{tabular}{lllll}
+\toprule
+Panel & \hmmthree{} & \arone{} & \artwo{} & \arthree{} \\
+\midrule
+15-session & \e{4.2}{-5} (0.94) & \e{2.9}{-4} (0.88) & \e{6.6}{-4} (0.88) & \e{7.4}{-4} (0.88) \\
+30-session & \e{4.4}{-5} (1.00) & \e{3.4}{-4} (0.78) & \e{6.6}{-4} (0.78) & \e{7.2}{-4} (0.78) \\
+CS1 & \e{7.5}{-6} (0.83) & \e{8.1}{-5} (1.00) & \e{1.5}{-4} (1.00) & \e{2.0}{-4} (1.00) \\
+\bottomrule
+\end{tabular}
+\end{center}
+For the AR-HMMs, the prior mode gives zero probability to some held-out symbols of 2 of the 17 writers in the 15-session panel and 2 of the 9 in the 30-session panel (log-likelihood $-\infty$); these writers stay in the medians, counted as losses for the prior mode and as wins for the per-person fit, and no median is infinite. Over finite writers only, the \arthree{} smoothing effect is \e{8.9}{-4} (15-session) and \e{1.0}{-3} (30-session).
+
+\paragraph{Per-person fit minus prior mode.} For the \arthree{} at $\tau=10^6$ in the 15-session panel: \e{-3.5}{-4}, \e{-3.2}{-4}, \e{-3.1}{-4}, \e{-2.8}{-4}, \e{-2.3}{-4}, \e{-1.6}{-4} and \e{-1.2}{-4} at $k=1$, 2, 3, 5, 8, 12, 15 (share 0.18, 0.18, 0.18, 0.18, 0.24, 0.29, 0.35; the shares include the two writers with $-\infty$ for the prior mode). In the 30-session panel it is \e{-3.4}{-4} to \e{-1.2}{-4} up to $k=15$, \e{-6.6}{-5} (0.44) at $k=20$ and \e{1.2}{-4} (0.78) at $k=30$. Medians are not additive, so these values do not decompose the remainder.
+
+\paragraph{The prior mode as a candidate.} When the prior mode is added to the candidates (ordered $\infty$, prior mode, $10^6$, \dots, 0), the median objective picks it in CoAuthor for at most one writer at $k=1$ to 8 (a writer whose held-out log-likelihood is then $-\infty$), and per-person minus shared is unchanged except at $k=5$ (\e{5.3}{-4} instead of \e{5.5}{-4}); in CS1 it replaces the shared model for every writer, so per-person minus shared becomes the smoothing effect (\e{8.1}{-5} to \e{2.0}{-4}).
+
+\paragraph{Choice by the mean.} With the mean over the other writers instead of the median (a candidate with any $-\infty$ is not chosen), the prior mode is never chosen in CoAuthor; in the 15-session panel the \arthree{} at $\tau=10^6$ is chosen for every writer at every $k$, per-person minus shared is \e{4.8}{-4} to \e{7.6}{-4} (share 1.00) and per-person minus own chain 0.220 to 0.020 for every writer. The choices differ from the median objective for one writer at $k=1$ to 8, none at $k=12$ and 16 at $k=15$. In the 30-session panel at $k=30$ per-person minus shared is \e{1.3}{-3} (0.89) and per-person minus prior mode \e{6.0}{-4} (0.89). CS1 is unchanged.
+
+\paragraph{Pause share.} A pause second is a held-out symbol with no key press in the preceding 30\,s. Pooled share, per-writer median [quartiles] and range: 15-session 0.046, 0.029 [0.015, 0.046], 0.008 to 0.240; 30-session 0.042, 0.030 [0.011, 0.046], 0.008 to 0.157; CS1 0.716, 0.727 [0.498, 0.841], 0.082 to 0.900. The prior-mode values over symbols with a key press in the window (\arthree{}): 15-session \e{6.7}{-4} (0.82), 30-session \e{6.5}{-4} (0.67), CS1 \e{4.4}{-4} (1.00).
+
+% ---------------------------------------------------------------------------
+\Ssec{7}{Intervals and interquartile ranges}
+
+Bootstrap intervals of the median resample writers with replacement 2,000 times with their values fixed and take the 2.5\% and 97.5\% points; quartiles are computed with the inverted empirical distribution function. With 17 writers the two coincide in almost every cell (2,489 of 2,512 cells in the second analysis): the median of a resample of 17 is its 9th order statistic, whose 2.5\% and 97.5\% points fall on the 5th and 13th order statistics of the original values (the probability that the resampled median is at or below the 4th is 0.008 and at or below the 5th 0.036), which are also the quartiles. This is why, in the 15-session panel, the intervals of Table~2 of the paper and of the symmetric refit in Table~3 equal the quartiles; it is not an error of aggregation. With other numbers of writers the two rarely coincide.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Quartiles [Q1, Q3] over writers for the cells of Table~2 of the paper (bootstrap interval where it differs).}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+Cell & Per-person $-$ shared & Per-person $-$ own chain \\
+\midrule
+Joint, 15-session, $k=1$ & \e{4.8}{-4} [\e{3.2}{-4}, \e{5.9}{-4}] & 0.220 [0.175, 0.419] \\
+Joint, 15-session, $k=5$ & \e{5.5}{-4} [\e{4.2}{-4}, \e{6.6}{-4}] & 0.059 [0.050, 0.076] \\
+Joint, 15-session, $k=15$ & \e{4.1}{-4} [\e{2.2}{-4}, \e{7.8}{-4}] & 0.020 [0.016, 0.041] \\
+Joint, 30-session, $k=30$ & \e{1.1}{-3} [\e{-6.9}{-4}, \e{2.0}{-3}]; bootstrap [\e{-2.2}{-3}, \e{3.7}{-3}] & 0.013 [0.010, 0.016] \\
+Joint, CS1, $k=5$ & 0 [0, 0] & 0.029 [0.022, 0.034]; bootstrap [0.023, 0.032] \\
+\hmmthree{}, 15-session, $k=5$ & 0.188 [0.103, 0.321] & $-0.518$ [$-0.630$, $-0.360$] \\
+\hmmthree{}, 15-session, $k=15$ & 0.165 [0.110, 0.302] & $-0.522$ [$-0.746$, $-0.394$] \\
+\hmmthree{}, CS1, $k=5$ & 0.028 [$-0.063$, 0.071]; bootstrap [$-0.039$, 0.053] & $-1.096$ [$-1.202$, $-0.947$]; bootstrap [$-1.180$, $-1.021$] \\
+\arthree{}, 15-session, $k=5$ & \e{5.5}{-4} [\e{4.2}{-4}, \e{6.6}{-4}] & 0.059 [0.050, 0.076] \\
+\arthree{}, 15-session, $k=15$ & \e{7.6}{-4} [\e{6.0}{-4}, \e{9.5}{-4}] & 0.020 [0.016, 0.041] \\
+\arone{}, 15-session, $k=5$ & \e{3.0}{-4} [\e{2.1}{-4}, \e{4.3}{-4}] & 0.043 [0.033, 0.050] \\
+\arone{}, 15-session, $k=15$ & 0.002 [\e{9.8}{-4}, 0.005] & 0.007 [0.003, 0.011] \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[htbp]
+\centering\small
+\caption{Quartiles for Figure~3 of the paper (15-session panel; per-person $-$ shared / per-person $-$ own chain). The joint choice equals the \arthree{} except at $k=15$ (Table above).}
+\begin{tabular}{llll}
+\toprule
+$k$ & \hmmthree{} & \arone{} & \arthree{} \\
+\midrule
+1 & [$-0.053$, 0.104] / [$-0.623$, $-0.430$] & [\e{1.5}{-4}, \e{3.0}{-4}] / [0.155, 0.396] & [\e{3.2}{-4}, \e{5.9}{-4}] / [0.175, 0.419] \\
+2 & [0.020, 0.179] / [$-0.738$, $-0.399$] & [\e{1.6}{-4}, \e{3.1}{-4}] / [0.086, 0.150] & [\e{3.6}{-4}, \e{6.1}{-4}] / [0.096, 0.186] \\
+3 & [0.042, 0.268] / [$-0.674$, $-0.366$] & [\e{1.8}{-4}, \e{3.7}{-4}] / [0.060, 0.125] & [\e{3.8}{-4}, \e{6.2}{-4}] / [0.080, 0.150] \\
+5 & [0.103, 0.321] / [$-0.630$, $-0.360$] & [\e{2.1}{-4}, \e{4.3}{-4}] / [0.033, 0.050] & [\e{4.2}{-4}, \e{6.6}{-4}] / [0.050, 0.076] \\
+8 & [0.089, 0.237] / [$-0.728$, $-0.388$] & [\e{2.5}{-4}, \e{6.4}{-4}] / [0.014, 0.027] & [\e{4.9}{-4}, \e{7.4}{-4}] / [0.031, 0.050] \\
+12 & [0.101, 0.299] / [$-0.664$, $-0.338$] & [\e{8.0}{-4}, 0.003] / [0.004, 0.015] & [\e{5.5}{-4}, \e{8.5}{-4}] / [0.019, 0.043] \\
+15 & [0.110, 0.302] / [$-0.746$, $-0.394$] & [\e{9.8}{-4}, 0.005] / [0.003, 0.011] & [\e{6.0}{-4}, \e{9.5}{-4}] / [0.016, 0.041] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------------
+\Ssec{8}{Status of the analyses}
+
+For every analysis and check, the conditions (rows, grids, readings, and how each outcome would change the text) were committed to a version-controlled repository before its code or, for reanalyses of stored values, before its computation. Each run recorded the code version, the input hashes and a self-test; mutation tests checked that the self-tests fail when the code is broken. The four analyses, designed one after another:
+\begin{enumerate}
+\item per-person \hmmthree{} against a shared model and the own chain (CoAuthor);
+\item structures (HMM with 3, 6, 10 states; AR-HMM with 1 to 3) and shrinkage $\tau\le10^4$ chosen on other writers (CoAuthor and CS1);
+\item the extended grid of $\tau$ and the joint choice;
+\item the prior mode and the smoothing effect.
+\end{enumerate}
+The twelve later checks, counted as listed:
+\begin{enumerate}
+\item unsmoothed and non-overlapping symbolizations with pseudo-residuals (S13);
+\item structure compensation (S12);
+\item synthetic sensitivity, first null (S10);
+\item the prior-mode decomposition applied to synthetic writers (S10);
+\item ten seeds per level and false-alarm rates for the first null (S10);
+\item the prior mode as a candidate (S6);
+\item the choice by the mean (S6);
+\item the pause share (S6);
+\item the writer split (S9);
+\item the smoothing checks: the base smoothing and the own chain's added value chosen on other writers, the shared-only refit, the symmetric refit and its controls, including the data swap (S9);
+\item the second null (S10);
+\item the score without first symbols (S4).
+\end{enumerate}
+Six changes were made after seeing results: (a) the extension of the $\tau$ grid, after the second analysis chose the top of its grid; (b) the change of structure families in the third analysis; both bear on the main result. (c) The symmetric refit was added, and read as the comparison bearing on a designer's decision, after the shared-only refit had made the remainder vanish; (d) its controls, with the report of the chosen $\tau$, were added after seeing the symmetric refit; (e) the second null was added after reviewing how the first null behaved; (f) the score without first symbols was added last. Changes (c) to (f) are marked post hoc in the paper; the controls and the score without first symbols report $k=5$ and 15, the points fixed in their conditions. Readings were committed before computation also for these additions.
+
+% ---------------------------------------------------------------------------
+\Ssec{9}{Checks of the choice and of the smoothing}
+
+\paragraph{Writer split.} The purpose is to check whether the remainder depends on choosing and reporting on the same writers. The 15-session panel was split 1,000 times at random into halves of 8 and 9 writers, each used once for choosing and once for reporting (2,000 pairs).
+\begin{center}\small
+\begin{tabular}{rlr}
+\toprule
+$k$ & Median over pairs [2.5\%, 97.5\%] & Share of pairs above zero \\
+\midrule
+1 & \e{4.76}{-4} [\e{3.33}{-4}, \e{5.82}{-4}] & 1.00 \\
+2 & \e{4.97}{-4} [\e{3.64}{-4}, \e{6.02}{-4}] & 1.00 \\
+3 & \e{5.05}{-4} [\e{3.87}{-4}, \e{6.13}{-4}] & 1.00 \\
+5 & \e{5.53}{-4} [\e{4.29}{-4}, \e{6.58}{-4}] & 1.00 \\
+8 & \e{5.96}{-4} [\e{5.02}{-4}, \e{7.34}{-4}] & 1.00 \\
+12 & \e{6.83}{-4} [\e{-4.21}{-3}, \e{8.16}{-4}] & 0.95 \\
+15 & \e{7.42}{-4} [\e{-3.66}{-3}, \e{9.09}{-4}] & 0.75 \\
+\bottomrule
+\end{tabular}
+\end{center}
+The median difference between choosing on the other half and on the reported half itself is 0 at every $k$. The \arthree{} is chosen in every pair; at $k=15$ the choosing half picks $\tau=10^6$ in 1,242 pairs and an interior value in 758 (not prespecified). Because the choices sit at the edges of both grids, the grid extensions made after seeing results lie outside what the split checks.
+
+\paragraph{Base smoothing chosen on other writers.} The multiplier grid is $\{0.03, 0.1, 0.3, 1, 3\}$; it is chosen for each target writer by the other writers' median, on their held-out units, of the shared model with $\alpha$ minus the one with $\alpha=1$. In the 15-session panel $\alpha=0.03$ was chosen for all 17 writers; the shared \arthree{} with it beats the one with $\alpha=1$ by \e{1.61}{-3} (13 of 17). In the 30-session panel the chosen multiplier differed between writers (1 for four, 0.1 for four, 0.3 for one), so the symmetric refit was not run there; its shared-only remainders are 0 at $k\le5$ and \e{6.2}{-4} to \e{1.95}{-3} at $k=8$ to 30 (not used for the reading).
+
+\paragraph{Shared-only refit} (15-session panel; only the shared model is refitted, as the $\tau=\infty$ candidate and as the comparison). Remainder (share): 0 (0.00) at $k=1$, 2, 3; 0 (0.12) at $k=5$ and 8; \e{-1.05}{-3} (0.29) at $k=12$, where all writers were given $\tau=10^6$; 0 (0.18) at $k=15$. The shared model itself was chosen for 16 or 17 writers at $k\le3$ and for 8 or 9 at $k=5$, 8 and 15.
+
+\paragraph{Symmetric refit} (post hoc; 15-session panel; \arthree{}; $\alpha=0.03$ on both sides; $\bar S$ and the prior mode from the refitted shared model). The weight is $N/(N+\tau)$ at the median number of training symbols, a conversion, not an estimate of what the data are worth.
+\begin{center}\small
+\begin{tabular}{rllll}
+\toprule
+$k$ & Remainder (share) & Chosen $\tau$ (writers) & Weight & Per-person $-$ own chain \\
+\midrule
+1 & \e{5.18}{-4} (0.71) & $10^4$:17 & 0.059 & 0.222 (1.00) \\
+2 & \e{1.25}{-3} (0.76) & $10^4$:17 & 0.110 & 0.160 (1.00) \\
+3 & \e{2.05}{-3} (0.88) & $10^4$:17 & 0.160 & 0.095 (1.00) \\
+5 & \e{3.38}{-3} (0.94) & $10^4$:17 & 0.244 & 0.063 (1.00) \\
+8 & \e{4.32}{-3} (1.00) & $10^4$:16, $10^3$:1 & 0.339 & 0.043 (1.00) \\
+12 & \e{6.67}{-3} (0.88) & $10^3$:16, $10^4$:1 & 0.887 & 0.033 (1.00) \\
+15 & \e{5.17}{-3} (0.88) & $10^3$:17 & 0.906 & 0.030 (1.00) \\
+\bottomrule
+\end{tabular}
+\end{center}
+The shares are not evidence of per-person differences. Choosing $\tau$ by the fixed-structure objective (per-person minus shared) instead of the joint objective gives nearly the same values except at $k=12$ (\e{4.62}{-3}) and $k=15$ (\e{7.14}{-3}, share 1.00). The 95\% bootstrap intervals of the median (Table~3 of the paper) are [\e{2.7}{-3}, \e{6.1}{-3}] at $k=5$ and [\e{2.9}{-3}, \e{1.2}{-2}] at $k=15$; with 17 writers they equal the quartiles (S7).
+
+\paragraph{Controls of the symmetric refit} (post hoc; readings committed before computation). (1) The prior mode at $\alpha=0.03$ minus the shared model at $\alpha=0.03$ (the smoothing effect at $\alpha=0.03$): \e{2.46}{-5} (0.82). (2) The prior mode at $\alpha=1$ minus the shared model at $\alpha=0.03$: \e{-1.33}{-3} (0.24). In both, two writers have $-\infty$ for the prior mode (counted as losses for it). (3) Per-person minus the prior mode at $\alpha=0.03$: \e{4.83}{-4}, \e{1.23}{-3}, \e{2.02}{-3}, \e{3.35}{-3}, \e{4.29}{-3}, \e{8.82}{-3} and \e{7.92}{-3} at $k=1$, 2, 3, 5, 8, 12, 15 (shares as for the remainder; the two writers count as wins for the per-person fit). Being the limit of very strong shrinkage, the prior mode cannot tell whether the remainder needs the writer's data or comes from refitting the prior.
+
+\paragraph{Data swap} (post hoc). For each writer $w$ and each of the other 16 writers $v$ (272 pairs), the per-person fit is refitted with $w$'s chosen $\tau$ and a prior from a shared model fitted without $w$ and $v$, to $v$'s $k$ training units, and scored on $w$'s held-out units; $w$'s value is the mean over $v$.
+\begin{center}\small
+\begin{tabular}{rlllll}
+\toprule
+$k$ & Own $-$ swapped & Swapped $-$ shared & Own $-$ swapped, same prior & Pairs swap wins & $\tau$ \\
+\midrule
+5 & \e{4.73}{-3} (1.00) & \e{-1.68}{-3} (0.00) & \e{4.68}{-3} (1.00) & 0.015 & $10^4$:17 \\
+15 & \e{2.53}{-2} (1.00) & \e{-1.73}{-2} (0.00) & \e{2.52}{-2} (1.00) & 0.011 & $10^3$:17 \\
+\bottomrule
+\end{tabular}
+\end{center}
+``Same prior'' refits $w$'s own fit with the prior without $w$ and $v$, so both sides use the same $\bar S$. No swapped value is $-\infty$. The committed reading (a margin of at least half the remainder) would also hold with no remainder if the swapped fit lost by more than half of it; the margin is not a share of the remainder.
+
+\paragraph{Own-chain smoothing chosen on other writers.} The grid of the value added to every count is $\{0.01, 0.03, 0.1, 0.3, 0.5, 1, 2\}$. Chosen values: 0.03 for all writers at every $k$ in the 15-session panel; 0.01 or 0.03 in the 30-session panel; 0.01 to 0.1 in CS1. The re-chosen chain beats the chain with 0.5 by 0.100 ($k=1$) to 0.012 ($k=15$) in the 15-session panel and by \e{2.1}{-3} to \e{8.5}{-3} in CS1. Against it, the \hmmthree{} loses by $-0.53$ to $-0.58$ (every writer of the 15-session panel; CS1 $-1.03$ to $-1.10$, all but one writer at $k=1$ and 2), and the joint choice wins by 0.139 ($k=1$) to \e{9.1}{-3} ($k=15$, 15 of 17 writers) and by 0.025 to 0.038 in CS1 (every writer). The remainder of the joint choice is almost unchanged (\e{4.6}{-4} to \e{7.2}{-4}). The shrinkage-only row was not recomputed against the re-chosen chain.
+
+% ---------------------------------------------------------------------------
+\Ssec{10}{Synthetic sensitivity check}
+
+\paragraph{First null.} The generating model is a \arthree{} with transition probabilities between states of 0.97 on the diagonal. A writer's symbol-to-symbol tables are $C_w=(1-\lambda)C_0+\lambda D_w$ with $D_w\sim\text{Dirichlet}(2C_0)$; $\lambda$ is calibrated by bisection on 40 separate synthetic writers of 20,000 symbols so that the median over writers of the writer's own generating model minus the common one, on the writer's symbols, is within 10\% of the level $g$ ($\lambda=0.022$, 0.043, 0.090 and 0.191 for $10^{-3}$, $3\times10^{-3}$, $10^{-2}$, $3\times10^{-2}$; realized medians \e{8.8}{-4}, \e{2.96}{-3}, \e{9.49}{-3}, \e{3.01}{-2}). Synthetic CoAuthor panels have 17 writers with 20 sessions of 600 to 700 symbols and 26 further writers with five sessions used only in shared models; synthetic CS1 panels have 23 writers with six assignments (two sequences of 5,000 to 8,000 symbols each) and 8 further writers. The joint choice and all fits use the fixed base smoothing.
+
+\paragraph{Detection rule.} The threshold is the largest panel remainder over five negative controls ($g=0$); a replicate is detected if its remainder exceeds the threshold and at least 80\% of writers favour the per-person fit; a level is reliably detected if detected in at least eight of ten seeds. A level can fail on either part of the rule, which we did not separate. With five controls, a further control exceeds their maximum with probability about one in six.
+
+\begin{center}\small
+\begin{tabular}{rllllll}
+\toprule
+$k$ & $10^{-3}$ & $3\times10^{-3}$ & $10^{-2}$ & $3\times10^{-2}$ & False alarms & Threshold \\
+\midrule
+5 & 0.0 & 0.2 & 0.9 & 1.0 & 0 of 10 & \e{1.38}{-5} \\
+15 & 0.1 & 0.6 & 0.9 & 1.0 & 0 of 10 & \e{8.44}{-5} \\
+1 & 0.0 & 0.0 & 0.2 & 0.8 & 0 of 10 & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent CoAuthor, first null, ten seeds per level; detection rates. Ten seeds give wide intervals (0 of 10 is compatible with a rate up to about 0.3). The share of the planted difference returned in the remainder is 3 to 16\% at $k=5$ and 14 to 40\% at $k=15$ (not prespecified). Negative-control medians lie between \e{-6.4}{-5} and \e{9.9}{-5} ($k=5$) and between \e{-8.5}{-5} and \e{2.8}{-4} ($k=15$). The rule applied to the real panel would return a detection at $k=5$ and 15, but this null's prior mode does not beat its shared model (prior mode minus shared \e{-1.3}{-5} to \e{-3.7}{-4} in every synthetic cell, against \e{+7.4}{-4} in the real panel), so its threshold is not used to read the real panel.
+
+\paragraph{CS1 (first null).} Five negative controls and two seeds per planted level; every level from $10^{-3}$ was detected in both seeds (threshold \e{5.7}{-5}). Synthetic CS1 writers were given finite $\tau$ (mostly $10^6$ in the negative controls and at $10^{-3}$, smaller values at higher levels), whereas the real panel chose the shared model itself for every writer, so the synthetic CS1 values are not used to read the real panel.
+
+\paragraph{Further cases (first null).} A difference of $3\times10^{-2}$ planted in 5 of 17 writers was not detected in the panel median (panel remainders 0 and \e{1.56}{-4} at $k=5$, \e{1.22}{-4} and \e{3.25}{-4} at $k=15$; shares below 0.8). With a true structure outside the candidates (five states), two of three negative controls at $k=5$ and all three at $k=15$ exceeded the three-state threshold. The decomposition of the remainder into per-person minus prior mode and prior mode minus shared, applied to synthetic writers, did not separate a planted difference from none: negative controls already gave the pattern expected of a planted difference.
+
+\paragraph{Second null} (post hoc). The generator is the real CoAuthor shared \arthree{}, fitted to the training units of all CoAuthor writers, with its base pseudo-counts multiplied by $\alpha$; only aggregate parameters of the real data enter it. The multiplier was chosen as the one with a positive smoothing effect in all three calibration seeds closest on a log scale to the real \e{7.4}{-4}:
+\begin{center}\small
+\begin{tabular}{ll}
+\toprule
+$\alpha$ & Smoothing effect in three seeds \\
+\midrule
+1 & $-\infty$ in all three \\
+0.3 & $-\infty$ in all three \\
+0.1 & \e{1.80}{-3}, $-\infty$, \e{1.72}{-3} \\
+0.03 & \e{1.76}{-3}, \e{1.83}{-3}, \e{1.54}{-3} (chosen) \\
+\bottomrule
+\end{tabular}
+\end{center}
+Its smoothing effect, \e{1.8}{-3}, is about 2.4 times the real one. Mixing, seeds, the 55 replicates and the detection rule are as in the first null, with $\lambda$ recalibrated for this generator.
+\begin{center}\small
+\begin{tabular}{rllllll}
+\toprule
+$k$ & $10^{-3}$ & $3\times10^{-3}$ & $10^{-2}$ & $3\times10^{-2}$ & False alarms & Threshold \\
+\midrule
+5 & 0 & 0 & 0 & 0.2 & 0 of 10 & \e{1.82}{-3} \\
+15 & 0 & 0 & 0.2 & 0.3 & 0 of 10 & \e{1.83}{-3} \\
+\bottomrule
+\end{tabular}
+\end{center}
+All fifteen negative controls left \e{1.12}{-3} to \e{1.83}{-3}, every writer favouring the per-person fit; the threshold relative to the smoothing effect is about 1.0. The real panel (\e{5.53}{-4} and \e{4.14}{-4}) is not detected. Synthetic writers given $\tau=10^6$: 873 of 935 at $k=5$ and 783 of 935 at $k=15$, pooled over planted levels and negative controls (not prespecified); in the real panel $\tau=10^6$ for all 17 writers at $k=5$ and $3\times10^5$ for 16 at $k=15$. With $3\times10^{-2}$ planted, the lowest seed at $k=5$ left \e{-9.8}{-4}, below every negative control. Relative to the smoothing effect, the remainder is about 0.6 to 1.0 in the negative controls and 0.75, 0.97 and 0.56 in the real panel at $k=5$, 12 and 15 (ratios of medians; not prespecified); the ratio was not examined with planted differences.
+
+% ---------------------------------------------------------------------------
+\Ssec{11}{Results by structure, panel and \texorpdfstring{$k$}{k}}
+
+Per-person minus same-structure shared / per-person minus own chain, with $\tau$ chosen on other writers. Shares are given in brackets where they are not 1.00 for a positive median or 0.00 for a negative one. HMM-3 is the \hmmthree{} and AR-1 to AR-3 the \arone{} to \arthree{}; ``Joint'' is the joint choice (``='' where it equals AR-3); ``AR-3, $\tau=0$'' is the \arthree{} fitted to the writer's data alone (minus own chain / minus shared).
+
+\begin{table}[htbp]
+\centering\scriptsize\setlength{\tabcolsep}{2.8pt}
+\caption{CoAuthor 15-session panel (17 writers).}
+\begin{tabular}{rllllll}
+\toprule
+$k$ & HMM-3 & AR-1 & AR-2 & AR-3 & Joint & AR-3, $\tau=0$ \\
+\midrule
+1 & 0.012 (0.59) / $-0.479$ & \e{2.0}{-4} / 0.205 & \e{3.8}{-4} / 0.213 & \e{4.8}{-4} / 0.220 & = & $-0.004$ / $-0.224$ \\
+2 & 0.066 (0.76) / $-0.542$ & \e{2.2}{-4} / 0.140 & \e{3.9}{-4} / 0.150 & \e{5.0}{-4} / 0.157 & = & $-0.002$ / $-0.159$ \\
+3 & 0.140 (0.94) / $-0.510$ & \e{2.3}{-4} / 0.082 & \e{4.0}{-4} / 0.090 & \e{5.0}{-4} / 0.090 & = & $-0.002$ / $-0.091$ \\
+5 & 0.188 (0.88) / $-0.518$ & \e{3.0}{-4} / 0.043 & \e{4.8}{-4} / 0.057 & \e{5.5}{-4} / 0.059 & = & $-0.001$ / $-0.059$ \\
+8 & 0.168 (0.94) / $-0.509$ & \e{3.8}{-4} (0.94) / 0.019 (0.94) & \e{5.5}{-4} / 0.030 & \e{6.0}{-4} / 0.038 & = & \e{-8.9}{-4} / $-0.038$ \\
+12 & 0.144 (0.94) / $-0.522$ & \e{8.8}{-4} (0.82) / 0.012 (0.88) & \e{6.9}{-4} / 0.021 & \e{7.2}{-4} / 0.027 & = & \e{-4.4}{-4} / $-0.027$ \\
+15 & 0.165 / $-0.522$ & 0.002 (0.82) / 0.007 (0.76) & \e{7.4}{-4} / 0.015 (0.94) & \e{7.6}{-4} / 0.020 & \e{4.1}{-4} (0.94) / 0.020 & \e{-2.9}{-4} / $-0.020$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering\scriptsize\setlength{\tabcolsep}{1.5pt}
+\caption{CoAuthor 30-session panel (9 writers).}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{rllllll}
+\toprule
+$k$ & HMM-3 & AR-1 & AR-2 & AR-3 & Joint & AR-3, $\tau=0$ \\
+\midrule
+1 & 0.012 (0.67) / $-0.560$ & \e{2.3}{-4} / 0.184 & \e{4.7}{-4} / 0.187 & \e{5.4}{-4} / 0.189 & = & $-0.004$ / $-0.193$ \\
+2 & 0.042 (0.56) / $-0.593$ & \e{2.9}{-4} / 0.133 & \e{4.9}{-4} / 0.137 & \e{5.7}{-4} / 0.134 & = & $-0.002$ / $-0.136$ \\
+3 & 0.091 (0.89) / $-0.560$ & \e{3.1}{-4} / 0.082 & \e{5.3}{-4} / 0.090 & \e{6.0}{-4} / 0.087 & = & $-0.002$ / $-0.089$ \\
+5 & 0.130 (0.89) / $-0.570$ & \e{3.6}{-4} / 0.040 & \e{5.9}{-4} / 0.052 & \e{6.4}{-4} / 0.057 & = & $-0.001$ / $-0.058$ \\
+8 & 0.121 (0.89) / $-0.598$ & \e{4.0}{-4} (0.67) / 0.017 (0.89) & \e{6.8}{-4} / 0.029 & \e{7.1}{-4} / 0.036 & = & \e{-1.0}{-3} / $-0.036$ \\
+12 & 0.129 (0.89) / $-0.599$ & \e{8.8}{-4} (0.78) / 0.009 (0.89) & \e{7.2}{-4} / 0.018 & \e{7.5}{-4} / 0.024 & = & \e{-4.7}{-4} / $-0.023$ \\
+15 & 0.129 / $-0.605$ & 0.002 (0.78) / 0.007 (0.78) & \e{7.8}{-4} / 0.013 & \e{8.0}{-4} / 0.020 & \e{7.4}{-4} / 0.020 & \e{1.3}{-4} / $-0.016$ \\
+20 & 0.176 / $-0.577$ & 0.003 (0.89) / 0.004 (0.78) & 0.001 (0.78) / 0.010 (0.89) & \e{9.3}{-4} / 0.016 & \e{4.1}{-4} (0.78) / 0.016 & \e{-3.1}{-4} / $-0.012$ \\
+30 & 0.165 / $-0.613$ & 0.005 (0.89) / 0.001 (0.78) & 0.002 (0.78) / 0.006 (0.78) & 0.001 (0.89) / 0.013 & 0.001 (0.67) / 0.013 & 0.006 / $-0.008$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[htbp]
+\centering\scriptsize\setlength{\tabcolsep}{4pt}
+\caption{CS1 five-assignment panel (23 writers). The \artwo{}, \arthree{} and the joint choice choose the shared model itself ($\tau=\infty$) for every writer, so per-person minus shared is 0.}
+\begin{tabular}{rlllll}
+\toprule
+$k$ & HMM-3 & AR-1 & AR-2 & AR-3 = joint & AR-3, $\tau=0$ \\
+\midrule
+1 & 0.007 (0.61) / $-1.010$ (0.04) & 0 / 0.026 (0.96) & 0 / 0.044 & 0 / 0.050 & 0.004 / $-0.049$ \\
+2 & 0.002 (0.61) / $-1.050$ (0.04) & 0 / 0.009 (0.96) & 0 / 0.042 & 0 / 0.046 & 0.011 / $-0.040$ \\
+3 & 0 / $-1.045$ & 0 / 0.007 (0.70) & 0 / 0.025 & 0 / 0.033 & 0.011 / $-0.021$ \\
+5 & 0.028 (0.57) / $-1.096$ & \e{3.4}{-4} (0.52) / \e{6.9}{-4} (0.65) & 0 / 0.022 & 0 / 0.029 & 0.018 / $-0.007$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{All-writer panels.} CoAuthor (28 writers at $k=1$ to 9 at $k=30$): the \hmmthree{} gain is 0.048 to 0.176 and it loses to the own chain by $-0.46$ to $-0.61$; the joint choice selects the \arthree{} in every cell, with remainders \e{4.8}{-4} to \e{7.2}{-4} at $k\le12$, \e{4.1}{-4} (0.94) at $k=15$, \e{1.1}{-4} (0.58) at $k=20$ and 0.001 (0.67) at $k=30$, and beats the own chain at every $k$ (0.220 to 0.013). CS1 (25 writers at $k=1$, otherwise as the five-assignment panel): at $k=1$ the \hmmthree{} gives 0.007 (0.64) / $-1.029$, and the joint choice 0 / 0.052.
+
+\paragraph{The 10-state HMM} (second analysis; $\tau\le10^4$). Per-person minus shared / minus own chain: 15-session panel $-0.011$ (0.00) / 0.136 at $k=1$, \e{1.5}{-4} (0.53) / $-0.011$ (0.47) at $k=5$, 0.013 (0.82) / $-0.037$ (0.00) at $k=15$; 30-session panel 0.022 (1.00) / $-0.039$ (0.00) at $k=30$; CS1 $-0.010$ (0.22) / $-0.066$ (0.17) at $k=1$ and 0.002 (0.61) / $-0.112$ (0.00) at $k=5$. Its chosen $\tau$ was $10^4$, the top of that grid, in most cells.
+
+% ---------------------------------------------------------------------------
+\Ssec{12}{Structure compensation}
+
+\paragraph{Question and design.} Does the per-person \hmmthree{} gain arise because the \hmmthree{} cannot carry the dependence on the previous symbol and the per-person fit compensates for it? Part 1 shuffles the order of symbols within each sequence (training, held-out, shared and own chain alike), which removes first-order dependence and slow drift but keeps the number of parameters. Part 2 scores other writers' unshrunk per-person fits on the target writer. The check uses symbol sets of 10, 26 and 50 symbols (grids of $3\times3$, $5\times5$ and $7\times7$ plus the deletion-run symbol), the cells 15-session $k=5$ and 15 and 30-session $k=30$, and CS1 $k=5$ read separately. Quantities: $G$, per-person ($\tau$ chosen on others) minus shared, on the original ($o$) and shuffled ($p$) sequences; $\Delta D$, the drop in the own chain's advantage over the shared model after shuffling (a difference of medians); $S_0$, the median over other writers' unshrunk fits scored on the target minus shared; $G_{0r}$, the target's own unshrunk fit (random start) minus shared.
+
+\paragraph{Rule} (fixed before computation; 1/2 and 1/10 are wording cut points). Part 1 ``vanishes'' if in all three symbol sets $\Delta D>0$, $G_o>0$ and $G_p<G_o/2$, and ``does not follow'' if in any set $\Delta D>0$ and $G_p\ge G_o$. Part 2 ``others gain too'' if in all three $S_0>0$ and $S_0>G_0/10$, and ``specific to the writer'' if in all three $S_0\le0$ or $S_0\le G_0/10$. Shapes: A (vanishes, others gain too), A$'$ (vanishes, specific to the writer), B (does not follow), C (other).
+
+\begin{center}\small
+\begin{tabular}{llrrrrr}
+\toprule
+Cell & Symbols & $G_o$ & $G_p$ & $\Delta D$ & $S_0$ & $G_{0r}$ \\
+\midrule
+15-session, $k=5$ & 10 & 0.016 & 0.027 & 0.088 & $-0.092$ & 0.010 \\
+ & 26 & 0.188 & 0.060 & 0.782 & $-0.214$ & 0.188 \\
+ & 50 & 0.230 & 0.075 & 1.107 & $-0.350$ & 0.114 \\
+15-session, $k=15$ & 10 & 0.030 & 0.047 & 0.076 & $-0.103$ & 0.011 \\
+ & 26 & 0.165 & 0.075 & 0.755 & $-0.237$ & 0.114 \\
+ & 50 & 0.279 & 0.085 & 1.099 & $-0.350$ & 0.237 \\
+30-session, $k=30$ & 10 & 0.032 & 0.046 & 0.102 & $-0.077$ & 0.021 \\
+ & 26 & 0.165 & 0.077 & 0.811 & $-0.261$ & 0.081 \\
+ & 50 & 0.262 & 0.097 & 1.191 & $-0.410$ & 0.226 \\
+CS1, $k=5$ & 10 & 0.010 & 0.003 & 0.373 & $-0.375$ & $-0.224$ \\
+ & 26 & 0.028 & 0.023 & 1.103 & $-0.114$ & $-0.086$ \\
+ & 50 & 0.022 & 0.002 & 1.525 & $-0.201$ & $-0.198$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Result.} All three CoAuthor cells have shape B, and Part 2 is ``specific to the writer'' in all three ($S_0$ favours the per-person fit for no writer). Described after seeing results: ``does not follow'' comes only from the 10-symbol sets; with 26 and 50 symbols $G_p/G_o$ is 0.30 to 0.46 and $G_p$ stays positive (0.060 to 0.097). CS1 has shape C ($G_{0r}<0$, so Part 2 is uninformative). The check is not used to explain the main result: it neither confirms nor refutes compensation, does not apportion the remaining $G_p$ between first-order dependence and slow drift, and $S_0$ rests on random-start unshrunk fits that lost on the training objective for most writers.
+
+% ---------------------------------------------------------------------------
+\Ssec{13}{Other symbolizations and pseudo-residuals}
+
+\paragraph{Variants.} $u$ (unsmoothed) uses the composite values without exponential smoothing; $n$ (non-overlapping) keeps one symbol per 30\,s window, which gives about one-thirtieth of the symbols (median held-out symbols 107 against 3,296 in CoAuthor, 353 against 10,635 in CS1). Both remove the smoothing and $n$ also the window overlap, but the seconds since the last key press still carry memory across windows. Only the direction of $n$ is read, as its parameter counts are unchanged while its data are far fewer.
+
+\paragraph{Differences.} Per-person \hmmthree{} minus shared \hmmthree{} ($G$), per-person \hmmthree{} minus own chain ($C_a$) and joint choice minus own chain ($C_b$), with shares:
+\begin{center}\small
+\begin{tabular}{llrrr}
+\toprule
+Cell & Symbols & $G$ & $C_a$ & $C_b$ \\
+\midrule
+15-session, $k=5$ & original & 0.188 (0.88) & $-0.518$ (0.00) & 0.059 (1.00) \\
+ & $u$ & 0.140 (0.88) & $-0.558$ (0.00) & 0.049 (0.94) \\
+ & $n$ & 0.043 (0.59) & 0.298 (1.00) & 0.351 (1.00) \\
+15-session, $k=15$ & original & 0.165 (1.00) & $-0.522$ (0.00) & 0.020 (1.00) \\
+ & $u$ & 0.155 (1.00) & $-0.566$ (0.00) & 0.012 (0.82) \\
+ & $n$ & 0.096 (1.00) & 0.140 (1.00) & 0.140 (1.00) \\
+CS1, $k=5$ & original & 0.028 (0.57) & $-1.096$ (0.00) & 0.029 (1.00) \\
+ & $u$ & 0.010 (0.61) & $-0.924$ (0.00) & 0.026 (1.00) \\
+ & $n$ & $-0.003$ (0.48) & $-0.353$ (0.09) & 0.165 (1.00) \\
+\bottomrule
+\end{tabular}
+\end{center}
+With $n$ the joint choice picks the \hmmthree{} for every writer in CoAuthor at $k=5$ and 15 (and the \arthree{} in CS1); with $u$ it picks mostly the \arthree{} (16 and 13 of 17 at $k=5$ and 15, otherwise the \artwo{}). The joint-choice remainder with $u$ is \e{5.8}{-4} (1.00) and \e{8.0}{-4} (0.94) at $k=5$ and 15, and \e{2.6}{-5} (0.61) in CS1 at $k=5$ with $\tau=10^6$. The $n$ results were not checked against synthetic writers.
+
+\paragraph{Pseudo-residuals.} For every held-out symbol, the one-step predictive distribution over the 26 symbols is collapsed onto the two ordered grid axes ($x$ and $y$ bands; the deletion-run symbol excluded and its probability removed), and a randomized quantile residual is computed for each axis \citep{Dunn1996}, with common random numbers across models. Lag-1 autocorrelations (median over writers; $x$ / $y$ axis):
+\begin{center}\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrr}
+\toprule
+Symbols & Cell & Shared \hmmthree{} & Shared \arthree{} & Own chain \\
+\midrule
+original & 15-session, $k=5$, 15 & 0.226 / 0.493 & $-0.012$ / $-0.011$ & $-0.001$ to $-0.005$ / 0.001 to 0.020 \\
+original & CS1, $k=5$ & 0.644 / 0.528 & $-0.007$ / $-0.005$ & $-0.001$ / $-0.003$ \\
+$u$ & 15-session, $k=5$, 15 & 0.315 / 0.525 & $-0.015$ / $-0.014$ & $-0.013$ to $-0.002$ / $-0.015$ to 0.007 \\
+$u$ & CS1, $k=5$ & 0.548 / 0.634 & $-0.005$ / $-0.004$ & $-0.008$ / $-0.007$ \\
+$n$ & 15-session, $k=5$, 15 & 0.037 / 0.012 & --- & $-0.117$ to $-0.106$ / 0.004 to 0.007 \\
+$n$ & CS1, $k=5$ & 0.319 / 0.311 & $-0.013$ / $-0.033$ & $-0.007$ / $-0.024$ \\
+\bottomrule
+\end{tabular}}
+\end{center}
+The per-person \hmmthree{} is similar to the shared one (0.24 to 0.63). Over lags 1 to 10, $|r|$ stays at or below 0.017 for the shared \arthree{} and the joint choice and at or below 0.029 for the own chain, whereas the shared \hmmthree{} still has 0.11 to 0.52 at lag 10.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

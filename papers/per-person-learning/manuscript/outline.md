@@ -123,3 +123,7 @@ The body no longer carries the following; the supplement sections must hold them
 - S15: second null: the threshold relative to the smoothing effect is about 1.0; over 80% of synthetic writers given tau = 10^6 at k = 5 and 15; with a planted difference of 3e-2 the lowest seed at k = 5 left -9.8e-4, below every negative control; the ratio was not examined with planted differences.
 - S16: symmetric refit: chosen tau for every k; the prior mode at alpha = 0.03 gives zero probability to some held-out symbols of two writers (counted as losses); the swap control's secondary comparison with the same S-bar (4.68e-3 and 2.52e-2) and the share of the 272 pairs in which the swap beat the writer's own fit (0.015 and 0.011).
 - Body after the round 7 computations: 8,049 words (sections intro to conclusion) trimmed to 7,231 before round 8.
+
+## Supplement written (Online Resource S1 to S13)
+
+The supplement is `supplement.tex` (one PDF, sections S1 to S13), numbered in the order of first mention in the body. Old numbers used in the notes above map to the new ones as follows: S1→S1, S4→S2, S2→S3, S3→S4, S8→S5, S9→S6, S7→S7, S12→S8, S16→S9, S15→S10, S5→S11, S14→S12, S13→S13 (old S6, S10 and S11 were never used in the body; the proxy-label results are not part of the supplement, and the verification record is summarized in S8). The body was trimmed from 8,059 to about 6,900 words by moving detail into S2 to S13; each moved sentence is kept in the supplement.
