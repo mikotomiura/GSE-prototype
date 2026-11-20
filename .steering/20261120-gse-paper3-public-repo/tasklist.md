@@ -1,0 +1,11 @@
+# タスクリスト
+- [x] 引き継ぎ・棚卸し・手本の読み込み
+- [x] 判断 1（原文のまま）・判断 2（範囲は出す）を研究者に聞く
+- [x] assemble.sh を書き、~/per-person-keystroke-models に組む（842 ファイル）
+- [x] tools（check_release・control・check_pins・control_check_pins・verify・readme_media）
+- [x] README（英・日）・図（ロゴ・結果・流れ・GIF、日英）・LICENSE・CITATION.cff・.zenodo.json・paper/BUILD.md・build.sh
+- [x] docs/conditions-summary.md（サブエージェントが書き、別のサブエージェントが原文と照合 → 15 件を直した）
+- [x] verify.sh が 0（4 回目・0a7dcad・陽性対照 70 件・私用の一覧 532 ID で 0 件）
+- [x] レビュー（security-checker・/cross-review）と対応（判断 5）
+- [x] 中身の一覧を研究者に見せ、公開の承認を取る（今公開する・推奨）
+- [x] GitHub の public 化・Zenodo の publish・照合（判断 7）
