@@ -293,20 +293,20 @@ def steps():
 
 # ---------------------------------------------------------------- 価値: 2 つの読める度合い
 def quadrant():
-    """横 = 自分のものと分かる・縦 = 状態として読める。手跡は右下を狙う"""
+    """横 = 自分のものと分かる・縦 = 系の判断が読める（許した行為の量を超えて）。手跡は右下を狙う"""
     sk = Sk(1500, 720, 307)
     ox, oy, w, h = 230, 640, 1180, 580
     sk.arrow(ox, oy, ox + w, oy, INK, 3, 16)
     sk.arrow(ox, oy, ox, oy - h, INK, 3, 16)
     sk.text(ox + w / 2, oy + 45, "自分の手のものと分かる →", 24, INK, "mm")
-    sk.text(ox - 25, oy - h + 10, "状態として", 22, INK, "rm")
+    sk.text(ox - 25, oy - h + 10, "系の判断が", 22, INK, "rm")
     sk.text(ox - 25, oy - h + 42, "読める ↑", 22, INK, "rm")
     mx, my = ox + w / 2, oy - h / 2
     sk.line(mx, oy - 10, mx, oy - h + 20, GRAY, 2, passes=1)
     sk.line(ox + 10, my, ox + w - 20, my, GRAY, 2, passes=1)
     cells = [
-        (ox + 30, oy - h + 40, "系の状態の表示", ["天気の比喩で状態を映す（WeatherTank）", "誰の手かは問わない"], GRAY),
-        (mx + 30, oy - h + 40, "自己追跡のグラフ・data double", ["自分のものと分かり、状態も読める", "判断を運ぶと「外の人の意見」（Ruckenstein 2014）"], INDIGO),
+        (ox + 30, oy - h + 40, "状態を映す周辺表示", ["天気の比喩で情報を映す（WeatherTank）", "誰の手かは問わない"], GRAY),
+        (mx + 30, oy - h + 40, "自己追跡のグラフ・data double", ["自分のものと分かり、状態も読める", "系の判断の色に「外の人の意見」を期待（Ruckenstein 2014）"], INDIGO),
         (ox + 30, my + 30, "装飾の壁紙・生成の作品", ["どちらも読めない"], GRAY),
     ]
     for x, y, t, lines, c in cells:
@@ -334,7 +334,7 @@ def reverse():
              "溜めない・8 秒で消える・育たない"),
             ("状態の周辺表示・data double", "状態や判断を映す", "WeatherTank ・ Ruckenstein 2014",
              "行為だけを映す・判断を運ばない"),
-            ("判断を返さない表現", "解釈を開く。読めるかは測っていない", "Affective Diary ・ Boehner 2005",
+            ("判断を返さない表現", "解釈を開く。読めるかの検査は見つからない", "Affective Diary ・ Boehner 2005",
              "読めるかを、漏れの検査で測る")]
     for i, (t, d, src, ours) in enumerate(rows):
         y = 70 + i * 150
