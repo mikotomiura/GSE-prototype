@@ -6,4 +6,4 @@
 - [x] 3 票の検証・カード・references・_index
 - [ ] check_citations 違反なし・コミット・push
 - [ ] /cross-review 2 巡
-- [ ] 設計案とデッキへの還元
+- [x] 設計案とデッキへの還元（§1.2 の 4 行目・§8・デッキの対応表）
