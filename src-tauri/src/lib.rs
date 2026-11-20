@@ -55,11 +55,16 @@ pub mod s1_driver;
 pub mod handmark_driver;
 // ポインタのスレッドの純粋な部分（OS API を呼ばない・cfg なし）。
 pub mod handmark_pointer_thread;
-// 手跡の背景の窓(macOS だけ・ADR-051)。駆動役の出来事だけが開け閉めする。
-#[cfg(target_os = "macos")]
+// 手跡の背景の窓(macOS と Windows・ADR-051)。駆動役の出来事だけが開け閉めする。
+#[cfg(any(target_os = "macos", windows))]
 pub mod handmark_stage;
-// 手跡の下の縁の帯の窓(macOS だけ・ADR-051)。背景の窓と一緒に開け閉めする(帯は従)。
-#[cfg(target_os = "macos")]
+// 背景の窓をデスクトップのすぐ上に保ち、アイコンを写すための純関数(OS 非依存・cfg なし・判断 9・10)。
+pub mod handmark_desktop;
+// その Windows の部分(並びの番・アイコンの写し)。
+#[cfg(windows)]
+pub mod handmark_desktop_windows;
+// 手跡の下の縁の帯の窓(macOS と Windows・ADR-051)。背景の窓と一緒に開け閉めする(帯は従)。
+#[cfg(any(target_os = "macos", windows))]
 pub mod handmark_edge_strip;
 pub mod handmark_store;
 // 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
@@ -2312,7 +2317,7 @@ fn show_s1_overlay(app: &tauri::AppHandle) {
 }
 
 // ===========================================================================
-// 手跡（段 1 の後期・ADR-051・1b）の配線。★ 段 1 のモードかつ macOS のときだけ駆動スレッドを起こす。
+// 手跡（段 1 の後期・ADR-051・1b）の配線。★ 段 1 のモードかつ macOS か Windows のときだけ駆動スレッドを起こす。
 //   純粋な部分は `handmark_driver`（出来事 `Effect` を返す）。ここは出来事を行・窓・トレイに変えるだけ。
 //   ロックの順: `LogState` のロックは `log_tx` を複製する間だけ取り、放してから `HANDMARK_DRIVER` を取る
 //   （`handmark_log_tx`）。ふだんは `HANDMARK_DRIVER` を持っている間は `LogState` を取らない（出来事の実行は
@@ -2331,7 +2336,7 @@ static HANDMARK_PRESS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
 
 /// ポインタのスレッドへの門(駆動役が `Effect::PointerGate` で書く)。ビット 0 = 窓が開いている・
 /// 1 = カーソルが入っている・2 = クリックが入っている。0 = 閉じている。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 static HANDMARK_POINTER_GATE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// 手跡の駆動役へ打鍵の時刻を送る(口が無ければ何もしない・満杯なら捨てる)。
@@ -2353,7 +2358,7 @@ fn run_handmark_effects(
     fx: Vec<crate::handmark_driver::Effect>,
 ) {
     use crate::handmark_driver::Effect;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = app;
     for e in fx {
         match e {
@@ -2362,23 +2367,23 @@ fn run_handmark_effects(
                     tracing::warn!("handmark: day row not sent: {}", log_send_error(err));
                 }
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             Effect::OpenWindow { .. } => {
                 crate::handmark_stage::open(app);
                 // 帯は従: 出せなくても背景は閉じない(帯の側が理由を 1 行残す)。
                 crate::handmark_edge_strip::open(app);
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             Effect::CloseWindow => {
                 crate::handmark_stage::close(app);
                 crate::handmark_edge_strip::close(app);
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             Effect::State(s) => {
                 crate::handmark_stage::emit_state(app, &s);
                 crate::handmark_edge_strip::emit_state(app, &s);
             }
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", windows)))]
             Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
             // ポインタのスレッドへの入れ切り(Atomic に書くだけ)と、トレイの「カーソル」「クリック」の項目の状態。
@@ -2387,7 +2392,7 @@ fn run_handmark_effects(
                 cursor,
                 click,
             } => {
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 HANDMARK_POINTER_GATE.store(
                     u8::from(open) | (u8::from(cursor) << 1) | (u8::from(click) << 2),
                     std::sync::atomic::Ordering::Release,
@@ -2538,9 +2543,9 @@ fn handmark_finish_before_end(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>)
     run_handmark_effects(app, log_tx, fx);
 }
 
-/// 窓の層の様子。★ 呼ぶのは macOS の駆動スレッドだけ（macOS 以外は窓も駆動役も無い。
+/// 窓の層の様子。★ 呼ぶのは macOS と Windows の駆動スレッドだけ（他の OS は窓も駆動役も無い。
 /// `cfg` を付けないと Windows の clippy が未使用で赤になる・2026-11-08 の CI で実測）。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
     crate::handmark_stage::status()
 }
@@ -2548,7 +2553,7 @@ fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
 /// 駆動役を捨てる(駆動スレッドがパニックで抜けたときに、その後のトレイの押下が古い駆動役で門を
 /// 開け直さないように)。ロックが毒を受けていても取れる。★ 終了の処理中は残す(`handmark_finish_before_end`
 /// が最後の行を書くのに駆動役が要る)。
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_os = "macos", windows, test))]
 fn handmark_clear_driver() {
     if is_shutting_down() {
         return;
@@ -2557,12 +2562,12 @@ fn handmark_clear_driver() {
 }
 
 /// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠し、駆動役を捨てる。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 struct HandmarkWindowGuard {
     app: tauri::AppHandle,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl Drop for HandmarkWindowGuard {
     fn drop(&mut self) {
         // ★ 駆動役を捨てるのが最初(以後のトレイの押下は `handmark_lock()` が `None` を返して何もしない)。
@@ -2578,10 +2583,10 @@ impl Drop for HandmarkWindowGuard {
     }
 }
 
-/// 手跡のポインタのスレッド。★ 段 1 かつ macOS のときだけ起こす。`HANDMARK_DRIVER` のロックを取らず、
+/// 手跡のポインタのスレッド。★ 段 1 かつ macOS か Windows のときだけ起こす。`HANDMARK_DRIVER` のロックを取らず、
 /// 門の Atomic・一時停止・主画面の大きさだけを読む。読んだ値・座標・場は窓以外へ出さない
 /// (ログ・エラー文にも入れない・ADR-050 D2)。時計は起動からの単調な ms（駆動役の壁時計とは別）。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn spawn_handmark_pointer(app: tauri::AppHandle) {
     let spawned = thread::Builder::new()
         .name("gse-handmark-pointer".to_string())
@@ -2596,11 +2601,12 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
                 || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
                 || {
                     let (w, h) = crate::handmark_stage::screen_size_pt();
-                    crate::input::handmark_pointer::to_point(
-                        crate::input::handmark_pointer_macos::read(),
-                        w,
-                        h,
-                    )
+                    #[cfg(target_os = "macos")]
+                    let sample = Some(crate::input::handmark_pointer_macos::read());
+                    // Windows: 主画面の高さ（物理ピクセル）で y の向きを直す。読めなければ None。
+                    #[cfg(windows)]
+                    let sample = crate::input::handmark_pointer_windows::read(h);
+                    sample.and_then(|s| crate::input::handmark_pointer::to_point(s, w, h))
                 },
                 |s, now| crate::handmark_stage::emit_trace(&app, s, now),
                 |r, now| crate::handmark_stage::emit_ripple(&app, r, now),
@@ -2616,8 +2622,8 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
     }
 }
 
-/// 手跡の駆動スレッド(250 ms ごと)。★ 段 1 かつ macOS のときだけ起こす。
-#[cfg(target_os = "macos")]
+/// 手跡の駆動スレッド(250 ms ごと)。★ 段 1 かつ macOS か Windows のときだけ起こす。
+#[cfg(any(target_os = "macos", windows))]
 fn spawn_handmark_driver(
     app: tauri::AppHandle,
     log_tx: Sender<LogEntry>,
@@ -7201,15 +7207,15 @@ pub fn run() {
                 let _ = S1_PRESS_TX.set(press_tx);
                 let _ = S1_FOCUS_TX.set(focus_tx);
                 spawn_s1_driver(app.handle().clone(), log_tx_s1, press_rx, focus_rx);
-                // 手跡(ADR-051): 段 1 の後期の背景。macOS だけ(窓が無い OS では行も書かない)。
-                #[cfg(target_os = "macos")]
+                // 手跡(ADR-051): 段 1 の後期の背景。macOS と Windows(窓が無い OS では行も書かない)。
+                #[cfg(any(target_os = "macos", windows))]
                 {
                     let (hm_tx, hm_rx) = crossbeam_channel::bounded::<u64>(4096);
                     let _ = HANDMARK_PRESS_TX.set(hm_tx);
                     spawn_handmark_driver(app.handle().clone(), log_tx_handmark, hm_rx);
                     spawn_handmark_pointer(app.handle().clone());
                 }
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(not(any(target_os = "macos", windows)))]
                 let _ = log_tx_handmark;
             }
 
@@ -7339,8 +7345,8 @@ pub fn run() {
             //   ★ O1 は `start_session` を押さないので、今は overlay が一度も `show()` されない。
             show_s1_overlay(app.handle());
 
-            // 手跡: 背景の窓を隠したまま先に作る(setup のメインスレッド・段 1 かつ macOS のときだけ)。
-            #[cfg(target_os = "macos")]
+            // 手跡: 背景の窓を隠したまま先に作る(setup のメインスレッド・段 1 かつ macOS か Windows のときだけ)。
+            #[cfg(any(target_os = "macos", windows))]
             if crate::s1::is_s1() {
                 crate::handmark_stage::setup(app);
                 crate::handmark_edge_strip::setup(app);

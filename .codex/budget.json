@@ -36,10 +36,11 @@
   "_comment_merge_2026_10_13_public_matching": "2026-10-13: docs/public-keystroke-matching-freeze に origin/main を merge した際、today と history の 10-12 が衝突した。共通の起点（c97f4fb0）は 10-12 の 309776 / 8 回。10-12 は本ブランチで増えていないので origin/main の 517454 / 15 回を採った。10-13 は和: 本ブランチ 67500 / 2 回（本計算のコードの直しの Codex レビュー 2 巡）＋ origin/main 214879 / 7 回 = 282379 / 9 回。",
   "_comment_merge_2026_10_12_public_matching": "2026-10-12: docs/public-keystroke-matching-prereg に origin/main を merge した際、today が衝突した。共通の起点の today は 10-12 の 99497 / 2 回。和を採った: 起点 99497 / 2 ＋ 本ブランチ +101499 / +2（合成の記録の検査の /cross-review 2 巡の Codex） ＋ origin/main +108780 / +4 = 309776 / 8 回。",
   "_comment_merge_2026_10_14_rhythm_stage": "2026-10-14: docs/rhythm-stage-graded-world に origin/main を merge した際、台帳が衝突した。共通の起点（60eb1021）の today は 10-13 の 214879 / 7 回。10-13 は和を採った: 起点 214879 / 7 ＋ 本ブランチ +91960 / +3（背景のステージの第 2 回の /cross-review の Codex） ＋ origin/main +229964 / +4 = 536803 / 14 回を history に入れた。today は本ブランチの 10-14 の 251688 / 8 回（origin/main に 10-14 の記帳は無い）。",
+  "_comment_merge_2026_11_19_handmark_windows": "2026-11-19: feature/handmark-windows に origin/main（PR #429 の merge 後）を取り込んだ際、台帳の today が衝突した。共通の起点（1aef2ad6）の today は 11-10 で、11-19 の記帳は両側とも起点の後に始まっている。和を採った: 本ブランチ 78271 / 2 回（手跡の /cross-review 2 巡の Codex） ＋ origin/main 96111 / 2 回（CI の優先度の /cross-review 2 巡の Codex） = 174382 / 4 回。",
   "today": {
     "date": "2026-11-20",
-    "tokens_used": 325444,
-    "invocations": 10
+    "tokens_used": 344163,
+    "invocations": 11
   },
   "history": [
     {
@@ -336,6 +337,11 @@
       "date": "2026-11-10",
       "tokens_used": 87394,
       "invocations": 3
+    },
+    {
+      "date": "2026-11-19",
+      "tokens_used": 174382,
+      "invocations": 4
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。 ★★★ 2026-09-21 訂正（研究者判断・blockers.md 起票 22）: ⚠️ **上の『実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)』は誤りである。** ★ 回転させるコードは scripts/run-codex-review.sh の `d['history'] = sorted(...)[-30:]` に在った。★ 2026-09-21 に実測: 日付が 09-20 → 09-21 へ変わった最初の記帳で、歴代最古の 2026-08-12 (25290 / 1 回) が実際に消えた。→ ★ 切り捨てを外し、消えた 1 件を実測値で戻した。★ history の件数上限は【置かない】と裁定した（研究者判断 2026-09-21）。⚠️ 本文は当時の記録として残してあるので、この訂正と併せて読むこと。",
@@ -373,5 +379,6 @@
   "_comment_merge_2026_11_10_coauthor_ml": "2026-11-10: exp/gse-coauthor-ml-improve に origin/main（PR #403 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
   "_comment_merge_2026_11_10_tau_extend": "2026-11-10: exp/gse-timeseries-tau-extend に origin/main（PR #404 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
   "_comment_merge_2026_11_10_tau_mode": "2026-11-10: exp/gse-tau-mode-candidate に origin/main（PR #405 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
-  "_comment_merge_2026_11_10_structure_deficit": "2026-11-10: exp/gse-structure-deficit-test に origin/main（PR #406 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。"
+  "_comment_merge_2026_11_10_structure_deficit": "2026-11-10: exp/gse-structure-deficit-test に origin/main（PR #406 の後）を merge した際、台帳が衝突した。 日ごとに _comment_merge_2026_09_11 の規則どおり起点からの差分の和を採った（history は消していない）: 両側が足した日は無い。片側だけが足した日はその側の値を採った。daily_token_budget は変えていない。",
+  "_comment_merge_2026_11_21_handmark_stop_noticing": "2026-11-21: docs/handmark-stop-noticing-survey（S-EA → S-CX → 設計案 → S-SN を積んだ枝）に origin/main を取り込んだ際、台帳の today が衝突した。共通の起点（8a59fa1a）の today は 11-10 で、11-20 の記帳は両側とも起点の後に始まっている。和を採った: 本ブランチ 325444 / 10 回（S-CX・設計案・S-SN・ADR-056 の /cross-review の Codex） ＋ origin/main 18719 / 1 回 = 344163 / 11 回。history は origin/main のもの（11-19 を含む）を採った。"
 }
