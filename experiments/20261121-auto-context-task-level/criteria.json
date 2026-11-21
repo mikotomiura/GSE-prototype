@@ -1,5 +1,5 @@
 {
-  "status": "frozen 2026-11-21: 研究者が確定（decisions.md 判断 15）。実データを処理するより前のコミットに入れる。以後は値を変えない（変えるなら別の版として記録する）。主の判定は real の premise_*（作業の記録で区切った作業ごとに様式の連なりの出方が違うか・判断 11）。v2 の判定（stability・style_copy・diary・state_copy）と synthetic は記述（合成の陽性 4/6・判断 14）。作業の記録の Mac 以外の行は「（Mac の外）」1 つにまとめる（config.json の diary_label_rule）",
+  "status": "frozen 2026-11-21: 研究者が確定（decisions.md 判断 15）。実データを処理するより前のコミットに入れる。以後は値を変えない（変えるなら別の版として記録する）。主の判定は real の premise_*（作業の記録で区切った作業ごとに様式の連なりの出方が違うか・判断 11）。v2 の判定（stability・style_copy・diary・state_copy）と synthetic は記述（合成の陽性 4/6・判断 14）。作業の記録の Mac 以外の行は「（Mac の外）」1 つにまとめる（config.json の diary_label_rule）。v1.1（2026-11-22・実データの前・研究者が決定・判断 17）: 数値の閾値は変えず、作業の記録の当て方だけを決めた。行は次の行の始まりとその行の日の 24 時の早い方で終わる（config の diary_entry_end=day_end）。PC が「なし」（離席・休憩・食事）の行は照合に入れない",
   "synthetic": {
     "boundary_f1_min": 0.6,
     "ari_min": 0.5,

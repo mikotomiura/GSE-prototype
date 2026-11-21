@@ -171,6 +171,24 @@ def build(kind: str, seed: int) -> tuple[list[tuple[int, list[dict]]], dict]:
     return files, truth
 
 
+def with_midnight_rows(entries: list[dict]) -> list[dict]:
+    """日をまたぐ行の続きとして、00:00（Asia/Tokyo）に同じ作業の行を足す（作業の記録の規約・判断 17）。"""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Asia/Tokyo")
+    out: list[dict] = []
+    for i, e in enumerate(entries):
+        out.append(e)
+        nxt = entries[i + 1]["start_ms"] if i + 1 < len(entries) else None
+        day = datetime.fromtimestamp(e["start_ms"] / 1000, tz=tz).date()
+        while True:
+            mid = int(datetime.combine(day, datetime.min.time(), tzinfo=tz).timestamp() * 1000) + 86_400_000
+            if nxt is None or mid >= nxt:
+                break
+            out.append({**e, "start_ms": mid})
+            day = datetime.fromtimestamp(mid / 1000, tz=tz).date()
+    return out
+
+
 def diaries(truth: dict, rng: random.Random) -> dict[str, dict]:
     blocks = truth["blocks"]
     t_start, t_end = blocks[0]["start_ms"], blocks[-1]["end_ms"]
@@ -186,6 +204,7 @@ def diaries(truth: dict, rng: random.Random) -> dict[str, dict]:
         i += 1
     mid = (t_start + t_end) // 2
     few = [{"start_ms": t_start, "task": "task P", "pc": "Mac"}, {"start_ms": mid, "task": "task Q", "pc": "Mac"}]
+    match, mismatch, few = (with_midnight_rows(x) for x in (match, mismatch, few))
     commits = []
     for b in blocks:
         t = b["start_ms"] + rng.randint(5, 25) * 60_000

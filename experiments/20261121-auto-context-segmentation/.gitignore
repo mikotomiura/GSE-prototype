@@ -1,3 +1,4 @@
 work/
 results/*.features.json
 people*.json
+results/capabilities.json

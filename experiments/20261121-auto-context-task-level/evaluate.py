@@ -185,7 +185,10 @@ def diary_label(entry: dict, rule: str) -> str | None:
     - `mac_only`（記述・判断 16）: Mac 以外の行は照合に入れない（None）。「Mac にいるかどうか」だけで差が出る
       交絡を外して見るため。
     - `task`: 作業名のまま。
+    PC が「なし」（離席・休憩・食事）の行は、どの形でも照合に入れない（None・行の終わりの印としてだけ使う・判断 17）。
     """
+    if entry["pc"] == "なし":
+        return None
     if rule == "task":
         return entry["task"]
     if rule == "task_or_outside":

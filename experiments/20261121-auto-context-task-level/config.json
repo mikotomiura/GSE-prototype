@@ -12,7 +12,7 @@
   "v1_min_observed_frac": 0.5,
   "v1_pseudo": 0.5,
   "v1_min_run": 2,
-  "diary_entry_end": "next_entry",
+  "diary_entry_end": "day_end",
   "diary_pcs": {
     "Mac": [
       "mac",

@@ -114,6 +114,18 @@ class PerWindowTest(unittest.TestCase):
         self.assertEqual(lab, [None, "A", "A"])
         self.assertNotEqual(blk[1], blk[2])  # 日をまたいだら同じ名前でも別のブロック
 
+    def test_away_rows_are_excluded(self):
+        diary = {"entries": [
+            {"start_ms": ms("2026-11-22 09:00"), "task": "A", "pc": "Mac"},
+            {"start_ms": ms("2026-11-22 10:00"), "task": "昼食", "pc": "なし"},
+            {"start_ms": ms("2026-11-22 11:00"), "task": "A", "pc": "Mac"},
+        ], "end_ms": None}
+        for rule in ("task_or_outside", "mac_only", "task"):
+            lab, _, blk = ev.per_window_diary(self._at("2026-11-22 09:30", "2026-11-22 10:30", "2026-11-22 11:30"),
+                                              diary, rule, "day_end")
+            self.assertEqual(lab, ["A", None, "A"])
+            self.assertNotEqual(blk[0], blk[2])  # 離席を挟んだら別のブロック
+
     def test_after_last_day_is_none(self):
         lab, _, _ = ev.per_window_diary(self._at("2026-11-24 01:00", "2026-11-22 08:00"), self.diary,
                                         "task_or_outside")
