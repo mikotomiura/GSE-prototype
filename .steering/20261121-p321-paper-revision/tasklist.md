@@ -15,6 +15,9 @@
 - [x] S3: 補助解析を追加だけで足した（`c3e1133`・旧い値の不変は SHA-256 で検査・判断 16）／ K のライセンスは一次で CC BY 4.0（派生表の実装は S9 の前に）
 - [x] S4: 名前は U・A・A|R ＋内容名・概念は unaided resolution（判断 17・研究者の選択）→ 一括で置き換えた
 - [ ] S5: 本文を内側から（A・B・E・F・G・H・I・J・K・L・M・minor・nit。各行に直した箇所か直さない理由）／ `NOTES.md` の "other project" を消す
+  - [x] 前半: §4〜§8・結論（判断 18・`b80b2d8`〜`c84c86b`）
+  - [ ] 後半: 序論・§2（B の 0 件と検索の範囲・F の系統・L）／ §5.5 の LLM（E: モデルの版・日付・プロンプト・人が確かめた範囲・研究者に聞く）／ RQ4（G: 22 件の根拠・報告値どうしの算術・人の照合・照会）／ 要旨（−3.5 の符号・250 語）／ 声明を JSS の形に（CRediT・competing interest・生成 AI の節を文献表の直前）／ D1 と D2 の範囲を分ける（L256 の all/ce）／ 合わせ込みの的と検査の区別（L160）／ 再現一式の文言（config `_comment`・`analyze.py` の docstring・NOTES の "other project" と "drift" と L10）／ 引用を GSE の `docs/references.md` に登録（citation-ssot）
+  - [ ] K: 派生表 `results/d1_episodes.csv`（URL・名前・セッション ID なし）を実装する（§8 に約束を書いた）
 - [ ] S6: 題の案 2〜3 本 → 研究者 ／ 要旨 250 語・Highlights・キーワード
 - [ ] S7: 研究者の通読と手入れ（記録する）
 - [ ] S8: attack-me round 2 → 研究者が採否 ／ `/cross-review` 2 巡

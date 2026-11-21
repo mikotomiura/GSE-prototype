@@ -43,3 +43,12 @@
   - Thomas Price（NCSU・弱い）
   - 除外した例: Ko・Myers・Guo ほか（原著者の共著者）
 - 未確認: 本文・著者の全リスト・現在の所属・候補者と研究者本人の利害。
+
+## B の 2 回目（2026-11-21・Sonnet・入れ子なし・約 12 分）
+
+- 結果: **INSTANCE 0**。NEAR は弱いものが 1 件だけ（Marwan の博士論文。ヒントを 1 回も求めなかった学生について、独立したかったからかもしれないと書く。同じ文で「ボタンに気づかなかった」も挙げ、その学生のコードは基準に届いていない → 実例ではなく、むしろ警告側）。
+- 指定の 8 本: 5 本は本文を読んだ（Theory of Troubleshooting は arXiv 2602.10540・Taxonomy は CEUR・Activity Blueprint は HAL・Vibe Coding は arXiv 2512.22418・Video Game Debugging は arXiv 2510.08834）→ どれも NONE（ゲームの論文は参照を時間の 2.3% と書くだけ）。2 本は無料の版が無く読めなかった（Information Foraging Interpretation of Liveness・TSE 2025 の retrospective）。学習者の論文は見つからなかった。
+- 前向きの引用: 58 件中 36 件の無料の PDF を grep した。約 22 件は無料の PDF に届かなかった。
+- **WARNING（本論の主張を支える逐語）**: Marwan, Dombe, Price 2020 ITiCSE（10.1145/3341525.3387394・著者の PDF `isnap.csc.ncsu.edu/home/public/papers/MarwanITiCSE2020.pdf`）の抄録 "Students may avoid help when they need it, or abuse help to avoid putting in effort"、関連研究の節 "students who need help are the least likely to ask for it"（他の文献の引用）。arXiv 2609.21600v1 "those who need help the most are the ones who seek it the least"。
+- やり残し: OpenAlex の無料の上限に達した（429）ので、教育系の検索は Crossref と arXiv で代えた（ノイズが多い）。学位論文は Marwan のものだけ開いた。
+- ⚠️ 逐語は、使う前にメインが PDF で確かめる。
