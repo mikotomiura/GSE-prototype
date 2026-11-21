@@ -114,3 +114,13 @@
   - 時間で重みをつけると numerator effect 19.1pp。未解決で参照なしの episode の中央値は 290.5 秒、解決で参照なしは 108 秒。
   - D2 で研究期間の終わり（P4TA）を除くと table5 は 6.2pp・k=2、table+text は 0.0pp・k=1。P1TA を除いた table+text は 5.9pp。
 - **研究者に聞くこと**（S4 の前に）: B の 2 回目（やり残しの本文を開く・Google Scholar と教育系）を回すか。
+
+## 判断 17: S4 —— 名前は「内容名＋新しい記号」・概念の語は unaided resolution（2026-11-21・研究者の選択・私の推奨）
+- **決定**: unconsulted share U = (a+b)/N ／ unaided-resolution share A = a/N ／ unaided-resolution rate among resolved units A|R = a/S。差は unresolved-unconsulted share（U − A ＝ b/N）・conditioning difference（U − A|R）・denominator difference（A − A|R。分解にだけ使う）。"effect" は使わない。概念は "unaided resolution" に統一する（self-resolution・resolved without help の揺れを消す）。`metrics.json` のキー（R0・R0_prime・R1・numerator_effect など）は外部の契約なので変えない。
+- **理由**: R2 の指摘 3 点（4 つのセルに 6 つの名前・R0′ のプライムが R0 の変種に見える・effect が因果を連想させる）をすべて解く。記号が中身を表す（U = unconsulted、A = unaided）。
+- **却下案**: 内容名＋記号は今のまま（プライムの誤解が残る）／記号を主にして effect だけ替える。
+- **実施**（`revision-jss` の 2 つ目のコミット・未 push）: マクロ `\Rz`・`\Rzp`・`\Ro` の出力を U・A・A_{|R} に替えた。本文の語を使い捨てのスクリプトで一括で置き換え、残った 5 か所は手で直した。表の列見出しは記号の差にして、表の幅を保った。
+- **置き換えの途中で起きたこと**:
+  - "self-resolution" の一括置き換えで、Data availability の GitHub の URL（`self-resolution-measure`）まで書き換わった → 戻した。
+  - sed で表の見出しを直そうとしてバックスラッシュが落ち、`Rz{}` が文字のまま組まれた。ビルドは通ってしまう → Edit で直し、`[^\]R[zo]p?{}` を grep して 0 件を確かめた。
+- **残り**（S5）: "the effect"・"two effects" などの一般語の effect（約 10 か所）と、文の流れの手直し。題は S6。
