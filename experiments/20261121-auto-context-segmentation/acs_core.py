@@ -481,18 +481,36 @@ def segment_person(win: Windows, cfg: dict, seed: int, seams: np.ndarray | None 
     return Result(win, [FEATURE_NAMES[j] for j in keep], k, raw, smoothed, names, absorbed, bnd)
 
 
-def concat_windows(parts: list[Windows]) -> tuple[Windows, np.ndarray]:
-    """ファイルごとの窓をつなぐ。ファイルの継ぎ目には強制の境界が立つよう、継ぎ目の印を返す。"""
-    starts = np.concatenate([p.start_ms for p in parts]) if parts else np.zeros(0, dtype=np.int64)
-    ends = np.concatenate([p.end_ms for p in parts]) if parts else np.zeros(0, dtype=np.int64)
-    X = np.concatenate([p.X for p in parts]) if parts else np.zeros((0, len(FEATURE_NAMES)))
-    idle = np.concatenate([p.idle for p in parts]) if parts else np.zeros(0, dtype=bool)
+def concat_windows(parts: list[Windows]) -> tuple[Windows, np.ndarray, dict]:
+    """ファイルごとの窓を時刻の順につなぐ。戻り値は (窓, 継ぎ目の印, 重なりの数)。
+
+    O1 の記録では、次のファイルが始まった後も前のファイルに feat 行が書かれ続けることがあり、
+    グリッドの右端は feat 行まで伸びるので、ファイルの窓が時間で重なる（decisions.md 判断 17）。
+    時刻の順に並べ、前のファイルの窓のうち次のファイルの最初の窓より後ろにかかるものを落とす。
+    落とした窓の数と、そのうち操作のあった（無操作でない）窓の数を返す。
+    """
+    parts = sorted((p for p in parts if len(p.idle)), key=lambda p: int(p.start_ms[0]))
+    kept: list[Windows] = []
+    dropped = dropped_active = 0
+    for i, p in enumerate(parts):
+        if i + 1 < len(parts):
+            nxt = int(parts[i + 1].start_ms[0])
+            keep = p.end_ms <= nxt
+            dropped += int((~keep).sum())
+            dropped_active += int((~keep & ~p.idle).sum())
+            p = Windows(p.start_ms[keep], p.end_ms[keep], p.X[keep], p.idle[keep])
+        if len(p.idle):
+            kept.append(p)
+    starts = np.concatenate([p.start_ms for p in kept]) if kept else np.zeros(0, dtype=np.int64)
+    ends = np.concatenate([p.end_ms for p in kept]) if kept else np.zeros(0, dtype=np.int64)
+    X = np.concatenate([p.X for p in kept]) if kept else np.zeros((0, len(FEATURE_NAMES)))
+    idle = np.concatenate([p.idle for p in kept]) if kept else np.zeros(0, dtype=bool)
     seams = np.zeros(len(idle) + 1, dtype=bool)
     off = 0
-    for p in parts:
+    for p in kept:
         seams[off] = True
         off += len(p.idle)
     seams[len(idle)] = True
     if len(starts) > 1 and np.any(starts[1:] < ends[:-1]):
-        raise ValueError("windows overlap or are not in time order (files overlap, or are not sorted by time)")
-    return Windows(starts, ends, X, idle), seams
+        raise ValueError("windows still overlap after trimming (a file starts inside an earlier file's window)")
+    return Windows(starts, ends, X, idle), seams, {"dropped_windows": dropped, "dropped_active_windows": dropped_active}

@@ -257,7 +257,7 @@ def quantity_only_ari(win: core.Windows, res: core.Result, cfg: dict, seed: int,
 
 def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: dict) -> dict:
     seed = cfg["seed"]
-    parts, decl_all, state_all, act_all = [], [], [], []
+    parts = []
     for f in files:
         env = work / pid / (f.stem + ".features.json")
         run_features(f, env)
@@ -268,11 +268,17 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
             # （ディスクを守るため・共有しない中間成果物を残さないため）。
             env.unlink(missing_ok=True)
         side = read_side(f)
-        parts.append(w)
-        decl_all += per_window_decl(w, side["decl"])
-        state_all += per_window_state(w, side["feats"])
-        act_all += per_window_activity(w, side["labels"])
-    win, seams = core.concat_windows(parts)
+        parts.append((w, per_window_decl(w, side["decl"]), per_window_state(w, side["feats"]),
+                      per_window_activity(w, side["labels"])))
+    # 窓ごとの付帯情報は窓の開始時刻で引き直す（concat_windows が並べ替えと落としを行うため）。
+    side_by_start: dict[int, tuple] = {}
+    for w, d, st, ac in parts:
+        for i, s0 in enumerate(w.start_ms):
+            side_by_start[int(s0)] = (d[i], st[i], ac[i])
+    win, seams, overlap = core.concat_windows([w for w, *_ in parts])
+    decl_all = [side_by_start[int(s0)][0] for s0 in win.start_ms]
+    state_all = [side_by_start[int(s0)][1] for s0 in win.start_ms]
+    act_all = [side_by_start[int(s0)][2] for s0 in win.start_ms]
     res = core.segment_person(win, cfg, seed, seams)
     lab = res.labels
     active = lab != core.IDLE
@@ -351,6 +357,8 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
         "person": pid,
         "files": len(files),
         "windows": int(len(lab)),
+        "overlap_dropped_windows": overlap["dropped_windows"],
+        "overlap_dropped_active_windows": overlap["dropped_active_windows"],
         "active_windows": int(active.sum()),
         "k": res.gmm_k,
         "names": {res.names[v]: float(durations[lab == v].sum()) for v in sorted(set(lab.tolist()))},

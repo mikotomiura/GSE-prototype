@@ -100,13 +100,24 @@ class SeamTest(unittest.TestCase):
         f2 = core.forced_boundaries(win, 300)
         self.assertTrue(f2[2] and f2[4])
 
-    def test_concat_rejects_overlapping_files(self):
-        a = core.Windows(np.array([0]), np.array([180_000]), np.zeros((1, len(core.FEATURE_NAMES))),
-                         np.array([False]))
-        b = core.Windows(np.array([100_000]), np.array([280_000]), np.zeros((1, len(core.FEATURE_NAMES))),
-                         np.array([False]))
-        with self.assertRaises(ValueError):
-            core.concat_windows([a, b])
+    def test_concat_sorts_and_trims_the_tail_that_overlaps_the_next_file(self):
+        z = lambda n: np.zeros((n, len(core.FEATURE_NAMES)))  # noqa: E731
+        # 前のファイル: 0, 180, 360, 540 秒の窓（360 と 540 は無操作の尾）。次のファイルは 400 秒から。
+        a = core.Windows(np.array([0, 180, 360, 540]) * 1000, np.array([180, 360, 540, 720]) * 1000, z(4),
+                         np.array([False, False, True, True]))
+        b = core.Windows(np.array([400, 580]) * 1000, np.array([580, 760]) * 1000, z(2),
+                         np.array([False, False]))
+        win, seams, ov = core.concat_windows([b, a])  # 順を逆に渡しても時刻で並ぶ
+        self.assertEqual((win.start_ms // 1000).tolist(), [0, 180, 400, 580])
+        self.assertEqual(ov, {"dropped_windows": 2, "dropped_active_windows": 0})
+        self.assertTrue(seams[0] and seams[2] and seams[4])
+
+    def test_concat_counts_dropped_active_windows(self):
+        z = lambda n: np.zeros((n, len(core.FEATURE_NAMES)))  # noqa: E731
+        a = core.Windows(np.array([0, 180]) * 1000, np.array([180, 360]) * 1000, z(2), np.array([False, False]))
+        b = core.Windows(np.array([200]) * 1000, np.array([380]) * 1000, z(1), np.array([False]))
+        _, _, ov = core.concat_windows([a, b])
+        self.assertEqual(ov, {"dropped_windows": 1, "dropped_active_windows": 1})
 
 
 class BlockPermutationTest(unittest.TestCase):

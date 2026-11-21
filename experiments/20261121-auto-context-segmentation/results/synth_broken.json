@@ -1,0 +1,24 @@
+{
+  "file": "synth_negative.ndjson",
+  "k": 2,
+  "label_kinds_after_smoothing": 1,
+  "boundary_f1": 1.0,
+  "boundary_recall": 1.0,
+  "ari": 1.0,
+  "absorbed_runs": 2,
+  "kept_features": [
+    "focus_rate_per_min",
+    "pointer_frac",
+    "key_rate_per_min",
+    "log_pointer_key_ratio",
+    "alr_edit",
+    "alr_nav",
+    "alr_modifier",
+    "alr_other"
+  ],
+  "criteria": "positive",
+  "replay": [
+    "/Users/johnd/GSE-prototype/src-tauri/target/debug/gse-replay"
+  ],
+  "pass": false
+}

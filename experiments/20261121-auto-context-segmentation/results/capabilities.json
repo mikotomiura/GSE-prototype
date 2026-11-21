@@ -1,0 +1,1206 @@
+{
+  "files": [
+    {
+      "file_id": "b6c2c8f0",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "639e09b6",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "60898755",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8dc27e63",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "879521cc",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "22aeb9c7",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "bd559fed",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "53383e6a",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "628b3bfb",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0e02dbc9",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c58cca4b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5ab6711b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "70a0985d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c7bfc503",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f153326c",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f16b5245",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e27d256f",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "bcae3d30",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "62ad4ffa",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 1
+    },
+    {
+      "file_id": "fae194d9",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9992d63b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "271bb167",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "84893057",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "47abbf09",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "a5593f30",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5e3de04b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f1fcb0d2",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5cd100ad",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "ffa7ecde",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c23d1fa2",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1a292c75",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "a97278cd",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f363c5a8",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9b8819a5",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1f8bbb17",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9b3514e9",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7d3a5a1f",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1e8ecb92",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "972e9f49",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "49790050",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "79d244c8",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "dc09a882",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b25a80fd",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b2ba0785",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "21893f1b",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5fac0dd6",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "484bc739",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7d3633f7",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3d14940c",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b09a40d7",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "eb983380",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7d8e375d",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "84129ef7",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "4c18a5c2",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "ae9f347d",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1d18b20e",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3014bf8f",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "085985c8",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "630e7552",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1a329b4d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7b8a7b46",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "fc09c78b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "537c6b8c",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8861282b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "bb0299e2",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7c30dc4e",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c4c2b936",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0b43d309",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c4786419",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5a71e53c",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "de5e6385",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f29e4162",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f3cfe9b3",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0805e186",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "17c607a8",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "39073e98",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "591a8d8d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5f338b85",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b3e68cc9",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "866d59b1",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "596a02ef",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "aef3748d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "166e8427",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "2eea71af",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "d20e8cc3",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7230ce25",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "31284fbf",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c73d257f",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "19a40566",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0f58b7c2",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8fc64870",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "98fda35b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7560ab53",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "62160048",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f8d2efbc",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "45dad49b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1852bb01",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "a0177e74",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f2230127",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "017f2781",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "2b921254",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "fcbdb532",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "4a459662",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "137f8bbf",
+      "app_version": "0.1.31",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "d7fd59cd",
+      "app_version": "0.1.33",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f15611ee",
+      "app_version": "0.1.33",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e9cbb040",
+      "app_version": "0.1.33",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8fd6c30b",
+      "app_version": "0.1.34",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "27fa93d9",
+      "app_version": "0.1.34",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "ff2c9b48",
+      "app_version": "0.1.34",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b778685d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "2f03492a",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3a1ca48b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "99bf50dd",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1c3aebc0",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b119922f",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "43a35d00",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0cf84029",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b4782b53",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "34e91f3e",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7da5725b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8a8d2b18",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "27157de9",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c238a6ad",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "93369566",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "d3699301",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "714d7c66",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "df4b6297",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c2cb7d13",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1b58fc12",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "30edbdf1",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0dc323df",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "67ea4807",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "18b53333",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1759472b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "2cabb431",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "26ee00ab",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "29f55e3e",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "eb777cd9",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "24acead9",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "d3ae9c95",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "4f4aed1f",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "2939dda9",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8928cf34",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "6ffb8b7e",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8823c48a",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5291ae8c",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f90607fa",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e288a0d5",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "78cce7da",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "d4679693",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "18577d8d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "60668456",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "144033d6",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "075f9aea",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "b63c0bee",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f9eff838",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "6442084b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "245d4765",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7ad745d8",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "034d3b97",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "98f70381",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "710aa786",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "c423987f",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7778899b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "6c8185da",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "220ad96c",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "6f171c03",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "aaa20883",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "4247ece5",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e31036ff",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1b34251f",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "80a61da4",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "99283e90",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "107d8d65",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "da51a4c8",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "fafef90b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e4fd022b",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0c5bf7b0",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "4460eb8d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9cf67100",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "1b0dda3e",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e734fef6",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0966818a",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f23e365d",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "caa89657",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "6677f6e1",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "88c2b5ba",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "bad0b8ac",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e722a4f7",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "535b037c",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "11bf8854",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9f7a8ca5",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "7cb463cc",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5a950d83",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "853ea4b7",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "43a4dfd2",
+      "app_version": "0.1.40",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    }
+  ],
+  "verdicts": [
+    {
+      "line_type": "key",
+      "verdict": "PRESENT",
+      "rows": 1088655,
+      "declared_as": [
+        "unconditional"
+      ],
+      "note": "宣言: unconditional"
+    },
+    {
+      "line_type": "feat",
+      "verdict": "PRESENT",
+      "rows": 7219937,
+      "declared_as": [
+        "unconditional"
+      ],
+      "note": "宣言: unconditional"
+    }
+  ]
+}
