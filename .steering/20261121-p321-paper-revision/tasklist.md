@@ -3,37 +3,17 @@
 ## 0. 始める
 - [x] grill（判断 1〜10）・`/start-task`（worktree `C:/GSE-wt/p321-desk-reject`・ブランチ `docs/p321-emse-desk-reject`・attack-me round 1 の記録 `bddf51f6` を取り込んだ）
 - [x] 出し先の候補を一次で比べる → 研究者が選ぶ（判断 6）→ **JSS**（判断 11）
-- [ ] JSS の投稿ガイドの残り（Article structure・Highlights・LaTeX・Open Science）と、編集者の論考 arXiv 2601.19217 の「査読の依頼の上限」を一次で読む
-- [ ] design.md（順序・節の組み替え・出し先の書式）→ `/reimagine`（判断 10）→ 研究者の承認
+- [x] JSS の投稿ガイドの残り（LaTeX・Highlights・キーワード・要旨・生成 AI・データ・Open Science）と arXiv 2601.19217v2 の「依頼 20 件の上限」を一次で読んだ（design-v1.md §0）
+- [x] design.md（v1）→ `/reimagine`（v2 は独立の Opus）→ ハイブリッドを採用（`design-comparison.md`）
 
-## 1. 外に出る準備（返事を待つものを先に）
-- [ ] 原著者への照会の文面の下書き → 研究者が送る・日付を記録（判断 5）
-- [ ] D1 の元データのライセンスを一次で確かめる（判断 8）
-
-## 2. 調べる
-- [ ] 誤読の実例の検索の手順を決める → 検索 → 結果（判断 3）
-- [ ] クラスタが少ないときの区間の手法を文献で確かめる → 1 つ選ぶ（判断 9・`citation-ssot`）
-- [ ] 先行研究の系統を足す（指摘 F・挙げられた文献は一次で確かめてから）
-
-## 3. 直す（verdict §5 の順・論文用リポジトリ `C:/self-resolution-measure`）
-- [ ] major 1 A: 感度分析と区間・DF3 の位置と k（判断 2）
-- [ ] major 2 B（判断 3）
-- [ ] major 3 C: 用語 → 題の案 2〜3 本 → 研究者が選ぶ（判断 4）
-- [ ] major 4 G: 報告値の算術・22 件の根拠・journal 版の照合・照会
-- [ ] major 5 E: LLM の利用の記録
-- [ ] major 6 H（判断 9）
-- [ ] major 7 I
-- [ ] major 8 F
-- [ ] major 9 J
-- [ ] major 10 K（判断 8）
-- [ ] minor（§5 の列挙をすべて）と nit
-- [ ] 出し先の書式への組み替え
-- [ ] `bash run.sh`・`bash paper/build.sh` が exit 0
-
-## 4. 確かめる
-- [ ] attack-me round 2（判断 10）→ 研究者が採否を決める
-- [ ] `/cross-review`（Claude ＋ Codex・論文用リポジトリの差分）
-
-## 5. 出す
-- [ ] 新しいタグ・Zenodo の新しい版（再現一式）・Zenodo のプレプリントの下書き → 研究者が publish（判断 7）
-- [ ] 研究者が投稿 → 原稿 ID を記録
+## 1. 段（design.md §3 の S0〜S9）
+- [ ] S0: journal 版の本文で committed 10・fresh 79 を一次で確かめる → 照会の文面 → 研究者が送る・日付を記録（判断 5）
+- [ ] S1: 枠を elsarticle に移す（`body.tex` ＋ `main-jss.tex`・本文の差分 0・36 頁未満）／ 推薦の査読者の欄の有無 ／ Open Science Initiative への参加（研究者）
+- [ ] S2: B の検索の手順 → 検索 ／ H の手法（「役に立たない」も選べる）／ F（サブエージェント → 一次で裏取り）
+- [ ] S3: 補助解析（A・H・I・M・k・DF3 の位置）を追加だけで ／ 旧い値の不変 ／ K（figshare のライセンスを Chrome で）
+- [ ] S4: 名前の辞書 → 研究者が選ぶ → 一括で置き換え（C）
+- [ ] S5: 本文を内側から（A・B・E・F・G・H・I・J・K・L・M・minor・nit。各行に直した箇所か直さない理由）／ `NOTES.md` の "other project" を消す
+- [ ] S6: 題の案 2〜3 本 → 研究者 ／ 要旨 250 語・Highlights・キーワード
+- [ ] S7: 研究者の通読と手入れ（記録する）
+- [ ] S8: attack-me round 2 → 研究者が採否 ／ `/cross-review` 2 巡
+- [ ] S9: 照会の返事か未回答を反映 ／ 新しいタグ ／ Zenodo の新しい版とプレプリントの下書き → 研究者が publish と JSS への投稿 → 原稿 ID を記録
