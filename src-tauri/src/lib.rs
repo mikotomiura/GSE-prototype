@@ -2339,6 +2339,17 @@ static HANDMARK_PRESS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
 #[cfg(any(target_os = "macos", windows))]
 static HANDMARK_POINTER_GATE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
+/// 記録の一時停止の最後の遷移の時刻(`set_recording_paused` の `now`・`recording_pause` の行と同じ値)。0 は未設定。
+static HANDMARK_PAUSE_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// 駆動スレッドの刻みが一時停止の遷移を入れるときの時刻。コマンドの経路が置いた時刻があればそれ、無ければ `wall`。
+fn handmark_pause_at(wall: u64) -> u64 {
+    match HANDMARK_PAUSE_AT_MS.load(std::sync::atomic::Ordering::SeqCst) {
+        0 => wall,
+        t => t,
+    }
+}
+
 /// 手跡の駆動役へ打鍵の時刻を送る(口が無ければ何もしない・満杯なら捨てる)。
 fn handmark_send_press(t_ms: u64) {
     if let Some(tx) = HANDMARK_PRESS_TX.get() {
@@ -2414,6 +2425,12 @@ fn handmark_stopped_cfg_from_env() -> Option<crate::analysis::handmark::stopped:
     // 門は `ensure_debug_enabled` と同じ（`GSE_DEBUG=1` のときだけ）。
     let debug = ensure_debug_enabled().is_ok();
     let raw = std::env::var("GSE_HANDMARK_STOPPED").ok();
+    if raw.is_some() && !debug {
+        // 研究者が入ったと思い込まないよう 1 行残す（値は出さない・参加者の既定の挙動は変わらない）
+        tracing::info!(
+            "handmark: GSE_HANDMARK_STOPPED is set but GSE_DEBUG is not 1; stopped layer stays off"
+        );
+    }
     match crate::analysis::handmark::stopped::parse_stopped_cfg(raw.as_deref(), debug) {
         Ok(cfg) => {
             if let Some(c) = cfg.as_ref() {
@@ -2709,7 +2726,10 @@ fn spawn_handmark_driver(
                 d.on_press(t);
             }
             // 記録の一時停止(コマンドの経路で既に合わせてあれば何もしない)
-            let mut fx = d.on_paused(fs, crate::recording::is_paused(), wall);
+            // 時刻はコマンドの経路が決めた遷移の時刻(`recording_pause` の行と同じ値)。コマンドの経路が先に
+            // ロックを取れなかったときも、記録と同じ時刻で入れる(止まりの層の再生の一致・ADR-051 D5)。
+            let paused_now = crate::recording::is_paused();
+            let mut fx = d.on_paused(fs, paused_now, handmark_pause_at(wall));
             // 窓の層の様子(作れなかった・出せなかった)を、この刻みの前に駆動役へ渡す
             fx.extend(d.on_window_status(handmark_window_status(), wall));
             // 帯が出ていて見えているか(見えていた時間 `visible_ms` の足し込み用)
@@ -3419,6 +3439,10 @@ fn set_recording_paused(
     if paused && !crate::recording::is_paused() {
         let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
         s1_on_pause_requested(&app, &log_tx);
+    }
+    // 手跡: 遷移の時刻を先に置く(駆動スレッドの刻みが先に遷移を見たときも、記録の行と同じ時刻を使う)。
+    if paused != crate::recording::is_paused() {
+        HANDMARK_PAUSE_AT_MS.store(now, std::sync::atomic::Ordering::SeqCst);
     }
     let previous = crate::recording::set_paused(paused);
     if previous != paused {

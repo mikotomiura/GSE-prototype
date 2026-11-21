@@ -532,7 +532,8 @@ impl HandmarkDriver {
                 });
                 due_pauses.sort_by_key(|e| e.0);
                 for (pt, paused) in due_pauses {
-                    if pt > self.stage_t0 {
+                    // 起点と同じ時刻の出来事も入れる（門は同じ値に冪等・再生の `paused_at` は `<= t0` を畳む）
+                    if pt >= self.stage_t0 {
                         self.stop_gate.on_pause(pt, paused);
                     }
                 }
@@ -1159,6 +1160,123 @@ mod tests {
         assert_ne!(seed, seed2);
         let want = replay_stopped_live(&[], &[], seed2, day_t, day_t, &cfg);
         assert_eq!(f.bits(), want.bits());
+    }
+
+    /// 1 刻み進め、出た止まりの層を、駆動役のいまの起点と種からの再生と to_bits で比べる。
+    fn tick_and_check(
+        d: &mut HandmarkDriver,
+        fs: &MemFs,
+        now: u64,
+        today: i64,
+        presses: &[u64],
+        pauses: &[(u64, bool)],
+        cfg: &StoppedCfg,
+    ) -> StoppedFrame {
+        let fx = d.tick(fs, now, today);
+        let f = fx
+            .iter()
+            .filter_map(|e| match e {
+                Effect::Stopped(f) => Some(*f),
+                _ => None,
+            })
+            .next_back()
+            .expect("窓が出ていて設定が入っていれば毎刻み出る");
+        let want = crate::analysis::handmark::stopped::replay_stopped_live(
+            presses,
+            pauses,
+            d.stage_seed,
+            d.stage_t0,
+            now,
+            cfg,
+        );
+        assert_eq!(f.bits(), want.bits(), "t {} t0 {}", now - T0, d.stage_t0);
+        f
+    }
+
+    /// 起点の取り直しが一時停止と重なる経路（一時停止中の時計の飛び・一時停止中の日の変わり目・窓を閉じている
+    /// 間に始まった一時停止・起点と同じ ms の一時停止）でも、刻みごとに再生と一致し、取り直しの後は最初の打鍵まで
+    /// 返さない。取り直しの後に打って止まれば v が 1 に戻る（陽性対照）。
+    #[test]
+    fn stopped_frames_match_the_replay_across_restarts_while_paused() {
+        let cfg = stopped_cfg();
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        d.set_stopped(Some(cfg));
+        let mut presses: Vec<u64> = Vec::new();
+        let mut pauses: Vec<(u64, bool)> = Vec::new();
+        let mut now = T0;
+        let mut today = ON_DAY;
+        // 打って止まり、`secs` 秒ぶん刻む。（見えた最大の v, 最後の刻みの v）を返す。出来事は 500 ms 遅れて
+        // 入る（ライブの規則）ので、止めた直後の数刻みは前の v のまま。「0 のまま」は最後の刻みで見る。
+        macro_rules! run {
+            ($type_first:expr, $secs:expr) => {{
+                if $type_first {
+                    for k in 0..40u64 {
+                        let p = now + 100 + k * 150;
+                        if d.is_window_open() && d.paused.is_none() {
+                            d.on_press(p);
+                            presses.push(p);
+                        }
+                    }
+                }
+                let (mut max_v, mut last_v) = (0.0f64, 0.0f64);
+                let end = now + $secs * 1_000;
+                while now < end {
+                    now += 250;
+                    let f = tick_and_check(&mut d, &fs, now, today, &presses, &pauses, &cfg);
+                    max_v = max_v.max(f.v);
+                    last_v = f.v;
+                }
+                (max_v, last_v)
+            }};
+        }
+        macro_rules! pause {
+            ($p:expr) => {{
+                let _ = d.on_paused(&fs, $p, now);
+                pauses.push((now, $p));
+            }};
+        }
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 1) 一時停止中の時計の飛び → 再開 → 打つまで 0 → 打てば 1
+        pause!(true);
+        assert_eq!(run!(false, 10).1, 0.0);
+        now += 2 * 86_400_000;
+        assert_eq!(run!(false, 10).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 2) 一時停止中の日の変わり目
+        pause!(true);
+        assert_eq!(run!(false, 5).1, 0.0);
+        today = NEXT_ON_DAY;
+        assert_eq!(run!(false, 10).1, 0.0);
+        assert!(d.is_window_open());
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 3) 窓を閉じている間に始まった一時停止（戻したときは一時停止中から始まる）
+        let _ = d.turn_off(&fs, now);
+        assert!(!d.is_window_open());
+        pause!(true);
+        now += 1_000;
+        let _ = d.turn_on(&fs, now);
+        assert!(d.is_window_open());
+        assert_eq!(run!(true, 30).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 4) 起点と同じ ms の一時停止（戻した直後に同じ時刻で止める）
+        let _ = d.turn_off(&fs, now);
+        let _ = d.turn_on(&fs, now);
+        assert_eq!(d.stage_t0, now);
+        pause!(true);
+        // 一時停止の判定をすり抜けた打鍵が 1 つ届いても（時刻は一時停止の後）、門は閉じたまま。
+        // 起点と同じ時刻の一時停止を落とすと、ライブだけが開く（変異で赤になることを確かめた）。
+        d.on_press(now + 50);
+        presses.push(now + 50);
+        assert_eq!(run!(false, 30).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(true, 60).0, 1.0);
     }
 
     /// 設定が無ければ（参加者の配布物の既定）止まりの層を出さず、今の状態の列も変わらない。

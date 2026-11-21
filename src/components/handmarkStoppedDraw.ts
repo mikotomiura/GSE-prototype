@@ -1,5 +1,5 @@
 // 手跡の止まりの層の描画(純関数・ADR-056・.steering/20261121-handmark-stopped-state-prototype/)。
-// 画面(HandmarkStage.tsx)と机上の道具が、handmarkStageDraw.ts の drawFrame の後に同じ順で呼ぶ。
+// 画面(HandmarkStage.tsx)が handmarkStageDraw.ts の drawFrame の後に呼ぶ。机上の道具も PR-b で同じ順に呼ぶ。
 // React・Tauri・performance・Date・Math.random を使わない。入力は、そのときに見せる止まりの層(寄せた後)・
 // 配置・大きさだけ。何も積まない。
 // - 見えの度合い v は Rust が決める(止まりの始まりからの短い立ち上がりだけ・止まりの長さを持たない)。
@@ -24,9 +24,12 @@ export function parseStopped(msg: unknown): StoppedShown | null {
   const m = msg as { v?: unknown; ambient?: unknown; form?: unknown; strength?: unknown };
   if (m.form !== "band" && m.form !== "motes" && m.form !== "wind") return null;
   // 値を読むだけ(列を作らない・窓の列の検査 handmark_guard.rs の `the_window_lists_only_named_slots`)。
+  // 添字で読む(配列でない値が届いても分割代入で落ちない)。
   const amb = m.ambient instanceof Object ? (m.ambient as ReadonlyArray<unknown>) : null;
   if (amb === null || amb.length !== 3) return null;
-  const [a0, a1, a2] = amb;
+  const a0 = amb[0];
+  const a1 = amb[1];
+  const a2 = amb[2];
   const num = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
   if (!num(m.v) || !num(m.strength) || !num(a0) || !num(a1) || !num(a2)) return null;
   const clamp = (x: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, x));

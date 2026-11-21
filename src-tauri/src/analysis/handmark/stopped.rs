@@ -7,7 +7,8 @@
 //!   明けの後に 1 回以上の打鍵があり、一時停止の外のときだけ開く（ADR-056 D7・判断 2・判断 8）。
 //! - 自律の動き [`ambient`] は、日の種と絶対の時刻の 1 秒ごとの節の擬似乱数を、全幅 W の窓の重みで足した値。
 //!   W より離れた 2 つの時刻は節を共有しないので、記憶は W で切れる。`grid_start` も周期の関数も使わない
-//!   （ADR-056 D2）。重みは足し算と掛け算だけの多項式なので、どの機械でも同じビット列になる。
+//!   （ADR-056 D2）。使う演算は四則と `sqrt` だけ（IEEE 754 で正しく丸められ、Rust は勝手に FMA へ縮めない）で、
+//!   和は節の番号の昇順に固定してあるので、どの機械でも同じビット列になる（`cos` などの数学関数は使わない）。
 //! - 推定の出力・キーの種類・系の状態は入らない（入力の型に口が無い・ADR-047 D2・ADR-048 D2）。
 
 use super::state::{splitmix64, Stage, LIVE_LAG_MS};
@@ -78,14 +79,14 @@ pub fn parse_stopped_cfg(raw: Option<&str>, debug: bool) -> Result<Option<Stoppe
         let (key, value) = item
             .split_once('=')
             .map(|(k, v)| (k.trim(), v.trim()))
-            .ok_or_else(|| format!("項目に = が無い: {item}"))?;
+            .ok_or_else(|| "項目に = が無い".to_string())?;
         match key {
             "form" => {
                 cfg.form = match value {
                     "band" => StoppedForm::Band,
                     "motes" => StoppedForm::Motes,
                     "wind" => StoppedForm::Wind,
-                    _ => return Err(format!("form は band・motes・wind のどれか: {value}")),
+                    _ => return Err("form は band・motes・wind のどれか".to_string()),
                 }
             }
             "rise_ms" => {
@@ -93,23 +94,23 @@ pub fn parse_stopped_cfg(raw: Option<&str>, debug: bool) -> Result<Option<Stoppe
                     .parse::<u64>()
                     .ok()
                     .filter(|v| *v <= RISE_MS_MAX)
-                    .ok_or_else(|| format!("rise_ms は 0〜{RISE_MS_MAX}: {value}"))?
+                    .ok_or_else(|| format!("rise_ms は 0〜{RISE_MS_MAX}"))?
             }
             "window_s" => {
                 cfg.window_s = value
                     .parse::<u64>()
                     .ok()
                     .filter(|v| (WINDOW_S_MIN..=WINDOW_S_MAX).contains(v))
-                    .ok_or_else(|| format!("window_s は {WINDOW_S_MIN}〜{WINDOW_S_MAX}: {value}"))?
+                    .ok_or_else(|| format!("window_s は {WINDOW_S_MIN}〜{WINDOW_S_MAX}"))?
             }
             "strength" => {
                 cfg.strength = value
                     .parse::<f64>()
                     .ok()
                     .filter(|v| (0.0..=1.0).contains(v))
-                    .ok_or_else(|| format!("strength は 0〜1: {value}"))?
+                    .ok_or_else(|| "strength は 0〜1".to_string())?
             }
-            _ => return Err(format!("知らない項目: {key}")),
+            _ => return Err("知らない項目がある".to_string()),
         }
     }
     Ok(Some(cfg))
@@ -293,7 +294,8 @@ pub fn replay_stopped(
         if pt > t {
             break;
         }
-        if pt > t0 {
+        // 起点と同じ時刻の出来事も入れる（`paused_at` が畳んだものと同じ値なので冪等・駆動役と同じ条件）
+        if pt >= t0 {
             gate.on_pause(pt, paused);
         }
     }
@@ -403,6 +405,16 @@ mod tests {
                 for n in [lo, hi] {
                     let d = (i128::from(n) * 1_000 - i128::from(t)).unsigned_abs();
                     assert!(d < u128::from(w / 2), "{t} {w} {n}");
+                }
+                // 範囲は最大（1 つ外側の節は窓の外）。狭すぎる範囲は分散の正規化で隠れるので、ここで縛る
+                let outside = |n: u64| {
+                    (i128::from(n) * 1_000 - i128::from(t)).unsigned_abs() >= u128::from(w / 2)
+                };
+                if lo > 0 {
+                    assert!(outside(lo - 1), "{t} {w} lo");
+                }
+                if let Some(n) = hi.checked_add(1) {
+                    assert!(outside(n), "{t} {w} hi");
                 }
                 // W ちょうど離れた時刻とは、節を共有しない
                 if let Some(t2) = t.checked_add(w) {
@@ -532,14 +544,18 @@ mod tests {
     #[test]
     fn the_gate_does_not_depend_on_the_order_of_presses_and_pauses() {
         let mut r = SplitMix64::new(12);
+        let (mut open, mut shut) = (0, 0);
         for case in 0..300u64 {
             let t0 = 1_000_000 + r.below(1_000);
-            let mut gate_a = StopGate::new(t0, false);
-            let mut gate_b = StopGate::new(t0, false);
+            // 起点で一時停止中から始まる件も混ぜる
+            let start_paused = r.below(4) == 0;
+            let mut gate_a = StopGate::new(t0, start_paused);
+            let mut gate_b = StopGate::new(t0, start_paused);
+            let mut gate_c = StopGate::new(t0, start_paused);
             let mut presses = Vec::new();
             let mut pauses = Vec::new();
             let mut t = t0;
-            let mut paused = false;
+            let mut paused = start_paused;
             for _ in 0..r.below(20) {
                 t += r.below(50_000);
                 if r.below(3) == 0 {
@@ -561,8 +577,50 @@ mod tests {
             for &p in presses.iter().rev() {
                 gate_b.on_press(p);
             }
+            // 無作為に混ぜた順（一時停止どうしは時刻の順のまま）
+            let (mut i, mut j) = (0, 0);
+            while i < presses.len() || j < pauses.len() {
+                if j >= pauses.len() || (i < presses.len() && r.below(2) == 0) {
+                    gate_c.on_press(presses[i]);
+                    i += 1;
+                } else {
+                    gate_c.on_pause(pauses[j].0, pauses[j].1);
+                    j += 1;
+                }
+            }
             assert_eq!(gate_a.is_open(), gate_b.is_open(), "case {case}");
+            assert_eq!(gate_a.is_open(), gate_c.is_open(), "case {case}");
+            if gate_a.is_open() {
+                open += 1;
+            } else {
+                shut += 1;
+            }
         }
+        // 陽性対照: 開いた件と閉じた件が両方ある（比べが常に偽どうしになっていない）
+        assert!(open > 20 && shut > 20, "open {open} shut {shut}");
+    }
+
+    /// 起点と同じ時刻の一時停止の出来事は、起点で畳んだ状態と同じに扱う（駆動役と同じ `>= t0`）。
+    #[test]
+    fn a_pause_at_exactly_t0_keeps_the_gate_shut() {
+        let c = cfg(0, 20);
+        let t0 = 5_000_000u64;
+        let presses = burst(t0 + 1_000);
+        // 起点と同じ時刻に止め、打鍵（記録には残らない想定だが、門が閉じていることを見るために入れる）の後に開く
+        let pauses = [(t0, true)];
+        assert_eq!(
+            replay_stopped(&presses, &pauses, 1, t0, t0 + 600_000, &c).v,
+            0.0
+        );
+        let pauses = [(t0, true), (t0 + 1, false)];
+        assert_eq!(
+            replay_stopped(&presses, &pauses, 1, t0, t0 + 600_000, &c).v,
+            1.0
+        );
+        let mut g = StopGate::new(t0, false);
+        g.on_press(t0 + 5);
+        g.on_pause(t0, true);
+        assert!(!g.is_open());
     }
 
     #[test]
