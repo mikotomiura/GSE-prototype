@@ -25,13 +25,14 @@
 - [x] 合成で陽性は終了コード 0、壊した入力は非 0 を確かめる
 
 ### 実データ
-- [ ] `data.md` に入力（本人の段 1・O1）の SHA-256 と capabilities_gate の結果を書く
-- [ ] 実行して、人ごとの判定（使える／使えない／判定できない）と落ちた段を notes.md に書く
-- [ ] 本人の区間の一覧を研究者に振り返ってもらい、decisions に残す
-- [ ] 識別子の要否の見積もりを decisions に残す
+- [x] `data.md` に入力（本人の段 1・O1）の SHA-256 と capabilities_gate の結果を書く
+- [x] 実行して、人ごとの判定（使える／使えない／判定できない）と落ちた段を notes.md に書く
+- [x] 本人の区間の一覧を研究者に振り返ってもらい、decisions に残す（名前の意味の確かめ・判断 20）（11-19〜11-21・表は work/review-20261119-21.md）
+- [ ] （次のタスクへ）最終の数を出す前に、本人の入力の写しを取って固定する（記録が書き足されているため）
+- [x] 識別子の要否の見積もりを decisions に残す（判断 21・数ではなく、外れの種類から次の段で見ると記録）
 
 ### 文書・レビュー・完了
 - [x] `docs/glossary.md`（特徴行の項に context）・`docs/functional-design.md`
-- [ ] code-reviewer と security-checker を並列で回し、指摘に対応する
+- [x] code-reviewer と security-checker を並列で回し、指摘に対応する
 - [ ] /finish-task で /cross-review（Claude と Codex）。Codex にはコードの diff だけを渡す
 - [ ] コミット（git-workflow に従う）。push と PR は研究者に確かめてから
