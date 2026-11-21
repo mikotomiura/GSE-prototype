@@ -47,3 +47,22 @@
 ## 判断 10: 投稿の前に attack-me round 2 を当てる ／ /reimagine を使う
 - **決定**: 直した原稿に attack-me round 2 を当てる。査読者の席は出し先の分野に合わせる。/reimagine は design.md を書いた後、着手の前に使う（研究者の選択。私の推奨は「使わない」だった）。
 - **理由**（round 2）: 直した箇所が新しい穴を生んでいないか、round 1 の指摘が本当に閉じたかを確かめる。
+
+## 判断 11: 出し先 = Journal of Systems and Software（JSS・Elsevier）（2026-11-21・研究者の選択）
+- **調べ方**: 出版社の系統ごとに Sonnet の汎用エージェント 3 本へ並列で渡した（判断 6）。3 本とも、誌ごとの投稿ガイドの本体を WebFetch で読めなかった（ScienceDirect・Wiley は 403、Springer は認証へのリダイレクト）。そこで判断に使う行は、私が Chrome の `javascript_tool` で公式のページから逐語で取った（下の「一次」）。「代行」はサブエージェントが取った逐語で、私は開いていない。
+- **比較**（費用は購読型で出す場合）:
+
+| 誌 | 費用 | 査読 | preprint | 長さ・書式 | 範囲 |
+|---|---|---|---|---|---|
+| **JSS** | 一次 "No open access publication fee."（`sciencedirect.com/journal/journal-of-systems-and-software/publish/open-access-options`） | 一次 "This journal follows a single anonymized review process." | 一次 "Authors may share preprints in line with Elsevier's article sharing policy. Sharing preprints, such as on a preprint server, will not count as prior publication." | 一次 "It is encouraged that authors submit full-length papers of less than 36 pages single-column or 18 pages double-column." ／ 要旨は "does not exceed 250 words"（いまの要旨は超える） | 代行 "All articles should provide evidence to support their claims" ・ "The journal welcomes reports of practical experience for all of these topics, as well as replication studies."（`shop.elsevier.com/journals/journal-of-systems-and-software/0164-1212`）／ 代行 JSS Open Science Initiative（再現一式を Open Science Board が審査し、採否には影響しない） |
+| IST | 一次 "No open access publication fee." | 一次 single anonymized | 一次（JSS と同じ文） | 一次 "A research paper's maximum length is 15,000 words … figures and tables count 200 words each." ／ 構造化した要旨が必須 | 一次 "Empirical studies of all aspects of engineering and managing software development" ／ データは一次 "Option C"（寄託が必須） |
+| SQJ | 一次 "The journal does not charge a submission fee or publication fee." | 一次 "This journal follows a single-blind reviewing procedure." | Springer 全体（前タスク判断 23 の一次） | 一次 "The submission must be generated via LaTeX using the header \documentclass{sn-jnl}." | 一次 品質と品質管理が中心（"all aspects of software quality"） |
+| JSEP | 一次 "There is no page charge to authors." | 確かめられなかった | 一次 "…allow authors to submit manuscripts that have already been made available on a non-commercial preprint server." | 確かめなかった | 代行（検索の要約）開発・テスト・保守・進化 |
+| TSE | 代行（IEEE CS の MOPC の PDF）"Any pages or fraction thereof exceeding this limit are charged $200 per page." ・ "…12 formatted pages for Transactions…" → 外した | — | — | — | — |
+| TOSEM | 代行（検索の要約）2026-01-01 から全面 OA・APC が要る → 外した（memory `feedback_venue_no_talk_zero_cost` と同じ） | — | — | — | — |
+
+- **決定**: JSS（研究者の選択・私の推奨）。
+- **理由**: 範囲に「主張に証拠を」と「replication studies の歓迎」があり、再解析の論文にいちばん合う。Open Science Initiative があり、公開済みの再現一式を生かせる。査読は single anonymized なので、Zenodo の preprint（判断 7）と両立する。
+- **却下案**: IST（範囲は合う。構造化した要旨が要るだけで、条件は満たす。JSS が不採択なら次の候補）／SQJ（書式の手間は最小だが範囲が品質管理に寄る）／JSEP（査読の方式が未確認・範囲が保守と進化に寄る）／TSE（超過頁料）／TOSEM（APC）。
+- **改訂への効き方**（design.md の前提）: 要旨を 250 語以内に削る ／ 書式は elsarticle を勧められている（"We encourage you use our LaTeX template"。初回の投稿で必須かは、JSS の LaTeX の節を design の段で確かめる）／ 編集できるソース一式を出す ／ Highlights が要るかを確かめる ／ Open Science Initiative に参加するか（研究者の判断・design の段で）。
+- ⚠️ **未確認**: 代行の行（範囲・Open Science の文）は私が開いていない。design の段で JSS の投稿ガイドの Article structure・Highlights・LaTeX・Open Science の節を一次で読む。サブエージェントは「JSS が 2025 年に査読の依頼に 20 件の上限を設けた」と編集者の論考（arXiv 2601.19217・本文は読んでいない）の要約から報告した → 受け付けの状況に関わるので、design の段で確かめる。

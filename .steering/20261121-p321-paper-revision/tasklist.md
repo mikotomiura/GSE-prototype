@@ -2,7 +2,8 @@
 
 ## 0. 始める
 - [x] grill（判断 1〜10）・`/start-task`（worktree `C:/GSE-wt/p321-desk-reject`・ブランチ `docs/p321-emse-desk-reject`・attack-me round 1 の記録 `bddf51f6` を取り込んだ）
-- [ ] 出し先の候補を一次で比べる → 研究者が選ぶ（判断 6）
+- [x] 出し先の候補を一次で比べる → 研究者が選ぶ（判断 6）→ **JSS**（判断 11）
+- [ ] JSS の投稿ガイドの残り（Article structure・Highlights・LaTeX・Open Science）と、編集者の論考 arXiv 2601.19217 の「査読の依頼の上限」を一次で読む
 - [ ] design.md（順序・節の組み替え・出し先の書式）→ `/reimagine`（判断 10）→ 研究者の承認
 
 ## 1. 外に出る準備（返事を待つものを先に）
