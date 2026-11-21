@@ -22,4 +22,7 @@
 - [x] S7（判断 21〜23）: 研究者の通読と修正案の採用 → (1)(2)(3)・要旨・一般化は実施（`a55b9bb`）。残り: 文献検索 B のやり直し → §2.5 と付録 ／ 生成 AI の申告の「読んで直した」を研究者に聞く
 - [ ] （旧 S7 の項目）研究者の通読と手入れ（記録する）／ journal 版の 8 つの報告値を研究者が PDF と照合するか（すれば §5.3 の文を直す）／ 通読の後に生成 AI の申告へ「読んで直した」の文を足す ／ Highlights とキーワードを見てもらう
 - [ ] S8: attack-me round 2 → 研究者が採否 ／ `/cross-review` 2 巡
+  - [x] attack-me round 2（`c077e5bf`・判断 25）。研究者が採否を決めた
+  - [ ] round 2 の直す一覧（verdict.md §4・判断 25）を実施する。研究者の D2 の手での数え直しを受け取る
+  - [ ] `/cross-review` 2 巡（直した後）
 - [ ] S9: 照会の返事か未回答を反映（RQ4 の "at the time of submission we had not received a reply" を確かめる）／ README の引用の bibtex と Data availability の DOI を新しい版に ／ 新しいタグ ／ Zenodo の新しい版とプレプリントの下書き → 研究者が publish と JSS への投稿 → 原稿 ID を記録
