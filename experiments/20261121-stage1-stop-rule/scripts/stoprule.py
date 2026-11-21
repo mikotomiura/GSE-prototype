@@ -286,19 +286,26 @@ def cmd_count(a):
 
 def cmd_need(a):
     c = json.load(open(a.counts))
-    lam, pi = c["lambda_per_observed_day"], c["pi_stuck"]
-    if lam is None or pi is None:
-        sys.exit("λ・π が無い（回答が無い）")
+    lam, pi_obs = c["lambda_per_observed_day"], c["pi_stuck"]
+    if lam is None:
+        sys.exit("λ が無い（回答が無い）")
+    # π は記録の値か、--pis で仮の幅を入れる（記録の π が 0 か 1 だと模擬にならない）
+    pis = [float(x) for x in a.pis.split(",")] if a.pis else [pi_obs]
+    if any(p is None or not (0 < p < 1) for p in pis):
+        sys.exit("π が (0, 1) の外（--pis で仮の幅を入れる）")
     rows, idx = [], 0
-    for auc in [float(x) for x in a.aucs.split(",")]:
-        for sd in [float(x) for x in a.sds.split(",")]:
-            for D in [int(x) for x in a.days.split(",")]:
-                w = slope_width(D, auc, pi, lam, sd, a.rho, a.reps, a.seed, idx)
-                idx += 1
-                rows.append({"auc": auc, "sd_day": sd, "rho_day": a.rho, "days": D, **(w or {})})
-                print(auc, sd, D, (w or {}).get("percentile"), flush=True, file=sys.stderr)
-    json.dump({"note": "件数の要約（λ・π）と想定する AUC・日の揺れからの模擬。記録の予測と申告の関係は使っていない。",
-               "lambda_per_observed_day": lam, "pi_stuck": pi, "reps": a.reps, "seed": a.seed, "rows": rows},
+    for pi in pis:
+        for auc in [float(x) for x in a.aucs.split(",")]:
+            for sd in [float(x) for x in a.sds.split(",")]:
+                for D in [int(x) for x in a.days.split(",")]:
+                    w = slope_width(D, auc, pi, lam, sd, a.rho, a.reps, a.seed, idx)
+                    idx += 1
+                    rows.append({"pi": pi, "auc": auc, "sd_day": sd, "rho_day": a.rho, "days": D, **(w or {})})
+                    print(pi, auc, sd, D, (w or {}).get("percentile"), flush=True, file=sys.stderr)
+    json.dump({"note": "件数の要約（λ）と、π・想定する AUC・日の揺れからの模擬。記録の予測と申告の関係は使っていない。"
+               "days は観測日（無作為の枠の回答が 1 件以上ある日）の数。",
+               "lambda_per_observed_day": lam, "pi_observed": pi_obs, "pis": pis, "reps": a.reps, "seed": a.seed,
+               "rows": rows},
               open(a.out, "w"), ensure_ascii=False, indent=1)
 
 
@@ -323,6 +330,7 @@ def main(argv):
     q.add_argument("--aucs", default="0.6,0.7,0.8")
     q.add_argument("--sds", default="0.5,1.0")
     q.add_argument("--rho", type=float, default=0.3)
+    q.add_argument("--pis", default=None, help="π の仮の幅（例 0.03,0.05,0.10,0.20）。省くと記録の π")
     q.add_argument("--days", default="20,30,40,50,60,80,100,120,150,200")
     q.add_argument("--reps", type=int, default=200)
     a = ap.parse_args(argv)

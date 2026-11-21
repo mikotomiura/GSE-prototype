@@ -1,0 +1,57 @@
+{
+ "elapsed_days": 15,
+ "observed_days": 8,
+ "probes_by_stratum": {
+  "random": 103,
+  "low_operation_end": 99,
+  "resumption": 16
+ },
+ "answered_by_stratum": {
+  "random": 94,
+  "low_operation_end": 85,
+  "resumption": 13
+ },
+ "random_unanswered": 7,
+ "random_answered": 94,
+ "random_stuck": 0,
+ "random_nonstuck": 78,
+ "random_excluded": 16,
+ "in_C1": {
+  "answered": 30,
+  "stuck": 0,
+  "nonstuck": 24
+ },
+ "in_C2": {
+  "answered": 10,
+  "stuck": 0,
+  "nonstuck": 9
+ },
+ "episodes": {
+  "C1": 542,
+  "C2": 95
+ },
+ "assigned_days": 0,
+ "answers_per_observed_day_q": [
+  3,
+  11,
+  16
+ ],
+ "lambda_per_observed_day": 11.75,
+ "pi_stuck": 0.0,
+ "rules": {
+  "stuck": [
+   "stuck"
+  ],
+  "excluded": [
+   "cannot_answer"
+  ],
+  "day_cutoff_hour": 4,
+  "in_stall": "recall_window_end_ms in [onset, resume or interval end]"
+ },
+ "files": 26,
+ "c0_selfcheck": {
+  "files": 26,
+  "mismatch_files": 0,
+  "no_focus_files": 10
+ }
+}
