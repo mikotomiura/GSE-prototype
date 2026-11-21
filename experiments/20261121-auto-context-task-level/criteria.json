@@ -1,11 +1,11 @@
 {
-  "status": "draft（研究者と確定する前・実データは未処理）",
+  "status": "frozen 2026-11-21: 研究者が確定（decisions.md 判断 15）。実データを処理するより前のコミットに入れる。以後は値を変えない（変えるなら別の版として記録する）。主の判定は real の premise_*（作業の記録で区切った作業ごとに様式の連なりの出方が違うか・判断 11）。v2 の判定（stability・style_copy・diary・state_copy）と synthetic は記述（合成の陽性 4/6・判断 14）。作業の記録の Mac 以外の行は「（Mac の外）」1 つにまとめる（config.json の diary_label_rule）",
   "synthetic": {
     "boundary_f1_min": 0.6,
     "ari_min": 0.5,
     "positive_min_k": 2,
     "negative_max_k": 1,
-    "note": "v2 の陽性の対照は long（2.5〜5 時間の作業）。値は下書きで、seed 20261121 の試し（K=2・ARI 0.57・F1 0.67）を見た後の案（判断 12）"
+    "note": "v2（記述）の陽性の対照は long（2.5〜5 時間の作業）。値は seed 20261121 の試しを見た後に決めた（判断 12・15）"
   },
   "real": {
     "stability_ari_min": 0.5,
