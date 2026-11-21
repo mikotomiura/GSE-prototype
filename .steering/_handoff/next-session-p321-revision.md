@@ -7,7 +7,7 @@
 ```
 git fetch origin してから MSYS_NO_PATHCONV=1 git show origin/docs/p321-emse-desk-reject:.steering/_handoff/next-session-p321-revision.md を読んで、§2 の上から進めてください。
 worktree は C:/GSE-wt/p321-desk-reject（ブランチ docs/p321-emse-desk-reject）。タスクは .steering/20261121-p321-paper-revision/（decisions 判断 1〜23・design.md・tasklist・survey-s2.md・search-log/）。
-論文用リポジトリは C:/self-resolution-measure のブランチ revision-jss（未 push。S9 まで push しない）。着手時に git status が clean で、HEAD が bab36eb かを確かめる。研究者の PDF 照合の結果を聞き、済んでいれば §5.3 の文を直す。
+論文用リポジトリは C:/self-resolution-measure のブランチ revision-jss（未 push。S9 まで push しない）。着手時に git status が clean で、HEAD が 75e8e76 かを確かめる（8 つの値の PDF 照合は済み・判断 24）。
 Tectonic 0.17.0 が scratchpad から消えていたら、GitHub のリリースから取り直し、TECTONIC=<path> bash paper/build.sh で使う。
 照会（2026-11-21 に送信・待つ目安は 12-05）に返事が来ているかを研究者に聞く。
 ```
