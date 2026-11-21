@@ -203,7 +203,8 @@ def fit_hmm(seqs: list[Seq], n_symbols: int, k: int, p_stay: float, rng: np.rand
                 pi_cnt += g[0]
             h.emis = cnt / cnt.sum(axis=1, keepdims=True)
             h.pi = pi_cnt / pi_cnt.sum()
-            if ll - prev < tol * abs(ll):
+            # MAP の EM で単調に増えるのは事後で、尤度は下がりうるので、変化の大きさで止める（code-reviewer LOW）。
+            if abs(ll - prev) < tol * abs(ll):
                 break
             prev = ll
         h.loglik = loglik(seqs, h)

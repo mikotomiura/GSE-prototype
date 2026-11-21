@@ -143,6 +143,51 @@
             21
           ]
         },
+        "p_within_day": 0.0009995002498750624,
+        "verdict": "differs"
+      },
+      "premise_mac_only": {
+        "runs": 138,
+        "values": {
+          "task X": 53,
+          "task Y": 37,
+          "task Z": 48
+        },
+        "blocks": 12,
+        "testable": true,
+        "nmi": 0.3104553092491756,
+        "p": 0.0004997501249375312,
+        "p_achievable": 0.0009995002498750624,
+        "mi_nats_per_run": 0.3813350936186586,
+        "detectable_runs_lower_bound": 9.0,
+        "median_task_runs": 11.5,
+        "per_task_styles": {
+          "task X": [
+            23,
+            7,
+            0,
+            0,
+            0,
+            23
+          ],
+          "task Y": [
+            6,
+            16,
+            15,
+            0,
+            0,
+            0
+          ],
+          "task Z": [
+            0,
+            5,
+            22,
+            0,
+            0,
+            21
+          ]
+        },
+        "p_within_day": 0.0009995002498750624,
         "verdict": "differs"
       },
       "premise_verdict": "differs",
@@ -284,6 +329,51 @@
             10
           ]
         },
+        "p_within_day": 0.791104447776112,
+        "verdict": "not_shown"
+      },
+      "premise_mac_only": {
+        "runs": 138,
+        "values": {
+          "task P": 55,
+          "task Q": 42,
+          "task R": 41
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.010852781583514133,
+        "p": 0.7866066966516742,
+        "p_achievable": 0.0004997501249375312,
+        "mi_nats_per_run": 0.013338638777498895,
+        "detectable_runs_lower_bound": 548.0,
+        "median_task_runs": 8.0,
+        "per_task_styles": {
+          "task P": [
+            10,
+            8,
+            16,
+            0,
+            0,
+            21
+          ],
+          "task Q": [
+            9,
+            10,
+            10,
+            0,
+            0,
+            13
+          ],
+          "task R": [
+            10,
+            10,
+            11,
+            0,
+            0,
+            10
+          ]
+        },
+        "p_within_day": 0.791104447776112,
         "verdict": "not_shown"
       },
       "premise_verdict": "not_shown",
@@ -414,6 +504,42 @@
             21
           ]
         },
+        "p_within_day": null,
+        "verdict": "undecidable"
+      },
+      "premise_mac_only": {
+        "runs": 138,
+        "values": {
+          "task P": 70,
+          "task Q": 68
+        },
+        "blocks": 2,
+        "testable": false,
+        "nmi": 0.0046209267282705645,
+        "p": null,
+        "p_achievable": 1.0,
+        "mi_nats_per_run": 0.004763894420675665,
+        "detectable_runs_lower_bound": 1782.0,
+        "median_task_runs": 69.0,
+        "per_task_styles": {
+          "task P": [
+            17,
+            13,
+            17,
+            0,
+            0,
+            23
+          ],
+          "task Q": [
+            12,
+            15,
+            20,
+            0,
+            0,
+            21
+          ]
+        },
+        "p_within_day": null,
         "verdict": "undecidable"
       },
       "premise_verdict": "undecidable",
@@ -550,6 +676,48 @@
             1
           ]
         },
+        "p_within_day": 0.8510744627686156,
+        "verdict": "not_shown"
+      },
+      "premise_mac_only": {
+        "runs": 145,
+        "values": {
+          "task N1": 52,
+          "task N2": 43,
+          "task N3": 50
+        },
+        "blocks": 12,
+        "testable": true,
+        "nmi": 0.009224118279239277,
+        "p": 0.8690654672663668,
+        "p_achievable": 0.0009995002498750624,
+        "mi_nats_per_run": 0.011754278723421179,
+        "detectable_runs_lower_bound": 634.0,
+        "median_task_runs": 12.0,
+        "per_task_styles": {
+          "task N1": [
+            15,
+            10,
+            10,
+            16,
+            1
+          ],
+          "task N2": [
+            13,
+            10,
+            11,
+            8,
+            1
+          ],
+          "task N3": [
+            13,
+            11,
+            15,
+            10,
+            1
+          ]
+        },
+        "p_within_day": 0.8510744627686156,
         "verdict": "not_shown"
       },
       "premise_verdict": "not_shown",

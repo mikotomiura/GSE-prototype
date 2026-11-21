@@ -40,6 +40,9 @@ class Person:
     res: "core.Result"  # 1 段目の結果（raw_labels・labels・gmm_k）
     relative_files: int
     overlap: dict
+    # 窓ごとに、匿名化で相対時刻になったファイル由来か。置き直した時刻は実時刻ではないので、
+    # 作業の記録とコミット（実時刻で当てる照合）には使わない（code-reviewer HIGH・判断 16）。
+    relative: np.ndarray
 
 
 def stage1_config() -> dict:
@@ -60,20 +63,23 @@ def load_person(pid: str, files: list[Path], work: Path) -> Person:
         finally:
             env.unlink(missing_ok=True)  # 封筒は大きく、共有しない中間成果物なので残さない
         side = ev1.read_side(f)
+        rel = False
         if len(w.start_ms) and int(w.start_ms[0]) < ev1.RELATIVE_EPOCH_LIMIT_MS:
+            rel = True
             relative_files += 1
             offset = (cursor + ev1.RELATIVE_GAP_MS if cursor is not None else ev1.RELATIVE_EPOCH_LIMIT_MS) \
                 - int(w.start_ms[0])
             w, side = ev1.shift_windows(w, offset), ev1.shift_side(side, offset)
         if len(w.end_ms):
             cursor = int(w.end_ms[-1]) if cursor is None else max(cursor, int(w.end_ms[-1]))
-        parts.append((w, ev1.per_window_decl(w, side["decl"]), ev1.per_window_state(w, side["feats"])))
+        parts.append((w, ev1.per_window_decl(w, side["decl"]), ev1.per_window_state(w, side["feats"]), rel))
     side_by_start: dict[int, tuple] = {}
-    for w, d, st in parts:
+    for w, d, st, rel in parts:
         for i, s0 in enumerate(w.start_ms):
-            side_by_start[int(s0)] = (d[i], st[i])
+            side_by_start[int(s0)] = (d[i], st[i], rel)
     win, seams, overlap = core.concat_windows([w for w, *_ in parts])
     decl = [side_by_start[int(s0)][0] for s0 in win.start_ms]
     state = [side_by_start[int(s0)][1] for s0 in win.start_ms]
+    relative = np.array([side_by_start[int(s0)][2] for s0 in win.start_ms], dtype=bool)
     res = core.segment_person(win, cfg, cfg["seed"], seams)
-    return Person(win, seams, decl, state, res, relative_files, overlap)
+    return Person(win, seams, decl, state, res, relative_files, overlap, relative)

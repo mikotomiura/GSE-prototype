@@ -26,11 +26,13 @@ mkdir -p "$EXP_DIR/results" "$WORK"
 # config_gated で 0 行は判定不能 → --features 側で null になり、1 段目の解析がその列を落とす。
 REQUIRED_LINE_TYPES=(--require key --require feat)
 
-gate() {  # gate <出力名> <ファイル...>
-  local name="$1"; shift
-  local tmp="$EXP_DIR/results/.$name.tmp"
+gate() {  # gate <出力先のディレクトリ> <出力名> <ファイル...>
+  # ⚠️ 実データのゲートの JSON は work/ に置く（file_id はファイル名の SHA-256 の先頭 8 字で、
+  #   記録の開始時刻を総当たりで戻せる・security-checker MEDIUM・判断 16）。results/ には合成の分だけを置く。
+  local dir="$1" name="$2"; shift 2
+  local tmp="$dir/.$name.tmp"
   "$PY" "$REPO_ROOT/scripts/capabilities_gate.py" "$@" "${REQUIRED_LINE_TYPES[@]}" --json > "$tmp"
-  mv "$tmp" "$EXP_DIR/results/$name.json"
+  mv "$tmp" "$dir/$name.json"
 }
 
 grep -m1 'HMM_VERSION' "$REPO_ROOT/src-tauri/src/analysis/engine.rs" > "$EXP_DIR/results/hmm_version.txt"
@@ -48,7 +50,7 @@ expect_rc() {  # expect_rc <期待する終了コード> <出力> <コマンド.
     exit 1
   fi
   if [ "$rc" -ne "$want" ]; then
-    echo "${V2_STRICT:-1}" | grep -q 0 && { echo "v2: 期待と違う（終了コード ${rc}・期待 ${want}）: $out" >&2; return 0; }
+    if [ "${V2_STRICT:-1}" = 0 ]; then echo "v2: 期待と違う（終了コード ${rc}・期待 ${want}）: ${out}" >&2; return 0; fi
     echo "NG: 終了コード ${rc}（期待 ${want}）: $*" >&2
     exit 1
   fi
@@ -72,7 +74,7 @@ if [ "$MODE" = synth ]; then
     for kind in positive long negative; do
       while IFS= read -r f; do files+=("$f"); done < <("$PY" -I -c 'import json,sys; [print(f) for f in json.load(open(sys.argv[1]))]' "$d/$kind/files.json")
     done
-    gate "capabilities.synth.$seed" "${files[@]}"
+    gate "$EXP_DIR/results" "capabilities.synth.${seed}" "${files[@]}"
     r="$EXP_DIR/results/synth.$seed"
     # v2（自動のまとめ・記述）: 長く違う作業で陽性・混ぜ方が同じ作業で陰性・陰性の記録を陽性の基準で（壊した入力）。
     # v2 は主の判定ではないので、合否は記録して先へ進む（主の問いの経路だけが run.sh の合否を決める・判断 14）。
@@ -111,8 +113,8 @@ if [ "$MODE" = real ]; then
     "$PY" -I -c 'import json,sys; [print(f) for p in json.load(open(sys.argv[1], encoding="utf-8")) for f in p["files"]]' "$PEOPLE_JSON"
   )
   [ "${#INPUT_FILES[@]}" -gt 0 ] || { echo "PEOPLE_JSON にファイルが 1 本も無い" >&2; exit 2; }
-  gate capabilities "${INPUT_FILES[@]}"
-  echo "Step 0 OK: capabilities gate 通過"
+  gate "$WORK" capabilities "${INPUT_FILES[@]}"
+  echo "Step 0 OK: capabilities gate 通過（結果は work/capabilities.json・コミットしない）"
   "$PY" -I "$EXP_DIR/evaluate.py" real --people "$PEOPLE_JSON" --work "$WORK" --out "$WORK/real.json"
   echo "Step 2b OK: 実データの判定は work/real.json（区間と照合を含むのでコミットしない。notes.md へは集計だけを写す）"
   exit 0

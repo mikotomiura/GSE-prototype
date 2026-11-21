@@ -1,6 +1,8 @@
 """枝ごとの reflog から、コミットした時刻と作業の単位の名前だけを書き出す（auto-context-task-level・判断 6・13）。
 
-- 読むのは reflog の時刻と見出しの種類（`commit` かどうか）だけ。コミットの内容・メッセージ・ファイルは読まない。
+- 読むのは reflog の時刻と見出しの種類（`commit` かどうか）だけ。コミットの内容・ファイルは読まない。
+  見出し（`%gs`）は `commit: <件名>` の形なので件名がメモリに入るが、種類の判定にだけ使い、保存も表示もしない
+  （security-checker LOW）。`commit (merge)`・`cherry-pick`・`rebase` の行は数えない（本人がその枝で書いたコミットに限る）。
 - 単位: 「repo の名前@枝の名前」。worktree はほぼ枝ごとに切っているので、worktree の単位とほぼ同じになる。
   主のチェックアウトで枝を切り替えても、枝の reflog はその枝のコミットだけを持つ（判断 13）。
 - 消した枝と他の PC のコミットは入らない（reflog が無い）。
@@ -58,6 +60,7 @@ def reflog(common: Path, branch: str) -> list[tuple[int, str]]:
     out = []
     for line in txt.splitlines():
         sel, _, subj = line.partition("\t")
+        subj = subj[:20]  # 種類の判定に要る頭だけを残す
         m = re.search(r"@\{(\d+)\}", sel)
         if m:
             out.append((int(m.group(1)), subj))
@@ -71,6 +74,10 @@ def main() -> None:
     ap.add_argument("--since", required=True, help="YYYY-MM-DD（Asia/Tokyo）")
     ap.add_argument("--out", required=True, type=Path)
     a = ap.parse_args()
+    # 出力は実験の work/ の配下に限る（枝の名前と時刻を追跡対象の場所に書かない・security-checker LOW）。
+    work = (Path(__file__).resolve().parent / "work").resolve()
+    if not a.out.resolve().is_relative_to(work):
+        raise SystemExit("--out は実験の work/ の配下に置く")
     since = int(datetime.strptime(a.since, "%Y-%m-%d").replace(tzinfo=TZ).timestamp())
     commits = []
     per_unit: dict[str, int] = {}

@@ -17,6 +17,7 @@ import json
 import math
 import re
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -50,6 +51,8 @@ def load_config() -> dict:
     if "seed" in cfg:
         raise SystemExit("config.json に seed を置かない（SEED の 1 か所から読む）")
     cfg["seed"] = int((HERE / "SEED").read_text(encoding="utf-8").strip())
+    if not cfg["pseudo"] > 0:
+        raise SystemExit("config.json の pseudo は正にする（0 だと出力の確率が 0 になり前向きの尺度で 0 割りが起きる）")
     return cfg
 
 
@@ -118,44 +121,84 @@ def boundaries(lab: np.ndarray, starts: np.ndarray) -> list[int]:
 # 照合の材料を窓へ写す
 # ---------------------------------------------------------------------------
 
-def parse_diary_md(path: Path) -> dict:
-    """`work/diary.md` の表を読む。行は「時刻・作業・PC・後で」。日付は `## YYYY-MM-DD` の見出し。"""
+class DiaryError(SystemExit):
+    pass
+
+
+def _norm(x: str) -> str:
+    return unicodedata.normalize("NFKC", x).strip()
+
+
+def parse_diary_md(path: Path, pcs: dict[str, str]) -> dict:
+    """`work/diary.md` の表を読む。行は「時刻・作業・PC・後で」。日付は `## YYYY-MM-DD` で始まる見出し。
+
+    黙って誤らないよう、読めない行は止める（code-reviewer HIGH・判断 16）。
+    - `##` で始まる行は、日付で始まらなければ止める（後ろに曜日などが付くのはよい）。
+    - 表の行は、見出しの行・区切りの行・全部が空の行を飛ばす。それ以外で時刻が読めない・作業が空・
+      PC が `pcs`（NFKC で正規化して小文字にした名前 → 正式の名前）に無い行は止める。
+    - 全角の数字やコロンは NFKC で半角に直してから読む。
+    """
     entries = []
     day = None
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
-        m = re.match(r"^##\s+(\d{4}-\d{2}-\d{2})\s*$", line)
-        if m:
+    for no, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), start=1):
+        if line.startswith("##"):
+            m = re.match(r"^##\s+(\d{4}-\d{2}-\d{2})", _norm(line))
+            if not m:
+                raise DiaryError(f"作業の記録 {no} 行目: 見出しが日付（YYYY-MM-DD）で始まっていない")
             day = m.group(1)
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")] if line.startswith("|") else []
-        if day is None or len(cells) < 3 or not re.fullmatch(r"\d{1,2}:\d{2}", cells[0] or ""):
+        if not line.lstrip().startswith("|"):
             continue
+        cells = [_norm(c) for c in line.strip().strip("|").split("|")]
+        if all(c == "" for c in cells) or cells[0] == "時刻" or re.fullmatch(r"[-:\s]+", "".join(cells)):
+            continue
+        if day is None:
+            raise DiaryError(f"作業の記録 {no} 行目: 日付の見出しより前に表の行がある")
+        if len(cells) < 3 or not re.fullmatch(r"\d{1,2}:\d{2}", cells[0]):
+            raise DiaryError(f"作業の記録 {no} 行目: 時刻（HH:MM）が読めない")
+        if cells[1] == "":
+            raise DiaryError(f"作業の記録 {no} 行目: 作業が空")
+        pc = pcs.get(cells[2].lower())
+        if pc is None:
+            raise DiaryError(f"作業の記録 {no} 行目: PC が許す名前（{sorted(set(pcs.values()))}）に無い")
         t = datetime.strptime(f"{day} {cells[0]}", "%Y-%m-%d %H:%M").replace(tzinfo=TZ)
-        entries.append({"start_ms": int(t.timestamp() * 1000), "task": cells[1], "pc": cells[2],
+        entries.append({"start_ms": int(t.timestamp() * 1000), "task": cells[1], "pc": pc,
                         "late": bool(len(cells) > 3 and cells[3])})
     entries.sort(key=lambda e: e["start_ms"])
     return {"entries": entries, "end_ms": None}
 
 
-def load_diary(path: Path | None) -> dict | None:
+def diary_pcs(cfg: dict) -> dict[str, str]:
+    return {_norm(k).lower(): v for v, names in cfg["diary_pcs"].items() for k in [v, *names]}
+
+
+def load_diary(path: Path | None, cfg: dict) -> dict | None:
     if path is None:
         return None
-    return parse_diary_md(path) if Path(path).suffix == ".md" else load_json(path)
+    return parse_diary_md(path, diary_pcs(cfg)) if Path(path).suffix == ".md" else load_json(path)
 
 
-def diary_label(entry: dict, rule: str) -> str:
-    """作業の記録の 1 行から照合の名前を作る。`task_or_outside` は Mac 以外の PC の行を「Mac の外」にまとめる。"""
+def diary_label(entry: dict, rule: str) -> str | None:
+    """作業の記録の 1 行から照合の名前を作る。
+
+    - `task_or_outside`（主・判断 15）: Mac 以外の PC の行を「（Mac の外）」1 つにまとめる。
+    - `mac_only`（記述・判断 16）: Mac 以外の行は照合に入れない（None）。「Mac にいるかどうか」だけで差が出る
+      交絡を外して見るため。
+    - `task`: 作業名のまま。
+    """
     if rule == "task":
         return entry["task"]
     if rule == "task_or_outside":
         return entry["task"] if entry["pc"] == "Mac" else "（Mac の外）"
+    if rule == "mac_only":
+        return entry["task"] if entry["pc"] == "Mac" else None
     raise ValueError(rule)
 
 
-def per_window_diary(win, diary: dict | None, rule: str) -> tuple[list, list, list]:
+def per_window_diary(win, diary: dict | None, rule: str, entry_end: str = "next_entry") -> tuple[list, list, list]:
     """窓の中点を含む記録の行の名前・PC・ブロックの番号（記録の範囲の外は None）。
 
-    行はその次の行の始まりまで続く。ブロックは、照合の名前が同じ行が続くところを 1 つにしたもの
+    行はその次の行の始まりまで続く（`entry_end="day_end"` なら、その行の日の 24 時でも切る）。ブロックは、照合の名前が同じ行が続くところを 1 つにしたもの
     （帰無分布で入れ替える単位。無操作で列が切れてもブロックは切らない・判断 12）。
     """
     m = len(win.start_ms)
@@ -168,20 +211,27 @@ def per_window_diary(win, diary: dict | None, rule: str) -> tuple[list, list, li
     if end is None:
         last = datetime.fromtimestamp(ent[-1]["start_ms"] / 1000, tz=TZ)
         end = int(last.replace(hour=23, minute=59, second=59).timestamp() * 1000) + 1000
+    if entry_end not in ("next_entry", "day_end"):
+        raise ValueError(entry_end)
+    day_end = [int(datetime.fromtimestamp(e["start_ms"] / 1000, tz=TZ).replace(hour=23, minute=59, second=59)
+                   .timestamp() * 1000) + 1000 for e in ent]
     ent_block = []
     for j, e in enumerate(ent):
-        same = j > 0 and diary_label(ent[j - 1], rule) == diary_label(e, rule)
+        # 日の 24 時で切るときは、日をまたいだら同じ名前でも別のブロックにする（間に記録の無い時間がある）。
+        same = (j > 0 and diary_label(ent[j - 1], rule) == diary_label(e, rule)
+                and not (entry_end == "day_end" and day_end[j - 1] != day_end[j]))
         ent_block.append(ent_block[-1] if same else (ent_block[-1] + 1 if ent_block else 0))
     labels, pcs, blocks = [], [], []
     for s0, e0 in zip(win.start_ms, win.end_ms):
         mid = (int(s0) + int(e0)) // 2
         j = int(np.searchsorted(starts, mid, side="right")) - 1
-        if j < 0 or mid >= end:
+        lab = diary_label(ent[j], rule) if j >= 0 else None
+        if j < 0 or mid >= end or lab is None or (entry_end == "day_end" and mid >= day_end[j]):
             labels.append(None)
             pcs.append(None)
             blocks.append(None)
         else:
-            labels.append(diary_label(ent[j], rule))
+            labels.append(lab)
             pcs.append(ent[j]["pc"])
             blocks.append(ent_block[j])
     return labels, pcs, blocks
@@ -278,6 +328,28 @@ def detectable_runs(mi: float, max_len: int = 10_000) -> float:
     return math.inf
 
 
+def within_day_pvalue(labels: np.ndarray, ref: np.ndarray, blocks: np.ndarray, days: np.ndarray, n_perm: int,
+                      rng: np.random.Generator) -> float:
+    """ブロックに付いた `ref` の値を、同じ日のブロックの間でだけ入れ替えた帰無分布に対する NMI の片側 p。"""
+    obs = core.nmi(labels, ref)
+    nb = int(blocks.max()) + 1
+    val = np.empty(nb, dtype=object)
+    bday = np.empty(nb, dtype=object)
+    for b in range(nb):
+        idx = np.flatnonzero(blocks == b)
+        val[b] = ref[idx[0]]
+        bday[b] = days[idx[0]]
+    groups = [np.flatnonzero(bday == d) for d in sorted(set(bday.tolist()))]
+    ge = 0
+    for _ in range(n_perm):
+        perm = val.copy()
+        for g in groups:
+            perm[g] = val[rng.permutation(g)]
+        if core.nmi(labels, perm[blocks].astype(str)) >= obs - 1e-12:
+            ge += 1
+    return (1 + ge) / (1 + n_perm)
+
+
 def premise(p: stage1.Person, cfg: dict, d_lab: list, d_blk: list, crit: dict, seed: int) -> dict:
     """主の問い: 作業の記録で区切った作業ごとに、様式の連なりの出方が違うか（判断 11）。
 
@@ -286,7 +358,7 @@ def premise(p: stage1.Person, cfg: dict, d_lab: list, d_blk: list, crit: dict, s
     帰無分布はブロックに付いた作業名の入れ替え。届く p の下限も確かめる（1 段目の判断 14・15）。
     """
     seqs, _ = _sequences(p, cfg)
-    styles, names, blocks = [], [], []
+    styles, names, blocks, days = [], [], [], []
     for s in seqs:
         for o, mem in zip(s.obs, s.members):
             nm = d_lab[int(mem[0])]
@@ -295,9 +367,10 @@ def premise(p: stage1.Person, cfg: dict, d_lab: list, d_blk: list, crit: dict, s
             styles.append(int(o))
             names.append(nm)
             blocks.append(d_blk[int(mem[0])])
+            days.append(datetime.fromtimestamp(int(p.win.start_ms[int(mem[0])]) / 1000, tz=TZ).date().isoformat())
     out = {"runs": len(styles), "values": {}, "blocks": 0, "testable": False, "nmi": math.nan, "p": math.nan,
            "p_achievable": math.nan, "mi_nats_per_run": math.nan, "detectable_runs_lower_bound": None,
-           "median_task_runs": math.nan, "per_task_styles": {}}
+           "median_task_runs": math.nan, "per_task_styles": {}, "p_within_day": math.nan}
     if not styles:
         return out
     styles_a, names_a, blocks_a = np.array(styles), np.array(names, dtype=object).astype(str), np.array(blocks)
@@ -322,6 +395,10 @@ def premise(p: stage1.Person, cfg: dict, d_lab: list, d_blk: list, crit: dict, s
     if testable:
         out["nmi"], out["p"] = core.block_permutation_pvalue(styles_a, names_a, blocks_a, crit["n_perm"],
                                                              np.random.default_rng(seed + 11))
+        # 感度（記述・判断 16）: 日の中だけで入れ替える。様式と作業の両方に日ごとの流れがあると、全体の入れ替えの
+        # p は小さく出うる（記録は無作為化されていない）。ブロックの日はブロックの最初の連なりの日。
+        out["p_within_day"] = within_day_pvalue(styles_a, names_a, blocks_a, np.array(days), crit["n_perm"],
+                                                np.random.default_rng(seed + 13))
     else:
         out["nmi"] = core.nmi(styles_a, names_a)
     if not out["testable"]:
@@ -374,10 +451,16 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     style_copy = core.ari(lab[smask], sm[smask]) if smask.sum() >= 2 else math.nan
     st = np.array([s if s is not None else -9 for s in p.state])
 
-    diary = load_diary(diary_path)
-    d_lab, d_pc, d_blk = per_window_diary(win, diary, cfg["diary_label_rule"])
+    diary = load_diary(diary_path, cfg)
+    d_lab, d_pc, d_blk = per_window_diary(win, diary, cfg["diary_label_rule"], cfg["diary_entry_end"])
+    m_lab, _, m_blk = per_window_diary(win, diary, "mac_only", cfg["diary_entry_end"])
+    # 相対時刻のファイル由来の窓は、置き直した時刻が実時刻ではないので、実時刻で当てる照合に入れない（判断 16）。
+    d_lab = [None if r else x for x, r in zip(d_lab, p.relative)]
+    d_pc = [None if r else x for x, r in zip(d_pc, p.relative)]
+    m_lab = [None if r else x for x, r in zip(m_lab, p.relative)]
     commits = load_json(commits_path) if commits_path else None
     c_lab = per_window_commits(win, commits, cfg["commit_half_window_s"])
+    c_lab = [None if r else x for x, r in zip(c_lab, p.relative)]
 
     diary_cmp = compare(lab, d_lab, p.seams, crit, seed, d_blk)
     diary_cmp_v1 = compare(v1["labels"], d_lab, p.seams, crit, seed, d_blk)
@@ -391,6 +474,7 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     diary_nmi_common = core.nmi(lab[common], d_arr[common].astype(str)) if common.sum() >= 2 else math.nan
 
     prem = premise(p, cfg, d_lab, d_blk, crit, seed)
+    prem_mac = premise(p, cfg, m_lab, m_blk, crit, seed)
     stab = stability_ari(p, cfg, seed)
 
     failed: list[str] = []
@@ -439,6 +523,7 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
                if (lab != hm.MISSING).sum() >= 2 else math.nan},
         "identifier_estimate": identifier_estimate(lab, d_lab, d_pc),
         "premise": prem,
+        "premise_mac_only": prem_mac,
         "premise_verdict": prem.get("verdict", "undecidable"),
         "verdict": verdict,
         "failed": failed,
@@ -501,6 +586,9 @@ def cmd_synth(a: argparse.Namespace) -> int:
 def cmd_real(a: argparse.Namespace) -> int:
     cfg = load_config()
     crit = load_json(HERE / "criteria.json")["real"]
+    # 合成のときは work/synth/<seed>/ を --work に渡すので、実験の work/ の配下であればよい（security-checker LOW）。
+    if not a.work.resolve().is_relative_to((HERE / "work").resolve()):
+        raise SystemExit("--work は実験の work/ の配下に置く（実データ由来の中間成果物を追跡対象の場所に書かない）")
     if not a.out.resolve().is_relative_to(a.work.resolve()):
         raise SystemExit("--out は --work の配下に置く（照合の結果を追跡対象の場所に書かない）")
     people = load_json(a.people)
