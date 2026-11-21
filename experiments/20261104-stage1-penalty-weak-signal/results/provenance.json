@@ -1,0 +1,28 @@
+{
+ "run_id": "20261104T222554-56670",
+ "git_head": "4cbac8efadec66d5f8710f442ab95d078bdb85bd",
+ "dirty": [],
+ "reps": 400,
+ "jobs": 8,
+ "last_stage": "done",
+ "exit_code": 0,
+ "python": "3.14.4",
+ "numpy": "2.5.2",
+ "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+ "sha256": {
+  "scripts/check_mutations.py": "c1b7ce275abcdb4d3397041e62fdf86578fcbbf8c9543192af11cf17bf0b01fa",
+  "scripts/report_weak.py": "c396ff4fe7255937af6683fd11e59ba2cbbcb745ab145812ae39d73f8d6a8b18",
+  "scripts/selftest_weak.py": "0ba72b8628f76393592d17c78b9e55ebedb08173da1ebcb95fbbb0e519a00db4",
+  "scripts/weak.py": "a1bcad458b1f60353779ebb7cff621065dad8b18d528688c7166077cc029da7f",
+  "run.sh": "9d67293e8ae13b396388a401c9014dd36513e3a511e17304ba7655d5cb08699c",
+  "mutate.sh": "57888b709a55b2cc23c5d70d2fabb13aa5c854c38ae07e7fc0c3fde1e3058086",
+  "conditions.md": "7dc8175c71f17a62d0b730ae38bc53034680185cb2e425899920fd49b8c872f8",
+  "SEED": "2961e762519b41fe994e946866ae3f81799dfc5cfd421872827141ce8ba96a98",
+  "../20261104-stage1-penalty-synthetic/scripts/sim.py": "a6fca6154c5fe384106fd03f3898e791a3bc445574724221b6db2acc4d3a8c97",
+  "../20261104-stage1-penalty-synthetic/scripts/report.py": "4b59e74fba8a27b2ef90ac7e5603ff51bc66bc84d44f9db2b88d591ef2093c64",
+  "../20261104-stage1-penalty-synthetic/scripts/selftest.py": "3c53b9ad31bc46d313e5e851db3f38993afc4f48b2e7bff06455ba939fe076a3",
+  "../20261104-stage1-penalty-synthetic/results/summary.json": "93c8b4714a5e4844790356897ce85d1aa96a6f837cb75361284b29dd0b122a15"
+ },
+ "changed_during_run": [],
+ "end_hash_failed": false
+}
