@@ -261,7 +261,12 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     for f in files:
         env = work / pid / (f.stem + ".features.json")
         run_features(f, env)
-        w = core.make_windows(core.load_envelope(env), cfg["window_s"])
+        try:
+            w = core.make_windows(core.load_envelope(env), cfg["window_s"])
+        finally:
+            # 封筒は入力の約 4 倍の大きさになる（1.7 GB の入力で約 7 GB）。窓に集めたら消す
+            # （ディスクを守るため・共有しない中間成果物を残さないため）。
+            env.unlink(missing_ok=True)
         side = read_side(f)
         parts.append(w)
         decl_all += per_window_decl(w, side["decl"])
