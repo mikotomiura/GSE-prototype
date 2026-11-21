@@ -72,6 +72,7 @@
 
 pub mod activity;
 pub mod boundary;
+pub mod context;
 pub mod dispersion;
 pub mod idle_trim;
 pub mod quality;
@@ -81,6 +82,7 @@ pub mod stall_onset;
 
 pub use activity::T0Activity;
 pub use boundary::{Boundary, ImeShadowEvent};
+pub use context::{Context, ContextInputs, ImeStateLite, PointerBinLite};
 pub use dispersion::Dispersion;
 pub use quality::{HookHealthEvent, Quality};
 pub use restart::Restart;
@@ -187,6 +189,10 @@ pub struct FeatureRow {
     /// **観測区間の右端まで再停止を観測できなかった (右側打ち切り)** を意味する。
     /// ⚠️ 追跡時間そのものは載せていない (★ 生存解析に使うなら `blockers.md` 起票 20)。
     pub restart: Restart,
+    /// **文脈の量** (`docs/glossary.md`・`.steering/20261121-auto-context-segmentation/`)。
+    /// ⚠️★★★ **出力にだけ載せる** —— 他 Tier の計算・`features.rs` / `engine.rs` / HMM へは渡さない
+    /// (ADR-014 D4b)。非打鍵の列は入力が無ければ `null` (`context` モジュール doc の「欠測の読み方」)。
+    pub context: Context,
 }
 
 /// 連続する press 間の間隔 1 件。`resuming_ts` はその間隔を終える (2 打目の) press 時刻。
@@ -311,6 +317,33 @@ pub fn build_feature_rows_with_pole_inputs(
     stall_onset_inputs: &StallOnsetInputs,
     quality_inputs: &QualityInputs,
     pole_inputs: &PoleInputs,
+) -> Result<Vec<FeatureRow>, String> {
+    build_feature_rows_with_context_inputs(
+        keys,
+        paste_ts,
+        ime_events,
+        max_ticks,
+        stall_onset_inputs,
+        quality_inputs,
+        pole_inputs,
+        &ContextInputs::default(),
+    )
+}
+
+/// [`build_feature_rows_with_pole_inputs`] に **`context` の非打鍵の入力** ([`ContextInputs`]) を足した版。
+///
+/// ★ `context_inputs` は `context` 列にだけ効く。⚠️ 他の Tier の値は 1 バイトも変わらない
+/// (`tests::context_inputs_do_not_change_other_tiers` が固定)。
+#[allow(clippy::too_many_arguments)]
+pub fn build_feature_rows_with_context_inputs(
+    keys: &[KeyPress],
+    paste_ts: &[u64],
+    ime_events: &[ImeShadowEvent],
+    max_ticks: usize,
+    stall_onset_inputs: &StallOnsetInputs,
+    quality_inputs: &QualityInputs,
+    pole_inputs: &PoleInputs,
+    context_inputs: &ContextInputs,
 ) -> Result<Vec<FeatureRow>, String> {
     let pole = stall_onset_inputs.config.pole;
     if !pole.is_implemented() {
@@ -491,6 +524,14 @@ pub fn build_feature_rows_with_pole_inputs(
         stall_onset_inputs.feat_ts,
         stall_onset_inputs.config.hole_gap_ms,
     );
+    // ★ `context` は出力にだけ載せる (ADR-014 D4b)。⚠️ ここで作った値を上の Tier へ渡さない。
+    let mut context_col = context::context_column(
+        keys,
+        context_inputs,
+        tick_count,
+        grid_origin_ms,
+        ENGINE_TICK_MS,
+    );
 
     Ok((0..tick_count)
         .map(|idx| FeatureRow {
@@ -515,6 +556,7 @@ pub fn build_feature_rows_with_pole_inputs(
             quality: quality_col[idx].clone(),
             revision: revision_col[idx].clone(),
             restart: restart_col[idx].clone(),
+            context: std::mem::take(&mut context_col[idx]),
         })
         .collect())
 }
@@ -1124,5 +1166,65 @@ mod tests {
                 .all(|r| r.stall_onset.ime_overlap.is_none()),
             "onset でない行は null"
         );
+    }
+
+    /// `context_inputs` は `context` 列にだけ効く (ADR-014 D4b)。⚠️ 他の Tier の値は 1 バイトも変わらない。
+    /// ★ 陽性対照: `context` 自体は変わる (入力が効いていないのに緑になるのを防ぐ)。
+    #[test]
+    fn context_inputs_do_not_change_other_tiers() {
+        let keys: Vec<KeyPress> = [0, 100, 3_000, 3_100, 6_500, 6_600]
+            .iter()
+            .map(|&ms| key_at(ms))
+            .collect();
+        let feat_ts: Vec<u64> = (0..=7).map(|i| i * 1_000).collect();
+        let inputs = StallOnsetInputs {
+            feat_ts: &feat_ts,
+            task_kind_declarations: &[],
+            config: StallOnsetConfig::default(),
+        };
+        let focus = [1_500u64, 5_200];
+        let bins = [PointerBinLite { t: 2_000, moved: 4 }];
+        let ime = [ImeStateLite { t: 50, on: true }];
+        let with_context = build_feature_rows_with_context_inputs(
+            &keys,
+            &[],
+            &[],
+            TEST_MAX_TICKS,
+            &inputs,
+            &test_quality_inputs(),
+            &PoleInputs::default(),
+            &ContextInputs {
+                focus_ts: Some(&focus),
+                pointer_bins: Some(&bins),
+                ime_states: Some(&ime),
+            },
+        )
+        .expect("within tick limit");
+        let without = build_feature_rows(
+            &keys,
+            &[],
+            &[],
+            TEST_MAX_TICKS,
+            &inputs,
+            &test_quality_inputs(),
+        )
+        .expect("within tick limit");
+
+        let strip = |rows: &[FeatureRow]| -> Vec<serde_json::Value> {
+            rows.iter()
+                .map(|r| {
+                    let mut v = serde_json::to_value(r).expect("serialize");
+                    v.as_object_mut().expect("object").remove("context");
+                    v
+                })
+                .collect()
+        };
+        assert_eq!(strip(&with_context), strip(&without));
+        assert_ne!(
+            with_context.iter().map(|r| &r.context).collect::<Vec<_>>(),
+            without.iter().map(|r| &r.context).collect::<Vec<_>>()
+        );
+        assert_eq!(with_context[1].context.focus_transitions, Some(1));
+        assert_eq!(without[1].context.focus_transitions, None);
     }
 }

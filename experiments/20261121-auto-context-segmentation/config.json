@@ -1,0 +1,9 @@
+{
+  "window_s": 180,
+  "min_run_windows": 2,
+  "idle_gap_s": 300,
+  "k_max": 6,
+  "n_init": 5,
+  "stability_min_windows_per_half": 20,
+  "var_floor": 0.3
+}

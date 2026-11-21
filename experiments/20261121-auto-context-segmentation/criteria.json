@@ -1,0 +1,18 @@
+{
+  "status": "frozen 2026-11-21: 研究者が確定（decisions.md 判断 10・11）。実データを処理するより前のコミットに入れる。以後は値を変えない（変えるなら別の版として記録する）。v1.1（同日・実データの前）: 陽性に positive_min_label_kinds=2 を足した（判断 12・壊した入力の対照が、陽性の基準が切り替えの検出を要求していない穴を見つけた）。v1.2（同日・実データの前・研究者が決定）: (1) 宣言を宣言自身と照合しても p < decl_p_max に届かない人は判定できない、(2) 量の軸だけで再現でき、かつ量以外の軸だけでは再現できない（non_quantity_ari_min 未満）ときだけ「打鍵の多さで割れただけ」（判断 14）。v1.3（同日・実データの前・研究者が決定）: 宣言との照合の帰無分布を、巡回でずらす方式から、宣言のブロック（ファイルの中で同じ宣言が続く区間）に付いた値を入れ替える方式に変えた。min_shift_windows は使わなくなったので外した（判断 15）",
+  "synthetic": {
+    "boundary_f1_min": 0.8,
+    "ari_min": 0.7,
+    "negative_max_label_kinds": 1,
+    "positive_min_label_kinds": 2
+  },
+  "real": {
+    "stability_ari_min": 0.5,
+    "quantity_only_ari_max": 0.8,
+    "decl_min_windows_per_value": 10,
+    "decl_p_max": 0.05,
+    "n_perm": 2000,
+    "non_quantity_ari_min": 0.5
+  },
+  "window_note": "窓の数で書いた項目は config.json の window_s=180 秒の窓で数える（10 窓 = 30 分・20 窓 = 60 分）"
+}

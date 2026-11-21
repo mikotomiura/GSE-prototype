@@ -707,6 +707,12 @@ fn pole_applicability(pole: Pole, modifier_rows: Option<u64>) -> (bool, Option<&
 /// (`schema/current.json` の `pointer_bin`: 「行が無い＝活動が無かった」は宣言がある場合に限る)。
 /// `None` (`capabilities` 自体が無い旧ログ) も宣言なし。
 fn declares_pointer_bin(capabilities: Option<&serde_json::Value>) -> bool {
+    declares_line_type(capabilities, "pointer_bin")
+}
+
+/// `capabilities` のどれかの群に行種 `line_type` の宣言があるか。
+/// ★ 群 (`unconditional` / `threshold_gated` / `config_gated`) は区別しない ([`declares_pointer_bin`] と同じ規則)。
+fn declares_line_type(capabilities: Option<&serde_json::Value>, line_type: &str) -> bool {
     capabilities
         .and_then(serde_json::Value::as_object)
         .is_some_and(|groups| {
@@ -714,8 +720,18 @@ fn declares_pointer_bin(capabilities: Option<&serde_json::Value>) -> bool {
                 .values()
                 .filter_map(serde_json::Value::as_array)
                 .flatten()
-                .any(|name| name.as_str() == Some("pointer_bin"))
+                .any(|name| name.as_str() == Some(line_type))
         })
+}
+
+/// `context` (文脈の量) の非打鍵の列を出すかを決める (`.steering/20261121-auto-context-segmentation/`)。
+///
+/// ★ 3 状態は極 B の `pointer_applicability` と同じ規則:
+/// 1. 宣言が**無い** → `None` (計器が無かった。全 tick で `null`)。
+/// 2. 宣言は**ある**が行が **0 本** → `None` (判定不能。`config_gated` の 0 行は「無かった」と読めない)。
+/// 3. 宣言があり行が **1 本以上** → `Some(rows)` (行の無い tick は 0 / `false`)。
+fn context_rows_if_applicable<T>(declared: bool, rows: &[T]) -> Option<&[T]> {
+    (declared && !rows.is_empty()).then_some(rows)
 }
 
 /// 極 B の適用可否 (`(適用可否, 理由コード)`)。★ 判定式は 3 状態 (`decisions.md` 判断 26・2026-09-25 是正):
@@ -3019,6 +3035,25 @@ fn main() -> ExitCode {
             modifier_intervals: modifier_scan.as_ref().map(|s| s.intervals.as_slice()),
             pointer_active_ts,
         };
+        // ★ `context` (文脈の量) の非打鍵の行。全極で読むが、行に載せるだけで検出・HMM へは渡さない (ADR-014 D4b)。
+        let context_rows = match collect_context_rows(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect context rows: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let context_inputs = gse_next_lib::analysis::feat_offline::ContextInputs {
+            focus_ts: context_rows_if_applicable(
+                declares_line_type(capabilities.as_ref(), "focus_transition"),
+                &context_rows.focus_ts,
+            ),
+            pointer_bins: context_rows_if_applicable(pointer_declared, &context_rows.pointer_bins),
+            ime_states: context_rows_if_applicable(
+                declares_line_type(capabilities.as_ref(), "ime_state"),
+                &context_rows.ime_states,
+            ),
+        };
         // ★ 封筒の `provenance.observed_intervals` は「実際に評価した区間」。極 B では抑制区間を除いた区間で、
         //   ⚠️ 検出と**同じ 2 つの関数** (`pointer_suppression_intervals` / `evaluation_intervals`) から作る
         //   (区間の定義をここで作り直さない)。極 B 以外は観測区間そのまま。
@@ -3046,21 +3081,23 @@ fn main() -> ExitCode {
             capabilities_declared: capabilities.is_some(),
             hook_health: &hook_health_events,
         };
-        let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows_with_pole_inputs(
-            &keys,
-            &paste_ts,
-            &ime_events,
-            MAX_FEATURE_TICKS,
-            &stall_onset_inputs,
-            &quality_inputs,
-            &pole_inputs,
-        ) {
-            Ok(v) => v,
-            Err(msg) => {
-                tracing::error!("failed to build feature rows: {}", msg);
-                return ExitCode::from(1);
-            }
-        };
+        let rows =
+            match gse_next_lib::analysis::feat_offline::build_feature_rows_with_context_inputs(
+                &keys,
+                &paste_ts,
+                &ime_events,
+                MAX_FEATURE_TICKS,
+                &stall_onset_inputs,
+                &quality_inputs,
+                &pole_inputs,
+                &context_inputs,
+            ) {
+                Ok(v) => v,
+                Err(msg) => {
+                    tracing::error!("failed to build feature rows: {}", msg);
+                    return ExitCode::from(1);
+                }
+            };
         let envelope = FeatureEnvelope {
             provenance: FeatureProvenance {
                 sharing: SharingMarker::default(),
@@ -3970,6 +4007,99 @@ fn collect_all_feat_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, Strin
 struct PointerBinTimestampDto {
     /// **ビンの終端時刻** (`analysis/pointer_bin.rs`)。1 行が覆うのは `(t − 1000, t]`。
     t: u64,
+}
+
+/// `context` 用: `pointer_bin` 行の `t` と `moved` だけを読む DTO (★ 他のフィールドは読まない)。
+#[derive(Debug, serde::Deserialize)]
+struct PointerBinContextDto {
+    t: u64,
+    moved: u8,
+}
+
+/// `context` 用: `focus_transition` 行の `t` だけを読む DTO。
+#[derive(Debug, serde::Deserialize)]
+struct FocusTransitionContextDto {
+    t: u64,
+}
+
+/// `context` (文脈の量) の非打鍵の行を 1 回の走査で集める。
+#[derive(Debug, Default)]
+struct ContextRows {
+    focus_ts: Vec<u64>,
+    pointer_bins: Vec<gse_next_lib::analysis::feat_offline::PointerBinLite>,
+    ime_states: Vec<gse_next_lib::analysis::feat_offline::ImeStateLite>,
+}
+
+/// `--features` の `context` (`.steering/20261121-auto-context-segmentation/`) 用に、
+/// `focus_transition` / `pointer_bin` / `ime_state` 行の**時刻と、`context` が使う値だけ**を返す。
+///
+/// ★ `--features` 経路からだけ呼ぶ (`--snapshot` / `--metrics` / `--calibration` へは配線しない・ADR-014 D4b)。
+/// ⚠️ 読めない行は数えて warn し、既定値で埋めない ([`collect_pointer_bin_timestamps`] と同じ作法)。
+fn collect_context_rows(session_path: &PathBuf) -> Result<ContextRows, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let mut out = ContextRows::default();
+    let mut parse_failed_lines: u64 = 0;
+    let mut malformed_lines: u64 = 0;
+    for (lineno, line) in BufReader::new(file).lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        match ev {
+            ReplayEvent::FocusTransition(v) => {
+                match serde_json::from_value::<FocusTransitionContextDto>(v) {
+                    Ok(dto) => out.focus_ts.push(dto.t),
+                    Err(_) => malformed_lines += 1,
+                }
+            }
+            ReplayEvent::PointerBin(v) => match serde_json::from_value::<PointerBinContextDto>(v) {
+                Ok(dto) => {
+                    out.pointer_bins
+                        .push(gse_next_lib::analysis::feat_offline::PointerBinLite {
+                            t: dto.t,
+                            moved: dto.moved,
+                        })
+                }
+                Err(_) => malformed_lines += 1,
+            },
+            ReplayEvent::ImeState { t, on, .. } => {
+                out.ime_states
+                    .push(gse_next_lib::analysis::feat_offline::ImeStateLite { t, on });
+            }
+            _ => {}
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_context_rows: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if malformed_lines > 0 {
+        tracing::warn!(
+            skipped = malformed_lines,
+            "collect_context_rows: focus_transition / pointer_bin lines that did not match the \
+             logger format were skipped (not folded into a placeholder)"
+        );
+    }
+    Ok(out)
 }
 
 /// `--features --pole pointer_b` (issue 006) 用: NDJSON の `{"type":"pointer_bin", ...}` 行の**時刻だけ**を返す

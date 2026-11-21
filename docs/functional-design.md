@@ -170,6 +170,11 @@ O1 の自然作業のセッション NDJSON から、1 Hz の特徴行（stall o
   空いた区間の `feat` 行を落とす（前後の入力を含む秒の行は残す）。O1 のアプリは宣言を自分では外さず、PC が起きていれば `feat` 行が途切れないことへの対処。
   落とした量は `provenance.input_gap_trim`。この前処理なし（`--set idle_trim_input_gap_ms=0`）、無入力の末尾の前処理なし（`idle_trim_max_ms=0`・v1.3 では長い無入力の前処理は掛かったまま）、両方なしの 3 本を並べて報告する（v1.3 §7.4）。
 - **振る舞い上の制約**: 出力は `gse-dataset` へ共有しない（`scripts/check_no_feature_output.sh`）。`features.rs` / `engine.rs` は変えない。
+- **文脈の量 `context`**（2026-11-21・`.steering/20261121-auto-context-segmentation/`）: 各行に、その 1 秒の中のキーの種類の構成（全 press）・
+  `focus_transition` 行の数・`pointer_bin` 行の有無と `moved` の合計・tick の終端で IME モードがオンか、を載せる。窓では集約しない（窓の長さは解析側の引数）。
+  非打鍵の列は、`capabilities` に宣言が無いか、宣言があって行が 0 本なら `null`。研究解析の層（作業の区間を本人の中でまとめて task-A などと名前を付ける・
+  `experiments/20261121-auto-context-segmentation/`）の材料であり、他の列の計算・HMM・推定・介入には渡さない（ADR-014 D4b・ADR-010 D3）。
+  フォーカス遷移の数は、同じアプリの中の窓の切り替えも数えるので、注意の逸脱の頻度としては読まない。
 
 ### 3.11 フック生存監視（hook liveness）
 
