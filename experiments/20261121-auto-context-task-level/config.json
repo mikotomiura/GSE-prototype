@@ -1,0 +1,15 @@
+{
+  "mean_stay_windows": 15,
+  "reset_idle_s": 3600,
+  "k_max": 6,
+  "n_init": 5,
+  "pseudo": 1.0,
+  "stability_min_obs_per_half": 100,
+  "diary_label_rule": "task_or_outside",
+  "commit_half_window_s": 1800,
+  "synth_boundary_tol_s": 900,
+  "v1_task_window_windows": 10,
+  "v1_min_observed_frac": 0.5,
+  "v1_pseudo": 0.5,
+  "v1_min_run": 2
+}

@@ -12,12 +12,12 @@
 
 ## 実装（experiments/）
 - [ ] `_template` から実験のディレクトリを整える（run.sh の Step 0・SEED・config・env）
-- [ ] `act_hmm.py`: カテゴリの出力の HMM（前向き後ろ向き・Baum–Welch・Viterbi・欠測・リセット・BIC）
-- [ ] `test_act_hmm.py`: 小さな列で総当たりの尤度と比べる・欠測・リセット・K=1 と同じになる場合
-- [ ] `act_window.py`（v1・記述用）: 30 分の窓の割合 → 混合ガウス → 平滑化
-- [ ] `gen_synth_task.py`: 作業 = 様式の混ぜ方の 24 時間の記録（陽性・陰性）と、合成の作業の記録・コミットの列（一致・不一致・区切りが少ない）
+- [x] `act_hmm.py`: カテゴリの出力の HMM（前向き後ろ向き・Baum–Welch・Viterbi・欠測・リセット・BIC）
+- [x] `test_act_hmm.py`: 小さな列で総当たりの尤度と比べる・欠測・リセット・K=1 と同じになる場合
+- [x] `act_window.py`（v1・記述用）: 30 分の窓の割合 → 混合ガウス → 平滑化
+- [x] `gen_synth_task.py`: 作業 = 様式の混ぜ方の 24 時間の記録（陽性・陰性）と、合成の作業の記録・コミットの列（一致・不一致・区切りが少ない）
 - [ ] `git_commits.py`: worktree の reflog から時刻と worktree の名前だけを `work/` に書き出す
-- [ ] `evaluate.py`: synth / real（照合・循環の検査・判定・識別子の見積もり）
+- [ ] `evaluate.py`: synth / real（書いた・合成で未実行。gse-replay のビルドは空きを作ってから・判断 8）（照合・循環の検査・判定・識別子の見積もり）
 - [ ] 合成の対照（陽性・陰性・壊した入力・宣言と作業の記録の経路）を終了コードで確かめる
 - [ ] `criteria.json` を研究者と確定し、実データより前にコミットする
 - [ ] 本人の入力の写しを取って固定し、`data.md` に SHA-256 の要約値を書く

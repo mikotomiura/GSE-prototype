@@ -1,0 +1,16 @@
+{
+  "status": "draft（研究者と確定する前・実データは未処理）",
+  "synthetic": {
+    "boundary_f1_min": 0.8,
+    "ari_min": 0.7,
+    "positive_min_k": 2,
+    "negative_max_k": 1
+  },
+  "real": {
+    "stability_ari_min": 0.5,
+    "style_copy_ari_max": 0.8,
+    "ref_min_windows_per_value": 10,
+    "ref_p_max": 0.05,
+    "n_perm": 2000
+  }
+}
