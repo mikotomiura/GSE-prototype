@@ -31,6 +31,8 @@ class Seq:
     obs: np.ndarray
     gap: np.ndarray
     index: np.ndarray
+    # 連なりの列（`build_run_sequences`）のときだけ: 観測 i が代表する元の窓の位置の列。
+    members: list[np.ndarray] | None = None
 
 
 def build_sequences(labels: np.ndarray, missing: np.ndarray, reset_before: np.ndarray) -> list[Seq]:
@@ -62,6 +64,29 @@ def build_sequences(labels: np.ndarray, missing: np.ndarray, reset_before: np.nd
     if obs:
         seqs.append(Seq(np.array(obs), np.array(gap), np.array(idx)))
     return seqs
+
+
+def build_run_sequences(labels: np.ndarray, missing: np.ndarray, reset_before: np.ndarray) -> list[Seq]:
+    """同じ様式が続く窓を 1 つの観測（様式の連なり）にまとめた列を作る（判断 9）。
+
+    様式は数窓続くので、窓ごとの列に HMM を当てると、各状態が様式 1 つを出すだけになり様式を写す
+    （合成の対照で様式の写しの ARI 0.98）。連なりにまとめると、作業は「どの様式の連なりがどれだけ出るか」になる。
+    連なりは、様式が変わるか、列が切れる（リセット）ところで終わる。連なりの中の欠測（短い無操作）は無視する。
+    連なりの間の遷移は 1 歩とする（`gap` はすべて 0）。
+    """
+    out: list[Seq] = []
+    for s in build_sequences(labels, missing, reset_before):
+        obs: list[int] = []
+        members: list[list[int]] = []
+        for o, i in zip(s.obs, s.index):
+            if obs and obs[-1] == int(o):
+                members[-1].append(int(i))
+            else:
+                obs.append(int(o))
+                members.append([int(i)])
+        out.append(Seq(np.array(obs), np.zeros(len(obs), dtype=int), np.array([mm[0] for mm in members]),
+                       [np.array(mm) for mm in members]))
+    return out
 
 
 def stay_prob(mean_stay_windows: float) -> float:
@@ -230,7 +255,12 @@ def decode(seqs: list[Seq], h: Hmm, m: int) -> np.ndarray:
     out = np.full(m, MISSING, dtype=int)
     cache = _TransCache(h.k, h.p_stay)
     for s in seqs:
-        out[s.index] = viterbi(s, h, cache)
+        path = viterbi(s, h, cache)
+        if s.members is None:
+            out[s.index] = path
+        else:
+            for st, mem in zip(path, s.members):
+                out[mem] = st
     return out
 
 

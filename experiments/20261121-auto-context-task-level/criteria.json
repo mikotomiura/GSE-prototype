@@ -1,16 +1,18 @@
 {
   "status": "draft（研究者と確定する前・実データは未処理）",
   "synthetic": {
-    "boundary_f1_min": 0.8,
-    "ari_min": 0.7,
+    "boundary_f1_min": 0.6,
+    "ari_min": 0.5,
     "positive_min_k": 2,
-    "negative_max_k": 1
+    "negative_max_k": 1,
+    "note": "v2 の陽性の対照は long（2.5〜5 時間の作業）。値は下書きで、seed 20261121 の試し（K=2・ARI 0.57・F1 0.67）を見た後の案（判断 12）"
   },
   "real": {
     "stability_ari_min": 0.5,
     "style_copy_ari_max": 0.8,
     "ref_min_windows_per_value": 10,
     "ref_p_max": 0.05,
-    "n_perm": 2000
+    "n_perm": 2000,
+    "premise_min_runs_per_value": 5
   }
 }

@@ -1,0 +1,156 @@
+{
+  "files": [
+    {
+      "file_id": "79554490",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9df1e5eb",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0f4988b8",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0b375754",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8f23f45d",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3510cae4",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "79554490",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9df1e5eb",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0f4988b8",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0b375754",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8f23f45d",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3510cae4",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "14c2498e",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f0593796",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "a168330b",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f2426ee8",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "79554490",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9df1e5eb",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0f4988b8",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0b375754",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "8f23f45d",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3510cae4",
+      "app_version": "synthetic",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    }
+  ],
+  "verdicts": [
+    {
+      "line_type": "key",
+      "verdict": "PRESENT",
+      "rows": 1255244,
+      "declared_as": [
+        "unconditional"
+      ],
+      "note": "宣言: unconditional"
+    },
+    {
+      "line_type": "feat",
+      "verdict": "PRESENT",
+      "rows": 387720,
+      "declared_as": [
+        "unconditional"
+      ],
+      "note": "宣言: unconditional"
+    }
+  ]
+}

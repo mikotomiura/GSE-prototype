@@ -153,6 +153,25 @@ class FitTest(unittest.TestCase):
         self.assertEqual(h.k, 1)
 
 
+class RunSequenceTest(unittest.TestCase):
+    def test_runs_merge_same_style_and_skip_short_missing(self):
+        labels = np.array([0, 0, 9, 0, 1, 1, 2, 2, 2])
+        missing = np.array([0, 0, 1, 0, 0, 0, 0, 0, 0], dtype=bool)
+        reset = np.array([0, 0, 0, 0, 0, 0, 0, 1, 0], dtype=bool)
+        seqs = hm.build_run_sequences(labels, missing, reset)
+        self.assertEqual([s.obs.tolist() for s in seqs], [[0, 1, 2], [2]])
+        self.assertEqual([m.tolist() for m in seqs[0].members], [[0, 1, 3], [4, 5], [6]])
+        self.assertEqual(seqs[1].members[0].tolist(), [7, 8])
+
+    def test_decode_fills_members(self):
+        labels = np.array([0, 0, 9, 1, 1])
+        missing = np.array([0, 0, 1, 0, 0], dtype=bool)
+        seqs = hm.build_run_sequences(labels, missing, np.zeros(5, dtype=bool))
+        h = hm.Hmm(np.array([0.5, 0.5]), np.array([[0.9, 0.1], [0.1, 0.9]]), 0.6)
+        out = hm.decode(seqs, h, 5)
+        self.assertEqual(out.tolist(), [0, 0, -1, 1, 1])
+
+
 class NameTest(unittest.TestCase):
     def test_names_by_total_duration(self):
         names = hm.name_states(np.array([1, 1, 0, -1, 1]), np.full(5, 180.0))

@@ -4,8 +4,12 @@
 6〜15 分ごとに様式を入れ替え、その入れ替え方（どの様式がどれだけ出るか）を作業ごとに変える。
 合成の記録は実データに混ぜない。
 
-- `positive`: 3 つの作業を 60〜150 分ごとに切り替える（約 16 時間）。
-- `negative`: 作業が 1 つ（同じ混ぜ方で様式が入れ替わる）。陽性の基準で判定すると落ちるはずの入力（= 作業の切り替えを消した入力）。
+- `positive`: 3 つの作業を 90〜180 分ごとに切り替える（12 ブロック・約 27 時間）。
+- 様式は前と違うものを混ぜ方から引き、6〜12 分続ける（1 段目の実データで様式が 6〜12 分ごとに入れ替わった
+  ことに合わせる・1 段目の notes.md「読み方」・判断 9）。
+- `long`: `positive` と同じ作業を 150〜300 分ごとに切り替える（v2 の自動のまとめの陽性の対照・判断 11）。
+- `negative`: 3 つの作業の混ぜ方が同じ（名前だけが違う）。主の問いで p が大きくなり、v2 では K = 1 になるはず
+  （陽性の基準で判定すると落ちるはずの入力 = 作業の切り替えを消した入力）。
 
 照合の経路の確かめのために、次も書く（`--out-dir` の下）。
 - `diary_match.json`: 作業の記録が真の作業と一致する
@@ -34,28 +38,36 @@ g1 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(g1)
 
 T0 = 1_700_000_000_000
+# 作業ごとに主な様式を 2 つずつずらす。混ぜ方が重なりすぎると、作業 1 つに連なりが 10 個ほどしかないため、
+# 真の分け方でも切り替えのコストが分けた得を上回り、どの手法でも見分けられない（判断 10）。
 TASKS = {
-    "X": {"mix": {"typing_ja": 0.6, "editing": 0.3, "pointer": 0.1}, "task_kind": "argumentative",
+    "X": {"mix": {"typing_ja": 0.5, "editing": 0.4, "pointer": 0.1}, "task_kind": "argumentative",
           "worktree": "repo-x"},
-    "Y": {"mix": {"pointer": 0.5, "switching": 0.4, "editing": 0.1}, "task_kind": "vibe_coding",
+    "Y": {"mix": {"pointer": 0.5, "switching": 0.4, "typing_ja": 0.1}, "task_kind": "vibe_coding",
           "worktree": "repo-y"},
-    "Z": {"mix": {"editing": 0.5, "switching": 0.25, "typing_ja": 0.25}, "task_kind": "other",
+    "Z": {"mix": {"editing": 0.45, "switching": 0.45, "pointer": 0.1}, "task_kind": "other",
           "worktree": "repo-z"},
-    "N": {"mix": {"typing_ja": 0.3, "pointer": 0.25, "switching": 0.2, "editing": 0.25},
-          "task_kind": "other", "worktree": "repo-n"},
 }
+# 陰性: 混ぜ方は同じで、作業の名前（と宣言・worktree）だけが違う 3 つ（主の問いで p が大きくなるはず・判断 11）。
+for _i, _kind in enumerate(["argumentative", "vibe_coding", "other"], start=1):
+    TASKS[f"N{_i}"] = {"mix": {"typing_ja": 0.3, "pointer": 0.25, "switching": 0.2, "editing": 0.25},
+                       "task_kind": _kind, "worktree": f"repo-n{_i}"}
 FILE_SPLIT_S = 5 * 3600  # 記録を約 5 時間ごとのファイルに分ける（作業の区切りとは揃えない）
 LONG_IDLE_S = 90 * 60  # 1 回だけ挟む長い無操作（列のリセットが起きる長さ）
 
 
 def plan_blocks(kind: str, rng: random.Random) -> list[tuple[str, int]]:
+    pos = ["X", "Y", "Z", "X", "Z", "Y", "X", "Y", "Z", "Y", "X", "Z"]
     if kind == "positive":
-        order = ["X", "Y", "Z", "X", "Z", "Y", "X", "Y", "Z"]
+        order, lo, hi = pos, 90, 180
+    elif kind == "long":
+        # v2（自動のまとめ）の陽性の対照: 長く違う作業（判断 10・11）。
+        order, lo, hi = pos, 150, 300
     elif kind == "negative":
-        order = ["N"] * 9
+        order, lo, hi = [t.replace("X", "N1").replace("Y", "N2").replace("Z", "N3") for t in pos], 90, 180
     else:
         raise SystemExit(f"unknown kind: {kind}")
-    return [(t, rng.randint(60, 150) * 60) for t in order]
+    return [(t, rng.randint(lo, hi) * 60) for t in order]
 
 
 def plan_styles(blocks: list[tuple[str, int]], rng: random.Random) -> list[tuple[str, str, int]]:
@@ -65,14 +77,18 @@ def plan_styles(blocks: list[tuple[str, int]], rng: random.Random) -> list[tuple
         mix = TASKS[task]["mix"]
         names, weights = zip(*mix.items())
         left = dur
+        prev = None
         while left > 0:
             if rng.random() < 0.08:
                 d = min(left, rng.randint(5, 15) * 60)
                 out.append((task, "idle", d))
                 left -= d
                 continue
-            d = min(left, rng.randint(6, 15) * 60)
-            out.append((task, rng.choices(names, weights=weights)[0], d))
+            d = min(left, rng.randint(6, 12) * 60)
+            cand = [(n, w) for n, w in zip(names, weights) if n != prev]
+            style = rng.choices([c[0] for c in cand], weights=[c[1] for c in cand])[0]
+            out.append((task, style, d))
+            prev = style
             left -= d
         if bi == 2:
             out.append((task, "idle", LONG_IDLE_S))
@@ -186,7 +202,7 @@ def diaries(truth: dict, rng: random.Random) -> dict[str, dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--kind", required=True, choices=["positive", "negative"])
+    ap.add_argument("--kind", required=True, choices=["positive", "long", "negative"])
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--out-dir", required=True, type=Path)
     a = ap.parse_args()

@@ -1,5 +1,5 @@
 {
-  "mean_stay_windows": 15,
+  "mean_stay_runs": 8,
   "reset_idle_s": 3600,
   "k_max": 6,
   "n_init": 5,

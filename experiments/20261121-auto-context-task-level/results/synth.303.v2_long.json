@@ -1,0 +1,28 @@
+{
+  "stage1_k": 6,
+  "k": 1,
+  "emission": [
+    [
+      0.214,
+      0.308,
+      0.008,
+      0.011,
+      0.278,
+      0.18
+    ]
+  ],
+  "boundary_f1": 0.0,
+  "boundary_recall": 0.0,
+  "ari": 0.0,
+  "style_copy_ari": 0.0,
+  "v1": {
+    "k": 3,
+    "ari": 0.745374554271834,
+    "boundary_f1": 0.6363636363636364
+  },
+  "criteria": "positive",
+  "replay": [
+    "gse-replay"
+  ],
+  "pass": false
+}

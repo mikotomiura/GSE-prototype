@@ -62,7 +62,8 @@ def dumps(x) -> str:
 # ---------------------------------------------------------------------------
 
 def _sequences(p: stage1.Person, cfg: dict, lo: int = 0, hi: int | None = None) -> tuple[list[hm.Seq], int]:
-    raw = p.res.raw_labels
+    # 観測は 1 段目の平滑化の後の様式の名前を、同じ様式の連なりにまとめたもの（判断 9）。
+    raw = p.res.labels
     m = len(raw)
     hi = m if hi is None else hi
     win = p.win
@@ -71,9 +72,10 @@ def _sequences(p: stage1.Person, cfg: dict, lo: int = 0, hi: int | None = None) 
     reset = reset.copy()
     reset[lo] = True
     sl = slice(lo, hi)
-    seqs = hm.build_sequences(raw[sl], win.idle[sl], reset[sl])
+    seqs = hm.build_run_sequences(raw[sl], raw[sl] == IDLE, reset[sl])
     for s in seqs:
         s.index = s.index + lo
+        s.members = [mm + lo for mm in s.members]
     n_sym = int(raw[raw != IDLE].max()) + 1 if (raw != IDLE).any() else 1
     return seqs, n_sym
 
@@ -83,21 +85,21 @@ def fit_v2(p: stage1.Person, cfg: dict, seed: int) -> dict:
     m = len(p.res.raw_labels)
     if not seqs:
         return {"labels": np.full(m, hm.MISSING, dtype=int), "k": 0, "n_symbols": n_sym, "emis": None}
-    h = hm.select_hmm(seqs, n_sym, cfg["k_max"], hm.stay_prob(cfg["mean_stay_windows"]), seed,
+    h = hm.select_hmm(seqs, n_sym, cfg["k_max"], hm.stay_prob(cfg["mean_stay_runs"]), seed,
                       cfg["n_init"], cfg["pseudo"])
     return {"labels": hm.decode(seqs, h, m), "k": h.k, "n_symbols": n_sym, "emis": h.emis.round(3).tolist()}
 
 
 def stability_ari(p: stage1.Person, cfg: dict, seed: int) -> float:
     """観測のある窓を時間で半分に分け、前半で学んだモデルと後半だけで学んだモデルで後半を復号した列の ARI。"""
-    obs_idx = np.flatnonzero(~p.win.idle)
+    obs_idx = np.flatnonzero(p.res.labels != IDLE)
     if len(obs_idx) < 2 * cfg["stability_min_obs_per_half"]:
         return math.nan
     cut = int(obs_idx[len(obs_idx) // 2])
     m = len(p.res.raw_labels)
     first, n_sym = _sequences(p, cfg, 0, cut)
     second, _ = _sequences(p, cfg, cut, m)
-    ps = hm.stay_prob(cfg["mean_stay_windows"])
+    ps = hm.stay_prob(cfg["mean_stay_runs"])
     h1 = hm.select_hmm(first, n_sym, cfg["k_max"], ps, seed, cfg["n_init"], cfg["pseudo"])
     h2 = hm.select_hmm(second, n_sym, cfg["k_max"], ps, seed + 1, cfg["n_init"], cfg["pseudo"])
     l1 = hm.decode(second, h1, m)
@@ -150,11 +152,15 @@ def diary_label(entry: dict, rule: str) -> str:
     raise ValueError(rule)
 
 
-def per_window_diary(win, diary: dict | None, rule: str) -> tuple[list, list]:
-    """窓の中点を含む記録の行の名前と PC（記録の範囲の外は None）。行はその次の行の始まりまで続く。"""
+def per_window_diary(win, diary: dict | None, rule: str) -> tuple[list, list, list]:
+    """窓の中点を含む記録の行の名前・PC・ブロックの番号（記録の範囲の外は None）。
+
+    行はその次の行の始まりまで続く。ブロックは、照合の名前が同じ行が続くところを 1 つにしたもの
+    （帰無分布で入れ替える単位。無操作で列が切れてもブロックは切らない・判断 12）。
+    """
     m = len(win.start_ms)
     if diary is None or not diary["entries"]:
-        return [None] * m, [None] * m
+        return [None] * m, [None] * m, [None] * m
     ent = diary["entries"]
     starts = np.array([e["start_ms"] for e in ent])
     # 最後の行の終わり: 明示が無ければ、最後の行の日の終わり（記録した最後の日の 24 時）まで。
@@ -162,17 +168,23 @@ def per_window_diary(win, diary: dict | None, rule: str) -> tuple[list, list]:
     if end is None:
         last = datetime.fromtimestamp(ent[-1]["start_ms"] / 1000, tz=TZ)
         end = int(last.replace(hour=23, minute=59, second=59).timestamp() * 1000) + 1000
-    labels, pcs = [], []
+    ent_block = []
+    for j, e in enumerate(ent):
+        same = j > 0 and diary_label(ent[j - 1], rule) == diary_label(e, rule)
+        ent_block.append(ent_block[-1] if same else (ent_block[-1] + 1 if ent_block else 0))
+    labels, pcs, blocks = [], [], []
     for s0, e0 in zip(win.start_ms, win.end_ms):
         mid = (int(s0) + int(e0)) // 2
         j = int(np.searchsorted(starts, mid, side="right")) - 1
         if j < 0 or mid >= end:
             labels.append(None)
             pcs.append(None)
+            blocks.append(None)
         else:
             labels.append(diary_label(ent[j], rule))
             pcs.append(ent[j]["pc"])
-    return labels, pcs
+            blocks.append(ent_block[j])
+    return labels, pcs, blocks
 
 
 def per_window_commits(win, commits: dict | None, half_window_s: int) -> list:
@@ -197,7 +209,8 @@ def per_window_commits(win, commits: dict | None, half_window_s: int) -> list:
     return out
 
 
-def compare(lab: np.ndarray, ref: list, seams: np.ndarray, crit: dict, seed: int) -> dict:
+def compare(lab: np.ndarray, ref: list, seams: np.ndarray, crit: dict, seed: int,
+            ref_blocks: list | None = None) -> dict:
     """作業の名前と照合の名前のブロックの入れ替えの p（1 段目の判断 14・15 の方式）。
 
     比べるのは、作業の名前があり（観測のある窓）照合の名前もある窓。ブロックは、照合の名前が続く区間
@@ -212,11 +225,15 @@ def compare(lab: np.ndarray, ref: list, seams: np.ndarray, crit: dict, seed: int
     vals, counts = np.unique(refa[mask].astype(str), return_counts=True)
     out["values"] = {str(v): int(c) for v, c in zip(vals, counts)}
     idx = np.flatnonzero(mask)
-    blocks = np.zeros(len(idx), dtype=int)
-    for t in range(1, len(idx)):
-        i, j = idx[t - 1], idx[t]
-        new = refa[i] != refa[j] or bool(seams[i + 1:j + 1].any())
-        blocks[t] = blocks[t - 1] + (1 if new else 0)
+    if ref_blocks is not None:
+        # 作業の記録: ブロックは記録の行（同じ名前が続く行）。ファイルの継ぎ目でも切らない（判断 12）。
+        _, blocks = np.unique(np.array([ref_blocks[i] for i in idx]), return_inverse=True)
+    else:
+        blocks = np.zeros(len(idx), dtype=int)
+        for t in range(1, len(idx)):
+            i, j = idx[t - 1], idx[t]
+            new = refa[i] != refa[j] or bool(seams[i + 1:j + 1].any())
+            blocks[t] = blocks[t - 1] + (1 if new else 0)
     out["blocks"] = int(blocks[-1] + 1)
     r = refa[mask].astype(str)
     testable = sum(c >= crit["ref_min_windows_per_value"] for c in counts) >= 2
@@ -230,6 +247,87 @@ def compare(lab: np.ndarray, ref: list, seams: np.ndarray, crit: dict, seed: int
                                                              np.random.default_rng(seed + 7))
     else:
         out["nmi"] = core.nmi(lab[mask], r)
+    return out
+
+
+def mutual_info(a: np.ndarray, b: np.ndarray) -> float:
+    """相互情報量（nats・度数からそのまま求める。少ない度数では上に偏る）。"""
+    c = core._contingency(np.asarray(a), np.asarray(b))
+    n = c.sum()
+    if n == 0:
+        return math.nan
+    pj = c / n
+    pa, pb = pj.sum(axis=1), pj.sum(axis=0)
+    nz = pj > 0
+    return float((pj[nz] * np.log(pj[nz] / np.outer(pa, pb)[nz])).sum())
+
+
+def detectable_runs(mi: float, max_len: int = 10_000) -> float:
+    """作業 2 つが交互に来るとき、BIC のまとめで作業が見える長さの目安（作業 1 つあたりの連なりの数）。
+
+    作業 1 つを分けて得る尤度は おおよそ L * mi、切り替えを表すコストは 乗り換え log(L) と滞在 約 1（nats）。
+    L * mi >= log(L) + 1 を満たす最小の L を返す。BIC の罰と作業が 3 つ以上のときの乗り換えを入れていないので、
+    楽観的な下限である（これより短い作業は見えない。これより長くても見えるとは限らない・判断 11・12）。
+    合成の陽性（1.5〜3 時間）ではこの下限 9 に対し作業 1 つが 11.5 連なりで、v2 は作業を見つけられなかった。
+    """
+    if not mi or math.isnan(mi) or mi <= 0:
+        return math.inf
+    for L in range(1, max_len + 1):
+        if L * mi >= math.log(L) + 1:
+            return float(L)
+    return math.inf
+
+
+def premise(p: stage1.Person, cfg: dict, d_lab: list, d_blk: list, crit: dict, seed: int) -> dict:
+    """主の問い: 作業の記録で区切った作業ごとに、様式の連なりの出方が違うか（判断 11）。
+
+    単位は様式の連なり（`_sequences` と同じ作り方）。連なりの作業名は、連なりの最初の窓の記録の名前。
+    ブロックは記録の行（同じ名前が続く行・`per_window_diary`）。無操作で列が切れても切らない（判断 12）。
+    帰無分布はブロックに付いた作業名の入れ替え。届く p の下限も確かめる（1 段目の判断 14・15）。
+    """
+    seqs, _ = _sequences(p, cfg)
+    styles, names, blocks = [], [], []
+    for s in seqs:
+        for o, mem in zip(s.obs, s.members):
+            nm = d_lab[int(mem[0])]
+            if nm is None:
+                continue
+            styles.append(int(o))
+            names.append(nm)
+            blocks.append(d_blk[int(mem[0])])
+    out = {"runs": len(styles), "values": {}, "blocks": 0, "testable": False, "nmi": math.nan, "p": math.nan,
+           "p_achievable": math.nan, "mi_nats_per_run": math.nan, "detectable_runs_lower_bound": None,
+           "median_task_runs": math.nan, "per_task_styles": {}}
+    if not styles:
+        return out
+    styles_a, names_a, blocks_a = np.array(styles), np.array(names, dtype=object).astype(str), np.array(blocks)
+    _, blocks_a = np.unique(blocks_a, return_inverse=True)
+    vals, counts = np.unique(names_a, return_counts=True)
+    out["values"] = {str(v): int(c) for v, c in zip(vals, counts)}
+    out["blocks"] = int(blocks_a.max() + 1)
+    out["per_task_styles"] = {str(v): np.bincount(styles_a[names_a == v], minlength=int(styles_a.max()) + 1).tolist()
+                              for v in vals}
+    out["median_task_runs"] = float(np.median(np.bincount(blocks_a)))
+    mi = mutual_info(styles_a, names_a)
+    out["mi_nats_per_run"] = mi
+    dl = detectable_runs(mi)
+    # inf（相互情報量が 0 か、上限の長さでも届かない）は JSON にできないので null にする（「届かない」の意味）。
+    out["detectable_runs_lower_bound"] = None if math.isinf(dl) else dl
+    testable = sum(c >= crit["premise_min_runs_per_value"] for c in counts) >= 2
+    if testable:
+        _, pa = core.block_permutation_pvalue(names_a, names_a, blocks_a, crit["n_perm"], np.random.default_rng(seed))
+        out["p_achievable"] = pa
+        testable = not math.isnan(pa) and pa < crit["ref_p_max"]
+    out["testable"] = bool(testable)
+    if testable:
+        out["nmi"], out["p"] = core.block_permutation_pvalue(styles_a, names_a, blocks_a, crit["n_perm"],
+                                                             np.random.default_rng(seed + 11))
+    else:
+        out["nmi"] = core.nmi(styles_a, names_a)
+    if not out["testable"]:
+        out["verdict"] = "undecidable"
+    else:
+        out["verdict"] = "differs" if out["p"] < crit["ref_p_max"] else "not_shown"
     return out
 
 
@@ -277,12 +375,12 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     st = np.array([s if s is not None else -9 for s in p.state])
 
     diary = load_diary(diary_path)
-    d_lab, d_pc = per_window_diary(win, diary, cfg["diary_label_rule"])
+    d_lab, d_pc, d_blk = per_window_diary(win, diary, cfg["diary_label_rule"])
     commits = load_json(commits_path) if commits_path else None
     c_lab = per_window_commits(win, commits, cfg["commit_half_window_s"])
 
-    diary_cmp = compare(lab, d_lab, p.seams, crit, seed)
-    diary_cmp_v1 = compare(v1["labels"], d_lab, p.seams, crit, seed)
+    diary_cmp = compare(lab, d_lab, p.seams, crit, seed, d_blk)
+    diary_cmp_v1 = compare(v1["labels"], d_lab, p.seams, crit, seed, d_blk)
     commit_cmp = compare(lab, c_lab, p.seams, crit, seed)
     decl_cmp = compare(lab, p.decl, p.seams, crit, seed)
 
@@ -292,6 +390,7 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     state_nmi_common = core.nmi(lab[common], st[common]) if common.sum() >= 2 else math.nan
     diary_nmi_common = core.nmi(lab[common], d_arr[common].astype(str)) if common.sum() >= 2 else math.nan
 
+    prem = premise(p, cfg, d_lab, d_blk, crit, seed)
     stab = stability_ari(p, cfg, seed)
 
     failed: list[str] = []
@@ -339,6 +438,8 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
                "ari_with_v2": core.ari(v1["labels"][lab != hm.MISSING], lab[lab != hm.MISSING])
                if (lab != hm.MISSING).sum() >= 2 else math.nan},
         "identifier_estimate": identifier_estimate(lab, d_lab, d_pc),
+        "premise": prem,
+        "premise_verdict": prem.get("verdict", "undecidable"),
         "verdict": verdict,
         "failed": failed,
         "undecidable": undecided,
@@ -411,14 +512,17 @@ def cmd_real(a: argparse.Namespace) -> int:
                             Path(p["diary"]) if p.get("diary") else None,
                             Path(p["commits"]) if p.get("commits") else None)
         out.append(r)
-        print(f'{r["person"]}: {r["verdict"]} (failed: {r["failed"] or "-"}; undecidable: {r["undecidable"] or "-"})')
+        print(f'{r["person"]}: premise={r["premise_verdict"]} v2={r["verdict"]} '
+              f'(failed: {r["failed"] or "-"}; undecidable: {r["undecidable"] or "-"})')
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(dumps({"sharing": SHARING_MARKER, "replay": stage1.ev1.replay_label(), "people": out}) + "\n",
                      encoding="utf-8")
     if a.expect:
         want = load_json(a.expect)
-        got = {r["person"]: r["verdict"] for r in out}
-        bad = {k: (v, got.get(k)) for k, v in want.items() if got.get(k) != v}
+        # {id: {"premise": ..., "v2": ...}}（書いた方だけを見る）
+        got = {r["person"]: {"premise": r["premise_verdict"], "v2": r["verdict"]} for r in out}
+        bad = {k: (v, got.get(k)) for k, v in want.items()
+               if k not in got or any(got[k][f] != x for f, x in v.items())}
         if bad:
             print(f"NG: 期待した判定と違う: {bad}", file=sys.stderr)
             return 3
@@ -437,7 +541,7 @@ def main() -> int:
                    help="[{id, files:[...], diary?, commits?}] の JSON（実パスを含むのでコミットしない）")
     r.add_argument("--work", required=True, type=Path)
     r.add_argument("--out", required=True, type=Path)
-    r.add_argument("--expect", type=Path, help="{id: verdict} の JSON。違えば終了コード 3（合成の照合の経路の確かめ用）")
+    r.add_argument("--expect", type=Path, help="{id: {premise?, v2?}} の JSON。違えば終了コード 3（合成の照合の経路の確かめ用）")
     a = ap.parse_args()
     return cmd_synth(a) if a.cmd == "synth" else cmd_real(a)
 

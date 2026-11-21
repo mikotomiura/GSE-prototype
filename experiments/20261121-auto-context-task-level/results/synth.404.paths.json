@@ -1,0 +1,568 @@
+{
+  "sharing": {
+    "gse_dataset": "prohibited",
+    "reason": "experiments/20261121-auto-context-task-level の実データ由来の中間成果物（区間の一覧・作業の記録との照合を含む）",
+    "rule": "docs/glossary.md 特徴行"
+  },
+  "replay": [
+    "gse-replay"
+  ],
+  "people": [
+    {
+      "person": "pos_match",
+      "files": 6,
+      "windows": 526,
+      "observed_windows": 465,
+      "relative_time_files": 0,
+      "overlap_dropped_active_windows": 2,
+      "stage1_k": 6,
+      "k": 1,
+      "emission": [
+        [
+          0.258,
+          0.252,
+          0.044,
+          0.214,
+          0.013,
+          0.22
+        ]
+      ],
+      "names": {
+        "none": 10980.0,
+        "work-A": 83700.0
+      },
+      "boundaries": 0,
+      "stability_ari": 1.0,
+      "style_copy_ari": 0.0,
+      "state_nmi_on_diary_windows": 0.0,
+      "diary_nmi_on_common_windows": 0.0,
+      "diary": {
+        "windows": 465,
+        "values": {
+          "task X": 158,
+          "task Y": 170,
+          "task Z": 137
+        },
+        "blocks": 12,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0009995002498750624
+      },
+      "commits": {
+        "windows": 465,
+        "values": {
+          "repo-x": 164,
+          "repo-y": 178,
+          "repo-z": 123
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0004997501249375312
+      },
+      "declaration": {
+        "windows": 465,
+        "values": {
+          "argumentative": 156,
+          "other": 138,
+          "vibe_coding": 171
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0004997501249375312
+      },
+      "v1": {
+        "k": 2,
+        "task_windows": 54,
+        "few_task_windows": 4,
+        "diary": {
+          "windows": 460,
+          "values": {
+            "task X": 158,
+            "task Y": 170,
+            "task Z": 132
+          },
+          "blocks": 12,
+          "testable": true,
+          "nmi": 0.2624816514595532,
+          "p": 0.004997501249375313,
+          "p_achievable": 0.0009995002498750624
+        },
+        "ari_with_v2": 0.0
+      },
+      "identifier_estimate": {
+        "windows": 465,
+        "mixed": 295,
+        "mixed_on_mac": 295,
+        "mixed_outside_mac": 0,
+        "mixed_frac": 0.6344086021505376,
+        "mixed_on_mac_frac": 0.6344086021505376
+      },
+      "premise": {
+        "runs": 153,
+        "values": {
+          "task X": 51,
+          "task Y": 56,
+          "task Z": 46
+        },
+        "blocks": 12,
+        "testable": true,
+        "nmi": 0.2246289358040445,
+        "p": 0.0004997501249375312,
+        "p_achievable": 0.0009995002498750624,
+        "mi_nats_per_run": 0.2942110896306776,
+        "detectable_runs_lower_bound": 12.0,
+        "median_task_runs": 12.5,
+        "per_task_styles": {
+          "task X": [
+            1,
+            20,
+            0,
+            23,
+            0,
+            7
+          ],
+          "task Y": [
+            21,
+            1,
+            4,
+            9,
+            1,
+            20
+          ],
+          "task Z": [
+            18,
+            18,
+            2,
+            1,
+            0,
+            7
+          ]
+        },
+        "verdict": "differs"
+      },
+      "premise_verdict": "differs",
+      "verdict": "not_usable",
+      "failed": [
+        "diary",
+        "state_copy"
+      ],
+      "undecidable": []
+    },
+    {
+      "person": "pos_mismatch",
+      "files": 6,
+      "windows": 526,
+      "observed_windows": 465,
+      "relative_time_files": 0,
+      "overlap_dropped_active_windows": 2,
+      "stage1_k": 6,
+      "k": 1,
+      "emission": [
+        [
+          0.258,
+          0.252,
+          0.044,
+          0.214,
+          0.013,
+          0.22
+        ]
+      ],
+      "names": {
+        "none": 10980.0,
+        "work-A": 83700.0
+      },
+      "boundaries": 0,
+      "stability_ari": 1.0,
+      "style_copy_ari": 0.0,
+      "state_nmi_on_diary_windows": 0.0,
+      "diary_nmi_on_common_windows": 0.0,
+      "diary": {
+        "windows": 465,
+        "values": {
+          "task P": 162,
+          "task Q": 154,
+          "task R": 149
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0004997501249375312
+      },
+      "commits": {
+        "windows": 0,
+        "values": {},
+        "blocks": 0,
+        "testable": false,
+        "nmi": null,
+        "p": null,
+        "p_achievable": null
+      },
+      "declaration": {
+        "windows": 465,
+        "values": {
+          "argumentative": 156,
+          "other": 138,
+          "vibe_coding": 171
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0004997501249375312
+      },
+      "v1": {
+        "k": 2,
+        "task_windows": 54,
+        "few_task_windows": 4,
+        "diary": {
+          "windows": 460,
+          "values": {
+            "task P": 157,
+            "task Q": 154,
+            "task R": 149
+          },
+          "blocks": 17,
+          "testable": true,
+          "nmi": 0.02387218724485034,
+          "p": 0.5867066466766616,
+          "p_achievable": 0.0004997501249375312
+        },
+        "ari_with_v2": 0.0
+      },
+      "identifier_estimate": {
+        "windows": 465,
+        "mixed": 303,
+        "mixed_on_mac": 303,
+        "mixed_outside_mac": 0,
+        "mixed_frac": 0.6516129032258065,
+        "mixed_on_mac_frac": 0.6516129032258065
+      },
+      "premise": {
+        "runs": 153,
+        "values": {
+          "task P": 54,
+          "task Q": 50,
+          "task R": 49
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.02060319174037648,
+        "p": 0.6811594202898551,
+        "p_achievable": 0.0004997501249375312,
+        "mi_nats_per_run": 0.02700922728262094,
+        "detectable_runs_lower_bound": 240.0,
+        "median_task_runs": 10.0,
+        "per_task_styles": {
+          "task P": [
+            12,
+            20,
+            2,
+            10,
+            0,
+            10
+          ],
+          "task Q": [
+            14,
+            9,
+            2,
+            13,
+            0,
+            12
+          ],
+          "task R": [
+            14,
+            10,
+            2,
+            10,
+            1,
+            12
+          ]
+        },
+        "verdict": "not_shown"
+      },
+      "premise_verdict": "not_shown",
+      "verdict": "not_usable",
+      "failed": [
+        "diary",
+        "state_copy"
+      ],
+      "undecidable": []
+    },
+    {
+      "person": "pos_few",
+      "files": 6,
+      "windows": 526,
+      "observed_windows": 465,
+      "relative_time_files": 0,
+      "overlap_dropped_active_windows": 2,
+      "stage1_k": 6,
+      "k": 1,
+      "emission": [
+        [
+          0.258,
+          0.252,
+          0.044,
+          0.214,
+          0.013,
+          0.22
+        ]
+      ],
+      "names": {
+        "none": 10980.0,
+        "work-A": 83700.0
+      },
+      "boundaries": 0,
+      "stability_ari": 1.0,
+      "style_copy_ari": 0.0,
+      "state_nmi_on_diary_windows": 0.0,
+      "diary_nmi_on_common_windows": 0.0,
+      "diary": {
+        "windows": 465,
+        "values": {
+          "task P": 209,
+          "task Q": 256
+        },
+        "blocks": 2,
+        "testable": false,
+        "nmi": 0.0,
+        "p": null,
+        "p_achievable": 1.0
+      },
+      "commits": {
+        "windows": 0,
+        "values": {},
+        "blocks": 0,
+        "testable": false,
+        "nmi": null,
+        "p": null,
+        "p_achievable": null
+      },
+      "declaration": {
+        "windows": 465,
+        "values": {
+          "argumentative": 156,
+          "other": 138,
+          "vibe_coding": 171
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0004997501249375312
+      },
+      "v1": {
+        "k": 2,
+        "task_windows": 54,
+        "few_task_windows": 4,
+        "diary": {
+          "windows": 460,
+          "values": {
+            "task P": 204,
+            "task Q": 256
+          },
+          "blocks": 2,
+          "testable": false,
+          "nmi": 0.00989939206108203,
+          "p": null,
+          "p_achievable": 1.0
+        },
+        "ari_with_v2": 0.0
+      },
+      "identifier_estimate": {
+        "windows": 465,
+        "mixed": 209,
+        "mixed_on_mac": 209,
+        "mixed_outside_mac": 0,
+        "mixed_frac": 0.44946236559139785,
+        "mixed_on_mac_frac": 0.44946236559139785
+      },
+      "premise": {
+        "runs": 153,
+        "values": {
+          "task P": 69,
+          "task Q": 84
+        },
+        "blocks": 2,
+        "testable": false,
+        "nmi": 0.005561197320779821,
+        "p": null,
+        "p_achievable": 1.0,
+        "mi_nats_per_run": 0.006151963629876204,
+        "detectable_runs_lower_bound": 1333.0,
+        "median_task_runs": 76.5,
+        "per_task_styles": {
+          "task P": [
+            18,
+            18,
+            3,
+            15,
+            1,
+            14
+          ],
+          "task Q": [
+            22,
+            21,
+            3,
+            18,
+            0,
+            20
+          ]
+        },
+        "verdict": "undecidable"
+      },
+      "premise_verdict": "undecidable",
+      "verdict": "undecidable",
+      "failed": [],
+      "undecidable": [
+        "diary"
+      ]
+    },
+    {
+      "person": "neg_match",
+      "files": 6,
+      "windows": 527,
+      "observed_windows": 466,
+      "relative_time_files": 0,
+      "overlap_dropped_active_windows": 2,
+      "stage1_k": 6,
+      "k": 1,
+      "emission": [
+        [
+          0.242,
+          0.223,
+          0.21,
+          0.019,
+          0.038,
+          0.268
+        ]
+      ],
+      "names": {
+        "none": 10980.0,
+        "work-A": 83880.0
+      },
+      "boundaries": 0,
+      "stability_ari": 1.0,
+      "style_copy_ari": 0.0,
+      "state_nmi_on_diary_windows": 0.0,
+      "diary_nmi_on_common_windows": 0.0,
+      "diary": {
+        "windows": 466,
+        "values": {
+          "task N1": 159,
+          "task N2": 170,
+          "task N3": 137
+        },
+        "blocks": 12,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0009995002498750624
+      },
+      "commits": {
+        "windows": 0,
+        "values": {},
+        "blocks": 0,
+        "testable": false,
+        "nmi": null,
+        "p": null,
+        "p_achievable": null
+      },
+      "declaration": {
+        "windows": 466,
+        "values": {
+          "argumentative": 157,
+          "other": 138,
+          "vibe_coding": 171
+        },
+        "blocks": 17,
+        "testable": true,
+        "nmi": 0.0,
+        "p": 1.0,
+        "p_achievable": 0.0004997501249375312
+      },
+      "v1": {
+        "k": 2,
+        "task_windows": 54,
+        "few_task_windows": 3,
+        "diary": {
+          "windows": 465,
+          "values": {
+            "task N1": 159,
+            "task N2": 170,
+            "task N3": 136
+          },
+          "blocks": 12,
+          "testable": true,
+          "nmi": 0.0011249255393893153,
+          "p": 0.9675162418790605,
+          "p_achievable": 0.0009995002498750624
+        },
+        "ari_with_v2": 0.0
+      },
+      "identifier_estimate": {
+        "windows": 466,
+        "mixed": 296,
+        "mixed_on_mac": 296,
+        "mixed_outside_mac": 0,
+        "mixed_frac": 0.6351931330472103,
+        "mixed_on_mac_frac": 0.6351931330472103
+      },
+      "premise": {
+        "runs": 151,
+        "values": {
+          "task N1": 49,
+          "task N2": 56,
+          "task N3": 46
+        },
+        "blocks": 12,
+        "testable": true,
+        "nmi": 0.028519938028564038,
+        "p": 0.19490254872563717,
+        "p_achievable": 0.0009995002498750624,
+        "mi_nats_per_run": 0.037480903410704314,
+        "detectable_runs_lower_bound": 163.0,
+        "median_task_runs": 12.5,
+        "per_task_styles": {
+          "task N1": [
+            8,
+            13,
+            12,
+            0,
+            1,
+            15
+          ],
+          "task N2": [
+            15,
+            13,
+            13,
+            0,
+            1,
+            14
+          ],
+          "task N3": [
+            14,
+            8,
+            7,
+            2,
+            3,
+            12
+          ]
+        },
+        "verdict": "not_shown"
+      },
+      "premise_verdict": "not_shown",
+      "verdict": "not_usable",
+      "failed": [
+        "diary",
+        "state_copy"
+      ],
+      "undecidable": []
+    }
+  ]
+}
