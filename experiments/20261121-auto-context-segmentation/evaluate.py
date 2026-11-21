@@ -102,6 +102,11 @@ def replay_bin() -> list[str]:
             "--bin", "gse-replay", "--"]
 
 
+def replay_label() -> list[str]:
+    """出力に刻む gse-replay の名前。フルパスはユーザー名を含むので、実行ファイルの名前だけにする。"""
+    return [Path(x).name if os.sep in x else x for x in replay_bin()]
+
+
 def run_features(ndjson: Path, out_json: Path) -> None:
     out_json.parent.mkdir(parents=True, exist_ok=True)
     with out_json.open("w", encoding="utf-8") as fh:
@@ -215,7 +220,7 @@ def cmd_synth(a: argparse.Namespace) -> int:
     else:
         ok = sc["label_kinds_after_smoothing"] <= crit["negative_max_label_kinds"]
     sc["criteria"] = a.criteria
-    sc["replay"] = replay_bin()
+    sc["replay"] = replay_label()
     sc["pass"] = bool(ok)
     print(dumps(sc))
     # 不合格は 3（例外による終了の 1 と区別する。run.sh は 3 と pass:false の両方を見る・cross-review HIGH）。
@@ -482,7 +487,7 @@ def cmd_real(a: argparse.Namespace) -> int:
                           encoding="utf-8")
         out.append(r)
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    doc = {"sharing": SHARING_MARKER, "replay": replay_bin(), "people": out}
+    doc = {"sharing": SHARING_MARKER, "replay": replay_label(), "people": out}
     a.out.write_text(dumps(doc) + "\n", encoding="utf-8")
     for r in out:
         print(f'{r["person"]}: {r["verdict"]} (failed: {r["failed"] or "-"}; undecidable: {r["undecidable"] or "-"})')

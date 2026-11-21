@@ -19,7 +19,7 @@
   ],
   "criteria": "positive",
   "replay": [
-    "/Users/johnd/GSE-prototype/src-tauri/target/debug/gse-replay"
+    "gse-replay"
   ],
   "pass": true
 }
