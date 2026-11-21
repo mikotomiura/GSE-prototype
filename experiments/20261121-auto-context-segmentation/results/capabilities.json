@@ -1187,7 +1187,7 @@
     {
       "line_type": "key",
       "verdict": "PRESENT",
-      "rows": 1088655,
+      "rows": 1088659,
       "declared_as": [
         "unconditional"
       ],
@@ -1196,7 +1196,7 @@
     {
       "line_type": "feat",
       "verdict": "PRESENT",
-      "rows": 7219937,
+      "rows": 7221467,
       "declared_as": [
         "unconditional"
       ],

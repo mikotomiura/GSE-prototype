@@ -66,6 +66,30 @@ def dumps(x) -> str:
     return json.dumps(_jsonable(x), ensure_ascii=False, indent=2, allow_nan=False)
 
 
+# 提出物の匿名化（`anonymize.rs`）は時刻を「ファイルの開始からの相対 ms」に直す。相対のファイルは
+# 名前の記録の時刻の順に並べ、前のファイルの終わりから RELATIVE_GAP_MS 空けて置き直す（decisions.md 判断 18）。
+RELATIVE_EPOCH_LIMIT_MS = 10**12  # これより小さい時刻は相対（絶対 epoch ms なら 2001 年以降は 10^12 を超える）
+RELATIVE_GAP_MS = 3_600_000
+STAMP_RE = __import__("re").compile(r"gse_o1_(\d{8}_\d{6})")
+
+
+def file_order_key(path: Path) -> tuple:
+    m = STAMP_RE.search(path.name)
+    return (m.group(1) if m else "", path.name)
+
+
+def shift_windows(w: core.Windows, offset: int) -> core.Windows:
+    return core.Windows(w.start_ms + offset, w.end_ms + offset, w.X, w.idle)
+
+
+def shift_side(side: dict, offset: int) -> dict:
+    return {"decl": [(t + offset, k) for t, k in side["decl"]],
+            # activity_label の recall_window_* は匿名化で相対化されず絶対時刻のまま残っている
+            # （ABSOLUTE_TIME_FIELDS に無い・decisions.md 判断 18）。相対のファイルでは時刻が揃わないので使わない。
+            "labels": [],
+            "feats": [(t + offset, s) for t, s in side["feats"]]}
+
+
 PERSON_ID_RE = __import__("re").compile(r"^[A-Za-z0-9_-]{1,64}$")
 TYPE_RE = __import__("re").compile(r'"type"\s*:\s*"(session_meta|activity_label|feat)"')
 
@@ -258,7 +282,9 @@ def quantity_only_ari(win: core.Windows, res: core.Result, cfg: dict, seed: int,
 def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: dict) -> dict:
     seed = cfg["seed"]
     parts = []
-    for f in files:
+    relative_files = 0
+    cursor = None  # 相対のファイルを置く位置（前のファイルの終わり）
+    for f in sorted(files, key=file_order_key):
         env = work / pid / (f.stem + ".features.json")
         run_features(f, env)
         try:
@@ -268,6 +294,12 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
             # （ディスクを守るため・共有しない中間成果物を残さないため）。
             env.unlink(missing_ok=True)
         side = read_side(f)
+        if len(w.start_ms) and int(w.start_ms[0]) < RELATIVE_EPOCH_LIMIT_MS:
+            relative_files += 1
+            offset = (cursor + RELATIVE_GAP_MS if cursor is not None else RELATIVE_EPOCH_LIMIT_MS) - int(w.start_ms[0])
+            w, side = shift_windows(w, offset), shift_side(side, offset)
+        if len(w.end_ms):
+            cursor = int(w.end_ms[-1]) if cursor is None else max(cursor, int(w.end_ms[-1]))
         parts.append((w, per_window_decl(w, side["decl"]), per_window_state(w, side["feats"]),
                       per_window_activity(w, side["labels"])))
     # 窓ごとの付帯情報は窓の開始時刻で引き直す（concat_windows が並べ替えと落としを行うため）。
@@ -357,6 +389,7 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
         "person": pid,
         "files": len(files),
         "windows": int(len(lab)),
+        "relative_time_files": relative_files,
         "overlap_dropped_windows": overlap["dropped_windows"],
         "overlap_dropped_active_windows": overlap["dropped_active_windows"],
         "active_windows": int(active.sum()),
