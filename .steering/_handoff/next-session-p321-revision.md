@@ -1,40 +1,41 @@
-# 次セッション — p321 の改訂（JSS へ）の S7 から
+# 次セッション — p321 の改訂（JSS へ）: 文献検索 B のやり直しから
 
-> 作成: 2026-11-21（S0〜S6 を終えた。S7 は研究者の通読なので区切った）。このメモを一次資料にしない。状態は着手時に測り直す（git・照会の返事・論文用リポジトリ）。
+> 作成: 2026-11-21 夜（S7 の修正案を採り、判断 21〜23 まで実施した）。このメモを一次資料にしない。着手するときに状態を測り直す（git・照会の返事・論文用リポジトリ）。
 
 ## §0 打ち込む用
 
 ```
-git fetch origin してから MSYS_NO_PATHCONV=1 git show origin/docs/p321-emse-desk-reject:.steering/_handoff/next-session-p321-revision.md を読んで、§2 の S7 から進めてください。
-worktree は C:/GSE-wt/p321-desk-reject（ブランチ docs/p321-emse-desk-reject）。タスクは .steering/20261121-p321-paper-revision/（decisions 判断 1〜20・design.md・tasklist・survey-s2.md）。
-論文用リポジトリは C:/self-resolution-measure のブランチ revision-jss（未 push・S9 まで push しない）。着手時に git status が clean で HEAD が 6d0d3b4 かを確かめる。
-Tectonic 0.17.0 が scratchpad から消えていれば GitHub のリリースから取り直し、TECTONIC=<path> bash paper/build.sh。
-照会（2026-11-21 送信・待つ目安 12-05）に返事が来ているか研究者に聞く。
+git fetch origin してから MSYS_NO_PATHCONV=1 git show origin/docs/p321-emse-desk-reject:.steering/_handoff/next-session-p321-revision.md を読んで、§2 の上から進めてください。
+worktree は C:/GSE-wt/p321-desk-reject（ブランチ docs/p321-emse-desk-reject）。タスクは .steering/20261121-p321-paper-revision/（decisions 判断 1〜23・design.md・tasklist・survey-s2.md・search-log/）。
+論文用リポジトリは C:/self-resolution-measure のブランチ revision-jss（未 push。S9 まで push しない）。着手時に git status が clean で、HEAD が a55b9bb かを確かめる。
+Tectonic 0.17.0 が scratchpad から消えていたら、GitHub のリリースから取り直し、TECTONIC=<path> bash paper/build.sh で使う。
+照会（2026-11-21 に送信・待つ目安は 12-05）に返事が来ているかを研究者に聞く。
 ```
 
-## §1 守ること（CLAUDE.md・memory から）
+## §1 守ること（CLAUDE.md と memory から）
 
-- 返答は日本語。★ や ⚠️ を多用しない。
-- 調べものはサブエージェントへ（model を明示・入れ子禁止・締切）。戻りの行は使う前にメインが一次で確かめる。有料の本文は使わない。
-- 公開物には GSE への言及を入れない。学術的な英語にする。
-- 凍結を壊さない: `analyze.py` が提出版の値と凍結した config をハッシュで守る。新しい解析は `post_review` にだけ足し、NOTES.md の Deviations に追記する。`run.sh` は値が変わると止まる → 意図した追加の後だけ `ALLOW_RESULT_CHANGE=1`。
-- 本文の数字は `\R{...}` だけ。新しい質的な文は `make_results.py` に検査と変異を足す。要旨・Highlights・声明・禁止する文言は `paper/check_frontmatter.py`（build.sh の Step 2）が見る。
-- バックスラッシュを含む置き換えや検査は heredoc でやらない（今回も 1 回壊れた）。Edit か Write で作った .py で。
-- git は明示のパスで add する。外に出る行為は研究者がするか、研究者の確認の後。
+- 返答は日本語で書く。★ や ⚠️ を多用しない。
+- 調べものはサブエージェントへ出す（model を明示・入れ子は禁止・締切を書く）。戻ってきた行は、使う前にメインが一次で確かめる。有料の本文は使わない。
+- 公開物には GSE への言及を入れない。学術的な英語で書く。
+- 凍結を壊さない。新しい解析は `post_review` にだけ足し、NOTES.md の Deviations に追記する。`run.sh` は値が変わると止まる → 意図した追加の後だけ `ALLOW_RESULT_CHANGE=1` を付ける。
+- 本文の数字は `\R{...}` だけで出す。新しい質的な文には、`make_results.py` に検査と変異を足す。
+- バックスラッシュを含む置き換えは heredoc でやらない（今回も壊れた）。Edit か、Write で作った .py を使う。
+- git は明示のパスで add する。外に出る行為は、研究者がするか、研究者の確認の後にする。
 
 ## §2 残り
 
-| 段 | 何を | 注意 |
+| 順 | 何を | 注意 |
 |---|---|---|
-| S7 | 研究者が `paper/main-jss.pdf`（24 頁）を通読し手を入れる。記録する | 研究者に頼むこと: (1) journal 版の 8 つの報告値を PDF と照合するか（すれば §5.3 の "the author has not compared them with the PDF" を直す）(2) Highlights 5 本（`paper/highlights.tex`）とキーワード 6 つを見る (3) 通読の後、生成 AI の申告に「使った後に読み、必要に応じて直した」を足してよいか |
-| S8 | attack-me round 2（席は再解析と測定の妥当性・クラスタが少ないときの推論・debugging の人的要因）→ 研究者が採否 → `/cross-review` 2 巡（論文用リポジトリの差分を GSE の worktree に fetch して範囲指定・memory `reference_codex_review_other_repo`） | S7 で読んだ箇所が変われば研究者が読み直す |
-| S9 | 照会の返事か未回答を RQ4 に（いまは "had not received a reply"）／ 新しいタグ ／ Zenodo の新しい版（23029603 の new version）と preprint の下書き → DOI を Data availability と README の bibtex に → 研究者が publish と JSS への投稿（推薦の査読者の欄を確かめる・候補は `survey-s2.md`）→ 原稿 ID を記録 | Highlights は投稿用の別ファイル（txt か docx）に起こす |
-| 最後 | GSE 側のブランチ（`docs/references.md` の [P635]〜[P640] を含む）を PR にする | |
+| 1 | 文献検索 B（キーワード）を、記録を付けてやり直す。`search-log/README.md` の 7 問を OpenAlex で（日本時間 9 時以降に。上限は UTC 0 時に戻る） | Sonnet に出す。scratchpad の `search-log/downloads` は消えているかもしれない。表と台本は `.steering/.../search-log/` にある |
+| 2 | 付録を作る。`supplement/literature-search/` を論文用リポジトリに置き、`citing-works.tsv`・`keyword-queries.tsv`・README（基準の文・日付・情報源・重複の規則・数・抜け）を入れる。PDF と本文の txt は入れない | 1 回目（58 件・本文 36）は 1 件ごとの記録が無い。2 回目（70 件・本文 43・NEAR 2・INSTANCE 0）を付録にする。§2.5 には両方の数を書き、差は説明できていないと書く |
+| 3 | §2.5 と §5.5 (3) を書き換える。ビルドし、`check_frontmatter` を通す | 「見つからなかった」を「存在しない」にしない |
+| 4 | 研究者に聞く: 生成 AI の申告に「使った後に著者が読み、必要に応じて直した」を足してよいか ／ journal 版の 8 つの値を PDF と照合するか | |
+| 5 | S8: attack-me round 2 → `/cross-review` 2 巡 | 今回足した節（§3.1・RQ1・§7「Beyond」・audit）を重点に見る |
+| 6 | S9: 照会の結果を RQ4 に ／ タグ ／ Zenodo の新しい版 ／ DOI ／ 投稿 ／ GSE 側の PR | `survey-s2.md` に推薦の査読者の候補がある |
 
-## §3 今回分かったこと（判断 19・20 の要点）
+## §3 今回分かったこと（判断 21〜23 の要点）
 
-- モデルの版は commit の Co-Authored-By の行から: 09-06 = Opus 5、09-28 以降 = Opus 5.5、11 月の委譲 = Sonnet 5.5、9 月の委譲の版は記録なし。
-- 研究者は解析のコードを読んでいない（§5.5 と §8 にそう書いた）。
-- journal 版: long = "23 episodes" は本文にある。short は件数なし。committed 10・fresh 79 だと 22/89 = 24.7% で 33% と合わない（`emse/arith/*`）。
-- D1 の派生表 `results/d1_episodes.csv` を入れた（Deviation 9）。metrics.json は不変。
-- 題: "When “no help” is not “solved”: unconsulted shares and unaided resolution in two public debugging datasets"。
+- 研究者は修正案をすべて採った。採らなかったのは、題と RQ の全面的な書き換えだけ。
+- 独立に数え直した結果（`audit/independent-recount/`）: 一致しなかったのは、DF3 がセッションの最後かどうかだけ。原因は Video8 で、ファイルの並びが時刻順になっていない。いまの解析は時刻の順で並べており、こちらが正しい。
+- LODO: D1 は 10.3〜12.5pp、D2 の table+text は 0〜7.1pp。b/(a+b) は D1 で 14.3%。
+- 新しい文献: Shihab ほか 2025 [P641]。Hellas 2023 は既に引いていた [P435]。

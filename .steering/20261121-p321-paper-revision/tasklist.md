@@ -19,6 +19,7 @@
   - [x] 後半（判断 19・`8109d1f`〜`8129e92`）: 序論・§2（B の 0 件と検索の範囲・F の系統・L）／ §5.5 の LLM（E: モデルの版・日付・プロンプト・人が確かめた範囲・研究者に聞く）／ RQ4（G: 22 件の根拠・報告値どうしの算術・人の照合・照会）／ 要旨（−3.5 の符号・250 語）／ 声明を JSS の形に（CRediT・competing interest・生成 AI の節を文献表の直前）／ D1 と D2 の範囲を分ける（L256 の all/ce）／ 合わせ込みの的と検査の区別（L160）／ 再現一式の文言（config `_comment`・`analyze.py` の docstring・NOTES の "other project" と "drift" と L10）／ 引用を GSE の `docs/references.md` に登録（citation-ssot）
   - [x] K: 派生表（`5372cdb`） `results/d1_episodes.csv`（URL・名前・セッション ID なし）を実装する（§8 に約束を書いた）
 - [x] S6: 題は案 A（判断 20）／ 要旨 249 語・Highlights 5 本・キーワード 6（build.sh が検査）
-- [ ] S7: 研究者の通読と手入れ（記録する）／ journal 版の 8 つの報告値を研究者が PDF と照合するか（すれば §5.3 の文を直す）／ 通読の後に生成 AI の申告へ「読んで直した」の文を足す ／ Highlights とキーワードを見てもらう
+- [x] S7（判断 21〜23）: 研究者の通読と修正案の採用 → (1)(2)(3)・要旨・一般化は実施（`a55b9bb`）。残り: 文献検索 B のやり直し → §2.5 と付録 ／ 生成 AI の申告の「読んで直した」を研究者に聞く
+- [ ] （旧 S7 の項目）研究者の通読と手入れ（記録する）／ journal 版の 8 つの報告値を研究者が PDF と照合するか（すれば §5.3 の文を直す）／ 通読の後に生成 AI の申告へ「読んで直した」の文を足す ／ Highlights とキーワードを見てもらう
 - [ ] S8: attack-me round 2 → 研究者が採否 ／ `/cross-review` 2 巡
 - [ ] S9: 照会の返事か未回答を反映（RQ4 の "at the time of submission we had not received a reply" を確かめる）／ README の引用の bibtex と Data availability の DOI を新しい版に ／ 新しいタグ ／ Zenodo の新しい版とプレプリントの下書き → 研究者が publish と JSS への投稿 → 原稿 ID を記録

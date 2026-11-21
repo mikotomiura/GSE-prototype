@@ -1,0 +1,22 @@
+query	source	date	hits	screened	fulltext_read	result
+debugging + "without consulting" (2021-2026)	Semantic Scholar /graph/v1/paper/search/bulk (title+abstract phrase match)	2026-11-21	0	0	0	no hits
+debugging "without consulting" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026	2026-11-21	not obtained	0	0	FAILED: HTTP 429, free daily budget exhausted (resets 00:00 UTC) after Search A pulls; retried 5x with 10 s waits
+debugging + "without seeking help" (2021-2026)	Semantic Scholar /graph/v1/paper/search/bulk (title+abstract phrase match)	2026-11-21	0	0	0	no hits
+debugging "without seeking help" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026	2026-11-21	not obtained	0	0	FAILED: HTTP 429, free daily budget exhausted (resets 00:00 UTC) after Search A pulls; retried 5x with 10 s waits
+debugging + "rarely consult" (2021-2026)	Semantic Scholar /graph/v1/paper/search/bulk (title+abstract phrase match)	2026-11-21	0	0	0	no hits
+debugging "rarely consult" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026	2026-11-21	not obtained	0	0	FAILED: HTTP 429, free daily budget exhausted (resets 00:00 UTC) after Search A pulls; retried 5x with 10 s waits
+debugging + "resolved on their own" (2021-2026)	Semantic Scholar /graph/v1/paper/search/bulk (title+abstract phrase match)	2026-11-21	0	0	0	no hits
+debugging "resolved on their own" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026	2026-11-21	not obtained	0	0	FAILED: HTTP 429, free daily budget exhausted (resets 00:00 UTC) after Search A pulls; retried 5x with 10 s waits
+debugging + "unaided" (2021-2026)	Semantic Scholar /graph/v1/paper/search/bulk (title+abstract phrase match)	2026-11-21	2	2	0	both hits irrelevant to debugging observation (microcontroller OS inference offload; teaching verification of generative AI); not read
+debugging "unaided" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026	2026-11-21	not obtained	0	0	FAILED: HTTP 429, free daily budget exhausted (resets 00:00 UTC) after Search A pulls; retried 5x with 10 s waits
+debugging + "without external help" (2021-2026)	Semantic Scholar /graph/v1/paper/search/bulk (title+abstract phrase match)	2026-11-21	0	0	0	no hits
+debugging "without external help" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026	2026-11-21	not obtained	0	0	FAILED: HTTP 429, free daily budget exhausted (resets 00:00 UTC) after Search A pulls; retried 5x with 10 s waits
+debugging + "self-resolved" (2021-2026)	Semantic Scholar /graph/v1/paper/search/bulk (title+abstract phrase match)	2026-11-21	0	0	0	no hits
+debugging "self-resolved" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026	2026-11-21	not obtained	0	0	FAILED: HTTP 429, free daily budget exhausted (resets 00:00 UTC) after Search A pulls; retried 5x with 10 s waits
+debugging without consulting (2021-2026, unquoted relevance search)	Semantic Scholar /graph/v1/paper/search	2026-11-21	not obtained	0	0	FAILED: HTTP 429 after 6 retries
+debugging without seeking help (2021-2026, unquoted relevance search)	Semantic Scholar /graph/v1/paper/search	2026-11-21	not obtained	0	0	FAILED: HTTP 429 after 6 retries
+debugging rarely consult (2021-2026, unquoted relevance search)	Semantic Scholar /graph/v1/paper/search	2026-11-21	not run	0	0	NOT RUN: time deadline after repeated 429
+debugging resolved on their own (2021-2026, unquoted relevance search)	Semantic Scholar /graph/v1/paper/search	2026-11-21	not run	0	0	NOT RUN: time deadline after repeated 429
+debugging unaided (2021-2026, unquoted relevance search)	Semantic Scholar /graph/v1/paper/search	2026-11-21	not run	0	0	NOT RUN: time deadline after repeated 429
+debugging without external help (2021-2026, unquoted relevance search)	Semantic Scholar /graph/v1/paper/search	2026-11-21	not run	0	0	NOT RUN: time deadline after repeated 429
+debugging self-resolved (2021-2026, unquoted relevance search)	Semantic Scholar /graph/v1/paper/search	2026-11-21	not run	0	0	NOT RUN: time deadline after repeated 429
