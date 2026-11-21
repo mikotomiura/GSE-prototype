@@ -53,3 +53,8 @@
 - [ ] A-3: 下書き `submit/8151855`（期限 2026-10-13）の続き: Start（研究者）→ Add Files（zip）→ 組版のログと Preview（TeX Live 2025）→ メタデータ・cs.HC のクロスリスト
 - [ ] A-4: 研究者が cls と bst の同梱を再確認して最後に Submit（判断 19・21）→ 公開後に EMSE へ申告・Zenodo の related_identifiers・README
 - [x] 完了時の `/cross-review`（code-reviewer ＋ Codex 1 回・4 ファイル限定）→ 裁定と修正・zip の 6 ファイルの走査（判断 21）
+
+## 7. EMSE の不採択（2026-11-21・判断 24）
+- [x] EMSE が査読に回さず不採択（査読の手が足りないため・原稿の中身の判断なし）
+- [x] 研究者の選択: 直してから別の雑誌へ ／ arXiv は返事なしで止まっている（上の endorsement と A-3・A-4 は改訂版で出し直す）
+- [ ] 改訂のタスクを `/start-task` で始める（出し先の規程を一次で確かめる・attack-me verdict §5 の順・§8 の問い 3 と 4）
