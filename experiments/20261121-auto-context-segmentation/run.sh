@@ -99,9 +99,14 @@ PYTHONUTF8=1 "$PY" -I "$EXP_DIR/evaluate.py" synth --ndjson "$WORK/synth_positiv
   --truth "$WORK/synth_positive.truth.json" --criteria positive --work "$WORK" > "$EXP_DIR/results/synth_positive.json"
 PYTHONUTF8=1 "$PY" -I "$EXP_DIR/evaluate.py" synth --ndjson "$WORK/synth_negative.ndjson" \
   --truth "$WORK/synth_negative.truth.json" --criteria negative --work "$WORK" > "$EXP_DIR/results/synth_negative.json"
-if PYTHONUTF8=1 "$PY" -I "$EXP_DIR/evaluate.py" synth --ndjson "$WORK/synth_negative.ndjson" \
-  --truth "$WORK/synth_negative.truth.json" --criteria positive --work "$WORK" > "$EXP_DIR/results/synth_broken.json"; then
-  echo "NG: 境界を消した入力が陽性の基準で通った（検査が効いていない）" >&2
+# ⚠️ 不合格は終了コード 3。例外（traceback）の 1 を「正しく落ちた」と読まないよう、3 と pass:false の両方を見る。
+set +e
+PYTHONUTF8=1 "$PY" -I "$EXP_DIR/evaluate.py" synth --ndjson "$WORK/synth_negative.ndjson" \
+  --truth "$WORK/synth_negative.truth.json" --criteria positive --work "$WORK" > "$EXP_DIR/results/synth_broken.json"
+broken_rc=$?
+set -e
+if [ "$broken_rc" -ne 3 ] || ! "$PY" -I -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["pass"] is False else 1)' "$EXP_DIR/results/synth_broken.json"; then
+  echo "NG: 境界を消した入力が、陽性の基準で期待どおりに落ちなかった（rc=$broken_rc）" >&2
   exit 1
 fi
 echo "Step 2a OK: 合成の対照 3 本"

@@ -47,7 +47,7 @@ def load_config() -> dict:
 # 実データ由来の出力に付ける共有禁止の印（`scripts/check_no_feature_output.sh` の is_marker が拾う形）。
 SHARING_MARKER = {
     "gse_dataset": "prohibited",
-    "reason": "experiments/20261121-auto-context-segmentation の実データ由来の中間成果物（区間の一覧を含む）",
+    "reason": "experiments/20261121-auto-context-segmentation の実データ由来の中間成果物（区間の一覧を含み、abs_segments.json は絶対時刻を含む）",
     "rule": "docs/glossary.md 特徴行",
 }
 
@@ -79,7 +79,7 @@ def file_order_key(path: Path) -> tuple:
 
 
 def shift_windows(w: core.Windows, offset: int) -> core.Windows:
-    return core.Windows(w.start_ms + offset, w.end_ms + offset, w.X, w.idle)
+    return core.Windows(w.start_ms + offset, w.end_ms + offset, w.X, w.idle, w.unknown_mask())
 
 
 def shift_side(side: dict, offset: int) -> dict:
@@ -90,7 +90,7 @@ def shift_side(side: dict, offset: int) -> dict:
             "feats": [(t + offset, s) for t, s in side["feats"]]}
 
 
-PERSON_ID_RE = __import__("re").compile(r"^[A-Za-z0-9_-]{1,64}$")
+PERSON_ID_RE = __import__("re").compile(r"[A-Za-z0-9_-]{1,64}")  # fullmatch で使う（$ は末尾の改行を通す）
 TYPE_RE = __import__("re").compile(r'"type"\s*:\s*"(session_meta|activity_label|feat)"')
 
 
@@ -128,8 +128,11 @@ def read_side(ndjson: Path) -> dict:
             if ty == "session_meta":
                 decl.append((int(d.get("ts", 0)), d.get("task_kind")))
             elif ty == "activity_label" and d.get("answered") and not d.get("debug"):
-                labels.append((int(d["recall_window_start_ms"]), int(d["recall_window_end_ms"]),
-                               str(d["category"])))
+                a0, b0, cat = d.get("recall_window_start_ms"), d.get("recall_window_end_ms"), d.get("category")
+                if isinstance(a0, int) and isinstance(b0, int) and cat is not None:
+                    labels.append((a0, b0, str(cat)))
+                else:
+                    unreadable += 1
             elif ty == "feat":
                 ps = [d.get("p_flow"), d.get("p_inc"), d.get("p_stuck")]
                 if all(isinstance(x, (int, float)) for x in ps):
@@ -215,7 +218,8 @@ def cmd_synth(a: argparse.Namespace) -> int:
     sc["replay"] = replay_bin()
     sc["pass"] = bool(ok)
     print(dumps(sc))
-    return 0 if ok else 1
+    # 不合格は 3（例外による終了の 1 と区別する。run.sh は 3 と pass:false の両方を見る・cross-review HIGH）。
+    return 0 if ok else 3
 
 
 # ---------------------------------------------------------------------------
@@ -286,8 +290,8 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     cursor = None  # 相対のファイルを置く位置（前のファイルの終わり）
     for f in sorted(files, key=file_order_key):
         env = work / pid / (f.stem + ".features.json")
-        run_features(f, env)
         try:
+            run_features(f, env)
             w = core.make_windows(core.load_envelope(env), cfg["window_s"])
         finally:
             # 封筒は入力の約 4 倍の大きさになる（1.7 GB の入力で約 7 GB）。窓に集めたら消す
@@ -372,15 +376,20 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     elif stab < crit["stability_ari_min"]:
         failed.append("stability")
     # 量だけで再現でき、かつ量以外の軸だけでは再現できないときだけ「打鍵の多さで割れただけ」（判断 14）。
-    if (not math.isnan(q_ari) and q_ari >= crit["quantity_only_ari_max"]
-            and (math.isnan(nq_ari) or nq_ari < crit["non_quantity_ari_min"])):
+    if math.isnan(q_ari):
+        undecided.append("quantity_only")
+    elif (q_ari >= crit["quantity_only_ari_max"]
+          and (math.isnan(nq_ari) or nq_ari < crit["non_quantity_ari_min"])):
         failed.append("quantity_only")
     if not decl_testable or math.isnan(decl_p):
         undecided.append("declaration")
     else:
         if decl_p >= crit["decl_p_max"]:
             failed.append("declaration")
-        if not math.isnan(state_nmi_common) and state_nmi_common >= decl_nmi_common:
+        # 状態の写しの検査も必須。推定状態が無い（feat 行の p_* が読めない）なら判定できない（cross-review・判断 22）。
+        if math.isnan(state_nmi_common):
+            undecided.append("state_copy")
+        elif state_nmi_common >= decl_nmi_common:
             failed.append("state_copy")
     verdict = "not_usable" if failed else ("undecidable" if undecided else "usable")
 
@@ -443,14 +452,35 @@ def _runs_of(lab: np.ndarray, seams: np.ndarray) -> list[tuple[int, int]]:
 
 def cmd_real(a: argparse.Namespace) -> int:
     ABS_SEGMENTS_FOR.update(a.abs_segments_for)
+    if a.abs_segments_for and not a.out.resolve().is_relative_to(a.work.resolve()):
+        raise SystemExit("--abs-segments-for を使うときは --out を --work の配下に置く（絶対時刻を追跡対象の場所に書かない）")
     cfg, crit = load_config(), load_json("criteria.json")["real"]
     people = json.loads(a.people.read_text(encoding="utf-8"))
+    unknown = sorted(set(a.abs_segments_for) - {str(p["id"]) for p in people})
+    if unknown:
+        raise SystemExit(f"--abs-segments-for に人の一覧に無い id がある: {unknown}")
     out = []
     for p in people:
-        if not PERSON_ID_RE.match(str(p["id"])):
+        if not PERSON_ID_RE.fullmatch(str(p["id"])):
             raise SystemExit(f"id は英数字・_・- の 64 字以内にする（パスに使うため）: {p['id']!r}")
         files = sorted(Path(f) for f in p["files"])
-        out.append(evaluate_person(p["id"], files, a.work, cfg, crit))
+        try:
+            r = evaluate_person(p["id"], files, a.work, cfg, crit)
+        except ValueError as e:
+            # 窓の重なりが落としきれない（3 本以上の連鎖など）。全員を止めず、その人を判定できないにする。
+            print(f"{p['id']}: {e}", file=sys.stderr)
+            r = {"person": p["id"], "files": len(files), "verdict": "undecidable", "failed": [],
+                 "undecidable": ["windows_overlap"], "relative_time_files": 0, "_abs_segments": None}
+        abs_segments = r.pop("_abs_segments")
+        if abs_segments is not None:
+            if r["relative_time_files"]:
+                # 相対時刻のファイル（O1 の提出物）を置き直した時刻は実時刻ではない。振り返りに使えないので出さない。
+                raise SystemExit(f"{p['id']}: 相対時刻のファイルが {r['relative_time_files']} 本あるので、絶対時刻の一覧は出さない")
+            ap = a.work / str(p["id"]) / "abs_segments.json"
+            ap.parent.mkdir(parents=True, exist_ok=True)
+            ap.write_text(dumps({"sharing": SHARING_MARKER, "person": p["id"], "segments": abs_segments}) + "\n",
+                          encoding="utf-8")
+        out.append(r)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     doc = {"sharing": SHARING_MARKER, "replay": replay_bin(), "people": out}
     a.out.write_text(dumps(doc) + "\n", encoding="utf-8")

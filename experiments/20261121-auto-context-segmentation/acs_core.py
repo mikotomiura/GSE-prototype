@@ -47,7 +47,8 @@ FEATURE_NAMES = [
     "alr_other",
 ]
 # 「量」の軸（打鍵の多さ・ポインタの多さ）。循環の検査（量の軸だけで再現できるか）に使う。
-QUANTITY_FEATURES = ["pointer_frac", "key_rate_per_min"]
+# v1.4（判断 22）: 打鍵数とポインタ秒から作る比も量の側に入れる（量だけで割れたまとまりを、量以外の軸で再現できたと読まないため）。
+QUANTITY_FEATURES = ["pointer_frac", "key_rate_per_min", "log_pointer_key_ratio"]
 
 
 @dataclass
@@ -91,7 +92,13 @@ class Windows:
     start_ms: np.ndarray
     end_ms: np.ndarray
     X: np.ndarray  # (m, d) 生の文脈ベクトル（nan を含みうる）
-    idle: np.ndarray  # bool
+    idle: np.ndarray  # bool: まとめに入れない窓（無操作、または打鍵が 0 でポインタが欠測の窓）
+    # bool: 打鍵が 0 でポインタが欠測の窓（操作の有無が分からない）。まとめには入れないが、
+    # 強制の境界（無操作の長さ）には数えない。None はすべて偽。
+    unknown: np.ndarray | None = None
+
+    def unknown_mask(self) -> np.ndarray:
+        return self.unknown if self.unknown is not None else np.zeros(len(self.idle), dtype=bool)
 
 
 def _nanmean_or_nan(a: np.ndarray) -> float:
@@ -103,7 +110,7 @@ def make_windows(ticks: Ticks, window_s: int) -> Windows:
     """重ならない `window_s` 秒の窓に集める。打鍵もポインタも無い窓は無操作（idle）。"""
     n = len(ticks.t_ms)
     m = n // window_s
-    starts, ends, rows, idle = [], [], [], []
+    starts, ends, rows, idle, unknown = [], [], [], [], []
     for w in range(m):
         sl = slice(w * window_s, (w + 1) * window_s)
         k = ticks.keys[sl]
@@ -138,12 +145,15 @@ def make_windows(ticks: Ticks, window_s: int) -> Windows:
         )
         starts.append(int(ticks.t_ms[sl.start]))
         ends.append(int(ticks.t_ms[sl.stop - 1]) + 1000)
+        pointer_missing = bool(np.all(np.isnan(p)))
         idle.append(key_total == 0 and pointer_secs == 0)
+        unknown.append(key_total == 0 and pointer_missing)
     return Windows(
         np.array(starts, dtype=np.int64),
         np.array(ends, dtype=np.int64),
         np.array(rows, dtype=float).reshape(m, len(FEATURE_NAMES)),
         np.array(idle, dtype=bool),
+        np.array(unknown, dtype=bool),
     )
 
 
@@ -309,11 +319,13 @@ def forced_boundaries(win: Windows, idle_gap_s: int, seams: np.ndarray | None = 
     forced = np.zeros(m + 1, dtype=bool)
     forced[m] = True
     dur = (win.end_ms - win.start_ms) / 1000.0
+    # 操作の有無が分からない窓（ポインタ欠測）は無操作の長さに数えない（cross-review・判断 22）。
+    known_idle = win.idle & ~win.unknown_mask()
     i = 0
     while i < m:
-        if win.idle[i]:
+        if known_idle[i]:
             j = i + 1
-            while j < m and win.idle[j] and not (seams is not None and seams[j]):
+            while j < m and known_idle[j] and not (seams is not None and seams[j]):
                 j += 1
             if float(dur[i:j].sum()) >= idle_gap_s:
                 forced[i] = True
@@ -387,19 +399,22 @@ def nmi(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def boundary_f1(pred: list[int], truth: list[int], tol_ms: int) -> tuple[float, float, float]:
-    """許容 `tol_ms` の中で 1 対 1 に対応づけた境界の適合率・再現率・F1。"""
+    """許容 `tol_ms` の中で 1 対 1 に対応づけた境界の適合率・再現率・F1。
+
+    対応づけは、両方を昇順に並べて 2 本の指で進める（1 次元で許容幅が一定のとき、これが最大の対応になる）。
+    """
     pred = sorted(pred)
     truth = sorted(truth)
-    used = [False] * len(pred)
-    hit = 0
-    for t in truth:
-        best = None
-        for i, p in enumerate(pred):
-            if not used[i] and abs(p - t) <= tol_ms and (best is None or abs(p - t) < abs(pred[best] - t)):
-                best = i
-        if best is not None:
-            used[best] = True
+    i = j = hit = 0
+    while i < len(pred) and j < len(truth):
+        if abs(pred[i] - truth[j]) <= tol_ms:
             hit += 1
+            i += 1
+            j += 1
+        elif pred[i] < truth[j]:
+            i += 1
+        else:
+            j += 1
     precision = hit / len(pred) if pred else (1.0 if not truth else 0.0)
     recall = hit / len(truth) if truth else 1.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
@@ -427,7 +442,8 @@ def block_permutation_pvalue(labels: np.ndarray, ref: np.ndarray, blocks: np.nda
         vals[j] = v[0]
     ge = 0
     for _ in range(n_perm):
-        if nmi(labels, rng.permutation(vals)[inv]) >= obs:
+        # 同じ分割でも浮動小数の和の順で 1e-16 ほどずれるので、許容を付けて比べる（反保守にしない）。
+        if nmi(labels, rng.permutation(vals)[inv]) >= obs - 1e-12:
             ge += 1
     return obs, (1 + ge) / (1 + n_perm)
 
@@ -498,13 +514,14 @@ def concat_windows(parts: list[Windows]) -> tuple[Windows, np.ndarray, dict]:
             keep = p.end_ms <= nxt
             dropped += int((~keep).sum())
             dropped_active += int((~keep & ~p.idle).sum())
-            p = Windows(p.start_ms[keep], p.end_ms[keep], p.X[keep], p.idle[keep])
+            p = Windows(p.start_ms[keep], p.end_ms[keep], p.X[keep], p.idle[keep], p.unknown_mask()[keep])
         if len(p.idle):
             kept.append(p)
     starts = np.concatenate([p.start_ms for p in kept]) if kept else np.zeros(0, dtype=np.int64)
     ends = np.concatenate([p.end_ms for p in kept]) if kept else np.zeros(0, dtype=np.int64)
     X = np.concatenate([p.X for p in kept]) if kept else np.zeros((0, len(FEATURE_NAMES)))
     idle = np.concatenate([p.idle for p in kept]) if kept else np.zeros(0, dtype=bool)
+    unknown = np.concatenate([p.unknown_mask() for p in kept]) if kept else np.zeros(0, dtype=bool)
     seams = np.zeros(len(idle) + 1, dtype=bool)
     off = 0
     for p in kept:
@@ -513,4 +530,4 @@ def concat_windows(parts: list[Windows]) -> tuple[Windows, np.ndarray, dict]:
     seams[len(idle)] = True
     if len(starts) > 1 and np.any(starts[1:] < ends[:-1]):
         raise ValueError("windows still overlap after trimming (a file starts inside an earlier file's window)")
-    return Windows(starts, ends, X, idle), seams, {"dropped_windows": dropped, "dropped_active_windows": dropped_active}
+    return Windows(starts, ends, X, idle, unknown), seams, {"dropped_windows": dropped, "dropped_active_windows": dropped_active}

@@ -67,6 +67,37 @@ class MetricTest(unittest.TestCase):
         self.assertAlmostEqual(f, 0.5)
 
 
+class BoundaryMatchingTest(unittest.TestCase):
+    def test_conflicting_candidates_get_the_maximum_matching(self):
+        # 貪欲に近い方から取ると 1 組しか対応しない例（cross-review の Codex の例）。最大の対応は 2 組。
+        p, r, f = core.boundary_f1([0, 3], [2, 4], tol_ms=2)
+        self.assertEqual((p, r), (1.0, 1.0))
+        self.assertAlmostEqual(f, 1.0)
+
+
+class UnknownWindowTest(unittest.TestCase):
+    def test_pointer_missing_windows_do_not_count_as_idle_time(self):
+        s = np.arange(6) * 180_000
+        idle = np.array([0, 1, 1, 1, 1, 0], dtype=bool)
+        unknown = np.array([0, 1, 1, 1, 0, 0], dtype=bool)
+        win = core.Windows(s, s + 180_000, np.zeros((6, len(core.FEATURE_NAMES))), idle, unknown)
+        # 確かな無操作は窓 4 の 1 つ（180 秒）だけなので、300 秒に届かず強制の境界は立たない。
+        f = core.forced_boundaries(win, 300)
+        self.assertFalse(f[1] or f[4] or f[5])
+        # 欠測でなければ 4 窓（720 秒）の無操作になり、両端に立つ。
+        f2 = core.forced_boundaries(core.Windows(s, s + 180_000, win.X, idle), 300)
+        self.assertTrue(f2[1] and f2[5])
+
+    def test_make_windows_marks_pointer_missing_zero_key_windows_unknown(self):
+        n = 360
+        ticks = core.Ticks(np.arange(n, dtype=np.int64) * 1000, np.r_[np.ones(180), np.zeros(180)],
+                           np.zeros((n, len(core.GROUP_ORDER))), np.full(n, np.nan), np.full(n, np.nan),
+                           np.full(n, np.nan))
+        w = core.make_windows(ticks, 180)
+        self.assertEqual(w.idle.tolist(), [False, True])
+        self.assertEqual(w.unknown.tolist(), [False, True])
+
+
 class GmmTest(unittest.TestCase):
     def test_bic_picks_two_for_two_blobs_and_one_for_one(self):
         rng = np.random.default_rng(0)
