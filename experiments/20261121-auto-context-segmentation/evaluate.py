@@ -415,6 +415,12 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
         "failed": failed,
         "undecidable": undecided,
         # 区間の一覧。時刻はその人の最初の窓からの相対 ms にする（絶対時刻を出さない・security-checker MEDIUM）。
+        "_abs_segments": [
+            {"start_ms": int(win.start_ms[i]), "end_ms": int(win.end_ms[j - 1]), "name": res.names[int(lab[i])],
+             "mean": {n: (None if np.isnan(v) else round(float(v), 2)) for n, v in
+                      zip(core.FEATURE_NAMES, np.nanmean(win.X[i:j], axis=0))} if lab[i] != core.IDLE else None}
+            for i, j in _runs_of(lab, seams)
+        ] if pid in ABS_SEGMENTS_FOR else None,
         "_segments": [
             {"start_rel_ms": int(win.start_ms[i] - win.start_ms[0]), "name": res.names[int(lab[i])]}
             for i in range(len(lab)) if i == 0 or lab[i] != lab[i - 1] or seams[i]
@@ -422,7 +428,21 @@ def evaluate_person(pid: str, files: list[Path], work: Path, cfg: dict, crit: di
     }
 
 
+# 絶対時刻つきの区間の一覧を出す人（研究者本人の振り返り用・decisions.md 判断 19）。cmd_real が --abs-segments-for で埋める。
+ABS_SEGMENTS_FOR: set[str] = set()
+
+
+def _runs_of(lab: np.ndarray, seams: np.ndarray) -> list[tuple[int, int]]:
+    out, s0 = [], 0
+    for i in range(1, len(lab) + 1):
+        if i == len(lab) or lab[i] != lab[s0] or seams[i]:
+            out.append((s0, i))
+            s0 = i
+    return out
+
+
 def cmd_real(a: argparse.Namespace) -> int:
+    ABS_SEGMENTS_FOR.update(a.abs_segments_for)
     cfg, crit = load_config(), load_json("criteria.json")["real"]
     people = json.loads(a.people.read_text(encoding="utf-8"))
     out = []
@@ -452,6 +472,8 @@ def main() -> int:
                    help="[{id, files:[...]}] の JSON（実ファイルのパスを含むのでコミットしない）")
     r.add_argument("--work", required=True, type=Path)
     r.add_argument("--out", required=True, type=Path)
+    r.add_argument("--abs-segments-for", nargs="*", default=[],
+                   help="絶対時刻つきの区間の一覧を出す id（研究者本人の振り返り用。出力は work/ に置きコミットしない）")
     a = ap.parse_args()
     return cmd_synth(a) if a.cmd == "synth" else cmd_real(a)
 
