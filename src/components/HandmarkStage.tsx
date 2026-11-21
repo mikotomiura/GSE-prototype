@@ -10,6 +10,8 @@
 // - 霧: どの入力にも依らない基層(漂いは Rust の drift)。
 // - Windows だけ: デスクトップのアイコンの写しが窓の受け口(`__gseHandmarkIcons`)に届き、模様のある画素にだけ重ねる
 //   (handmarkStageIcons.ts・模様がアイコンの後ろを流れて見える)。
+// - 止まりの層(ADR-056・研究者用の設定のときだけ `handmark-stopped` が届く): 打鍵が止まると、Rust が決めた
+//   見えの度合いと記憶の短い動きで、場の自律の動きを重ねる(handmarkStoppedDraw.ts)。止まりの長さは届かない。
 // 窓は何も保存せず、何も返さない。推定は受け取らない。数値・文字は描かない。
 // 描く部分は handmarkStageDraw.ts の純関数(机上の道具と同じ関数・手跡の PR 4)。この部品は受け取りと寄せと時計だけ。
 import { useEffect, useRef } from "react";
@@ -35,6 +37,8 @@ import {
 import type { RippleMessage, TraceMessage } from "./handmarkStageTrace";
 import { buildWorld, drawFrame, viewOf } from "./handmarkStageDraw";
 import type { RippleView, Shown, View, World } from "./handmarkStageDraw";
+import { drawStopped, lerpStopped, parseStopped, stoppedIsInvisible } from "./handmarkStoppedDraw";
+import type { StoppedShown } from "./handmarkStoppedDraw";
 import { clearIconLayer, drawIconsAtop, handleIconsMessage, installIconsHook, makeIconLayer } from "./handmarkStageIcons";
 import type { IconsHookMessage } from "./handmarkStageIcons";
 
@@ -43,6 +47,8 @@ const STATE_EVENT = "handmark-state";
 /** 跡の場・波紋の種のイベント名(src-tauri/src/handmark_stage.rs の TRACE_EVENT・RIPPLE_EVENT)。 */
 const TRACE_EVENT = "handmark-trace";
 const RIPPLE_EVENT = "handmark-ripple";
+/** 止まりの層のイベント名(src-tauri/src/handmark_stage.rs の STOPPED_EVENT・研究者用の設定のときだけ届く)。 */
+const STOPPED_EVENT = "handmark-stopped";
 /** 寿命を過ぎた波紋・古い場を、描画が止まっていても消すための時計の知らせの間隔。 */
 const CLOCK_TICK_MS = 250;
 
@@ -101,6 +107,11 @@ export default function HandmarkStage() {
     let to: Shown = { speed: 0, irreg: 0, phase: 0, drift: 0 };
     let shown: Shown = { speed: 0, irreg: 0, phase: 0, drift: 0 };
     let recvAt = performance.now();
+    // ---- 止まりの層(届いたときだけ)。状態と同じく STATE_TICK_MS かけて寄せる ----
+    let stoppedFrom: StoppedShown | null = null;
+    let stoppedTo: StoppedShown | null = null;
+    let stoppedShown: StoppedShown | null = null;
+    let stoppedRecvAt = performance.now();
 
     // ---- ポインタ(Rust から届く跡の場と波紋)。窓は積まず、届いた値を寄せて読むだけ ----
     const fieldFrom = makeField();
@@ -141,6 +152,9 @@ export default function HandmarkStage() {
         // 窓が閉じた: 状態も、場も波紋も消す(世代は次に開いたとき進んだ値が届く)。
         active = false;
         resetPointer();
+        stoppedFrom = null;
+        stoppedTo = null;
+        stoppedShown = null;
         clearIconLayer(icons);
         ctx.clearRect(0, 0, view.W, view.H);
         return;
@@ -169,6 +183,18 @@ export default function HandmarkStage() {
       recvAt = performance.now();
     };
 
+    // 届いた止まりの層を受け取り、いま見せている値から寄せ始める。読めない値は捨てる(前の値のまま)。
+    const onStopped = (msg: unknown): void => {
+      const next = parseStopped(msg);
+      if (next === null) return;
+      // 寄せ始める値は、いま見せている値(初めて届いたときは、そのまま置く)。状態の `from = shown` と同じ。
+      stoppedFrom = stoppedShown ?? next;
+      stoppedShown = stoppedFrom;
+      stoppedTo = next;
+      stoppedRecvAt = performance.now();
+      if (active && !stoppedIsInvisible(next)) kick();
+    };
+
     let frame: number | null = null;
     let idleTimer: number | null = null;
     const loop = (now: number): void => {
@@ -186,7 +212,13 @@ export default function HandmarkStage() {
       // 跡の場: 届いた場へ次の写しまで線形に寄せる。1 秒来なければ 0(描画の回数では積まない)。
       sweepPointer(now);
       lerpField(fieldFrom, fieldTo, (now - traceRecvAt) / TRACE_TICK_MS, fieldShown);
-      drawFrame(ctx, world, view, shown, fieldShown, rippleViews(now), reduceMotion ? 0.3 : 1);
+      if (stoppedFrom !== null && stoppedTo !== null) {
+        stoppedShown = lerpStopped(stoppedFrom, stoppedTo, (now - stoppedRecvAt) / STATE_TICK_MS);
+      }
+      const calm = reduceMotion ? 0.3 : 1;
+      // 机上の道具と同じ順(drawFrame の後に drawStopped)。アイコンの写しはその上。
+      drawFrame(ctx, world, view, shown, fieldShown, rippleViews(now), calm);
+      drawStopped(ctx, world, view, stoppedShown, calm);
       drawIconsAtop(ctx, icons, view.W, view.H);
       if (
         shown.speed > 0 ||
@@ -275,6 +307,7 @@ export default function HandmarkStage() {
     let unlisten: (() => void) | null = null;
     let unlistenTrace: (() => void) | null = null;
     let unlistenRipple: (() => void) | null = null;
+    let unlistenStopped: (() => void) | null = null;
     const win = getCurrentWebviewWindow();
     // listen に失敗したら背景は動かないだけ。
     win
@@ -304,6 +337,15 @@ export default function HandmarkStage() {
         else unlistenRipple = fn;
       })
       .catch(() => {});
+    win
+      .listen<unknown>(STOPPED_EVENT, (event) => {
+        onStopped(event.payload);
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenStopped = fn;
+      })
+      .catch(() => {});
     // 開いた直後の最初の区画は状態より先に届くことがあるので、active を待たずに置く。閉じるときは Rust が
     // 先に送り手を止めてから null を送り、null で層を消す。次に開いた最初の区画は層を消してから置く(reset)。
     const uninstallIcons = installIconsHook((msg: IconsHookMessage) => {
@@ -320,6 +362,7 @@ export default function HandmarkStage() {
       if (unlisten !== null) unlisten();
       if (unlistenTrace !== null) unlistenTrace();
       if (unlistenRipple !== null) unlistenRipple();
+      if (unlistenStopped !== null) unlistenStopped();
       uninstallIcons();
       clearIconLayer(icons);
     };

@@ -2383,8 +2383,13 @@ fn run_handmark_effects(
                 crate::handmark_stage::emit_state(app, &s);
                 crate::handmark_edge_strip::emit_state(app, &s);
             }
+            #[cfg(any(target_os = "macos", windows))]
+            Effect::Stopped(f) => crate::handmark_stage::emit_stopped(app, &f),
             #[cfg(not(any(target_os = "macos", windows)))]
-            Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
+            Effect::OpenWindow { .. }
+            | Effect::CloseWindow
+            | Effect::State(_)
+            | Effect::Stopped(_) => {}
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
             // ポインタのスレッドへの入れ切り(Atomic に書くだけ)と、トレイの「カーソル」「クリック」の項目の状態。
             Effect::PointerGate {
@@ -2399,6 +2404,26 @@ fn run_handmark_effects(
                 );
                 crate::tray::set_handmark_inputs_from_gate(open, cursor, click);
             }
+        }
+    }
+}
+
+/// 止まりの層（ADR-056）の研究者用の設定。`GSE_DEBUG=1` のときだけ `GSE_HANDMARK_STOPPED` を読む。
+/// 読めない値は警告を出して切ったままにする（参加者の配布物の既定は切ったまま）。
+fn handmark_stopped_cfg_from_env() -> Option<crate::analysis::handmark::stopped::StoppedCfg> {
+    // 門は `ensure_debug_enabled` と同じ（`GSE_DEBUG=1` のときだけ）。
+    let debug = ensure_debug_enabled().is_ok();
+    let raw = std::env::var("GSE_HANDMARK_STOPPED").ok();
+    match crate::analysis::handmark::stopped::parse_stopped_cfg(raw.as_deref(), debug) {
+        Ok(cfg) => {
+            if let Some(c) = cfg.as_ref() {
+                tracing::info!("handmark: stopped layer on ({:?})", c.form);
+            }
+            cfg
+        }
+        Err(e) => {
+            tracing::warn!("handmark: GSE_HANDMARK_STOPPED ignored: {e}");
+            None
         }
     }
 }
@@ -2659,7 +2684,8 @@ fn spawn_handmark_driver(
             let wall = epoch_ms();
             let today = today_of(&mut offset, wall);
             let mut g = handmark_lock();
-            let (d, fx) = crate::handmark_driver::HandmarkDriver::new(fs, true, wall, today);
+            let (mut d, fx) = crate::handmark_driver::HandmarkDriver::new(fs, true, wall, today);
+            d.set_stopped(handmark_stopped_cfg_from_env());
             run_handmark_effects(&app, &log_tx, fx);
             *g = Some(d);
         }
