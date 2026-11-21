@@ -7,7 +7,9 @@
 - [x] design.md（v1）→ `/reimagine`（v2 は独立の Opus）→ ハイブリッドを採用（`design-comparison.md`）
 
 ## 1. 段（design.md §3 の S0〜S9）
-- [ ] S0: journal 版の本文で committed 10・fresh 79 を一次で確かめる → 照会の文面 → 研究者が送る・日付を記録（判断 5）
+- [x] S0a: journal 版の本文（NSF PAR の版）で確かめた → 件数は本文に無く、v1 が 10・79（判断 12）
+- [x] S0b: 照会の文面（`inquiry-alaboudi-latoza-draft.md`）
+- [ ] S0c: 研究者が宛先を確かめて送る・日付を記録（判断 5）
 - [ ] S1: 枠を elsarticle に移す（`body.tex` ＋ `main-jss.tex`・本文の差分 0・36 頁未満）／ 推薦の査読者の欄の有無 ／ Open Science Initiative への参加（研究者）
 - [ ] S2: B の検索の手順 → 検索 ／ H の手法（「役に立たない」も選べる）／ F（サブエージェント → 一次で裏取り）
 - [ ] S3: 補助解析（A・H・I・M・k・DF3 の位置）を追加だけで ／ 旧い値の不変 ／ K（figshare のライセンスを Chrome で）

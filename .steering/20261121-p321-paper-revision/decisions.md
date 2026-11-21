@@ -48,6 +48,12 @@
 - **決定**: 直した原稿に attack-me round 2 を当てる。査読者の席は出し先の分野に合わせる。/reimagine は design.md を書いた後、着手の前に使う（研究者の選択。私の推奨は「使わない」だった）。
 - **理由**（round 2）: 直した箇所が新しい穴を生んでいないか、round 1 の指摘が本当に閉じたかを確かめる。
 
+## 判断 12: S0 —— journal 版の本文は committed・fresh の件数を書き直していない ／ 照会の前提を一次で固めた（2026-11-21）
+- **入手**: Springer のページは有料（"Buy article PDF ￥4,980"・Chrome で確認）。OpenAlex の無料の版は arXiv v1 だけ（別の版）。Google Scholar の「全 4 バージョン」に NSF Public Access Repository の PDF（`https://par.nsf.gov/servlets/purl/10490781`）があった。研究助成の成果の公開の置き場で、合法に無料で読める。2,295,565 B・SHA-256 `38fe70013497c01686dac59c6077cb1c350cc1942dbd49e1435ac9eccd24b94c`・34 頁・"Page 2 of 34 … (2023) 28:117 Empirical Software Engineering" の版面（scratchpad に置いた。repo には入れない）。⚠️ 2026-09-28 に [P433] の全文をどこから読んだかは記録が無い（同じ置き場の可能性があるが、確かめていない）。
+- **逐語**（journal 版）: "Consulting resources was the least common activity, occurring in only 33% of debugging episodes. However, 91% of developers consulted external resources at least once." ／ "Consulting resources occurred in all committed debugging episodes, but only 15% of fresh debugging episodes." ／ "coding 89 debugging episodes and 2135 instances of activities" ／ "Half of the debugging episodes focused on committed defects and did not end with a successful fix, either because more information was needed to reproduce the defect or the developer deferred debugging until later."
+- **件数**: journal 版の本文（抽出した文字）に、committed・fresh の件数は無かった（図 7 の時系列の図にだけある）。arXiv v1 の逐語は "Ten debugging episodes started because five developers (D1, D2, D3, D5, and D8) worked towards debugging reported defects" ・ "In the remaining 79 debugging episodes"。共有データからの再現も 10・79（`metrics.json` の `d1_gate_v1`）。→ verdict §4 の注意（「journal 版が committed 10・fresh 79 を報告しているか」）への答えは、「**報告していない。ただ『committed の半分が修正に至らなかった』は 10 件中 5 件と合う**」。原稿の 33% と 24.7% の不整合は「v1 の件数を仮定すると」という条件つきで書く（S5）。
+- **照会の文面**: `inquiry-alaboudi-latoza-draft.md`（英語・4 問: consultation の定義／件数と起点の割り当て／コーディングの改訂／DF3 の episode のその後）。宛先は研究者が確かめる。
+
 ## 判断 11: 出し先 = Journal of Systems and Software（JSS・Elsevier）（2026-11-21・研究者の選択）
 - **調べ方**: 出版社の系統ごとに Sonnet の汎用エージェント 3 本へ並列で渡した（判断 6）。3 本とも、誌ごとの投稿ガイドの本体を WebFetch で読めなかった（ScienceDirect・Wiley は 403、Springer は認証へのリダイレクト）。そこで判断に使う行は、私が Chrome の `javascript_tool` で公式のページから逐語で取った（下の「一次」）。「代行」はサブエージェントが取った逐語で、私は開いていない。
 - **比較**（費用は購読型で出す場合）:
