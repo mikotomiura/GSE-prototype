@@ -77,3 +77,20 @@
 - 研究者が mmiura.network の Gmail から送った。宛先は `tlatoza@gmu.edu`・`aalaboud@gmu.edu`（journal 版の著者情報）。文面は `inquiry-alaboudi-latoza-draft.md` の改稿（丁寧に直した版。4 つの問いの中身は判断 12 の版と同じ）。
 - 待つ目安は 2 週間 = **2026-12-05**。返事を待たずに S1〜S8 を進め、S9 で返事か「未回答」を RQ4 の節へ入れる。
 - 同じ日に研究者が決めたこと: Open Science Initiative に参加する ／ 推薦の査読者の欄は投稿の直前（S9）に確かめる（候補の下書きは S2 の F と一緒に作る）／ 費用が無いなら JSS のまま（判断 11 の一次 "No open access publication fee." と購読型の出し方で無料）。
+
+## 判断 14: S1 —— 枠を elsarticle に移した（論文用リポジトリ `revision-jss` の `061938a`・未 push）
+- **分け方**: `main.tex` を `abstract.tex`（要旨の 1 段落）・`body.tex`（§1〜結論）・`declarations.tex`（声明。`\bmhead` を枠が定める `\declhead` に替えただけ）と、枠 `main-jss.tex` に分けた。旧 `main.tex` は `git rm`（タグ `submission-2026-09-29` に残る）。
+- **本文の差分 0 の確かめ方**: 使い捨てのスクリプトで、3 つのファイルを旧 `main.tex`（main の版）の該当行と文字単位で比べた → 一致。題・キーワードも一致。
+- **枠**: `elsarticle` の `preprint,12pt,authoryear`・`elsarticle-harv`・`hyperref`（本文の節題が `\texorpdfstring` を使う。sn-jnl は hyperref を読んでいた）・`geometry` で A4・余白 25mm。理由: 既定の余白だと表 3 つが本文幅を 30〜59pt はみ出した。本文（表）を変えずに収めるため、枠の側で幅を広げた。10pt なら 14 頁、12pt で 18 頁（はみ出しは 2〜3pt が 2 件で、旧版にも 1 件あった程度）→ 査読で読みやすい 12pt を採った。36 頁未満の規程に十分。
+- **`build.sh`**: Springer の zip の取得とハッシュの検査を消した。代わりに、Tectonic の bundle から取る `elsarticle.cls`（"elsarticle 2020/11/20, 3.3"）と `elsarticle-harv.bst` の版の行を照合し、頁数が 35 を超えたら止める。変異で 3 つとも止まることを確かめた（頁の上限 10・クラスの版 3.4・bst を num）。`bash paper/build.sh` exit 0（18 頁）・`bash run.sh` exit 0（`results/` は変わらない）。
+- **README**: 組版の段落・配置の表・ライセンスの表（Springer の行を消した）を直した。
+- Tectonic 0.17.0 は scratchpad に取り直した（`tectonic-0.17.0-x86_64-pc-windows-msvc.zip`・SHA-256 `f61ce51f…`）。
+- **未確認**: 投稿画面に推薦の査読者の欄があるか（S9 で研究者が確かめる・判断 13）。
+
+## 判断 15: S2-B —— 誤読の実例の検索の手順（検索の前に決めた・判断 3）
+- **何を「実例」と数えるか**: 公刊物（論文・プレプリント・学位論文・技術報告）の本文で、(a) 参照・助けの求めが記録されなかった単位（episode・task・session）を、解決した・自力で解いた・助けが要らなかった、と読む文、または (b) 参照の頻度の低さから助けの必要の低さ・自力での解決を推す文。分類は「実例」「近い（参照が少ないことを述べるだけで、解決や必要には触れない）」「該当なし」。
+- **どこを**: (1) 前向きの引用: Alaboudi & LaToza の arXiv 2021（2105.02162）と EMSE 2023（10.1007/s10664-023-10352-5）、Li & Coblenz 2026 を引く文献を、OpenAlex（`cites:`）と Semantic Scholar の citations で全部挙げ、各文献で引用している箇所の前後を読む。(2) 語の検索: Google Scholar と OpenAlex で、下の語を 2021〜2026 年の範囲で検索し、各問いの上位 30 件の題と抄録を見る。
+- **語**: "debugging" と組み合わせて "without consulting" / "without seeking help" / "rarely consult" / "without external help" / "resolved on their own" / "self-resolved" / "unaided"。および "help seeking" "programming" "did not ask for help" "did not need help"。
+- **どこまで**: 有料の本文は使わない（無料の版を OpenAlex と Google Scholar の「すべての版」で探す）。無料の本文が無ければ抄録だけを読んだと記録する。締切 25 分。
+- **記録**: 候補ごとに、書誌・DOI か URL・読んだ版（本文か抄録か）・該当する文の逐語（25 語以内）・分類。0 件も結果として本文に書く（判断 3）。
+- **裏取り**: 「実例」「近い」に分類された候補は、メインが本文を開いて逐語を確かめてから使う。
