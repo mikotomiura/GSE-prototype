@@ -32,3 +32,11 @@ Thank you very much for your time.
 
 Kind regards,
 Mikoto Miura
+
+---
+
+## 改稿（2026-11-21・研究者の指示「角が立たず丁寧に」）
+
+- 上の版を柔らかくした。「再現できなかった」を「私の理解の不足かもしれない」と置き、各問いを「教えてほしい」の形にした。数字と 4 つの問いの中身は変えていない。
+- 宛先は journal 版の本文（NSF PAR の版）の著者情報から取った: `aalaboud@gmu.edu`・`tlatoza@gmu.edu`。⚠️ Alaboudi 氏は 2023 年以降に所属が変わっている可能性がある（未確認）。
+- 下書きの置き場所: コネクタで置いた johndo 側の下書きは消した（研究者の指示）。mmiura 側（mmiura.network）の Gmail に Chrome から置き直した（宛先 2 件・件名・本文 3,235 字を JS で確かめた・下書きフォルダに 1 件）。送るのは研究者。

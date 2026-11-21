@@ -72,3 +72,8 @@
 - **却下案**: IST（範囲は合う。構造化した要旨が要るだけで、条件は満たす。JSS が不採択なら次の候補）／SQJ（書式の手間は最小だが範囲が品質管理に寄る）／JSEP（査読の方式が未確認・範囲が保守と進化に寄る）／TSE（超過頁料）／TOSEM（APC）。
 - **改訂への効き方**（design.md の前提）: 要旨を 250 語以内に削る ／ 書式は elsarticle を勧められている（"We encourage you use our LaTeX template"。初回の投稿で必須かは、JSS の LaTeX の節を design の段で確かめる）／ 編集できるソース一式を出す ／ Highlights が要るかを確かめる ／ Open Science Initiative に参加するか（研究者の判断・design の段で）。
 - ⚠️ **未確認**: 代行の行（範囲・Open Science の文）は私が開いていない。design の段で JSS の投稿ガイドの Article structure・Highlights・LaTeX・Open Science の節を一次で読む。サブエージェントは「JSS が 2025 年に査読の依頼に 20 件の上限を設けた」と編集者の論考（arXiv 2601.19217・本文は読んでいない）の要約から報告した → 受け付けの状況に関わるので、design の段で確かめる。
+
+## 判断 13: S0c —— 照会を送った（2026-11-21・研究者）
+- 研究者が mmiura.network の Gmail から送った。宛先は `tlatoza@gmu.edu`・`aalaboud@gmu.edu`（journal 版の著者情報）。文面は `inquiry-alaboudi-latoza-draft.md` の改稿（丁寧に直した版。4 つの問いの中身は判断 12 の版と同じ）。
+- 待つ目安は 2 週間 = **2026-12-05**。返事を待たずに S1〜S8 を進め、S9 で返事か「未回答」を RQ4 の節へ入れる。
+- 同じ日に研究者が決めたこと: Open Science Initiative に参加する ／ 推薦の査読者の欄は投稿の直前（S9）に確かめる（候補の下書きは S2 の F と一緒に作る）／ 費用が無いなら JSS のまま（判断 11 の一次 "No open access publication fee." と購読型の出し方で無料）。
