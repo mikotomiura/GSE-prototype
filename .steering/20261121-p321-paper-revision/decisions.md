@@ -134,3 +134,18 @@
   - 新しい質的な文はすべて `make_results.py` の検査にし、変異で止まることを確かめた（6 本）。既存の変異 2 本が新しい検査で先に止まった → `post_results` を `claims` の後に回し、重複する検査を 1 つ消した。
   - 22 頁（36 頁未満）。
 - ⚠️ **約束を書いたが、まだ実装していないもの**: §8 の倫理の節に「再現一式の派生表は URL・名前を含まない」と書いた → K の派生表（`results/d1_episodes.csv`）を S9 の前に必ず実装する。実装しないなら、この文を消す。
+
+## 判断 19: S5 の後半 —— 序論・§2・§5.5・RQ4・要旨・声明・K を直した（2026-11-21）
+- **研究者に聞いたこと**（AskUserQuestion）: 照会の返事はまだ無い ／ 解析のコードは研究者は読んでいない（出力だけを見た）→ §5.5 にそのとおり書いた ／ モデルの版を記録から抜き出してよい。
+- **モデルの版の出どころ**: 論文用リポジトリと GSE の commit の Co-Authored-By の行（一次）。2026-09-06 の探索 = Claude Opus 5、09-28・29 と 11 月 = Opus 5.5、11 月の調べものの委譲 = Sonnet 5.5（この機械のセッション記録の `model` で確かめた）。9 月の委譲の Sonnet の版は記録が無い → 本文に「記録していない」と書いた。各インスタンスへの指示文は一式として保存していない → そう書き、渡したものを文で説明した。
+- **一次で確かめた文献**（PDF を pypdf・書誌は Crossref）: Marwan, Dombe & Price 2020（著者の PDF・抄録の逐語）・Ko, DeLine & Venolia 2007（著者の PDF・抄録の逐語）・Parnin & Rugaber 2011（SQJ 版・著者のページ・抄録の逐語）。`docs/references.md` に [P635]〜[P640]（前半で足した Imbens & Kolesár・MacKinnon ほか・Manski も含める）を登録。`check_citations.py` は違反なし。
+- **journal 版の 8 つの報告値**: NSF PAR の PDF（SHA-256 `38fe7001…`・判断 12 と同じ）から抽出した本文で、`config.json` の逐語 7 本と活動数 2135 がすべて見つかった（"Consulting resources occurred in all committed…" は抽出で語がつながっていたが同じ文）。long = "23 episodes" は本文にある・short は "bottom quartile" とだけあり件数が無い → 22 は 89 の 4 分の 1 の切り捨てと本文に書いた。⚠️ 研究者はまだ PDF と照合していない（本文にそう書いた。S7 で照合すれば書き換える）。
+- **論文用リポジトリ**（`revision-jss`・未 push）:
+  - `8109d1f`: 序論（予防の主張に絞る・貢献の並べ替え・分解は恒等式）、§2（中断と後回し・Marwan・部分識別・2 回目の検索の範囲と 0 件）、§5.5（版・日付・渡したもの・再現率は不明・コードは読んでいない）、RQ4（22 の根拠・報告値どうしの算術 22/89 = 24.7%・照会）、RQ2 の範囲を D1 と D2 で分けた、合わせ込みの的と検査の区別、要旨（249 語・符号を「上がる」に）、Highlights、声明を Elsevier の形に（生成 AI の申告を最後に）。`check_frontmatter.py`（要旨の語数・キーワード・Highlights の字数・申告の位置・禁止する文言・変異 8 本）を `build.sh` の Step 2 にした。`make_results.py` に算術の検査と変異 2 本。
+  - `5372cdb`: K を実装した。`analysis/derived.py` → `results/d1_episodes.csv`（匿名の開発者とセッションの番号・符号・長さ。名前・URL・元のセッション ID・時刻なし）。`analyze.py` は 8 つのセルと活動数を表から戻せないと書かない。自己検査に破損 2 本と漏れの検査。metrics.json と report.md はバイト同一（`run.sh` を `ALLOW_RESULT_CHANGE=1` で 1 回・CSV が無かったため。その後の素の `run.sh` は identical）。awk で CSV から別に数えても 70/89・60/73・60/89・DF3 12（最後 4）。NOTES の Deviation 9・DATA.md の帰属。再現一式の文言（config の `_comment`・docstring・"drift"・"other project"・L10・κ）。
+  - `8129e92`: 入れ子の定義の注・小数 2 桁の脚注。
+- **生成 AI の申告**: 「使った後に著者が読み、必要に応じて直した」の文は、S7 の通読の後にだけ足す（いまは書いていない）。
+
+## 判断 20: S6 —— 題は案 A（2026-11-21・研究者の選択・私の推奨）
+- "When “no help” is not “solved”: unconsulted shares and unaided resolution in two public debugging datasets"（`6d0d3b4`）。本文の 2 つの名前がそのまま入り、self-resolution の語が消える。README の見出しも替えた。README の引用の bibtex は旧い版（タグ）の題のまま → S9 で新しい版の DOI と一緒に替える。
+- Highlights 5 本（`paper/highlights.tex`・各 85 字以内）とキーワード 6 つ（変えていない）は S7 で研究者が見る。
