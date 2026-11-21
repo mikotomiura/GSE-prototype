@@ -22,7 +22,7 @@
 - [x] cargo test・clippy・tsc・フロントのテストが緑
 - [x] `docs/functional-design.md`・`docs/glossary.md`
 - [x] code-reviewer ∥ security-checker → 指摘の対応（判断 11・HIGH 0・MEDIUM 5 と LOW 8 を直した）
-- [ ] 手動の確かめ（研究者のデバッグ起動）
+- [x] 手動の確かめ（研究者のデバッグ起動）→ 試しのタスクへ回した（判断 12・段 1 の期間の外）
 
 ## PR-b: 机上の確かめ
 - [ ] `desk.rs`・`bin/replay.rs`: `--stopped <cfg>` の出力の口（切っているときは今と同じ）
