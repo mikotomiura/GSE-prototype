@@ -30,8 +30,9 @@
     - [x] 2 つ目の実装の文（入力に在った値 / 無かった値・span と sum・指示文が残っていない・格を下げた）・duration の定義・"agreed to be observed"（`abd08f7`）
     - [x] 要旨の 3.5 の言い方（\Ro{} exceeded \Rz{}）・語数 245・序論 21 行
     - [x] 手での数え直しの結果を §5.5 (2)・§8・audit README に書いた（判断 27・`caeaece`・一致）
-    - [ ] 構成概念の分け（表 1・§5.4・§7.1・要旨の "not a loss"）／ 最後の DF3 の理屈（B）
-    - [ ] 重複を消す ／ 再利用する人の表（§7.4）／ debugging のログ研究の文献 ／ CV3 か WCR の区間と MacKinnon の言い換え
+    - [x] 構成概念の分け・最後の DF3 の理屈（判断 28・`25f7191`）
+    - [x] 再利用する人の表・debugging のログ研究の文献・CV3 と MacKinnon の言い換え（判断 28）
+    - [ ] 重複を消す（区間の但し書き・DF3 の但し書きを方法の節で 1 回に・凍結の開示を短く）
     - [ ] 残りの minor と nit（verdict.md §4）／ Data availability の DOI は S9
     - [ ] NOT-READ のうち機関リポジトリの 4 件（K53・K59・K61・K143）をブラウザで読むか（任意）
   - [ ] `/cross-review` 2 巡（直した後）

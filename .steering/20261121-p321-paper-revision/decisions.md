@@ -224,3 +224,11 @@
 - **結果**（研究者がチャットで返した。コードの値は見ずに数えた）: 表 5 だけ N=17・S=13・a=9・b=2 ／ 表 5 と本文 N=17・S=13・a=8・b=1。P1TA の本文の 2 行は 1 件として数えた。迷った行は無い。
 - **照合**（メイン）: `results/metrics.json` の `d2.results.<mode>.counts`（`resolved_no_consult` 9・8、`unresolved_no_consult` 2・1、n 17、resolved 13）と一致。
 - **本文**（論文用リポジトリ `caeaece`）: §5.5 (2) と §8 に「著者が転記から手で数え直し、同じ表を得た（数え方の確かめであって、転記の確かめではない）」と書いた。§8 の "can be recounted by hand" を消した。`audit/independent-recount/README.md` に結果と、2 つ目の実装の「入力に在った値 / 無かった値」を足した。
+
+## 判断 28: round 2 の直し（新しく足すもの 3 つと構成概念）（2026-11-22）
+
+- **debugging のログ研究**: Sonnet のサブエージェントに候補を探させた（Beller 2018・Bourcier 2024・Petrillo 2019・Fontana 2021。Afzal 2018 と Soto-Valero 2018 は本文が取れなかった）。メインが本文で逐語を確かめた 2 本だけを §7.3 に引いた。Beller 2018（ICSE '18 本会議。Crossref で確かめた。OpenAlex は Companion としているが誤り）と Bourcier 2024（VISSOFT）。内容は、セッションを道具の事象で区切ること・IDE の外の助けは記録されないこと。Petrillo と Fontana は、ログで debugging を観察した研究として弱いので引かなかった。（`d917ecb`）
+- **CV3**: MacKinnon et al. 2023 の式 (18)（leave-one-cluster-out の平均）と t(G−1) で、`post_review/*/cv3` を足した（Deviations 13・自己検査 3 本・既存の値の変化 0）。D1 は [6.2, 16.2]、D2 は [−6.8, 30.4] と [−7.3, 19.0]。CR2-BM とほぼ同じ。言い換えの "no method is known to be reliable" は、原典の逐語 2 つ（"tends to be more reliable…"・"always reassuring when several methods yield essentially the same inferences"）に替え、クラスタの大きさの中央値と最大も書いた。WCR は足していない。（`9b5e247`）
+- **再利用する人の表**（tab:reuse・§7.4）: U だけ／U と u（Fréchet の上下限）／2×2 表／A|R だけ。D1 の例は 60.7〜78.7%。上下限は make_results が計算し、A が範囲の外なら止まる。（`219855f`）
+- **構成概念**: 表 1 を「観察した単位の中（測った）」と「最終的（観察されない・[A, U]）」の 2 行に分けた。Bounds・§7.1・要旨の "not a loss" を両面の書き方にした。最後の DF3 の数は「セッションの中で戻る機会」と書いた（指摘 B）。要旨は 246 語。（`25f7191`）
+- **ほか**: `check_frontmatter.py` は、バックスラッシュの落ちた `\R{}` を止めるようになった（sed で落ちたため）。
