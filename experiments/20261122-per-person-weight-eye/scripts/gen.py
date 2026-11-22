@@ -163,8 +163,8 @@ def build_new(strand, shape, seed, m0, lam=0.0, rho=0.0, n_writers=None, seqs=Tr
         for ls, C in zip(lens, Cs) if seqs else []:
             mw = dict(kind="ar", pi=m0["pi"].copy(), A=m0["A"].copy(), H=m0["H"].copy(), C=C)
             smp = SY.Sampler(mw)
-            seqs = [smp.seq(rng4.random((L, 2))) for L in ls]
-            units.append(dict(seqs=seqs, pflag=[np.ones(len(s), dtype=bool) for s in seqs]))
+            ss = [smp.seq(rng4.random((L, 2))) for L in ls]
+            units.append(dict(seqs=ss, pflag=[np.ones(len(x), dtype=bool) for x in ss]))
         writers.append(units)
         unitC.append(Cs)
     return writers, sh["P"], unitC

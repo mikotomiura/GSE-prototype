@@ -125,6 +125,37 @@ def naive_p_exact(s):
     return sum(naive_w(s, p) >= W for p in perms) / len(perms), W
 
 
+def naive_auc(s, v):
+    P = len(s)
+    pts = 0
+    for w in range(P):
+        if w == v:
+            continue
+        d = s[w][v] - s[v][v]
+        pts += 1 if abs(d) <= 1e-12 else (2 if d < 0 else 0)
+    return pts / (2.0 * (P - 1))
+
+
+def naive_rank1(s):
+    P = len(s)
+    tot = 0.0
+    for v in range(P):
+        mx = max(s[w][v] for w in range(P))
+        top = [w for w in range(P) if abs(s[w][v] - mx) <= 1e-12]
+        if v in top:
+            tot += 1.0 / len(top)
+    return tot / P
+
+
+def naive_gain(S, PA, NB, nsym):
+    """G_v = Σ NB_v · (log PA_v − log S) / Σ NB_v（追記 2）。"""
+    out = []
+    for v in range(len(PA)):
+        n = sum(map(sum, NB[v]))
+        out.append(sum(NB[v][j][c] * (math.log(PA[v][j][c]) - math.log(S[j][c])) for j in range(nsym) for c in range(nsym)) / n)
+    return out
+
+
 def tiny_writers():
     """3 人（パネル）+ 1 人（パネル外）・3 記号。各 3 単位（H = 1・k = 1）。書き手 0 と 1 の A（単位 1）は同じ数 → 同点。"""
     def U(*seqs):
@@ -176,11 +207,19 @@ def p_hand():
         npe, nW = naive_p_exact(NS[e])
         same_s = bool(np.allclose(S3[e], NS[e], rtol=1e-10, atol=1e-13))
         ps, _ = EY.p_sampled(c, EY.draw_perms(np.random.default_rng(pkey(0, 0, 0, 0, 0, 8000)), P))
-        rows[e] = dict(W=W, W_naive=nW, p_exact=pe, p_naive=npe, p_sampled=ps, same_s=same_s,
-                       ok=bool(same_s and W == nW and pe == npe), ok_sampled=bool(abs(ps - pe) <= 0.03))
+        auc = EY.auc_rows(c)
+        auc_n = [naive_auc(NS[e], v) for v in range(P)]
+        r1, r1n = EY.rank1(S3[e]), naive_rank1(NS[e])
+        rows[e] = dict(W=W, W_naive=nW, p_exact=pe, p_naive=npe, p_sampled=ps, same_s=same_s, auc=auc.tolist(),
+                       auc_naive=auc_n, rank1=r1, rank1_naive=r1n,
+                       ok=bool(same_s and W == nW and pe == npe and np.allclose(auc, auc_n, rtol=0, atol=1e-15)
+                               and abs(r1 - r1n) <= 1e-15),
+                       ok_sampled=bool(abs(ps - pe) <= 0.03))
         ok_c = ok_c and rows[e]["ok"]
     has_tie = bool(np.abs(S3["E1"][0] - S3["E1"][1]).max() <= 1e-12)
-    R["tables"] = dict(rows=rows, has_tie=has_tie, ok=bool(ok_c and has_tie))
+    G, Gn = EY.gain_own(T), naive_gain(S, PA, NB, 3)
+    ok_g = bool(np.allclose(G, Gn, rtol=1e-10, atol=1e-13))
+    R["tables"] = dict(rows=rows, has_tie=has_tie, G=G.tolist(), G_naive=Gn, ok_G=ok_g, ok=bool(ok_c and has_tie and ok_g))
     # (d) S に入る単位の数（ml.pool_units）と、A・B の単位の番号（data.split と間のセル）
     cnt = {}
     for shape, want in (("coauthor", 17 * 15 + 26 * 5), ("cs1", 23 * 5 + 8 * 2)):
