@@ -4,7 +4,7 @@
 - 下見 0（`--ceiling`）は 2 段で数分。
 - `go` の段ごとに約 2〜2.5 時間（下見 1 が 30〜45 分、スモークが約 5 分、本番が 1.3〜1.7 時間、ほかに各回の自己検査）。切り分けの読み（`--split`）と並べる表（`--compare`）は無い。
 
-下見 1 と本番の前には、`gh run list` と `Get-CimInstance Win32_Process` を見て notes に記録する（G-GEAR は self-hosted の Windows CI の runner を兼ねる）。
+下見 1 と本番の前には、`gh run list` と `Get-CimInstance Win32_Process` を見て notes に記録する（G-GEAR は self-hosted の Windows CI の runner を兼ねる）。同じ入れ物で `run.sh` を 2 本同時に回さない（`work-selftest/`・`work-*`・`results/.partial-*` を共有し、排他の仕組みは無い）。
 
 | 項目 | 値 |
 |---|---|

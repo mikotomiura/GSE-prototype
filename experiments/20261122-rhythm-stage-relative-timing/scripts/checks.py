@@ -66,9 +66,11 @@ A_NAMES = [f"act_w{k}" for k in range(5)] + ["gap_max", "gaps_ge2", "gaps_ge10",
 EX_NAMES = ["span_gap_max", "span_gaps_ge2", "span_gaps_ge10", "span_act"]
 WS_NAMES = ["w_n", "w_med", "w_iqr", "w_run", "w_last10"] + [f"lag{k}_{q}" for k in range(1, 5) for q in ("n", "med")]
 SS_NAMES = ["span_n", "span_med", "span_iqr", "span_run", "span_last10"]
-DROP_COLS = {"a": list(range(10)), "r": list(range(10, 20))}  # design 1.6: the a side's and the r side's ten
 SMOOTH_NAMES = ("a_sd", "a_absdiff", "a_ac1", "r_sd", "r_absdiff", "r_ac1")  # design 0 (d2), section 9 item 9
 SMOOTH_COLS = [st.FEAT_NAMES.index(n) for n in SMOOTH_NAMES]
+# design 1.6: the a side's ten, the r side's ten, and the six time-direction (smoothness) features of (d2) (decisions 14:
+# the turnover of the count window carries the key rate through them)
+DROP_COLS = {"a": list(range(10)), "r": list(range(10, 20)), "smooth": SMOOTH_COLS}
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +373,8 @@ def diffs(F: np.ndarray, sess_idx: np.ndarray, lags: int) -> np.ndarray:
 
 
 def keep_cols(drop: str | None) -> list[int]:
-    """design 1.6: the stage feature columns kept when the a side or the r side is dropped."""
+    """design 1.6: the stage feature columns kept when the a side, the r side or the six smoothness features are
+    dropped."""
     if drop is None:
         return list(range(len(st.FEAT_NAMES)))
     gone = set(DROP_COLS[drop])
@@ -381,7 +384,7 @@ def keep_cols(drop: str | None) -> list[int]:
 def build_x(label: str, base: str | None, cname: str | None, fs: str | None, drop: str | None = None) -> np.ndarray:
     """base: "A" (model A), "S" (A_speed) or None (the stage alone, (d0)); cname: the stage name's index file or None;
     fs: "full" (+ the window's 20 + the differences to the two earlier windows) or "small" (+ the window's 20); drop:
-    None, "a" or "r" (design 1.6: the side's ten features and their differences left out)."""
+    None, "a", "r" or "smooth" (design 1.6: those features and their differences left out)."""
     if cname is None:
         return np.asarray(_mm(f"{label}-{base}"))
     rows = np.asarray(_mm(f"{label}-rows"))
@@ -642,8 +645,8 @@ def stage_alone(tag: str, tab: dict, names: dict, cands: list[str], ra: dict, cf
 def dropped(tag: str, tab: dict, base: str, res: dict, names: dict, red: list[str], cfg: dict, seed: int, jobs: int,
             scratch: Path) -> dict:
     """design 1.6, 3.3 (c) (exploratory, no verdict word): for each red candidate of the base, the gain over the base
-    without the a side's ten features or without the r side's ten (and their differences), per attacker, with the
-    bootstrap interval."""
+    without the a side's ten features, without the r side's ten, or without the six smoothness features (and their
+    differences), per attacker, with the bootstrap interval."""
     if not red or "_preds" not in res:
         return {}
     Y, G = tab["Y"], tab["G"]

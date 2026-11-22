@@ -291,10 +291,12 @@ def test_stage_causal() -> None:
           "causal (stage): presses later in the same second (after 1800.35 s) leave every point before it unchanged")
     check(not same_series(c2, m2), "causal (stage): those presses do change later points (negative control)")
     # plan D per second: the value of second k does not depend on the presses at or after t = k + 1
-    ds_full = st.d_seconds(sess.presses, sess.duration_s, "run")
-    ds_cut = st.d_seconds(sess.presses[sess.presses < T], sess.duration_s, "run")
-    check(np.array_equal(ds_full.a[:T], ds_cut.a[:T]) and np.array_equal(ds_full.r[:T], ds_cut.r[:T])
-          and not np.array_equal(ds_full.a, ds_cut.a), "causal (D): second k < T unchanged when the presses from T go")
+    for dset in st.D_SETS:
+        ds_full = st.d_seconds(sess.presses, sess.duration_s, dset)
+        ds_cut = st.d_seconds(sess.presses[sess.presses < T], sess.duration_s, dset)
+        check(np.array_equal(ds_full.a[:T], ds_cut.a[:T]) and np.array_equal(ds_full.r[:T], ds_cut.r[:T])
+              and not np.array_equal(ds_full.a, ds_cut.a),
+              f"causal (D-{dset}): second k < T unchanged when the presses from T go")
     edge = np.array([0.1, 0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.0])  # the last press exactly at t = 2
     d_e = st.d_seconds(edge, 3, "all")
     check(d_e.hi[1] == 9 and d_e.hi[2] == 10, "causal (D): an interval ending exactly at t = k + 1 belongs to second k + 1")
@@ -396,10 +398,17 @@ def test_pc() -> None:
 
 
 def load_source_stage():
-    spec = importlib.util.spec_from_file_location("stage_shape_src", SRC_DIR / "stage.py")
+    """The shape world's stage.py, run from the bytes whose SHA-256 is checked (LF line ends): no .pyc is read from
+    or written to the source directory (security-checker, 2026-11-23)."""
+    path = SRC_DIR / "stage.py"
+    src = path.read_bytes().replace(b"\r\n", b"\n")
+    if hashlib.sha256(src).hexdigest() != SRC_SHA["stage.py"]:
+        raise SystemExit("the shape world's stage.py is not the 1cf9fcb9 file")
+    spec = importlib.util.spec_from_loader("stage_shape_src", loader=None, origin=str(path))
     old = importlib.util.module_from_spec(spec)
+    old.__file__ = str(path)
     sys.modules[spec.name] = old  # the dataclass Session looks its module up there
-    spec.loader.exec_module(old)
+    exec(compile(src, str(path), "exec"), old.__dict__)
     return old
 
 
@@ -539,6 +548,11 @@ def test_plan_d() -> None:
     irr, npair = st.d_irregularity(w7, adj7, np.ones(7, dtype=bool))
     want = float(np.median(np.abs(np.log(w7[1:] / w7[:-1]))))
     check(npair == 6 and irr == min(1.0, want), f"tempo: the median of |log ratio| over 6 pairs ({irr})")
+    w6 = w7[:6]
+    irr5, npair5 = st.d_irregularity(w6, np.ones(6, dtype=bool), np.ones(6, dtype=bool))
+    want5 = float(np.median(np.abs(np.log(w6[1:] / w6[:-1]))))
+    check(npair5 == st.MIN_PAIRS == 5 and irr5 == min(1.0, want5),
+          f"tempo: exactly MIN_PAIRS (5) pairs give a value ({irr5}); 4 hold (above)")
     sel = np.array([True, True, True, False, True, True, True])
     _, npair = st.d_irregularity(w7, adj7, sel)
     check(npair == 4, "tempo: a pair needs both intervals in the set")
@@ -834,7 +848,8 @@ def test_bases(cfg: dict, tmp: Path, jobs: int, source: bool = True) -> None:
         return
     for f, v in (("cfg.json", cfg), ("names.json", names), ("cands.json", cands)):
         (d / f).write_text(json.dumps(v), encoding="utf-8")
-    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    # no .pyc written to the source directory, and none read from its __pycache__ (the cache goes under d)
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPYCACHEPREFIX": str(d / "pycache")}
     r = subprocess.run([sys.executable, "-c", SRC_RUN, str(d), str(seed), str(jobs), str(nboot), str(nperm)],
                        cwd=str(SRC_DIR), env=env, capture_output=True, text=True)
     if r.returncode != 0:
@@ -868,6 +883,10 @@ def test_stats(cfg: dict) -> None:
     check(np.array_equal(D[4], np.zeros(40)) and np.array_equal(D[5, :20], F[5] - F[4]), "B-full: differences, none across sessions")
     check(ck.keep_cols("a") == list(range(10, 20)) and ck.keep_cols("r") == list(range(10)) and len(ck.keep_cols(None)) == 20,
           "drops: the a side is columns 0-9, the r side 10-19 (design 1.6)")
+    kept = [st.FEAT_NAMES[i] for i in ck.keep_cols("smooth")]
+    check(sorted(ck.DROP_COLS) == ["a", "r", "smooth"] and len(kept) == 14
+          and not set(kept) & set(cfg["describe"]["d2_smooth"]) and "a_since_change" in kept and "a_mean" in kept,
+          "drops: smooth leaves out exactly the six smoothness features of (d2) (design 1.6, decisions 14)")
     test_select_lambda(cfg)
 
 

@@ -112,7 +112,12 @@ selftest() {
 
 # provenance <out file> <seed> <worlds> [<step> <world doc>]
 provenance() {
-  "$PY" - "$1" "$HMM_VERSION" "$EXP_DIR" "$JOBS" "$2" "$3" "$MODE" "${GSE_REPLAY:-}" "${4:-}" "${5:-}" <<'PYEOF'
+  # the binary is checked again at the end: one replaced during the run fails here, before publish (security-checker)
+  if [ -n "${GSE_REPLAY:-}" ] && [ "$(sha256sum "$GSE_REPLAY" | cut -d' ' -f1)" != "$EXPECTED_REPLAY_SHA" ]; then
+    echo "gse-replay changed during the run (SHA-256 is no longer the EH1 build): not published" >&2
+    return 1
+  fi
+  "$PY" -"$1" "$HMM_VERSION" "$EXP_DIR" "$JOBS" "$2" "$3" "$MODE" "${GSE_REPLAY:-}" "${4:-}" "${5:-}" <<'PYEOF'
 import hashlib, json, os, platform, subprocess, sys
 from importlib.metadata import version
 out, hmm, exp_dir, jobs, seed, worlds, mode, binary, step, wdoc = sys.argv[1:11]
@@ -210,6 +215,9 @@ if [ "$MODE" = ceiling ]; then
   SEED_RUN=$(( 10#$BASE_SEED + 10#$OFFSET ))  # 10#: never octal
   STEPS="$("$PY" -c "import json,sys; print(' '.join(json.load(open(sys.argv[1],encoding='utf-8'))['ceiling']['steps']))" "$EXP_DIR/config.json")"
   STEPS="${STEPS%$'\r'}"
+  for S in $STEPS; do  # the names go into rm -rf paths: the same form as --step (security-checker)
+    case "$S" in [gf][0-9][0-9][0-9]) ;; *) echo "config.json ceiling.steps: bad step name $S" >&2; exit 2 ;; esac
+  done
   WORK_ARGS=()
   for S in $STEPS; do
     WORLD_ARGS="$(step_args "$S")"

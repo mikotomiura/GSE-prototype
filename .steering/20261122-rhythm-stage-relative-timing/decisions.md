@@ -143,3 +143,37 @@
 - **実測**: 下見 0（2 段）19 秒、下見 1 312 秒、本番 749 秒（判定がほとんど）。最後まで動き、`summary.json`・`e13.json`・`describe.json` が出た。`D-run` と `D-all` の記述の値が近かった（0.4241 と 0.4237）ので、2 本が同じ系列になっていないことを `describe.json` の遅れの記述で確かめた（別の値）。
 - **判断に使わないもの**: 試作の判定と AUC の値。design のどの数も、この値を見て変えていない。
 - **影響範囲**: design.md §4・`env.md` の所要（段あたり約 2〜2.5 h・2 段で約 4〜5 h）。
+
+## 判断 14: 入れ替わりの道は塞がない —— 文を直し、滑らかさの 6 量を落とす変種を足す
+
+- **判断日時**: 2026-11-23（研究者・推奨どおり）
+- **背景**: `/cross-review` 1 巡目の Codex が 3 本とも指摘した。数の窓の 40 個の統計量は倍率に不変だが、値を 1 秒ごとに作り直すので、1 秒あたりに入れ替わる間隔の数が打鍵の速さに比例する。秒ごとの系列の時間方向の量（`*_sd`・`*_absdiff`・`*_ac1`・`*_since_change`）は速さを運びうる。N1 は同じ押下で終わる窓どうしを比べるので、この道を確かめない。design §1.2 の「数の窓ではこの道が塞がる」は、版 2 が見つけた推定の滑らかさの道についてだけ正しい。`g050` では停滞の間は打鍵が遅いので、基準 A の上の赤が相対のタイミングでなく入れ替わりを通した速さから来うる。
+- **選択肢**: 文を直し変種を 1 つ足す／文を直すだけ／更新の仕方を変える（一定の秒ごとに窓を丸ごと入れ替える。判断 10 と §9 の 2 を開き直す）。
+- **採用**: 文を直し、(d2) の滑らかさの 6 量とその差分を落とした変種（`without_smooth`）を §1.6 の変種に足す。§3.3 に (c2)（基準 A の上の赤の読みの限り）を書く。
+- **理由**: 計器の定義と合否の規則を変えずに、赤がどちらの道から来たかの手がかりを結果の前に用意できる。変種の追加は既存の `a`・`r` の変種と同じ仕組み（`DROP_COLS`）で済む。
+- **トレードオフ**: 6 量を落としても、`*_since_change` と水準の量（`*_mean`・分位）にも入れ替わりの速さが残りうるので、変種は手がかりで、道を分けきらない。赤の候補の変種の当てはめが 1.5 倍になる。
+- **影響範囲**: design.md §1.2・§1.6・§3.3 (c)・(c2)。`checks.py` の `DROP_COLS`・`selftest.py` の落とす列の検査。
+- **見直しタイミング**: 本番の後、赤の候補で `without_smooth` の上乗せが 0.03 を下回ったとき（入れ替わりの道を疑い、notes に書く）。
+
+## 判断 15: code-reviewer・security-checker・`/cross-review` 1 巡目の指摘への対応（Claude・固定の前）
+
+- **判断日時**: 2026-11-23
+- **起動**: code-reviewer と security-checker を並列（HEAD `86f6fcf0`・読むだけ）。Codex は `run-codex-review.sh acfc8aea..HEAD -- <paths>` を 3 本（design ＋ `stage.py`・`run.sh` ／ design ＋ `checks.py` ／ design ＋ `selftest.py`・`ceiling.py`）を直列に。153,531 トークン・3 回。指摘はすべて一次で裏取りした。
+- **採ったもの**:
+  1. 写し元の dir に `.pyc` を書いていた（security-checker・code-reviewer の両方・実際に `stage.cpython-311.pyc` が 11-22 23:06 付けで有った）→ `load_source_stage` を SHA-256 を照らしたバイト列の `compile` と `exec` にした。写し元の `checks.py` を動かす子のプロセスは `PYTHONPYCACHEPREFIX` を一時 dir に向けた。前のセッションが書いた `.pyc` と空の `__pycache__` を消した（git に無視されていたファイルで、追跡されたファイルは変えていない）。
+  2. `summary.json` のキーが design と違う（code-reviewer・Codex）→ design §1.4 を実装（`verdicts.A_speed`）に合わせた。
+  3. §6 の「JSON がバイト単位で一致」が時間の欄で成り立たない（code-reviewer・Codex）→ 時間の欄と `provenance.json` を除くと直した。
+  4. 入れ替わりの道（Codex 3 本）→ 判断 14。
+  5. MIN_PAIRS のちょうど 5 個を確かめていない（code-reviewer）→ 自己検査に足した。
+  6. 案 D の因果性を `run` だけで確かめていた（code-reviewer）→ `run` と `all` の両方にした。
+  7. 時間の窓の変異は N1 でなく作り物の列の検査で落ちる（code-reviewer）→ design §3.7 の文を直した。
+  8. gse-replay の差し替え（security-checker）→ `provenance` で SHA-256 を照らし直し、違えば止めて publish しない。`replay_all.py` は写し元とバイト一致させる決まりなので変えない。
+  9. `ceiling.steps` のキーを `rm -rf` の道に使う（security-checker）→ `--step` と同じ形の検査を入れた。
+  10. N2 の 600 ms の読み（Codex 2 本）→ 生成器に区切りを書き出させられないので近似のまま、取り違えの割合（休止の約 6.3%）を design §3.7 に書いた。
+  11. 本番の列での配線の検査が結果に左右されうる（Codex）→ 前の 6 回と同じ極端な値の対照として残し、落ちたら止めて §8 に記録すると design §3.7 に書いた。
+  12. design の文のずれ（code-reviewer）: 入力に `active` を足す、最初に動いた点より前は 0、§3.0 の副の判定の語（`undecidable`・理由 `pilot_stop`・`ceiling`）を直した。
+  13. 二重起動（Codex）→ `env.md` に「同時に回さない」と書いた。
+- **採らなかったもの**:
+  - `cfg()` の `eval`（security-checker・低）: 渡る式は `run.sh` の定数 4 つだけで、外から入る経路が無い。
+  - 作業の場所と seed の照合（Codex・条件付き）: 誤検知。`run.sh` が同じ作業の場所に `SEED.run` を書き、`checks.py` はそれを読む。
+  - `pilot_parts` を作り物で通す検査（code-reviewer・低）: `pilot_check` が基準ごとに選びを計算し直して拒むので、誤りは止まる側に倒れる。試作（判断 13）で実際の `--pilot` を通した。
