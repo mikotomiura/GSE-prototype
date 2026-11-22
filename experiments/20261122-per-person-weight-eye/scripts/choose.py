@@ -1,7 +1,7 @@
 """D5 の案の選び（選びの組・CoAuthor k = 5・間なし）。規則は conditions.md D5 の 1〜4 の順。
 
-使い方: python3 -I choose.py <out_dir>
-読む: <out_dir>/select/summary_null1.json・summary_null2.json（第 2 の帰無は HP Z2 の集計）。
+使い方: python3 -I choose.py <out_dir> [--null2 <HP Z2 の summary_null2.json>]
+読む: <out_dir>/select/summary_null1.json と、第 2 の帰無の集計（既定 <out_dir>/hpz2/select/summary_null2.json）。
 出力: <out_dir>/select/d5.json（各量と選んだ案）。許された案が 0、外しの後が 0 なら止める（終了コード 4・D8）。
 """
 import json
@@ -25,12 +25,19 @@ MARGIN = 0.03
 
 
 def main():
-    out = sys.argv[1]
+    argv = sys.argv[1:]
+    n2 = None
+    if "--null2" in argv:
+        i = argv.index("--null2")
+        n2 = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+    out = argv[0]
     d = os.path.join(out, "select")
+    paths = {1: os.path.join(d, "summary_null1.json"), 2: n2 or os.path.join(out, "hpz2", "select", "summary_null2.json")}
     ch = RE.code_hash()
     S = {}
     for n in (1, 2):
-        s = json.load(open(os.path.join(d, "summary_null%d.json" % n)))
+        s = json.load(open(paths[n]))
         if s["code_hash"] != ch or s["which"] != "select":
             sys.exit("summary_null%d.json のコードのハッシュか組が違う" % n)
         S[n] = s["groups"]
