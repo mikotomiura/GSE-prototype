@@ -28,7 +28,7 @@ Tectonic は scratchpad の C:\Users\johnd\AppData\Local\Temp\claude\bb8fe8b6e5b
 
 | 順 | 何を | 注意 |
 |---|---|---|
-| 1 | 照会の結果を RQ4 に（返事が無ければ今の文 "at the time of submission we had not received a reply" のまま） | 返事が来たら §6.3 の RQ4 の段落と §8 も見る |
+| 1 | 照会の結果を RQ4 に（返事が無ければ今の文 "at the time of submission we had not received a reply" のまま） | 返事が来たら `next-session-p321-inquiry-reply.md` に従う。12-05 までに来なければ本文は変えずに順 2 へ |
 | 2 | README の引用（題が旧い: "outcome-agnostic self-resolution measures"）と Data availability の DOI（`10.5281/zenodo.23029603` は旧い版）を新しい版に | 版の DOI（concept DOI でない）。Zenodo の下書きで DOI を予約してから本文に入れる（memory: Zenodo token・下書きは自動で可、publish は都度確認） |
 | 3 | タグ → push（研究者）→ Zenodo の新しい版 → 研究者が publish | 出力はファイルに保存して 1 回だけ（memory: Capture output of state-changing calls） |
 | 4 | JSS への投稿（研究者）→ 原稿 ID を記録 → GSE 側の PR | `survey-s2.md` に推薦の査読者の候補 |
