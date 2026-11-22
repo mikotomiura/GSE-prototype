@@ -1,0 +1,232 @@
+{
+ "combined": {
+  "main": "meets",
+  "overall": "undetermined",
+  "provisional_meets": true,
+  "sensitivity": "not_run"
+ },
+ "day_gate_passed": true,
+ "days_with_min_windows": 20,
+ "desk": {
+  "desk_version": "hm-desk-3",
+  "inject_stuck": 0.0,
+  "labels": "recomputed",
+  "samples": 10,
+  "table_sha256": "d065f25104154d91fe629f8a1bfae386d09dbab24e7c7d12de81a2890debe37a"
+ },
+ "desk_summary": {
+  "excluded": {
+   "away": 65,
+   "few_feats": 0,
+   "pause": 0
+  },
+  "label_check": null,
+  "overflow_days": 0,
+  "redactions_given": false,
+  "seed_mismatch_days": 0,
+  "segments": 20,
+  "segments_recorded_t0": 0,
+  "sensitivity": {
+   "days": 0,
+   "few_on_windows": 0,
+   "late_days": 0,
+   "not_visible": 0,
+   "overflow": 0,
+   "redacted": 0,
+   "windows": 0,
+   "windows_off": 0
+  },
+  "windows": 3495
+ },
+ "n_days": 20,
+ "n_windows": 3495,
+ "newton_nonconverged": 0,
+ "overall": "meets",
+ "seconds": 133.8,
+ "sensitivity": {
+  "n_windows": 0,
+  "overall": "not_run",
+  "reason": "回 1（early）では感度分析を回さない（S1-F5）"
+ },
+ "t1_all_windows": 218,
+ "targets": {
+  "T1": {
+   "auc": {
+    "A": 0.8088909447405485,
+    "A2": 0.7917998297855248,
+    "A_time": 0.8049186460166549,
+    "pixel": 0.8011497008693993,
+    "state": 0.8000431812533108,
+    "state_perm": 0.8034330351651056
+   },
+   "ceiling": false,
+   "class_counts": [
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 2956,
+     "windows": 539
+    }
+   ],
+   "const_folds": {
+    "A": 0,
+    "A2": 0,
+    "A_time": 0,
+    "pixel": 0,
+    "state": 0,
+    "state_perm": 0
+   },
+   "diagnostics": {
+    "A2": -0.01709111495502369,
+    "A_time": -0.003972298723893597,
+    "state_perm": -0.0054579095754428986
+   },
+   "lambda": {
+    "A": [
+     0.001
+    ],
+    "A2": [
+     0.01
+    ],
+    "A_time": [
+     0.001
+    ],
+    "pixel": [
+     0.001
+    ],
+    "state": [
+     0.001
+    ],
+    "state_perm": [
+     0.001
+    ]
+   },
+   "pixel": {
+    "auc_a_lo": 0.7749978036037233,
+    "ceiling": false,
+    "ci90": [
+     -0.014096971390188473,
+     -0.002844882554411839
+    ],
+    "diff": -0.007741243871149162,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "state": {
+    "auc_a_lo": 0.774957273843711,
+    "ceiling": false,
+    "ci90": [
+     -0.014032718105181623,
+     -0.003920244413130437
+    ],
+    "diff": -0.008847763487237703,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "verdict": "meets"
+  },
+  "T2": {
+   "auc": {
+    "A": 0.836296934058424,
+    "A2": 0.8331110952914614,
+    "A_time": 0.8367001216120649,
+    "pixel": 0.8315533861861718,
+    "state": 0.8328906423225022,
+    "state_perm": 0.8329402434471979
+   },
+   "ceiling": false,
+   "class_counts": [
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 1652,
+     "windows": 1843
+    },
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 2590,
+     "windows": 905
+    },
+    {
+     "days": 20,
+     "neg_days": 20,
+     "neg_windows": 2748,
+     "windows": 747
+    }
+   ],
+   "const_folds": {
+    "A": 0,
+    "A2": 0,
+    "A_time": 0,
+    "pixel": 0,
+    "state": 0,
+    "state_perm": 0
+   },
+   "diagnostics": {
+    "A2": -0.0031858387669625454,
+    "A_time": 0.00040318755364088243,
+    "state_perm": -0.0033566906112261208
+   },
+   "lambda": {
+    "A": [
+     0.0001,
+     0.0001,
+     0.001
+    ],
+    "A2": [
+     0.001,
+     0.001,
+     0.01
+    ],
+    "A_time": [
+     0.0001,
+     0.0001,
+     0.01
+    ],
+    "pixel": [
+     0.0001,
+     0.0001,
+     0.001
+    ],
+    "state": [
+     0.0001,
+     0.001,
+     0.01
+    ],
+    "state_perm": [
+     0.0001,
+     0.0001,
+     0.01
+    ]
+   },
+   "pixel": {
+    "auc_a_lo": 0.8100801261749406,
+    "ceiling": false,
+    "ci90": [
+     -0.008927323763411692,
+     -0.0011776744810233553
+    ],
+    "diff": -0.004743547872252174,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "state": {
+    "auc_a_lo": 0.8087006411631045,
+    "ceiling": false,
+    "ci90": [
+     -0.00611727745051574,
+     -0.0010446849126760584
+    ],
+    "diff": -0.0034062917359217737,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "verdict": "meets"
+  }
+ }
+}

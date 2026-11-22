@@ -25,10 +25,10 @@
 - [x] 手動の確かめ（研究者のデバッグ起動）→ 試しのタスクへ回した（判断 12・段 1 の期間の外）
 
 ## PR-b: 机上の確かめ
-- [ ] `desk.rs`・`bin/replay.rs`: `--stopped <cfg>` の出力の口（切っているときは今と同じ）
-- [ ] `experiments/20261121-handmark-stopped-desk/`: 重ね描き（`drawFrame` → `drawStopped`）
-- [ ] (i)〜(iii)（片側 5%・判断 9）を形 × W で回し、結果を decisions.md に（推測で書かない）
-- [ ] 漏れの検査（ADR-051 D3・B′ と A）
+- [x] `desk.rs`・`bin/replay.rs`: `--stopped <cfg>` の出力の口（切っているときは今と同じ）・テスト（ライブの再生との一致・止まりの一覧・切っているときの一致・変異で赤）
+- [x] `experiments/20261121-handmark-stopped-desk/`: 重ね描き（`drawFrame` → `drawStopped`・順は `handmark-stopped-draw.test.mjs` が縛る）・検定・合成の対照（判断 13）・条件の固定（判断 14）
+- [ ] (i)〜(iii)（片側 5%・判断 9）を形 × W で回し、結果を decisions.md に（推測で書かない）→ Mac で（判断 14）
+- [ ] 漏れの検査（ADR-051 D3・B′ と A）→ Mac で（判断 14）
 - [ ] 今ある基層（`drift`）の扱いを (iii) の結果で研究者に確かめる
 
 ## 完了処理
