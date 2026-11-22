@@ -209,3 +209,12 @@
   - 長さ: 重複を消す（区間と DF3 の但し書きを方法の節で 1 回・凍結の開示を短くし詳細は NOTES へ・結論を短く）。8,000 語までは削らない。
   - 新しく足すもの: 再利用する人の表（U だけ／U と u／2×2 表で A について言える範囲）・**debugging のログ研究の文献**（サブエージェントで探し、メインが一次で確かめてから citation-ssot）・**CV3 か WCR の区間**（MacKinnon et al. 2023 の §7 の推奨。足した後で言い換えも直す）。D1 の標本の再コードはしない。
 - **次**: 文献検索 B → 付録 → §2.5 と一緒に、round 2 の直す一覧を実施 → `/cross-review` 2 巡。要旨の「実例は見つからなかった」は §2.5 と一緒に範囲つきにする。
+
+## 判断 26: 文献検索 B（OpenAlex）の結果と K19 の扱い（2026-11-22）
+
+- **やり方**: 17:04 JST に OpenAlex が 200 を返したので、`search-log/README.md` の 7 問を、語を変えずに Sonnet のサブエージェントに回させた（page 1・各 50 件・2021〜2026）。7 問とも 1 回目で 200。
+- **数**: meta.count は 185・3・5・35・393・23・7。page 1 の 173 行 → 重複を除いて 171 件。題と要旨で選んで KEEP 43・OFF-TOPIC 128。本文を読めたのは 27 件（K109・K110 は K105 の別の版として K105 の本文で判定）。INSTANCE 1（K19）・NEAR 1（K169）・NONE 27・NOT-READ 14。
+- **裏取り（メイン・一次）**: K19（Sychev 2022, ICSE-SEET, arXiv 2204.09036）の PDF（%PDF を確かめた）で、要旨の "most of the training question attempts resulted in finding the correct answer without help from the teaching staff" と 4 頁の "almost 80% of the questions without support from the teaching staff" を逐語で確かめた。職員への相談は試行ごとに記録されていない。諦めた試行（13.6%）は別に報告している。K169（arXiv 2603.28295）の "The remaining questions were self-resolved, or marked by the student as no longer relevant" も逐語で確かめた（依頼は記録されている → NEAR）。表の 171 行の内訳も数え直した。
+- **研究者の決定**（AskUserQuestion・私の推奨どおり）: K19 は INSTANCE として数える。基準は事前に固定して文字どおり当てる約束で、後から動かさない。§2.5 と要旨には「1 件見つかった（CS1 の小テスト）。ただし未完了の試行は別に報告しており、未解決を解決に混ぜてはいない」と範囲つきで書く。「実例は見つからなかった」という言い方はやめる。
+- **抜け**: page 1 だけ（"unaided" は 393 件中 50 件）。正規表現だけで読んだ。NOT-READ の 14 件のうち 4 件（K53・K59・K61・K143）は、機関リポジトリの PDF で、ブラウザなら開ける見込みがある。
+- **記録**: `search-log/keyword-hits-openalex.tsv`・`keyword-queries-openalex.tsv`・`search-b-openalex-run-notes.md`・`scripts/search-b/`。

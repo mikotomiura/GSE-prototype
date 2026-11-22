@@ -1,0 +1,8 @@
+query	source	date	hits	screened	fulltext_read	result
+debugging "without consulting" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026 (page 1, per-page=50)	2026-11-22	185	50	7	10 KEEP of 50 unique-on-page; INSTANCE ['K19']; NEAR none
+debugging "without seeking help" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026 (page 1, per-page=50)	2026-11-22	3	3	0	1 KEEP of 3 unique-on-page; INSTANCE none; NEAR none
+debugging "rarely consult" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026 (page 1, per-page=50)	2026-11-22	5	5	0	1 KEEP of 5 unique-on-page; INSTANCE none; NEAR none
+debugging "resolved on their own" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026 (page 1, per-page=50)	2026-11-22	35	35	3	5 KEEP of 35 unique-on-page; INSTANCE none; NEAR none
+debugging "unaided" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026 (page 1, per-page=50)	2026-11-22	393	50	16	21 KEEP of 50 unique-on-page; INSTANCE none; NEAR none
+debugging "without external help" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026 (page 1, per-page=50)	2026-11-22	23	23	2	6 KEEP of 23 unique-on-page; INSTANCE none; NEAR none
+debugging "self-resolved" (2021-2026)	OpenAlex /works?search=...&filter=publication_year:2021-2026 (page 1, per-page=50)	2026-11-22	7	7	1	1 KEEP of 7 unique-on-page; INSTANCE none; NEAR ['K169']

@@ -23,6 +23,16 @@
 - [ ] （旧 S7 の項目）研究者の通読と手入れ（記録する）／ journal 版の 8 つの報告値を研究者が PDF と照合するか（すれば §5.3 の文を直す）／ 通読の後に生成 AI の申告へ「読んで直した」の文を足す ／ Highlights とキーワードを見てもらう
 - [ ] S8: attack-me round 2 → 研究者が採否 ／ `/cross-review` 2 巡
   - [x] attack-me round 2（`c077e5bf`・判断 25）。研究者が採否を決めた
-  - [ ] round 2 の直す一覧（verdict.md §4・判断 25）を実施する。研究者の D2 の手での数え直しを受け取る
+  - [x] 文献検索 B を OpenAlex で回した（判断 26・INSTANCE 1 = Sychev 2022）→ 付録 `supplement/literature-search/`・§2.5・序論・要旨・§5.5 (3)（`d6e7962`・`b12e222`）
+  - [ ] round 2 の直す一覧（verdict.md §4・判断 25）を実施する。研究者の D2 の手での数え直しを受け取る（手順と記入表は `d2-hand-recount.md`）
+    - [x] D2 の 4 件の打ち切り（`9c4c3e7`・Deviations 12）・"positive in both" を観察した単位の中に限る
+    - [x] Hellas の例の向き（`68ce171`・52.5% は make_results が計算）
+    - [x] 2 つ目の実装の文（入力に在った値 / 無かった値・span と sum・指示文が残っていない・格を下げた）・duration の定義・"agreed to be observed"（`abd08f7`）
+    - [x] 要旨の 3.5 の言い方（\Ro{} exceeded \Rz{}）・語数 245・序論 21 行
+    - [ ] 手での数え直しの結果を §5.5 (2)・§8・`audit/independent-recount/README.md` に書く（§8 の "can be recounted by hand" を直す）
+    - [ ] 構成概念の分け（表 1・§5.4・§7.1・要旨の "not a loss"）／ 最後の DF3 の理屈（B）
+    - [ ] 重複を消す ／ 再利用する人の表（§7.4）／ debugging のログ研究の文献 ／ CV3 か WCR の区間と MacKinnon の言い換え
+    - [ ] 残りの minor と nit（verdict.md §4）／ Data availability の DOI は S9
+    - [ ] NOT-READ のうち機関リポジトリの 4 件（K53・K59・K61・K143）をブラウザで読むか（任意）
   - [ ] `/cross-review` 2 巡（直した後）
 - [ ] S9: 照会の返事か未回答を反映（RQ4 の "at the time of submission we had not received a reply" を確かめる）／ README の引用の bibtex と Data availability の DOI を新しい版に ／ 新しいタグ ／ Zenodo の新しい版とプレプリントの下書き → 研究者が publish と JSS への投稿 → 原稿 ID を記録

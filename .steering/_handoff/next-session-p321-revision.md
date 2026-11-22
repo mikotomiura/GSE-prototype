@@ -4,6 +4,8 @@
 >
 > 追記: 2026-11-22 未明（Surface）。OpenAlex が 429 だったので、先に S8 の attack-me round 2 を回した（判断 25・`attack-me/manuscript-jss/round-2/verdict.md`）。§2 の 4 は済み（判断 24）、5 の attack-me は済み。下の §2a が、5 の残り（round 2 の直す一覧）の中身。順番は §2 の 1 → 2 → 3 と §2a を一緒に → `/cross-review` 2 巡 → 6。論文用リポジトリは `75e8e76` のまま（round 2 では原稿を変えていない）。
 
+> 追記 2: 2026-11-22 夕方（Surface）。§2 の 1〜3 は済み（判断 26・論文用リポジトリ `b12e222`・未 push）。§2a の済み・残りは tasklist の S8 の下。研究者の D2 の手での数え直し（`d2-hand-recount.md`）を待っている。
+
 ## §2a round 2 で直すもの（判断 25・研究者が採った）
 
 - 直す一覧は verdict.md §4 のすべて。主なもの:
