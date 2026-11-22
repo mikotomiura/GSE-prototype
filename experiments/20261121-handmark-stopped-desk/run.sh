@@ -155,7 +155,7 @@ case "$MODE" in
     "$PY" -I "$LEAK/scripts/synth.py" --seed "$SEED" --days 20 --hours 1.5 --out "$WORK/recL"
     FORMS=(wind)
     leak_all "$WORK/recL" "$WORK" "$OUT/leak"
-    "$PY" -I "$SC/report.py" "$OUT" > "$EXP_DIR/results/controls_report.md"
+    PYTHONUTF8=1 "$PY" -I "$SC/report.py" "$OUT" > "$EXP_DIR/results/controls_report.md"
     ;;
   records)
     grep -q '<!-- conditions: fixed -->' "$EXP_DIR/conditions.md" \
@@ -202,7 +202,7 @@ out = {"records": [{k: r[k] for k in ("copy", "sha256", "last_line_cut")} for r 
        "redaction_ledger": m["redaction_ledger"] and {"sha256": m["redaction_ledger"]["sha256"]}}
 print(json.dumps(out, ensure_ascii=False, indent=1))
 PY
-    "$PY" -I "$SC/report.py" "$OUT" > "$OUT/report.md"
+    PYTHONUTF8=1 "$PY" -I "$SC/report.py" "$OUT" > "$OUT/report.md"
     printf '{"event":"finished","run":"%s"}\n' "$RUN_ID" >> "$EXP_DIR/results/records/runs.txt"
     echo "結果: results/records/${RUN_ID}/report.md"
     ;;

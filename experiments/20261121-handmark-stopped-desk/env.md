@@ -5,3 +5,4 @@
 - 描画: `src/components/handmarkStageDraw.ts` の `drawFrame` → `src/components/handmarkStoppedDraw.ts` の `drawStopped`（画面と同じ純関数・同じ順・`scripts/handmark-stopped-draw.test.mjs` が順を縛る）。
 - 合成の対照を回した機械（2026-11-22）: Windows 11（G-GEAR）・Python 3.13.13・numpy 2.5.2・Node 24.14.1。本人の記録を回す機械は回したときに書く。
 - スレッド: BLAS の並列は 1 に固定（run.sh）。
+- 本人の記録を回した機械（2026-11-22）: macOS 27.0.1（Darwin 27.0.0）・Python 3.14.4・numpy 2.5.2・Node 22.22.0。同じ機械で回した合成の対照は `results/controls_mac/`（(i)〜(iii) の JSON は Windows の `results/controls/` とバイト単位で同じ。漏れの検査は判定が同じで、区間が小数第 4 位で違う。描画の画素の機械差）。
