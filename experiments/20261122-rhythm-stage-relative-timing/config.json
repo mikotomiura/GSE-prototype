@@ -392,6 +392,24 @@
           "S-rank-hold-sec": 0.15,
           "S-rank-hold-sub": 0.15
         }
+      },
+      "f200": {
+        "A": {
+          "D-run-hold-sec": 0.1,
+          "D-all-hold-sec": 0.1,
+          "S-raw-hold-sec": 0.1,
+          "S-raw-hold-sub": 0.1,
+          "S-rank-hold-sec": 0.15,
+          "S-rank-hold-sub": 0.15
+        },
+        "S": {
+          "D-run-hold-sec": 0.3,
+          "D-all-hold-sec": 0.3,
+          "S-raw-hold-sec": 0.3,
+          "S-raw-hold-sub": 0.3,
+          "S-rank-hold-sec": 0.3,
+          "S-rank-hold-sub": 0.3
+        }
       }
     },
     "aim": 0.055
