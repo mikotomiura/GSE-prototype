@@ -112,12 +112,13 @@ selftest() {
 
 # provenance <out file> <seed> <worlds> [<step> <world doc>]
 provenance() {
-  # the binary is checked again at the end: one replaced during the run fails here, before publish (security-checker)
+  # the binary is checked again at the end, before publish (security-checker): this catches an accidental change
+  # during the run, not a replacement put back before the end (the machine is trusted; Codex round 2)
   if [ -n "${GSE_REPLAY:-}" ] && [ "$(sha256sum "$GSE_REPLAY" | cut -d' ' -f1)" != "$EXPECTED_REPLAY_SHA" ]; then
     echo "gse-replay changed during the run (SHA-256 is no longer the EH1 build): not published" >&2
     return 1
   fi
-  "$PY" -"$1" "$HMM_VERSION" "$EXP_DIR" "$JOBS" "$2" "$3" "$MODE" "${GSE_REPLAY:-}" "${4:-}" "${5:-}" <<'PYEOF'
+  "$PY" - "$1" "$HMM_VERSION" "$EXP_DIR" "$JOBS" "$2" "$3" "$MODE" "${GSE_REPLAY:-}" "${4:-}" "${5:-}" <<'PYEOF'
 import hashlib, json, os, platform, subprocess, sys
 from importlib.metadata import version
 out, hmm, exp_dir, jobs, seed, worlds, mode, binary, step, wdoc = sys.argv[1:11]

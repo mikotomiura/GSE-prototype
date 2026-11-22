@@ -785,6 +785,38 @@ def synth_scratch(d: Path, rng: np.random.Generator) -> tuple[dict, dict, list[s
     return tab, names, cands, {"XA": XA, "XS": XS}
 
 
+def test_build_x_drop(tmp: Path) -> None:
+    """design 1.6 (decisions 14, /cross-review round 2): a drop leaves out the features and their differences to the
+    earlier windows, for small and full."""
+    d = tmp / "build-x"
+    d.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(5)
+    G = np.repeat(np.arange(4), 6)
+    n = len(G)
+    XA, F = rng.normal(size=(n, 3)), rng.normal(size=(n, 20))
+    rows = np.arange(2, n)
+    ck.save(d, "L-A", XA[rows])
+    ck.save(d, "L-rows", rows)
+    ck.save(d, "G_all", G)
+    ck.save(d, "F", F)
+    ck._init(str(d))
+    try:
+        for drop in ("smooth", "a", "r"):
+            keep = ck.keep_cols(drop)
+            Fk = F[:, keep]
+            want_s = np.hstack([XA[rows], Fk[rows]])
+            want_f = np.hstack([XA[rows], Fk[rows], ck.diffs(Fk, G, 2)[rows]])
+            xs, xf = ck.build_x("L", "A", "F", "small", drop), ck.build_x("L", "A", "F", "full", drop)
+            check(np.array_equal(xs, want_s) and np.array_equal(xf, want_f) and xf.shape[1] == 3 + 3 * len(keep),
+                  f"build_x: drop {drop} leaves out its {20 - len(keep)} features and their differences "
+                  f"(small {xs.shape[1]}, full {xf.shape[1]} columns)")
+        full = ck.build_x("L", "A", "F", "full", None)
+        check(full.shape[1] == 3 + 60 and not np.array_equal(full[:, :45], ck.build_x("L", "A", "F", "full", "smooth")),
+              "build_x: no drop keeps all 20 and their 40 differences (negative control)")
+    finally:
+        ck._MM.clear()
+
+
 SRC_RUN = r"""
 import json, sys
 from pathlib import Path
@@ -1260,6 +1292,7 @@ def main() -> int:
     test_judge(cfg)
     test_bases(cfg, tmp, a.jobs)
     test_stats(cfg)
+    test_build_x_drop(tmp)
     test_apply_pilot(cfg)
     test_ceiling_gate(cfg)
     if a.gse_replay:
