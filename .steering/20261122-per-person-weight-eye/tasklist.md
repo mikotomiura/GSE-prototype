@@ -3,14 +3,14 @@
 ## 準備
 - [x] 引き継ぎを読む・worktree を切る（`~/GSE-prototype-weight-eye`・枝 `exp/gse-per-person-weight-eye`）
 - [x] /start-task の問い（decisions 判断 1〜7）
-- [ ] 論文 3 の S10・S13・S15 と、`synth.py`・`run_synth.py`・`pinned.py` を一次で読む（記号化・前半と後半に分けられる長さ・書き手の数）
-- [ ] PoPETs の論文の特徴量と記号化を読み、論文 3 との異同を decisions に書く（判断 7）
+- [x] 論文 3 の S2〜S5・S10・S13 と、`synth.py`・`run_synth.py`・`pinned.py`・`data.split`・`ml.pool_units` を一次で読む
+- [x] PoPETs の論文の特徴量と記号化を読み、論文 3 との異同を decisions に書く（判断 7: 照合の論文は書き手を見分けていなかった）
 
 ## 設計（合成の前）
-- [ ] design.md: 1 状態の遷移表での「共有モデルからのずれ」の定義（共有の当て方・縮み・行の重み）
-- [ ] design.md: 目の候補 2〜3 案と、それぞれの統計量・帰無（入れ替え）
-- [ ] 実験のディレクトリ `experiments/20261122-per-person-weight-eye/` と conditions.md（候補・選びの基準・偽陽性と検出力の数え方・「確実に拾う」の定義・Stop）
-- [ ] attack-me 1 回目（prereg・Codex を加える）→ 直し → conditions をコミット（合成の前）
+- [x] design.md: 1 状態の遷移表での表と縮みの定義（細部は conditions.md が一次）
+- [x] design.md: 目の候補 3 案と帰無（入れ替え）
+- [x] 実験のディレクトリ `experiments/20261122-per-person-weight-eye/` と conditions.md（候補・選びの基準・偽陽性と検出力・門・止め）
+- [x] attack-me（prereg・Codex を加える）round 1〜5（major → major → major → minor → minor で閉じた・判断 13〜36）→ conditions をコミット（合成の前）
 
 ## 合成の較正
 - [ ] 目のコードと selftest・変異（陽性対照が赤になる）
