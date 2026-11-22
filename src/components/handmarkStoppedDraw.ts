@@ -1,5 +1,5 @@
 // 手跡の止まりの層の描画(純関数・ADR-056・.steering/20261121-handmark-stopped-state-prototype/)。
-// 画面(HandmarkStage.tsx)が handmarkStageDraw.ts の drawFrame の後に呼ぶ。机上の道具も PR-b で同じ順に呼ぶ。
+// 画面(HandmarkStage.tsx)が handmarkStageDraw.ts の drawFrame の後に呼ぶ。机上の道具(experiments/20261121-handmark-stopped-desk/scripts/overlay.mjs)も同じ順に呼ぶ。
 // React・Tauri・performance・Date・Math.random を使わない。入力は、そのときに見せる止まりの層(寄せた後)・
 // 配置・大きさだけ。何も積まない。
 // - 見えの度合い v は Rust が決める(止まりの始まりからの短い立ち上がりだけ・止まりの長さを持たない)。

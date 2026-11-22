@@ -102,3 +102,16 @@ test("画面は drawFrame の後に drawStopped を呼び、その後にアイ�
   const i = src.indexOf("drawIconsAtop(ctx");
   assert.ok(f > 0 && s > f && i > s, `${f} ${s} ${i}`);
 });
+
+test("机上の重ね描き（overlay.mjs）も画面と同じ純関数を同じ順に呼ぶ", () => {
+  const src = readFileSync(
+    new URL("../experiments/20261121-handmark-stopped-desk/scripts/overlay.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.ok(src.includes('from "../../../src/components/handmarkStageDraw.ts"'), "drawFrame の出どころ");
+  assert.ok(src.includes('from "../../../src/components/handmarkStoppedDraw.ts"'), "drawStopped の出どころ");
+  const body = src.slice(src.indexOf("export function renderLum"));
+  const f = body.indexOf("drawFrame(ctx");
+  const s = body.indexOf("drawStopped(ctx");
+  assert.ok(f > 0 && s > f, `${f} ${s}`);
+});

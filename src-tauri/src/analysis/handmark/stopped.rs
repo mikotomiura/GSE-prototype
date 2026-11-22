@@ -260,7 +260,7 @@ pub fn stopped_view(
 }
 
 /// `t0` の時点で一時停止中か（`t0` 以下の時刻の出来事を時刻の順に入れた後の状態）。
-fn paused_at(pauses: &[(u64, bool)], t0: u64) -> bool {
+pub fn paused_at(pauses: &[(u64, bool)], t0: u64) -> bool {
     pauses
         .iter()
         .take_while(|(t, _)| *t <= t0)

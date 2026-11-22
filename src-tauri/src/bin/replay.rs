@@ -1591,6 +1591,19 @@ struct Args {
     /// --handmark-redactions <ledger>: 区間指定削除の台帳（`redaction_ledger.jsonl`）。重なる日を感度分析から除く
     /// （conditions.md C7）。
     hm_redactions_path: Option<PathBuf>,
+    /// --stopped <cfg>: 止まりの層（ADR-056）を足して描き直す（`stopped::parse_stopped_cfg` と同じ書式）。
+    /// 切っているとき（無いとき）の出力は今と同じ。
+    hm_stopped: Option<gse_next_lib::analysis::handmark::stopped::StoppedCfg>,
+    /// `--stopped` に渡した文字列（ヘッダに書く）。
+    hm_stopped_raw: Option<String>,
+    /// --stopped-frames <path>: 窓のコマ（`--frames`）と同じ順の、止まりの層のコマ。
+    hm_stopped_frames_path: Option<PathBuf>,
+    /// --stopped-stops <path>: 止まりの一覧（NDJSON・`desk::StopEpisode`）。
+    hm_stopped_stops_path: Option<PathBuf>,
+    /// --stopped-queries <path>: 描き直す時刻の一覧（NDJSON・`{"seg","t0","q"}`）。
+    hm_stopped_queries_path: Option<PathBuf>,
+    /// --stopped-query-frames <path>: 問い合わせの時刻のコマ（基層のコマ＋止まりの層）。
+    hm_stopped_query_frames_path: Option<PathBuf>,
     /// --features: ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力する (issue 001-007)。
     /// ⚠️ 手元の解析用中間成果物であり `gse-dataset` へ共有しない (`docs/glossary.md` 逐語)。
     features: bool,
@@ -1757,9 +1770,48 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         "--inject-stuck",
         "--samples",
         "--handmark-redactions",
+        "--stopped",
+        "--stopped-frames",
+        "--stopped-stops",
+        "--stopped-queries",
+        "--stopped-query-frames",
     ]
     .iter()
     .any(|f| args.iter().any(|a| a == f));
+    let hm_stopped_raw = take_value(&mut args, "--stopped")?;
+    // 机上では GSE_DEBUG に依らず読む（描き直すだけで、誰の画面にも出ない）。切った値（off・空）は受けない
+    let hm_stopped = match &hm_stopped_raw {
+        None => None,
+        Some(raw) => match gse_next_lib::analysis::handmark::stopped::parse_stopped_cfg(
+            Some(raw.as_str()),
+            true,
+        ) {
+            Ok(Some(c)) => Some(c),
+            Ok(None) => {
+                return Err("--stopped needs a layer setting (not empty or off)".to_string())
+            }
+            Err(e) => return Err(format!("--stopped: {e}")),
+        },
+    };
+    let hm_stopped_frames_path = take_value(&mut args, "--stopped-frames")?.map(PathBuf::from);
+    let hm_stopped_stops_path = take_value(&mut args, "--stopped-stops")?.map(PathBuf::from);
+    let hm_stopped_queries_path = take_value(&mut args, "--stopped-queries")?.map(PathBuf::from);
+    let hm_stopped_query_frames_path =
+        take_value(&mut args, "--stopped-query-frames")?.map(PathBuf::from);
+    if hm_stopped.is_none()
+        && (hm_stopped_frames_path.is_some()
+            || hm_stopped_stops_path.is_some()
+            || hm_stopped_queries_path.is_some()
+            || hm_stopped_query_frames_path.is_some())
+    {
+        return Err(
+            "--stopped-frames, --stopped-stops, --stopped-queries and --stopped-query-frames require --stopped"
+                .to_string(),
+        );
+    }
+    if hm_stopped_queries_path.is_some() != hm_stopped_query_frames_path.is_some() {
+        return Err("--stopped-queries and --stopped-query-frames go together".to_string());
+    }
     let hm_table_path = take_value(&mut args, "--handmark-table")?.map(PathBuf::from);
     let hm_table_sha_path = take_value(&mut args, "--handmark-table-sha")?.map(PathBuf::from);
     let hm_labels_recomputed = match take_value(&mut args, "--labels")?.as_deref() {
@@ -1772,6 +1824,11 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         }
     };
     let hm_frames_path = take_value(&mut args, "--frames")?.map(PathBuf::from);
+    if hm_stopped_frames_path.is_some() && hm_frames_path.is_none() {
+        return Err(
+            "--stopped-frames requires --frames (the two files run in the same order)".to_string(),
+        );
+    }
     let hm_redactions_path = take_value(&mut args, "--handmark-redactions")?.map(PathBuf::from);
     let hm_inject = match take_value(&mut args, "--inject-stuck")? {
         None => 0.0,
@@ -1999,6 +2056,12 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         hm_inject,
         hm_redactions_path,
         hm_samples,
+        hm_stopped,
+        hm_stopped_raw,
+        hm_stopped_frames_path,
+        hm_stopped_stops_path,
+        hm_stopped_queries_path,
+        hm_stopped_query_frames_path,
         features,
         feature_config_path,
         feature_sets,
@@ -2219,6 +2282,136 @@ fn write_frame(out: &mut Vec<u8>, id: u32, s: &gse_next_lib::analysis::handmark:
     }
 }
 
+/// 止まりの層の 1 コマの尾（little endian）: `v f64・ambient 3 × f64・strength f64・form u8（1 帯・2 粒・3 風）`。
+fn write_stopped(out: &mut Vec<u8>, st: &gse_next_lib::analysis::handmark::stopped::StoppedFrame) {
+    use gse_next_lib::analysis::handmark::stopped::StoppedForm;
+    for v in [
+        st.v,
+        st.ambient[0],
+        st.ambient[1],
+        st.ambient[2],
+        st.strength,
+    ] {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.push(match st.form {
+        StoppedForm::Band => 1,
+        StoppedForm::Motes => 2,
+        StoppedForm::Wind => 3,
+    });
+}
+
+/// ヘッダに書くライブの遅れ（問い合わせの時刻 `q` と `Stage` の時刻の差）。
+const LIVE_LAG_MS_DESK: u64 = gse_next_lib::analysis::handmark::state::LIVE_LAG_MS;
+/// 問い合わせの一覧の大きさの上限。
+const HM_QUERIES_MAX_BYTES: u64 = 256 * 1024 * 1024;
+
+/// 問い合わせの一覧（1 行 1 件・`{"seg","t0","q"}`）を読む。読めない行は止める。
+fn parse_stopped_queries(
+    bytes: &[u8],
+) -> Result<Vec<gse_next_lib::analysis::handmark::desk::Query>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|_| "stopped queries are not UTF-8")?;
+    let mut out = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = serde_json::from_str(line)
+            .map_err(|_| format!("stopped queries line {} is not JSON", i + 1))?;
+        let get = |k: &str| v.get(k).and_then(serde_json::Value::as_u64);
+        match (get("seg"), get("t0"), get("q")) {
+            (Some(seg), Some(t0), Some(q)) => {
+                out.push(gse_next_lib::analysis::handmark::desk::Query {
+                    seg: usize::try_from(seg).map_err(|_| "stopped queries: seg is too large")?,
+                    t0,
+                    q,
+                })
+            }
+            _ => {
+                return Err(format!(
+                    "stopped queries line {} needs seg, t0 and q",
+                    i + 1
+                ))
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// `--stopped-stops` と `--stopped-queries`（`--stopped` のとき）。作ったファイルは `created` に足す。
+/// 要約に書く数を返す（`--stopped` が無ければ `None`）。
+fn run_stopped_outputs(
+    args: &Args,
+    files: &[gse_next_lib::analysis::handmark::desk::DeskFile],
+    cfg: &gse_next_lib::analysis::handmark::desk::DeskConfig,
+    created: &mut Vec<PathBuf>,
+) -> Result<Option<serde_json::Value>, String> {
+    use gse_next_lib::analysis::handmark::desk;
+    let Some(scfg) = args.hm_stopped.as_ref() else {
+        return Ok(None);
+    };
+    let create = |fp: &PathBuf, what: &str, created: &mut Vec<PathBuf>| {
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(fp)
+            .map_err(|_| format!("{what} could not be created (it must not exist yet)"))?;
+        created.push(fp.clone());
+        Ok::<_, String>(std::io::BufWriter::new(f))
+    };
+    let mut stops_n: Option<usize> = None;
+    if let Some(fp) = &args.hm_stopped_stops_path {
+        let stops = desk::all_stops(files, cfg)?;
+        let mut w = create(fp, "stopped stops file", created)?;
+        for s in &stops {
+            let line = serde_json::to_string(s).map_err(|e| e.to_string())?;
+            w.write_all(line.as_bytes())
+                .and_then(|_| w.write_all(b"\n"))
+                .map_err(|_| "stopped stops file could not be written".to_string())?;
+        }
+        w.flush()
+            .map_err(|_| "stopped stops file could not be written".to_string())?;
+        stops_n = Some(stops.len());
+    }
+    let mut queries_n: Option<usize> = None;
+    if let (Some(qp), Some(fp)) = (
+        &args.hm_stopped_queries_path,
+        &args.hm_stopped_query_frames_path,
+    ) {
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        File::open(qp)
+            .map_err(|_| "stopped queries could not be read".to_string())?
+            .take(HM_QUERIES_MAX_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| "stopped queries could not be read".to_string())?;
+        if bytes.len() as u64 > HM_QUERIES_MAX_BYTES {
+            return Err("stopped queries are over 256 MiB".to_string());
+        }
+        let queries = parse_stopped_queries(&bytes)?;
+        let mut w = create(fp, "stopped query frames file", created)?;
+        let mut buf: Vec<u8> = Vec::new();
+        let mut err = false;
+        desk::render_queries(files, cfg, scfg, &queries, &mut |id, s, st| {
+            buf.clear();
+            write_frame(&mut buf, id, s);
+            write_stopped(&mut buf, st);
+            if w.write_all(&buf).is_err() {
+                err = true;
+            }
+        })?;
+        if err || w.flush().is_err() {
+            return Err("stopped query frames file could not be written".to_string());
+        }
+        queries_n = Some(queries.len());
+    }
+    Ok(Some(serde_json::json!({
+        "stops": stops_n,
+        "queries": queries_n,
+        "frames": args.hm_stopped_frames_path.is_some(),
+    })))
+}
+
 /// 区間指定削除の台帳（1 行 1 件・`from`・`to` を ms で持つ）から区間を読む。読めない行は止める（fail-closed）。
 fn parse_redaction_ledger(bytes: &[u8]) -> Result<Vec<(u64, u64)>, String> {
     let text = std::str::from_utf8(bytes).map_err(|_| "redaction ledger is not UTF-8")?;
@@ -2272,6 +2465,42 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         for q in paths.iter().chain([table_path, sha_path]) {
             if target.is_some() && std::fs::canonicalize(q).ok() == target {
                 return Err("--frames points at an input file".to_string());
+            }
+        }
+    }
+    // 止まりの層の書き出し先も同じ（問い合わせの一覧も入力に数える）。書き出し先どうしの重なりも止める
+    let stopped_outs: Vec<&PathBuf> = [
+        &args.hm_stopped_frames_path,
+        &args.hm_stopped_stops_path,
+        &args.hm_stopped_query_frames_path,
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    {
+        let inputs: Vec<&PathBuf> = paths
+            .iter()
+            .chain([table_path, sha_path])
+            .chain(args.hm_stopped_queries_path.iter())
+            .chain(args.hm_frames_path.iter())
+            .collect();
+        for (i, fp) in stopped_outs.iter().enumerate() {
+            let target = std::fs::canonicalize(fp).ok();
+            if target.is_none() {
+                // まだ無いファイル: 名前の一致だけ見る（作るときに create_new で既存を拒む）
+                if inputs.iter().chain(&stopped_outs[..i]).any(|q| q == fp) {
+                    return Err(
+                        "a --stopped-* output points at another input or output".to_string()
+                    );
+                }
+                continue;
+            }
+            for q in inputs.iter().chain(&stopped_outs[..i]) {
+                if std::fs::canonicalize(q).ok() == target {
+                    return Err(
+                        "a --stopped-* output points at another input or output".to_string()
+                    );
+                }
             }
         }
     }
@@ -2338,23 +2567,64 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         )),
         None => None,
     };
-    let mut frame_buf: Vec<u8> = Vec::new();
-    let mut frame_err = false;
-    let built = desk::build(&files, &cfg, &transform, &mut |id, s| {
-        if let Some(w) = frame_writer.as_mut() {
-            frame_buf.clear();
-            write_frame(&mut frame_buf, id, s);
-            if w.write_all(&frame_buf).is_err() {
-                frame_err = true;
-            }
-        }
-    });
-    let flushed = frame_writer.map_or(Ok(()), |mut w| w.flush());
-    let cleanup = || {
-        if let Some(fp) = &args.hm_frames_path {
+    // 止まりの層の書き出し（`--stopped` のときだけ）。作ったものは誤りのとき全部消す
+    let new_file = |fp: &PathBuf, what: &str| {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(fp)
+            .map(std::io::BufWriter::new)
+            .map_err(|_| format!("{what} could not be created (it must not exist yet)"))
+    };
+    let mut created: Vec<PathBuf> = args.hm_frames_path.iter().cloned().collect();
+    let remove_created = |created: &[PathBuf]| {
+        for fp in created {
             let _ = std::fs::remove_file(fp);
         }
     };
+    let mut stopped_writer = match &args.hm_stopped_frames_path {
+        Some(fp) => match new_file(fp, "stopped frames file") {
+            Ok(w) => {
+                created.push(fp.clone());
+                Some(w)
+            }
+            Err(e) => {
+                remove_created(&created);
+                return Err(e);
+            }
+        },
+        None => None,
+    };
+    let mut frame_buf: Vec<u8> = Vec::new();
+    let mut frame_err = false;
+    let built = desk::build_with(
+        &files,
+        &cfg,
+        &transform,
+        args.hm_stopped.as_ref(),
+        &mut |id, s, st| {
+            if let Some(w) = frame_writer.as_mut() {
+                frame_buf.clear();
+                write_frame(&mut frame_buf, id, s);
+                if w.write_all(&frame_buf).is_err() {
+                    frame_err = true;
+                }
+            }
+            if let (Some(w), Some(st)) = (stopped_writer.as_mut(), st) {
+                frame_buf.clear();
+                frame_buf.extend_from_slice(&id.to_le_bytes());
+                frame_buf.extend_from_slice(&s.t.to_le_bytes());
+                write_stopped(&mut frame_buf, st);
+                if w.write_all(&frame_buf).is_err() {
+                    frame_err = true;
+                }
+            }
+        },
+    );
+    let flushed = frame_writer
+        .map_or(Ok(()), |mut w| w.flush())
+        .and(stopped_writer.map_or(Ok(()), |mut w| w.flush()));
+    let cleanup = || remove_created(&created);
     let out = match built {
         Ok(o) if !frame_err && flushed.is_ok() => o,
         Ok(_) => {
@@ -2415,8 +2685,18 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
             "windows_by_hmm_version": per_version.iter().map(|(k, v)| (k.clone(), v.1)).collect::<std::collections::BTreeMap<_, _>>(),
         })
     };
+    // 止まりの一覧と、問い合わせの時刻のコマ（ADR-056 D2 の確かめ方・`--stopped` のときだけ）
+    let mut extra: Vec<PathBuf> = Vec::new();
+    let stopped_counts = match run_stopped_outputs(args, &files, &cfg, &mut extra) {
+        Ok(c) => c,
+        Err(e) => {
+            cleanup();
+            remove_created(&extra);
+            return Err(e);
+        }
+    };
     let mut text = String::new();
-    let header = serde_json::json!({
+    let mut header = serde_json::json!({
         "kind": "header",
         "mode": "handmark_windows",
         "desk_version": desk::DESK_VERSION,
@@ -2437,13 +2717,22 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         "pair_gap_ms": desk::PAIR_GAP_MS,
         "frames": want_frames,
     });
+    // 止まりの層の項目は `--stopped` のときだけ足す（切っているときのヘッダは今と同じ）
+    if let (Some(raw), Some(obj)) = (&args.hm_stopped_raw, header.as_object_mut()) {
+        obj.insert("stopped".into(), serde_json::json!(raw));
+        obj.insert(
+            "b_stopped_names".into(),
+            serde_json::json!(desk::B_STOPPED_NAMES),
+        );
+        obj.insert("live_lag_ms".into(), serde_json::json!(LIVE_LAG_MS_DESK));
+    }
     text.push_str(&header.to_string());
     text.push('\n');
     for w in &out.windows {
         text.push_str(&serde_json::to_string(w).map_err(|e| e.to_string())?);
         text.push('\n');
     }
-    let summary = serde_json::json!({
+    let mut summary = serde_json::json!({
         "kind": "summary",
         "windows": out.windows.len(),
         "excluded": out.excluded,
@@ -2456,6 +2745,9 @@ fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String
         "sensitivity": out.sens,
         "redactions_given": args.hm_redactions_path.is_some(),
     });
+    if let (Some(c), Some(obj)) = (stopped_counts, summary.as_object_mut()) {
+        obj.insert("stopped".into(), c);
+    }
     text.push_str(&summary.to_string());
     text.push('\n');
     Ok(text)
@@ -2520,7 +2812,7 @@ fn usage() -> String {
          gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs <N>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --probes [--utc-offset-secs <N>] [--day-state <s1_day_state.json>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --day-questions --utc-offset-secs <N>\n    \
-         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>（既定 10）] [--handmark-redactions <redaction_ledger.jsonl>]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>（既定 10）] [--handmark-redactions <redaction_ledger.jsonl>] [--stopped <cfg>（止まりの層・ADR-056） [--stopped-frames <path>] [--stopped-stops <path>] [--stopped-queries <q.ndjson> --stopped-query-frames <path>]]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
@@ -5607,6 +5899,271 @@ mod tests {
         }
         assert_eq!(std::fs::read(&rec).unwrap(), rec_bytes);
         assert_eq!(std::fs::read(&t_json).unwrap(), bytes);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn stopped_args_need_the_layer_and_go_together() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let base = [
+            "a.ndjson",
+            "--handmark-windows",
+            "--utc-offset-secs",
+            "32400",
+            "--handmark-table",
+            "t.json",
+            "--handmark-table-sha",
+            "t.sha256",
+        ];
+        let with = |extra: &[&str]| {
+            let mut xs = base.to_vec();
+            xs.extend_from_slice(extra);
+            parse_args_from(v(&xs))
+        };
+        let p = with(&["--stopped", "form=wind;window_s=30"]).unwrap();
+        assert_eq!(p.hm_stopped.unwrap().window_s, 30);
+        assert_eq!(p.hm_stopped_raw.as_deref(), Some("form=wind;window_s=30"));
+        assert!(with(&[]).unwrap().hm_stopped.is_none());
+        for bad in [
+            &["--stopped", "off"][..],
+            &["--stopped", ""][..],
+            &["--stopped", "form=leaf"][..],
+            &["--stopped-stops", "s.ndjson"][..],
+            &["--stopped-frames", "sf.bin", "--frames", "f.bin"][..],
+            &["--stopped", "form=band", "--stopped-frames", "sf.bin"][..],
+            &["--stopped", "form=band", "--stopped-queries", "q.ndjson"][..],
+            &["--stopped", "form=band", "--stopped-query-frames", "qf.bin"][..],
+        ] {
+            assert!(with(bad).is_err(), "{bad:?}");
+        }
+        // モード無しでは受けない
+        assert!(parse_args_from(v(&["a.ndjson", "--stopped", "form=band"])).is_err());
+    }
+
+    #[test]
+    fn stopped_outputs_leave_the_off_output_unchanged_and_render_queries() {
+        use gse_next_lib::analysis::handmark::{assignment, state::LIVE_LAG_MS, stopped};
+        let dir = std::env::temp_dir().join(format!("gse-replay-hms-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let table = assignment::generate(3, 20_400, 7, 7, 10).unwrap();
+        let bytes = table.canonical_bytes();
+        let sha = assignment::sha256_hex(&bytes);
+        std::fs::write(dir.join("t.json"), &bytes).unwrap();
+        std::fs::write(dir.join("t.sha256"), format!("{sha}  t.json\n")).unwrap();
+        // 10:00（JST）から 20 分。8 秒打っては 90 秒止まる。途中に一時停止を 1 つ
+        let start = ((20_407i64 * 86_400 + 4 * 3_600 - 32_400 + 6 * 3_600) * 1000) as u64;
+        let mut lines = vec![format!(
+            "{{\"type\":\"meta\",\"session_start\":{start},\"hmm_version\":\"0.5.0\"}}"
+        )];
+        let mut t = start + 200;
+        while t < start + 1_200_000 {
+            let burst_end = t + 8_000;
+            while t < burst_end {
+                lines.push(format!(
+                    "{{\"type\":\"key\",\"t\":{t},\"category\":\"alphabetic\",\"press\":true}}"
+                ));
+                t += 150;
+            }
+            t += 90_000;
+        }
+        let (pa, pb) = (start + 600_000, start + 640_000);
+        lines.push(format!(
+            "{{\"type\":\"recording_pause\",\"t\":{pa},\"paused\":true}}"
+        ));
+        lines.push(format!(
+            "{{\"type\":\"recording_pause\",\"t\":{pb},\"paused\":false}}"
+        ));
+        lines.push(format!(
+            "{{\"type\":\"meta\",\"session_end\":{}}}",
+            start + 1_200_000
+        ));
+        let rec = dir.join("s.ndjson");
+        std::fs::write(&rec, lines.join("\n") + "\n").unwrap();
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let p = |name: &str| dir.join(name);
+        let (tj, ts) = (p("t.json"), p("t.sha256"));
+        let mk = |extra: &[&str]| {
+            let mut xs = vec![
+                rec.to_str().unwrap(),
+                "--handmark-windows",
+                "--utc-offset-secs",
+                "32400",
+                "--handmark-table",
+                tj.to_str().unwrap(),
+                "--handmark-table-sha",
+                ts.to_str().unwrap(),
+                "--labels",
+                "recomputed",
+            ];
+            xs.extend_from_slice(extra);
+            parse_args_from(v(&xs)).unwrap()
+        };
+        let paths = vec![rec.clone()];
+        let s = |x: &Path| x.to_str().unwrap().to_string();
+        let off = run_handmark_windows(&mk(&["--frames", &s(&p("f0.bin"))]), &paths).unwrap();
+        let cfg_raw = "form=motes;rise_ms=2000;window_s=20;strength=0.5";
+        let on = run_handmark_windows(
+            &mk(&[
+                "--frames",
+                &s(&p("f1.bin")),
+                "--stopped",
+                cfg_raw,
+                "--stopped-frames",
+                &s(&p("sf.bin")),
+                "--stopped-stops",
+                &s(&p("stops.ndjson")),
+            ]),
+            &paths,
+        )
+        .unwrap();
+        // 基層のコマは変わらない（write_frame の書式も中身も）
+        let f0 = std::fs::read(p("f0.bin")).unwrap();
+        assert!(!f0.is_empty());
+        assert_eq!(f0, std::fs::read(p("f1.bin")).unwrap());
+        // 窓の行は b_stopped を除けば同じ。ヘッダと要約は止まりの項目を除けば同じ
+        let rows = |t: &str| -> Vec<serde_json::Value> {
+            t.lines()
+                .map(|l| serde_json::from_str(l).unwrap())
+                .collect()
+        };
+        let (r0, mut r1) = (rows(&off), rows(&on));
+        assert_eq!(r0.len(), r1.len());
+        assert!(!off.contains("stopped"));
+        let n = r1.len();
+        for (i, row) in r1.iter_mut().enumerate() {
+            let o = row.as_object_mut().unwrap();
+            if i == 0 {
+                assert_eq!(o.remove("stopped").unwrap(), cfg_raw);
+                assert_eq!(
+                    o.remove("b_stopped_names")
+                        .unwrap()
+                        .as_array()
+                        .unwrap()
+                        .len(),
+                    9
+                );
+                assert_eq!(o.remove("live_lag_ms").unwrap(), LIVE_LAG_MS);
+            } else if i == n - 1 {
+                let st = o.remove("stopped").unwrap();
+                assert!(st["stops"].as_u64().unwrap() > 0);
+            } else {
+                assert_eq!(o.remove("b_stopped").unwrap().as_array().unwrap().len(), 9);
+            }
+        }
+        assert_eq!(r0, r1);
+        // 止まりの層のコマは基層のコマと同じ数（id・t・尾 41 バイト）
+        let windows = r0.len() - 2;
+        assert!(windows > 0);
+        let sf = std::fs::read(p("sf.bin")).unwrap();
+        assert_eq!(sf.len(), windows * 20 * (4 + 8 + 41));
+        // 止まりの一覧から問い合わせを作り、立ち上がりの後のコマは v = 1・一時停止の間には止まりが無い
+        let stops: Vec<serde_json::Value> = std::fs::read_to_string(p("stops.ndjson"))
+            .unwrap()
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        assert!(stops.len() >= 8, "{}", stops.len());
+        let mut qlines = Vec::new();
+        let mut expect = Vec::new();
+        for st in &stops {
+            let (a, b) = (st["start"].as_u64().unwrap(), st["end"].as_u64().unwrap());
+            assert!(!(a < pb && b > pa), "a stop overlaps the pause");
+            for q in [a + 3_000 + LIVE_LAG_MS, b - 1 + LIVE_LAG_MS] {
+                if q - LIVE_LAG_MS >= a + 2_000 && q - LIVE_LAG_MS < b {
+                    qlines.push(format!(
+                        "{{\"seg\":{},\"t0\":{},\"q\":{q}}}",
+                        st["seg"], st["t0"]
+                    ));
+                    expect.push(q);
+                }
+            }
+        }
+        std::fs::write(p("q.ndjson"), qlines.join("\n") + "\n").unwrap();
+        run_handmark_windows(
+            &mk(&[
+                "--stopped",
+                cfg_raw,
+                "--stopped-queries",
+                &s(&p("q.ndjson")),
+                "--stopped-query-frames",
+                &s(&p("qf.bin")),
+            ]),
+            &paths,
+        )
+        .unwrap();
+        let qf = std::fs::read(p("qf.bin")).unwrap();
+        // 1 コマずつ読む（基層のコマ＋尾 41 バイト）
+        let mut o = 0usize;
+        let mut k = 0usize;
+        while o < qf.len() {
+            let id = u32::from_le_bytes(qf[o..o + 4].try_into().unwrap()) as usize;
+            let t = u64::from_le_bytes(qf[o + 4..o + 12].try_into().unwrap());
+            assert_eq!((id, t), (k, expect[k]));
+            let mut e = o + 4 + 8 + 32 + 4;
+            e += 1 + if qf[e] == 1 { 480 } else { 0 };
+            let nr = qf[e] as usize;
+            e += 1 + nr * 10;
+            let v = f64::from_le_bytes(qf[e..e + 8].try_into().unwrap());
+            assert_eq!(v, 1.0, "query {k}");
+            assert_eq!(qf[e + 40], 2, "motes");
+            o = e + 41;
+            k += 1;
+        }
+        assert_eq!(k, expect.len());
+        // 既にある出力・書き出し先どうしの重なりは止める
+        assert!(run_handmark_windows(
+            &mk(&[
+                "--stopped",
+                cfg_raw,
+                "--stopped-stops",
+                &s(&p("stops.ndjson")),
+            ]),
+            &paths
+        )
+        .is_err());
+        assert!(run_handmark_windows(
+            &mk(&[
+                "--stopped",
+                cfg_raw,
+                "--stopped-queries",
+                &s(&p("q.ndjson")),
+                "--stopped-query-frames",
+                &s(&p("q.ndjson")),
+            ]),
+            &paths
+        )
+        .is_err());
+        assert!(run_handmark_windows(
+            &mk(&[
+                "--frames",
+                &s(&p("f9.bin")),
+                "--stopped",
+                cfg_raw,
+                "--stopped-frames",
+                &s(&p("f9.bin")),
+            ]),
+            &paths
+        )
+        .is_err());
+        // 問い合わせが壊れていれば止め、作りかけのファイルを残さない
+        std::fs::write(p("qbad.ndjson"), "{\"seg\":0}\n").unwrap();
+        assert!(run_handmark_windows(
+            &mk(&[
+                "--frames",
+                &s(&p("f8.bin")),
+                "--stopped",
+                cfg_raw,
+                "--stopped-queries",
+                &s(&p("qbad.ndjson")),
+                "--stopped-query-frames",
+                &s(&p("qf8.bin")),
+            ]),
+            &paths
+        )
+        .is_err());
+        assert!(!p("f8.bin").exists() && !p("qf8.bin").exists());
+        let _ = stopped::StoppedForm::Band;
         let _ = std::fs::remove_dir_all(&dir);
     }
 

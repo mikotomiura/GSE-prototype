@@ -216,7 +216,7 @@ export default function HandmarkStage() {
         stoppedShown = lerpStopped(stoppedFrom, stoppedTo, (now - stoppedRecvAt) / STATE_TICK_MS);
       }
       const calm = reduceMotion ? 0.3 : 1;
-      // drawFrame の後に drawStopped(机上の道具も PR-b で同じ順に呼ぶ)。アイコンの写しはその上。
+      // drawFrame の後に drawStopped(机上の道具 overlay.mjs も同じ順に呼ぶ)。アイコンの写しはその上。
       drawFrame(ctx, world, view, shown, fieldShown, rippleViews(now), calm);
       drawStopped(ctx, world, view, stoppedShown, calm);
       drawIconsAtop(ctx, icons, view.W, view.H);

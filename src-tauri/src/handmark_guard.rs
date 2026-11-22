@@ -702,7 +702,7 @@ const DRAW: [(&str, &str); 2] = [
         "handmarkStageDraw.ts",
         include_str!("../../src/components/handmarkStageDraw.ts"),
     ),
-    // 止まりの層の重ね描き（ADR-056）。画面が `drawFrame` の後に呼ぶ（机上の道具も PR-b で同じ順に呼ぶ）。
+    // 止まりの層の重ね描き（ADR-056）。画面が `drawFrame` の後に呼ぶ（机上の道具 `overlay.mjs` も同じ順に呼ぶ）。
     (
         "handmarkStoppedDraw.ts",
         include_str!("../../src/components/handmarkStoppedDraw.ts"),
