@@ -14,8 +14,9 @@
 ## 検証状態
 
 - 4 つの angle（A1 打鍵の生体認証・A2 マルコフ連鎖での同定・A3 見分けと予測の乖離・A4 入れ替えの帰無と指紋の研究）を Sonnet のサブエージェントに並列で渡し、30 件ほどを持ち帰った。
-- 登録した 16 件（[V554]〜[V569]。Dehling ら 2024 は既登録の [V277] で、登録し直していない）は、メインが Crossref・OpenAlex・Europe PMC・arXiv・JMLR・ACL Anthology で書誌を確かめた。カードの根拠にした逐語は、抄録にあるものをメインが抄録の本文と照らして一致を確かめた。本文の逐語（[V554]・[V277]・[V557]・[V558]・[V569]）はサブエージェントの抽出で、メインは照合していない。
+- 登録した 18 件（[V554]〜[V571]。[V570] と [V571] は本文の追加の確認で足した。Dehling ら 2024 は既登録の [V277] で、登録し直していない）は、メインが Crossref・OpenAlex・Europe PMC・arXiv・JMLR・ACL Anthology で書誌を確かめた。カードの根拠にした逐語は、抄録にあるものをメインが抄録の本文と照らして一致を確かめた。本文の逐語（[V554]・[V277]・[V557]・[V558]・[V569]）はサブエージェントの抽出で、メインは照合していない。
 - 調べの報告の誤りを 2 件直した: [V554] の巻号は 16(4) ではなく 16(3)（Crossref）。A1 は Dehling ら 2024 を「未登録」と報告したが、既に [V277] にあった（同じ DOI。メインも一度登録し直し、check_citations.py の重複の検査で気づいて取り下げた）。
+- 本文の追加の確認（研究者の指示・同じ日）: [V559] は Nature の全文（Chrome）、[V562] は bioRxiv のプレプリントの考察（Chrome の PDF ビューアで画面を読んだ。24〜25 頁）、[V570] は著者のページの PDF をメインが読んだ。[V571] は著者のページ・ResearchGate・academia.edu を当たり、抄録だけが読めた（本文は未取得）。取得の自動の試み 2 つ（ブラウザを名乗る curl・ページの中での pdf.js の読み込み）は権限の自動判定で止められ、回り道はしていない。
 - `research-positioning.md` への還元: 不要（別の研究の位置づけで、GSE の主張には使わない）。
 - 3 票の判定（内的妥当性・この研究への外挿・別の説明の有無）はメインが回した。結果は各カードの見出しと否決リストに置く。
 
@@ -40,21 +41,21 @@
 5. **議論はあるか？** 3 票: 内的妥当性 ○（どちらも書き手ごとの遷移の表で当てる型そのもの）・外挿 ○（方法の既出を言うのに対象の違いは効かない）・別の説明 ○（反証の側の [V569] は「文字の特徴は話題を運ぶ」で、方法の既出を崩さない）。この研究にとっての含意: E1 を方法として新しいとは書かない。[V554] 自身が書く「話題で説明されうる」（逐語 *"Such letter sequences may also be dependent on the subject of the texts."*）と [V569] は、リズムの符号でも「人ではなく課題や条件を運ぶ」別の説明を考える根拠になる（カード 4 の [V562] と同じ論点）。
 6. **次に読むべき論文は？** Peng ら 2004（文字の言語モデルの平滑）・Hirst & Feiguina 2007（短い文で文字の bigram が効かなかったという記述・未読）・Schonlau らのコマンドの列の masquerade（未検索）。
 
-### カード 2: 打鍵の時刻を粗くしても識別は残る **[検証済 2-1]** [V277] [V556]
+### カード 2: 打鍵の時刻を粗くしても識別は残る **[検証済 2-1]** [V277] [V556] [V570]
 
 1. **どんなもの？** [V277] は、ブラウザの時刻の分解能の制限（最大 200 ms）を再生で再現し、固定文と自由作文の打鍵の識別の誤りを測った。[V556] は、自由作文の打鍵を、時間の間隔の順位という粗い要約（R 距離）で 205 人について識別した。
 2. **先行研究と比べてどこがすごい？** [V277] の抄録の逐語 *"they are surprisingly resilient to larger timestamp modifications, which results in a serious threat to users' privacy"*。[V556] の抄録の逐語 *"a few lines of text, even collected in different working sessions, are sufficient to reach a high level of accuracy"*。
 3. **技術や手法の肝はどこ？** 粗くしても、登録と照合で同じ粗さなら劣化は小さい。粗さが食い違うと大きく壊れる（[V277] の本文・サブエージェントの抽出）。
 4. **どうやって有効だと検証した？** [V277] は公開の固定文（51 人）と自由作文（28 人）。[V556] は 205 人。
 5. **議論はあるか？** 3 票: 内的妥当性 ○・外挿 △（粗くしたのは時刻の分解能や順位で、30 秒窓の要約と量子化ではない。自由作文は 28 人）・別の説明 ○。留保: 26 記号は数え方の段で個人差の多くを捨てているかもしれず、[V277] の結果がそのまま当てはまるとは言えない。この研究にとっての含意: 論文 3 の推測（粗い符号が個人差を残しすぎていない）には、隣の形で不利な証拠がある。目が拾わなかったとき、「粗い符号だから」とだけ読まない。
-6. **次に読むべき論文は？** Killourhy & Maxion 2008（時計の分解能・doi:10.1007/978-3-540-87403-4_18・本文が取れず未読）。
+6. **次に読むべき論文は？** [V570] は本文を読んだ: 51 人 × 400 回のパスワードで、粗い時計では検出が少しだけ悪くなる（抄録の逐語 *"detector performance is slightly worse at typical clock resolutions than at higher ones (e.g., a 4.2% increase in equal-error rate)"*）。向きは [V277] と同じ（粗くしても大きくは崩れない）。
 
 ### カード 3: 見分けに効くものと予測に効くものは分かれうる（脳画像） **[検証済 3-0（既出であること）]** [V559] [V560] [V561]
 
 1. **どんなもの？** [V559] は、脳の接続の指紋（人を見分ける）と行動の予測に効く接続を、接続・ネットワーク・地形・ばらつきの各水準で比べた。[V560] は「信頼性より予測を基準にせよ」という意見論文。[V561] は、脳の状態の層ごとに、人の見分けと人の間の表現型の予測を同じデータで比べた。
 2. **先行研究と比べてどこがすごい？** [V559] の抄録の逐語 *"a substantial divergence between discriminatory and predictive connectivity signatures on all levels of network organisation"*、*"The present study thus calls into question the direct functional relevance of connectome fingerprints."*。
 3. **技術や手法の肝はどこ？** 比べるのは「どの特徴が効くか」の重なりである。同じ人のモデルを作って、その人の後の記録の予測が良くなるか（個人化の得）ではない。
-4. **どうやって有効だと検証した？** [V559] は複数の分割・閾値・予測の算法で。[V561] は反対の向きで、抄録の逐語 *"time points of lower and intermediate co-fluctuation levels provide overall highest subject specificity as well as highest predictive capacity of individual-level phenotypes"*。
+4. **どうやって有効だと検証した？** [V559] は HCP の血縁のない 339 人で、指紋の同定の正解率は 96.8% と 97.3%（入れ替えで p < 0.001）。予測は人の間の行動（流動性知能・言語理解・握力など）の connectome-based predictive modeling で、10 分割の交差検証（本文・メインが Chrome で読んだ）。[V561] は反対の向きで、抄録の逐語 *"time points of lower and intermediate co-fluctuation levels provide overall highest subject specificity as well as highest predictive capacity of individual-level phenotypes"*。
 5. **議論はあるか？** 3 票: 内的妥当性 ○・外挿 ○（「乖離は既出」を言うのに対象の違いは効かない）・別の説明 ○。この研究にとっての含意: 「見分けと予測の乖離」を新しい発想としては書けない。言えるのは、同じ記録で、見分けの量と本人のモデルの予測の得（論文 3 の量）を並べること（判断 9）で、これは 0 件だった（A3 の検索式は `survey-positioning/angle-A3-identify-vs-predict.md`）。人の間の予測（[V559][V561]）と、本人の中の予測の得（論文 3）は別の量である。
 6. **次に読むべき論文は？** 打鍵・推薦・言語モデルの個人化で、見分けと個人化の得を両方測った研究（A3 で未検索）。Hedge ら 2018 の reliability paradox（群の効果の頑健さと個人差の信頼性は別・未読）。
 
@@ -68,16 +69,16 @@
    - 目の量（[V567] と同じ形）と帰無（[V566] の系統）は既出の型の上にある。
    - 記録の量の効き（[V563]）は、conditions.md の量の筋・長さの不均一・重ねの門がまさに測っているもの。設計の根拠として引ける。
    - 人のまとまり（[V562]）は、今の門に無い。CoAuthor の書き手が同じ題や条件でまとまると、入れ替えの棄却が「安定した本人の差」でなく「まとまりの差」を拾いうる。実データの読みの追記（D7）を書くときの論点の候補（研究者が決める）。
-6. **次に読むべき論文は？** [V562] の本文（推奨されている帰無の作り）。
+6. **次に読むべき論文は？** [V562] の考察はプレプリントの本文で読んだ（24〜25 頁）。逐語 *"The exchangeability test was seen to be very highly powered and sensitive to assumptions towards a greater propensity to reject. Most notably, any correlation of the measurement with a demographic or clustering variable will aid in matching."*。勧めは、照合の成績を他の指標（I2C2）と、照合の成績が何と関連するかの分析と組み合わせることで、逐語 *"We suggest the use of logistic regression on whether or not subjects were correctly matched for this task."*。まとまりの中だけで入れ替える帰無は、考察では勧めていない。HCP では照合の成績が本人・一卵性双生児・二卵性双生児・きょうだい・他人の順に並び、年齢・教育・人種が照合の成績と関連した。この研究にとっての含意: 書き手ごとに AUC_v がどんな属性（記録の量・課題・題）と関連するかを、実データで並べる読み方の先例になる。
 
-### カード 5: 間を空けると照合は悪くなる。同じ設計で漂いと安定した差を分けた例は見つからない **[検証済 2-1]** [V557] [V558] [V564] [V565]
+### カード 5: 間を空けると照合は悪くなる。同じ設計で漂いと安定した差を分けた例は見つからない **[検証済 2-1]** [V557] [V558] [V564] [V565] [V571]
 
 1. **どんなもの？** [V557] は、40 個の固定のパスワードを毎週 8 週打たせ、登録と照合の間を 0〜7 週と同じ設計の中で動かした（プレプリント）。[V558] は、固定のパスワードの打鍵の日をまたぐ揺れを測った。[V564] は、間の違う 4 つの脳画像のデータで個人差の安定を示した。[V565] は、9 人を密に測り、共通・安定した個人差・課題と日ごとの変動を分けた。
 2. **先行研究と比べてどこがすごい？** [V557] の抄録の逐語 *"Error increases monotonically with the gap for every mechanism, from an EER of 14.6-27.2% at a gap of zero to 25.5-37.1% at seven weeks"*。[V564] の抄録の逐語 *"individual differences of the functional connectome are stable across 3 months to 1–2 years (and even detectable at above-chance levels across 3 years)"*。
 3. **技術や手法の肝はどこ？** [V557] は間を設計の因子にした。[V565] は分散を共通・個人・日の成分に分けた（相関の構造の比べ）。
 4. **どうやって有効だと検証した？** [V557] は約 85 人・4 つの照合の方式。[V558] は CMU の 51 人・8 セッション（練習の効果を含む）。
 5. **議論はあるか？** 3 票: 内的妥当性 ○・外挿 △（[V557][V558] は固定文・短い入力・照合（EER）で、自由作文の長い窓の要約ではない。[V557] は査読前）・別の説明 ○。この研究にとっての含意: 「時間が近いと似る」は打鍵で実測されている。間を空けたセルを置く理由の根拠になる。同じ設計の中で間を空けたセルを並べ、漂いの合成で「安定した差としての偽陽性」を測ってから読む作りは、A1・A4 の検索の範囲では 0 件だった。
-6. **次に読むべき論文は？** Gunetti, Picardi & Ruffo 2005「古いプロファイル」（doi:10.1007/11558590_36・自由作文の劣化の最も古い候補・本文が取れず未読）。
+6. **次に読むべき論文は？** [V571]（自由作文の「古いプロファイル」）は抄録だけが読めた。逐語 *"typing dynamics of free text provide useful information for user identification and authentication even when a long time has passed since typing profiles of users were formed"*。自由作文では時間が経っても識別は残る、の側の材料。間の長さと落ち方の数は本文が要る（著者のページに PDF なし・ResearchGate は自動操作の確認で開けず・academia.edu はログインが要る）。
 
 ## 否決・保留
 
@@ -88,8 +89,8 @@
 
 ## やり残し
 
-1. 本文が未読のもの: [V559]〜[V567] は抄録だけ。特に [V562] の本文（推奨の帰無）と [V559] の N。
-2. Killourhy & Maxion 2008 と Gunetti, Picardi & Ruffo 2005 の本文（出版社の抄録も閉じていた）。
+1. 本文が未読のもの: [V560][V561][V563]〜[V567] は抄録だけ（[V559] と [V562] の考察は本文で読んだ）。
+2. [V571] の本文（間の長さと落ち方の数）。研究者が ResearchGate を手で開くか、所属の図書館で Springer の版を取れば読める。
 3. Q2 の未検索の分野: 打鍵の個人化・推薦・言語モデルの個人化・歩容で、見分けと個人化の得を両方測った研究。
 4. OpenAlex・Semantic Scholar・Google Scholar での直接の検索（今回は主に WebSearch と各 API での照合）。
 5. コマンドの列の masquerade（Schonlau ら）・Hirst & Feiguina 2007。
