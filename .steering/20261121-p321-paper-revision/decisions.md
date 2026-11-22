@@ -218,3 +218,9 @@
 - **研究者の決定**（AskUserQuestion・私の推奨どおり）: K19 は INSTANCE として数える。基準は事前に固定して文字どおり当てる約束で、後から動かさない。§2.5 と要旨には「1 件見つかった（CS1 の小テスト）。ただし未完了の試行は別に報告しており、未解決を解決に混ぜてはいない」と範囲つきで書く。「実例は見つからなかった」という言い方はやめる。
 - **抜け**: page 1 だけ（"unaided" は 393 件中 50 件）。正規表現だけで読んだ。NOT-READ の 14 件のうち 4 件（K53・K59・K61・K143）は、機関リポジトリの PDF で、ブラウザなら開ける見込みがある。
 - **記録**: `search-log/keyword-hits-openalex.tsv`・`keyword-queries-openalex.tsv`・`search-b-openalex-run-notes.md`・`scripts/search-b/`。
+
+## 判断 27: 研究者による D2 の手での数え直し（2026-11-22）
+
+- **結果**（研究者がチャットで返した。コードの値は見ずに数えた）: 表 5 だけ N=17・S=13・a=9・b=2 ／ 表 5 と本文 N=17・S=13・a=8・b=1。P1TA の本文の 2 行は 1 件として数えた。迷った行は無い。
+- **照合**（メイン）: `results/metrics.json` の `d2.results.<mode>.counts`（`resolved_no_consult` 9・8、`unresolved_no_consult` 2・1、n 17、resolved 13）と一致。
+- **本文**（論文用リポジトリ `caeaece`）: §5.5 (2) と §8 に「著者が転記から手で数え直し、同じ表を得た（数え方の確かめであって、転記の確かめではない）」と書いた。§8 の "can be recounted by hand" を消した。`audit/independent-recount/README.md` に結果と、2 つ目の実装の「入力に在った値 / 無かった値」を足した。

@@ -29,7 +29,7 @@
     - [x] Hellas の例の向き（`68ce171`・52.5% は make_results が計算）
     - [x] 2 つ目の実装の文（入力に在った値 / 無かった値・span と sum・指示文が残っていない・格を下げた）・duration の定義・"agreed to be observed"（`abd08f7`）
     - [x] 要旨の 3.5 の言い方（\Ro{} exceeded \Rz{}）・語数 245・序論 21 行
-    - [ ] 手での数え直しの結果を §5.5 (2)・§8・`audit/independent-recount/README.md` に書く（§8 の "can be recounted by hand" を直す）
+    - [x] 手での数え直しの結果を §5.5 (2)・§8・audit README に書いた（判断 27・`caeaece`・一致）
     - [ ] 構成概念の分け（表 1・§5.4・§7.1・要旨の "not a loss"）／ 最後の DF3 の理屈（B）
     - [ ] 重複を消す ／ 再利用する人の表（§7.4）／ debugging のログ研究の文献 ／ CV3 か WCR の区間と MacKinnon の言い換え
     - [ ] 残りの minor と nit（verdict.md §4）／ Data availability の DOI は S9
