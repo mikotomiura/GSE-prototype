@@ -3,11 +3,13 @@
 ADR-056 D2・設計案 §4.4 の確かめ方 2・conditions.md E2。時刻は Stage の時刻 τ（コマの時刻 q = τ + 遅れ）。
 評価に入るのは立ち上がりの後（τ ≥ 止まりの始まり + rise）だけ。
 
-  (i)   止まり 1 つにつき M1 個の対（q − 250 と q）。τ は [start + rise, end) から一様。ラベル = τ − start
+  (i)   止まり 1 つにつき M1 個の対（q − 250 と q）。τ は [start + rise + 250, end) から一様（対の 2 枚とも立ち上がりの
+        後・判断 13）。ラベル = τ − start
   (ii)  長さが rise + W + S 以上の止まり 1 つにつき 1 本の列（S 秒・1 秒おき）。列の始まり τ0 は
         [start + rise + W, end − S] から一様。ラベル = τ0 − start（記憶の窓 W より前の経過）
   (iii) 長さが rise + S 以上の止まり 1 つにつき 1 本の列。τ0 は [start + rise, end − S] から一様。
-        ラベル = τ0 − t0（手跡を出し始めた時刻 grid_start からの経過）
+        ラベル = τ0 − t0（区間の起点 t0 からの経過。conditions.md E2 の「grid_start」は t0 を 250 ms の格子に
+        切り下げた値で、t0 との差は 250 ms 未満・判断 17）
 
 出力: q.ndjson（区間ごとにまとめ、q の昇順・gse-replay --stopped-queries の入力。e と s0 は対照の描画が使う）と
 items.json（項目ごとの検定・止まり・日・ラベル・問い合わせの番号）。どちらも中間で、repo に置かない。

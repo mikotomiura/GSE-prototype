@@ -747,6 +747,10 @@ pub fn stream_samples(
 
 /// 一時停止の区間 `[from, to)` を、止まりの層の門に入れる出来事 `(時刻, 一時停止か)` の列にする（時刻の昇順・
 /// 同じ時刻は区間の並びのまま）。
+///
+/// 前提: `pauses` は重ならない（`parse_file` が `recording_pause` の行を時刻の順に状態機械で対にするので、
+/// 1 本の記録の中では重ならない。`resolve_overlaps` は終わりを縮めるだけ）。重なる区間を渡すと、門は
+/// 最後の出来事だけを持つので早く開きうる。
 pub fn pause_events(pauses: &[(u64, u64)]) -> Vec<(u64, bool)> {
     let mut ev: Vec<(u64, bool)> = pauses
         .iter()
@@ -903,8 +907,8 @@ pub struct StopEpisode {
 }
 
 /// 区間の止まりを列挙する。門（`StopGate`）が始まりの時点で開いていたものだけ（起動・戻し・一時停止明けの後の
-/// 最初の打鍵より前と、一時停止の間は止まりにならない）。門は打鍵か一時停止の始まりでしか閉じず、打鍵でしか
-/// 開かないので、止まりの間に開き閉じは起きない。
+/// 最初の打鍵より前と、一時停止の間は止まりにならない）。門は一時停止の始まりでしか閉じず、打鍵でしか開かない。
+/// 止まりは打鍵か一時停止の始まりで終わるので、止まりの間に門の開き閉じは起きない。
 pub fn stop_episodes(seg_index: usize, seg: &Segment, f: &DeskFile) -> Vec<StopEpisode> {
     let events = pause_events(&f.pauses);
     let mut gate = StopGate::new(seg.t0, paused_at(&events, seg.t0));

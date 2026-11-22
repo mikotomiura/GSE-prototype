@@ -239,6 +239,11 @@ impl HandmarkDriver {
         self.stopped = cfg;
     }
 
+    /// 止まりの層が入っているか（`lib.rs` が、一時停止の時刻をコマンドの経路の値に揃えるかを決める）。
+    pub fn stopped_on(&self) -> bool {
+        self.stopped.is_some()
+    }
+
     /// 一時停止の出来事を、窓が出ているときだけ溜める（窓を開くときは `new_stage` が今の状態から門を作る）。
     fn queue_pause(&mut self, now: u64, paused: bool) {
         if self.window_open && self.pending_pauses.len() < MAX_PENDING {

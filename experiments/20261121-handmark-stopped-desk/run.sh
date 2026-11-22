@@ -140,7 +140,12 @@ case "$MODE" in
     CLEAN=""
     trap '[ -z "$CLEAN" ] || rm -rf "$CLEAN"' EXIT
     setup_work
-    rm -rf "$WORK/tbl" "$WORK/rec" "$WORK/recL"; mkdir -p "$WORK/tbl"
+    # 指定の WORK の下に、この回だけの場所を新しく作る（WORK にあった物を消さない・/cross-review 1 巡目）
+    CW="$(mktemp -d "$WORK/controls.XXXXXX")"
+    [ -n "$CLEAN" ] || CLEAN="$CW"
+    chmod 700 "$CW"
+    WORK="$CW"
+    mkdir -p "$WORK/tbl"
     "$TABLE_TOOL" --seed "$SEED" --s1-start-day 20400 --early-min 30 --early-max 30 --late-days 10 --out "$WORK/tbl" --force >/dev/null
     TJ="$WORK/tbl/handmark_assignment.json"; TS="$WORK/tbl/handmark_assignment.sha256"
     UTC_OFFSET_SECS=32400; LABELS=recomputed; RED=()
@@ -160,6 +165,10 @@ case "$MODE" in
   records)
     grep -q '<!-- conditions: fixed -->' "$EXP_DIR/conditions.md" \
       || { echo "conditions.md に固定の印が無い。記録を開く前に条件を固定してコミットする" >&2; exit 4; }
+    # 印だけでなく、条件がコミット済みであること（未コミットの条件で本人の記録を開かない・/cross-review 1 巡目）
+    if [ -n "$(git -C "$REPO_ROOT" status --porcelain -- "$EXP_DIR/conditions.md")" ]; then
+      echo "conditions.md にコミットしていない変更がある。条件をコミットしてから回す" >&2; exit 4
+    fi
     : "${RECORDS_DIR:?RECORDS_DIR（本人の段 1 の記録の場所）}"
     : "${TABLE_JSON:?TABLE_JSON（割付の表）}"
     : "${TABLE_SHA:?TABLE_SHA（表の .sha256）}"

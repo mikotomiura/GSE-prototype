@@ -1841,6 +1841,14 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
             }
         },
     };
+    // 問い合わせの描き直し（`desk::render_queries`）は状態の変換をかけない。変換した窓と食い違うコマを
+    // 黙って書かないよう、組み合わせを拒む（/cross-review 1 巡目）
+    if hm_inject != 0.0 && hm_stopped_queries_path.is_some() {
+        return Err(
+            "--stopped-queries does not support --inject-stuck (query frames are not transformed)"
+                .to_string(),
+        );
+    }
     let hm_samples = match take_value(&mut args, "--samples")? {
         None => gse_next_lib::analysis::handmark::desk::DEFAULT_SAMPLES,
         Some(v) => match v.parse::<usize>() {
@@ -5570,6 +5578,23 @@ mod tests {
         assert!(p.hm_labels_recomputed);
         assert_eq!(p.hm_frames_path, Some(PathBuf::from("f.bin")));
         assert_eq!((p.hm_inject, p.hm_samples), (0.2, 6));
+        // 問い合わせの描き直しは変換をかけないので、--inject-stuck と一緒には受けない（0 なら受ける）
+        let mut q = base.to_vec();
+        q.extend([
+            "--stopped",
+            "form=band;rise_ms=2000;window_s=20;strength=0.5",
+            "--stopped-queries",
+            "q.ndjson",
+            "--stopped-query-frames",
+            "qf.bin",
+        ]);
+        assert!(parse_args_from(v(&q)).is_ok(), "queries without inject");
+        let mut q0 = q.clone();
+        q0.extend(["--inject-stuck", "0"]);
+        assert!(parse_args_from(v(&q0)).is_ok(), "queries with inject 0");
+        let mut qi = q.clone();
+        qi.extend(["--inject-stuck", "0.2"]);
+        assert!(parse_args_from(v(&qi)).is_err(), "queries with inject");
         // 必須のどれかが欠けると止める
         for drop in [
             "--utc-offset-secs",

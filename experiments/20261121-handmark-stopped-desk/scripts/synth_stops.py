@@ -2,8 +2,8 @@
 
 日ごとに 1 本のセッション（現地 10:00 から H 時間）を作る。打鍵のまとまり（5〜60 秒・間隔は対数正規）と止まりを
 交互に置く。止まりの長さは 2 つの混ぜ: 4 割は 3〜8 秒（is_idle に届かない）、6 割は 20 秒〜15 分の対数一様。
-ポインタは 1 秒ごとに確率で動く（打っている間 0.10・止まっている間 0.15）。1 日に 1 回、1〜5 分の記録の一時停止を
-止まりの中に置く（一時停止の間の打鍵は書かない）。
+ポインタは 1 秒ごとに確率で動く（打っている間 0.10・止まっている間 0.15）。90 秒より長い止まりがある日は 1 回、
+その中に記録の一時停止を置く（長さは最大 5 分で、止まりの長さで短くなる。無い日は置かない・一時停止の間の打鍵は書かない）。
 出力の行: meta（session_start・hmm_version）・key（category・press）・pointer_bin・recording_pause・meta（session_end）。
 """
 import argparse
@@ -41,7 +41,7 @@ def session(rng, day, utc_offset_secs, hours):
             gap = int(math.exp(rng.uniform(math.log(20_000), math.log(900_000))))
         stops.append((t, t + gap))
         t += gap
-    # 一時停止: 20 秒より長い止まりの中に 1 つ（打鍵と重ならない）
+    # 一時停止: 90 秒より長い止まりの中に 1 つ（打鍵と重ならない・無い日は置かない）
     long_stops = [s for s in stops if s[1] - s[0] > 90_000 and s[1] < end]
     if long_stops:
         a, b = rng.choice(long_stops)

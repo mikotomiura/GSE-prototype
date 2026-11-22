@@ -156,6 +156,12 @@ def analyse(items, lum, test, seed, R):
         out["reason"] = f"日が {n_days}（{MIN_DAYS} 未満）"
         return out
     folds = Folds(X, days)
+    # 学習の項目が足りずに落ちた折り目があれば、数えずに「決まらない」にする（黙って一部の日だけで判定しない）
+    n_scored = sum(len(te) for _, te, _, _ in folds.folds)
+    if n_scored != len(its):
+        out["verdict"] = "undetermined"
+        out["reason"] = f"学習の項目が {KNN_K + 2} 未満の折り目がある（{len(its)} 項目のうち {n_scored} だけ予測できる）"
+        return out
     rr, rk, stat = score(folds, labels)
     rng = np.random.default_rng([seed, {"i": 1, "ii": 2, "iii": 3}[test]])
     null = np.empty(R)

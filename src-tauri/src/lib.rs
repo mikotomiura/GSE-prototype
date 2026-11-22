@@ -2728,8 +2728,14 @@ fn spawn_handmark_driver(
             // 記録の一時停止(コマンドの経路で既に合わせてあれば何もしない)
             // 時刻はコマンドの経路が決めた遷移の時刻(`recording_pause` の行と同じ値)。コマンドの経路が先に
             // ロックを取れなかったときも、記録と同じ時刻で入れる(止まりの層の再生の一致・ADR-051 D5)。
+            // 止まりの層を切っているときは今までどおり `wall`(切っていれば 1 ビットも変えない・判断 10)。
             let paused_now = crate::recording::is_paused();
-            let mut fx = d.on_paused(fs, paused_now, handmark_pause_at(wall));
+            let at = if d.stopped_on() {
+                handmark_pause_at(wall)
+            } else {
+                wall
+            };
+            let mut fx = d.on_paused(fs, paused_now, at);
             // 窓の層の様子(作れなかった・出せなかった)を、この刻みの前に駆動役へ渡す
             fx.extend(d.on_window_status(handmark_window_status(), wall));
             // 帯が出ていて見えているか(見えていた時間 `visible_ms` の足し込み用)
