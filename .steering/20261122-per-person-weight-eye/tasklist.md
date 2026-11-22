@@ -13,7 +13,9 @@
 - [x] attack-me（prereg・Codex を加える）round 1〜5（major → major → major → minor → minor で閉じた・判断 13〜36）→ conditions をコミット（合成の前）
 
 ## 合成の較正
-- [ ] 目のコードと selftest・変異（陽性対照が赤になる）
+- [x] 目のコードと selftest・変異（陽性対照が赤になる）— Mac の V1 は c7645298 で緑（判断 37・38）
+- [ ] HP Z2: 第 2 の帰無の P-HASH・P-XMACH・第 2 の帰無の選びの組（handoff-hpz2-v1-select2.md）
+- [ ] Mac: 第 1 の帰無の選びの組（P-XMACH の後・研究者の選択）→ summarize → choose.py（D5）→ 選んだ案と D5 の量をコミット
 - [ ] 合成を回す（差なし・1e-3〜3e-2・5 人だけ）。seed と run_id を記録
 - [ ] notes.md に候補ごとの偽陽性と検出力。選びの基準どおりに 1 案を選ぶ
 - [ ] Stop の判定: 3e-2 を確実に拾えないなら、ここで止めて報告
