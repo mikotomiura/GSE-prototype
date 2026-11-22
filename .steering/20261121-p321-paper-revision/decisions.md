@@ -232,3 +232,10 @@
 - **再利用する人の表**（tab:reuse・§7.4）: U だけ／U と u（Fréchet の上下限）／2×2 表／A|R だけ。D1 の例は 60.7〜78.7%。上下限は make_results が計算し、A が範囲の外なら止まる。（`219855f`）
 - **構成概念**: 表 1 を「観察した単位の中（測った）」と「最終的（観察されない・[A, U]）」の 2 行に分けた。Bounds・§7.1・要旨の "not a loss" を両面の書き方にした。最後の DF3 の数は「セッションの中で戻る機会」と書いた（指摘 B）。要旨は 246 語。（`25f7191`）
 - **ほか**: `check_frontmatter.py` は、バックスラッシュの落ちた `\R{}` を止めるようになった（sed で落ちたため）。
+
+## 判断 29: round 2 の残りの minor・nit（2026-11-22・論文用 `dba6ec2`）
+
+- **一次で確かめたこと**（メイン）: journal 版（NSF PAR の本文）の κ は「The last iteration yielded a Cohen's Kappa inter-rater agreement … of 75% for episodes and 84% for activities」で、episode の一致が成果コードを含むかは書いていない。同意は、journal 版が Study 2 の面接（"After completing virtual consent"）だけ、D2 が参加者だけ（"The first author obtained informed consent"）。配信者の同意の記述は D1・D2 とも見つからなかった。Sjøberg & Bergersen（TSE・refs の sjoberg2023）の formative の定義は「when one chooses one or more indicators to form (define) a concept, one has a formative measurement model」。派生表 `results/d1_episodes.csv` を数えると 8 通りの 2×2 表がすべて metrics.json と一致した。
+- **直したもの**: Highlights 2〜4（観察した単位の中・まだ開いている単位・一つのデータセットで）／ 要旨（D2 の 2 件と 1 件は観察が終わった時点でまだ開いていた・推奨に「rule and coding」・247 語）／ §3.4 に formative と help の範囲 ／ §4.1 に block を開始時刻で並べること（2 つ目の実装の README の「本文が述べている」も直した）と κ が何の一致か分からないこと ／ §8 の Consultation の段落にも単一コーダーの限界 ／ §7.4 の道具を評価する人への提言（時間制限・割り当てた助け・IDE のログ）／ §8 の倫理に同意の記述 ／ Data availability に「行を数えれば 2×2 表が出る・読むスクリプトは無い」／ 言い回し（序論の "with one command"・`sec:related`→`sec:search`・"resolved without help"・"effect"・"direction"・"doubles"・"every definition"・unresolved-unconsulted share を pp に）／ 表 3 の所要時間を 2 行に ／ 要旨の "Its complement"。README の名前を原稿の名前にし、metrics.json のキーとの対応を表にした。
+- **検査**: make_results に「派生表から 8 つの 2×2 表が出る」を足し、変異 2 本（DF3 を DF1 に直す・1 行落とす）と D2 の 2 倍の変異 1 本を足した。selftest OK・`run.sh` 緑（結果は不変）・build 28 頁・Overfull は前と同じ 3 件。
+- **残したもの**: 所属の書き方（"Hiroshima, Japan" だけ）は研究者に聞く。README の引用の題（旧い題）と Data availability の DOI は S9。

@@ -33,7 +33,7 @@
     - [x] 構成概念の分け・最後の DF3 の理屈（判断 28・`25f7191`）
     - [x] 再利用する人の表・debugging のログ研究の文献・CV3 と MacKinnon の言い換え（判断 28）
     - [x] 重複を消す（区間の但し書きを方法の節に 1 回・後の 7 つの変更は NOTES へ・凍結の前の値の開示は残した・`27a8ef2`）。DF3 の但し書き（189・324・365・390 行）は持ち帰りに関わるので残した
-    - [ ] 残りの minor と nit（verdict.md §4）／ Data availability の DOI は S9
+    - [x] 残りの minor と nit（verdict.md §4・判断 29・論文用 `dba6ec2`）。所属の書き方は研究者に聞く ／ Data availability の DOI は S9
     - [ ] NOT-READ のうち機関リポジトリの 4 件（K53・K59・K61・K143）をブラウザで読むか（任意）
   - [ ] `/cross-review` 2 巡（直した後）
 - [ ] S9: 照会の返事か未回答を反映（RQ4 の "at the time of submission we had not received a reply" を確かめる）／ README の引用の bibtex と Data availability の DOI を新しい版に ／ 新しいタグ ／ Zenodo の新しい版とプレプリントの下書き → 研究者が publish と JSS への投稿 → 原稿 ID を記録
