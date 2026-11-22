@@ -10,7 +10,7 @@
 
 ### 細部は conditions.md が一次
 
-round 1〜3 の attack-me（判断 13〜29）で作りを直した。表・案・帰無・筋・種・選びと止めの細部は `experiments/20261122-per-person-weight-eye/conditions.md`（D1〜D9・V1〜V2）が一次で、ここには写さない（写すと食い違う。round 1・2 の監査がそれだった）。ここに書くのは筋立てだけ:
+round 1〜4 の attack-me（判断 13〜33）で作りを直した。表・案・帰無・筋・種・選びと止めの細部は `experiments/20261122-per-person-weight-eye/conditions.md`（D1〜D9・V1〜V2）が一次で、ここには写さない（写すと食い違う。round 1・2 の監査がそれだった）。ここに書くのは筋立てだけ:
 
 - 共有の表は全員で 1 つ（判断 13）。目の候補は E1・E2・E3。帰無は B の名札の入れ替え。
 - 生成は論文 3 の合成（第 1・第 2 の帰無）に、この研究で揺れ・漂い・量の筋と間を空けたセルを足したもの。
@@ -38,7 +38,7 @@ round 1〜3 の attack-me（判断 13〜29）で作りを直した。表・案�
 
 ## テスト戦略
 
-- selftest と変異は conditions.md V1 のとおり（P-HASH・P-HAND は 3 人の全 6 置換・P-NULL・P-POS は λ = 1 で実装だけを見る）。
+- selftest と変異は conditions.md V1 のとおり。
 - 実データには触れない（凍結の後の別タスク）。
 
 ## ロールバック計画
