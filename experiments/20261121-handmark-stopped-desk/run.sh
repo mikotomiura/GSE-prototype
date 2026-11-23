@@ -166,7 +166,14 @@ case "$MODE" in
     grep -q '<!-- conditions: fixed -->' "$EXP_DIR/conditions.md" \
       || { echo "conditions.md に固定の印が無い。記録を開く前に条件を固定してコミットする" >&2; exit 4; }
     # 印だけでなく、条件がコミット済みであること（未コミットの条件で本人の記録を開かない・/cross-review 1 巡目）
-    if [ -n "$(git -C "$REPO_ROOT" status --porcelain -- "$EXP_DIR/conditions.md")" ]; then
+    # git が失敗したとき・HEAD に無い（未追跡・無視）ときも止める（空の出力を「変更なし」と読まない・2 巡目）
+    git -C "$REPO_ROOT" rev-parse --is-inside-work-tree > /dev/null 2>&1 \
+      || { echo "git の作業ツリーの外では回さない（条件がコミット済みかを確かめられない）" >&2; exit 4; }
+    git -C "$REPO_ROOT" cat-file -e "HEAD:experiments/$(basename "$EXP_DIR")/conditions.md" 2> /dev/null \
+      || { echo "conditions.md が HEAD に無い。条件をコミットしてから回す" >&2; exit 4; }
+    COND_ST="$(git -C "$REPO_ROOT" status --porcelain --ignored -- "$EXP_DIR/conditions.md")" \
+      || { echo "git status が失敗した" >&2; exit 4; }
+    if [ -n "$COND_ST" ]; then
       echo "conditions.md にコミットしていない変更がある。条件をコミットしてから回す" >&2; exit 4
     fi
     : "${RECORDS_DIR:?RECORDS_DIR（本人の段 1 の記録の場所）}"

@@ -77,6 +77,7 @@ def main():
            for s in range(32)]
     v = E.analyse(few, r.normal(size=(32 * 30, E.NPIX)), "iii", 7, 20)
     check(v["verdict"] == "undetermined", f"折り目が落ちても判定した（{v['verdict']}）")
+    check("折り目" in v.get("reason", ""), f"折り目でない理由で決まらない（{v.get('reason')}）")
     # 陽性
     r = np.random.default_rng(5)
     items, nq = synth_items(r)

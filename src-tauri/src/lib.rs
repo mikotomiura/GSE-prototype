@@ -2342,11 +2342,13 @@ static HANDMARK_POINTER_GATE: std::sync::atomic::AtomicU8 = std::sync::atomic::A
 /// 記録の一時停止の最後の遷移の時刻(`set_recording_paused` の `now`・`recording_pause` の行と同じ値)。0 は未設定。
 static HANDMARK_PAUSE_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-/// 駆動スレッドの刻みが一時停止の遷移を入れるときの時刻。コマンドの経路が置いた時刻があればそれ、無ければ `wall`。
-fn handmark_pause_at(wall: u64) -> u64 {
-    match HANDMARK_PAUSE_AT_MS.load(std::sync::atomic::Ordering::SeqCst) {
-        0 => wall,
-        t => t,
+/// 駆動スレッドの刻みが一時停止の遷移を入れるときの時刻。止まりの層が入っていて、コマンドの経路が置いた時刻
+/// `recorded`(0 は未設定)があればそれ、無ければ `wall`。切っているときは常に `wall`(今までどおり・判断 10・17)。
+fn handmark_tick_pause_at(stopped_on: bool, recorded: u64, wall: u64) -> u64 {
+    if stopped_on && recorded != 0 {
+        recorded
+    } else {
+        wall
     }
 }
 
@@ -2730,11 +2732,11 @@ fn spawn_handmark_driver(
             // ロックを取れなかったときも、記録と同じ時刻で入れる(止まりの層の再生の一致・ADR-051 D5)。
             // 止まりの層を切っているときは今までどおり `wall`(切っていれば 1 ビットも変えない・判断 10)。
             let paused_now = crate::recording::is_paused();
-            let at = if d.stopped_on() {
-                handmark_pause_at(wall)
-            } else {
-                wall
-            };
+            let at = handmark_tick_pause_at(
+                d.stopped_on(),
+                HANDMARK_PAUSE_AT_MS.load(std::sync::atomic::Ordering::SeqCst),
+                wall,
+            );
             let mut fx = d.on_paused(fs, paused_now, at);
             // 窓の層の様子(作れなかった・出せなかった)を、この刻みの前に駆動役へ渡す
             fx.extend(d.on_window_status(handmark_window_status(), wall));
@@ -8532,6 +8534,18 @@ mod s1_driver_wiring_tests {
 mod handmark_wiring_tests {
     use super::*;
     use crate::handmark_store::testfs::with_table;
+
+    /// 刻みの一時停止の時刻: 切っているときは記録の時刻があっても `wall`(PR 前と同じ)、入っているときは
+    /// 記録の時刻(未設定の 0 なら `wall`)。
+    #[test]
+    fn the_tick_uses_the_recorded_pause_time_only_with_the_stopped_layer() {
+        let wall = 1_800_000_000_500;
+        let rec = 1_800_000_000_123;
+        assert_eq!(handmark_tick_pause_at(false, rec, wall), wall);
+        assert_eq!(handmark_tick_pause_at(false, 0, wall), wall);
+        assert_eq!(handmark_tick_pause_at(true, rec, wall), rec);
+        assert_eq!(handmark_tick_pause_at(true, 0, wall), wall);
+    }
 
     /// 駆動スレッドがロックを持ったままパニックしても（ロックが毒を受けても）、駆動役を捨てられ、
     /// 以後のトレイの押下の入口（`handmark_lock()` の `as_mut()`）は `None` で何もしない。
