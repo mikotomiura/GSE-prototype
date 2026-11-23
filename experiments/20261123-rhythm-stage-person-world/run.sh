@@ -9,7 +9,7 @@
 # Usage: bash run.sh (--selftest | --mutants | --ceiling | --pilot-k | --pilot | --apply-pilot | --smoke | --main)
 #                    [--step m049|m068|r049|r068] [--jobs N]
 #   --selftest   design 3.7: every self-test (with the gse-replay causality test when GSE_REPLAY is set).
-#   --mutants    design 3.7: each mutant put in place in turn; each must make its self-test fail (14 new + 7 earlier).
+#   --mutants    design 3.7: each mutant put in place in turn; each must make its self-test fail (19 new + 7 earlier).
 #   --ceiling    design 3.0 (pilot 0; needs --step): the self-tests, then SEED + person.seed_offsets.ceiling, 240 sessions
 #                of the step at full length, the baselines' AUC, PC-raw and the readers of model A; the gate of the step.
 #                No gse-replay. Writes results/<step>/ceiling/ (committed). A person-r step needs person.k.<step> first.

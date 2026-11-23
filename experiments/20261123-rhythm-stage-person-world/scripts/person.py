@@ -147,8 +147,24 @@ def judge_q(q: str, attk: dict, nulls: dict | None, auc_s: dict | None, cands: l
     return r
 
 
+TRUNC_DECLARE = 0.10  # design 3.3 (b): the share of sessions with a cut dimension above which the world is declared cut
+
+
 def variant_name(c: str) -> str:
     return c + VAR
+
+
+def variant_record(parent: dict, var: dict, parent_verdict: str, auc_s: dict | None, cfg: dict) -> dict:
+    """design 3.3 (c), fixed before the results (cross-review 2): the variant is read on the same attackers as the
+    parent's verdict (the non-ceiling ones), by their maxima. One reading only: the parent red_detected and the variant's
+    upper_max below the margin -> "smooth_path"; anything else (a bound across the margin, NaN, the parent not red)
+    -> "not_read". There is no reading of the lower bound (the variant has no null of its own)."""
+    use = [a for a in ck.ATTACKERS if a.split("/")[1] not in ck.ceiling_kinds(auc_s, cfg)]
+    mx = ck.maxima(var, use)
+    red = parent_verdict == "red_detected"  # the confirmed red only (not red_unconfirmed, not the stop path)
+    smooth = red and bool(np.isfinite(mx["upper_max"]) and mx["upper_max"] < cfg["e13"]["margin"])
+    return {"parent": parent, "without_smooth": var, "use": use, "maxima": mx,
+            "reading": "smooth_path" if smooth else "not_read"}
 
 
 # ---------------------------------------------------------------------------
@@ -283,10 +299,13 @@ class FoldAuc:
     def __init__(self, score: np.ndarray, y: np.ndarray, pf: np.ndarray):
         self.groups = [(np.nonzero(pf == f)[0]) for f in np.unique(pf)]
         self.preps = [ck.auc_prep(score[g], y[g]) for g in self.groups]
+        self.short_calls = 0  # calls where a fold had no defined AUC and was left out of the mean (cross-review 2)
 
     def __call__(self, w: np.ndarray | None = None) -> float:
         v = [ck.auc_w(p, np.ones(len(g)) if w is None else w[g]) for g, p in zip(self.groups, self.preps)]
         v = [x for x in v if np.isfinite(x)]
+        if len(v) < len(self.groups):
+            self.short_calls += 1
         return float(np.mean(v)) if v else float("nan")
 
 
@@ -408,8 +427,10 @@ def gain_records(scores: dict, base: dict, pairs: tuple, person: np.ndarray, M: 
         auc = fa()
         rec = {"gain": auc - auc_b[k], "auc": auc}
         if ws is not None:
+            s0 = fa.short_calls
             d = np.array([fa(w) - fa_b[k](w) for w in ws])
             rec["ci95"] = ck.ci95(d)
+            rec["boot_short_folds"] = fa.short_calls - s0  # draws whose mean left a fold out (described, not judged)
         out.setdefault(name, {})[f"{fs}/{k}"] = rec
     return out, auc_b
 
@@ -455,8 +476,10 @@ def pair_auc_raw(V: np.ndarray, person: np.ndarray, seed: int, folds: int, M: np
         fa = fold_auc(got[k], y, fold_s[I])
         rec = {"auc": fa()}
         if M is not None:
+            s0 = fa.short_calls  # the point estimate above is not a draw
             d = np.array([fa(pair_weights(m, pi, pj)) for m in M])
             rec["ci95"] = ck.ci95(d)
+            rec["boot_short_folds"] = fa.short_calls - s0  # draws whose mean left a fold out (described, not judged)
         out[k] = rec
     best = max(KINDS, key=lambda k: (-1.0 if not np.isfinite(out[k]["auc"]) else out[k]["auc"]))
     out["best"] = {"kind": best, **out[best]}
@@ -488,6 +511,18 @@ def oracle_scores(L: np.ndarray) -> np.ndarray:
 def oracle_auc(L: np.ndarray, person: np.ndarray) -> float:
     a, b = np.triu_indices(len(L), 1)
     return ck.weighted_auc(oracle_scores(L), (person[a] == person[b]).astype(int), np.ones(len(a)))
+
+
+def chance_check(X: np.ndarray, person: np.ndarray, seed: int, nperm: int, slots: int) -> dict:
+    """design 3.3 (d), fixed before the results (cross-review 2): the distance AUC of X against the 95th percentile of
+    the same AUC over fake persons (6 sessions kept). above_null: the AUC is above that percentile (to tell the
+    researcher; not a verdict). NaN in X -> NaN, not above."""
+    if not np.all(np.isfinite(X)) or nperm < 1:
+        return {"auc": float("nan"), "null95": float("nan"), "above_null": False}
+    auc = oracle_auc(X, person)
+    nul = [oracle_auc(X, permute_persons(seed, r, len(person), slots)[0]) for r in range(nperm)]
+    n95 = float(np.percentile(nul, 95))
+    return {"auc": auc, "null95": n95, "above_null": bool(auc > n95)}
 
 
 def top1_hit(V: np.ndarray, person: np.ndarray) -> dict:
@@ -700,7 +735,7 @@ def _k_task(args: tuple):
     seed, world, icc, k, i, dur_s = args
     segs, lat = gs.person_session(seed, _KCFG, world, icc, k, i, dur_s)
     times, _, _, dur_ms = gs.assemble(segs)
-    return (k, i), (raw_features(times, dur_ms // 1000, _KCFG["person"]["pc_raw"]), lat.get("clipped", [False] * 3))
+    return (k, i), (raw_features(times, dur_ms // 1000, _KCFG["person"]["pc_raw"]), lat["clipped"])
 
 
 def kgrid_curve(cfg: dict, seed: int, world: str, icc: float, grid: list[float], jobs: int, dur_s: int | None = None
@@ -764,9 +799,9 @@ def lam_key_problems(values) -> list[str]:
     out = []
     for v in values:
         k = f"{float(v):.3f}"
-        if k in seen and abs(seen[k] - float(v)) > 1e-12:
+        if k in seen and seen[k] != float(v):  # exact equality only, against the first value seen (cross-review 2)
             out.append(f"lambdas {seen[k]} and {v} both print as {k}")
-        seen[k] = float(v)
+        seen.setdefault(k, float(v))
     return out
 
 
@@ -898,6 +933,12 @@ def wiring_problems(summ: dict) -> list[str]:
     return out
 
 
+def wiring_checked(summ: dict) -> int:
+    """How many parts ((5) per base, (6)) had a judge for wiring_problems to read (cross-review 2: 0 is recorded)."""
+    parts = list(summ.get("five", {}).values()) + [summ.get("six", {})]
+    return sum(1 for p in parts if p.get("judge"))
+
+
 # ---------------------------------------------------------------------------
 # The modes: ceiling (pilot 0), pilot-k, pilot (pilot 1), apply-pilot, run (smoke and main)
 # ---------------------------------------------------------------------------
@@ -961,8 +1002,8 @@ def kgrid_run(cfg: dict, base_seed: int, step: str, out: Path, jobs: int, root: 
         raise SystemExit(f"{tgt_f}: {bad}")
     target = float(tdoc["pc_raw"]["best"]["auc"])
     seed = run_seed("pilot-k", base_seed, cfg)
-    if any(float(k) > gs.K_MAX for k in cfg["person"]["k_grid"]):
-        raise SystemExit(f"the k grid goes above {gs.K_MAX}")
+    if not all(math.isfinite(float(k)) and 0.0 <= float(k) <= gs.K_MAX for k in cfg["person"]["k_grid"]):
+        raise SystemExit(f"the k grid must be finite numbers in [0, {gs.K_MAX}]")
     curve = kgrid_curve(cfg, seed, "person-r", s["icc"], [float(k) for k in cfg["person"]["k_grid"]], jobs)
     ch = choose_k([c["k"] for c in curve], [c["auc"] for c in curve], target, cfg["person"]["k_tolerance"])
     doc = {"step": step, "seed": seed, "target_step": s["target_step"], "target": target, "curve": curve, "choice": ch,
@@ -1191,7 +1232,7 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
             par = {k: v for k, v in attk.items() if VAR not in k}
             j = judge_q("id", par, nulls, auc_b, cands, cfg, False)
             verd = {c: j["verdicts"][c] for c in cands}
-            variants = {c: {"parent": attk[c], "without_smooth": attk[variant_name(c)]} for c in cands}  # no verdict word
+            variants = {c: variant_record(attk[c], attk[variant_name(c)], verd[c], auc_b, cfg) for c in cands}
             res["five"][label] = {"verdicts": verd, "variants": variants, "judge": j, "auc_base": auc_b, "records": rec}
             print(f"(5) {label} done at {time.time() - t0:.0f} s", flush=True)
         if with6:
@@ -1214,7 +1255,7 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
             par = {k: v for k, v in attk.items() if VAR not in k}
             j = judge_q("pers", par, nulls, auc_s, cands, cfg, False)
             verd = {c: j["verdicts"][c] for c in cands}
-            variants = {c: {"parent": attk[c], "without_smooth": attk[variant_name(c)]} for c in cands}  # no verdict word
+            variants = {c: variant_record(attk[c], attk[variant_name(c)], verd[c], auc_s, cfg) for c in cands}
             res["six"] = {"verdicts": verd, "variants": variants, "judge": j, "auc_A": auc_a, "records": rec,
                           "last_auc_diff": {n: {a: {"diff": v["last_diff"], "ci95": v.get("last_diff_ci95")}
                                                 for a, v in d_.items()} for n, d_ in rec.items() if VAR not in n}}
@@ -1229,9 +1270,16 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
         desc["e1_oracle"] = {"auc": oracle_auc(L, person), "latents": lat}
         if world == "person-r":  # the speed shift alone must not identify a person (it is tied to no person)
             sp_only = np.array([[m["speed_log"]] for m in ms])
-            desc["e1_speed_log_only"] = {"auc": oracle_auc(sp_only, person)}
+            slots = pcfg["sessions_per_person"]
+            desc["e1_speed_log_only"] = chance_check(sp_only, person, seed, nperm, slots)  # the generator's latent
+            # observed: the median log of the short intervals (PC-raw's lg_p50), which dimensions 1 and 3 do not move
+            desc["e1_short_median_only"] = chance_check(raw_V[:, [1]], person, seed, nperm, slots)
             cl = np.array([m["clipped"] for m in ms], dtype=bool)
-            res["clipped"] = {"share_any": float(cl.any(axis=1).mean()), "share_by_dim": cl.mean(axis=0).tolist()}
+            share = float(cl.any(axis=1).mean())
+            # design 3.3 (b), fixed before the results (cross-review 2): above TRUNC_DECLARE the types are declared
+            # a world cut at the tails (not "k h x")
+            res["clipped"] = {"share_any": share, "share_by_dim": cl.mean(axis=0).tolist(),
+                              "truncated_world": bool(share > TRUNC_DECLARE), "declare_above": TRUNC_DECLARE}
         desc["e2_top1"] = {"oracle": top1_hit(L, person), "pc_raw": top1_hit(raw_V, person),
                            **{BASE_NAME[b]: top1_hit(vbs[b], person) for b in BASES}}
         desc["e3_r2"] = {}
@@ -1270,7 +1318,9 @@ def main() -> int:
         sp_ = Path(a.wiring)
         doc = json.loads(sp_.read_text(encoding="utf-8"))
         bad = wiring_problems(doc)
-        doc["wiring"] = {"passed": not bad, "problems": bad}
+        checked = wiring_checked(doc)
+        doc["wiring"] = {"passed": not bad, "problems": bad, "checked": checked}  # checked 0: nothing was judged
+        print(f"wiring: {checked} part(s) checked")
         dump(sp_, doc)
         for b in bad:
             print("WIRING FAILED:", b)

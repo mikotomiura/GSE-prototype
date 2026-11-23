@@ -81,6 +81,23 @@ def test_g0(chk, cfg: dict, config: Path, tmp: Path, hmm: str) -> None:
     chk((other / "sessions.json").read_bytes() != (tmp / "g0-old-v1" / "sessions.json").read_bytes()
         or (other / "ndjson" / "P000.ndjson").read_bytes() != (tmp / "g0-old-v1" / "ndjson" / "P000.ndjson").read_bytes(),
         "G0: another seed writes other sessions (negative control)")
+    bad = tmp / "g0-no-run-mode"
+    r = subprocess.run([sys.executable, str(HERE / "gen_sessions.py"), str(config), str(seed_file), str(bad),
+                        "--hmm-version", hmm, "--smoke", "--world", "person-m", "--icc", "0.494"],
+                       capture_output=True, env=env)
+    chk(r.returncode == 2 and not bad.exists(),
+        "G0: a person world without --run-mode stops before anything is written (cross-review 2)")
+    ok = tmp / "g0-with-run-mode"
+    r = subprocess.run([sys.executable, str(HERE / "gen_sessions.py"), str(config), str(seed_file), str(ok),
+                        "--hmm-version", hmm, "--smoke", "--world", "person-m", "--icc", "0.494", "--run-mode", "smoke"],
+                       capture_output=True, env=env)
+    chk(r.returncode == 0 and (ok / "world.json").exists() and (ok / "sessions.json").exists(),
+        "G0: the same call with --run-mode writes the world (positive control)")
+    mis = tmp / "g0-smoke-mismatch"
+    r = subprocess.run([sys.executable, str(HERE / "gen_sessions.py"), str(config), str(seed_file), str(mis),
+                        "--hmm-version", hmm, "--smoke", "--world", "person-m", "--icc", "0.494", "--run-mode", "main"],
+                       capture_output=True, env=env)
+    chk(r.returncode == 2 and not mis.exists(), "G0: --smoke with --run-mode main is refused before anything is written")
 
 
 def person_sessions(cfg: dict, world: str, icc: float, k: float | None, ids: range, dur_s: int = SHORT_S) -> list:
@@ -446,6 +463,29 @@ def test_p6(chk) -> None:
     got = pe.fold_auc(score, y, pf)()
     pooled = ck.weighted_auc(score, y, np.ones(400))
     chk(got > 0.99 and pooled < 0.9, f"P6: per-fold mean {got:.3f} is not the pooled AUC {pooled:.3f}")
+    fa = pe.fold_auc(score, y, pf)
+    w = np.ones(400)
+    w[(pf == 0) & (y == 0)] = 0.0  # fold 0 has no different-person pair left in this draw
+    s0 = fa.short_calls
+    v = fa(w)
+    want = float(np.mean([ck.weighted_auc(score[pf == f], y[pf == f], np.ones(80)) for f in range(1, 5)]))
+    chk(fa.short_calls - s0 == 1 and abs(v - want) < 1e-12,
+        "P6: a draw with a fold left undefined is counted (short_calls) and averages the other folds")
+    fa(np.ones(400))
+    chk(fa.short_calls - s0 == 1, "P6: a draw with every fold defined is not counted")
+    # the callers go through the seam (cross-review 2): a caller that pooled the folds would read about 0.6 here
+    base_s = rng.normal(size=400)
+    k0 = ck.KINDS[0]
+    pairs = (np.arange(400), np.arange(400), y, pf)
+    rec, auc_b = pe.gain_records({("X", "full", k0): score}, {k: base_s for k in ck.KINDS}, pairs, np.arange(400), None)
+    pg = pe.point_gains({("X", "full", k0): score}, {k: base_s for k in ck.KINDS}, pairs)
+    want_b = pe.fold_auc(base_s, y, pf)()
+    chk(abs(rec["X"][f"full/{k0}"]["auc"] - got) < 1e-12 and abs(auc_b[k0] - want_b) < 1e-12
+        and abs(pg["X"][f"full/{k0}"] - (got - want_b)) < 1e-12,
+        "P6: gain_records and point_gains read the per-fold mean (the seam), not the pooled AUC")
+    for fn in (pe.gain_records, pe.point_gains, pe.pair_auc_raw, pe.ceiling_run):
+        chk("weighted_auc" not in inspect.getsource(fn) and "fold_auc(" in inspect.getsource(fn),
+            f"P6: {fn.__name__} computes its AUC through fold_auc only")
 
 
 def test_p3(chk) -> None:
@@ -559,6 +599,11 @@ def test_q2(chk) -> None:
     chk(p0["d_pers"] > 0.2 and p0["d_comm"] > 0.2 and abs(p0["gain"]) < 0.05,
         f"Q2: a same-direction signal: delta_pers {p0['d_pers']:+.3f} and delta_comm {p0['d_comm']:+.3f} both large, D near 0")
     chk(abs(auc_a["lr"]["pers"] - 0.5) < 0.1 and abs(auc_a["lr"]["comm"] - 0.5) < 0.1, "Q2: model A's readers are at chance")
+    v = got[("PC1-pers", "small", "lr")]
+    valid = np.isfinite(pe.six_D(v, got[("__A__", "-", "lr")])["D"])
+    want = float((v[0] - v[1])[valid].mean())
+    chk(abs(p1["last_diff"] - want) < 1e-12 and p1["last_diff"] > 0,
+        f"Q2: last_diff is the mean of AUC(per-person) - AUC(common) over the valid persons ({p1['last_diff']:+.3f}, sign: per-person minus common)")
 
 
 def test_q3(chk) -> None:
@@ -646,10 +691,45 @@ def test_j3(chk, cfg: dict) -> None:
     src = inspect.getsource(pe.run_main)
     chk("judge_variants" not in src and "variant_lam" not in inspect.getsource(pe) and "vnulls" not in src,
         "J3: run_main does not judge the variants and has no variant lambda or null")
-    chk(pe.variant_name("D-run-hold-sec") == "D-run-hold-sec~ws" and '"without_smooth"' in src,
-        "J3: the variant is reported as a description (parent and without_smooth records)")
+    chk(pe.variant_name("D-run-hold-sec") == "D-run-hold-sec~ws" and src.count("variant_record(") == 2,
+        "J3: the variant is reported as a description through variant_record ((5) and (6))")
+
+    def var(up: float, up_ceil: float | None = None) -> dict:
+        return {a: {"gain": 0.0, "ci95": [-0.01, up_ceil if (up_ceil is not None and a.endswith("/" + ck.KINDS[0]))
+                                          else up]} for a in ck.ATTACKERS}
+
+    auc_ok = {k: 0.7 for k in ck.KINDS}
+    vr = lambda v, pv, auc=auc_ok: pe.variant_record({}, v, pv, auc, cfg)["reading"]
+    chk(vr(var(0.02), "red_detected") == "smooth_path", "J3: parent red_detected and the variant's upper below 0.03 -> smooth_path")
+    chk(vr(var(0.04), "red_detected") == "not_read", "J3: the variant's upper across 0.03 -> not_read")
+    chk(vr(var(0.02), "red_unconfirmed") == "not_read" and vr(var(0.02), "green") == "not_read",
+        "J3: the parent not red_detected -> not_read")
+    chk(vr(var(float("nan")), "red_detected") == "not_read", "J3: a NaN bound -> not_read")
+    auc_ceil = {**auc_ok, ck.KINDS[0]: 0.95}
+    chk(vr(var(0.02, 0.20), "red_detected", auc_ceil) == "smooth_path"
+        and vr(var(0.02, 0.20), "red_detected") == "not_read",
+        "J3: the variant is read on the parent's attackers (a ceiling classifier is left out, as in the verdict)")
     chk(pe.lam_key_problems([0.025, 0.05]) == [] and pe.lam_key_problems([0.1, 0.1004]) != [],
         "J3: two lambdas that print alike with three decimals are refused")
+    chk(pe.lam_key_problems([0.1, 0.1 + 6e-13, 0.1 + 1.2e-12]) != [] and pe.lam_key_problems([0.1, 0.1]) == [],
+        "J3: only an exact repeat shares a key; a chain of tiny steps is refused (cross-review 2)")
+    drop = cfg["person"]["variant_drop"]
+    kept = ck.keep_cols(drop)
+    gone = set(range(len(st.FEAT_NAMES))) - set(kept)
+    chk(drop == "smooth" and gone == set(ck.DROP_COLS["smooth"]) and len(gone) > 0,
+        "J3: the variant leaves out exactly the smoothness columns")
+    rng = np.random.default_rng(17)
+    n_s, rows_per = 4, 5
+    F = rng.normal(size=(n_s * rows_per, len(st.FEAT_NAMES)))
+    G = np.repeat(np.arange(n_s), rows_per)
+    full_m, _ = pe.cand_summary(F, G, n_s, None)
+    var_m, _ = pe.cand_summary(F, G, n_s, drop)
+    ref_m, _ = pe.cand_summary(F[:, kept], G, n_s, None)
+    F2 = F.copy()
+    F2[:, sorted(gone)] += 100.0  # moving only the dropped columns must not move the variant
+    var2_m, _ = pe.cand_summary(F2, G, n_s, drop)
+    chk(var_m.shape[1] == len(kept) < full_m.shape[1] and np.array_equal(var_m, ref_m) and np.array_equal(var_m, var2_m),
+        "J3: the variant's summaries do not read the smoothness columns (behaviour, not the source)")
 
 
 def test_j4(chk, cfg: dict) -> None:
@@ -842,6 +922,11 @@ def mutant_list(cfg: dict) -> list:
     def m19(v):  # no cut
         return v
 
+    orig_vr = pe.variant_record
+
+    def m14(parent, var, pv, auc_s, cfg_):  # the variant read on every attacker (the ceiling not left out)
+        return orig_vr(parent, var, pv, None, cfg_)
+
     T = lambda f, *a: (lambda chk: f(chk, *a))
     return [
         ("1 dimension 1 keeps the mean, not the median", gs, "interval_params", m1, T(test_g4, cfg)),
@@ -858,6 +943,7 @@ def mutant_list(cfg: dict) -> list:
         ("11 PC0p with a sign per person", st, "pc0p_sign", m11, lambda chk: test_q2(chk)),
         ("12 the summary reads the person number", pe, "summarize", m12, lambda chk: test_r1(chk)),
         ("13 the k grid at the main seed", pe, "run_seed", m13, T(test_seed_rules, cfg)),
+        ("14 the variant read on every attacker", pe, "variant_record", m14, T(test_j3, cfg)),
         ("15 the PC-stall and PC0 roles swapped", pe, "role_prefixes", m15, T(test_j2, cfg)),
         ("16 dimension 2's factors on the wrong things", gs, "dim2_scales", m16, T(test_g4, cfg)),
         ("17 the AR(1) not redrawn at a burst start", gs, "ar1_reset", m17, T(test_g4, cfg)),
@@ -914,6 +1000,8 @@ def test_records(chk, cfg: dict, tmp: Path) -> None:
     bad["five"]["A"]["judge"]["maxima"]["PC1-id"]["gain_max"] = 0.05
     bad["five"]["A"]["judge"]["maxima"]["PC0-id-X"]["upper_max"] = 0.05
     chk(len(pe.wiring_problems(bad)) == 2, "wiring: a weak PC1-id and a high PC0-id are both reported")
+    chk(pe.wiring_checked(good_summary) == 1 and pe.wiring_checked({"five": {}, "six": {}}) == 0,
+        "wiring: the number of parts checked is counted (0 when no part was judged)")
 
 
 def test_clip(chk, cfg: dict) -> None:
@@ -941,6 +1029,12 @@ def test_clip(chk, cfg: dict) -> None:
             t = gs.assemble(segs)[0]
             ok &= bool(len(t) > 100 and np.all(np.isfinite(t)) and np.all(np.diff(t) >= 0))
     chk(ok, "clip: k = 1.0 with extreme x draws a finite, ordered session to the end (6 cases)")
+    try:
+        gs.clip_log_scale(float("nan"))
+        nan_refused = False
+    except ValueError:
+        nan_refused = True
+    chk(nan_refused, "clip: a NaN log factor is refused, not cut to 1.5")
 
 
 def test_speed_only(chk, cfg: dict) -> None:
@@ -957,3 +1051,11 @@ def test_speed_only(chk, cfg: dict) -> None:
     chk(abs(auc - 0.5) < 0.03, f"speed only: person-r's speed_log alone matches at chance ({auc:.3f}, within 0.5 +- 0.03)")
     spm = np.array([[lat("person-m", p, sl)["m_log"]] for p in range(n_p) for sl in range(S)])
     chk(pe.oracle_auc(spm, person) > 0.55, "speed only: person-m's m_log does identify (negative control)")
+    sub = person < 40  # the run's size: 40 persons x 6
+    cm = pe.chance_check(spm[sub], person[sub], TEST_SEED, 20, S)
+    cr = pe.chance_check(sp[sub], person[sub], TEST_SEED, 20, S)
+    chk(cm["above_null"] and cm["auc"] > cm["null95"], f"speed only: chance_check flags person-m's m_log at 40 persons ({cm['auc']:.3f} > {cm['null95']:.3f})")
+    chk(np.isfinite(cr["null95"]) and cr["null95"] < 0.56, f"speed only: the fake-person 95% at 40 persons is near chance ({cr['null95']:.3f})")
+    bad = sp[sub].copy()
+    bad[0, 0] = np.nan
+    chk(not pe.chance_check(bad, person[sub], TEST_SEED, 20, S)["above_null"], "speed only: a NaN column is not flagged")

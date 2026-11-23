@@ -381,6 +381,8 @@ K_MAX = 1.0  # the largest k (the top of the k grid)
 
 def clip_log_scale(v: float) -> float:
     """The log factor of a type dimension cut to [-LOG_SCALE_MAX, LOG_SCALE_MAX] (a seam: selftest and the mutant)."""
+    if not math.isfinite(v):  # a NaN would be "cut" to 1.5 and pass silently (cross-review 2)
+        raise ValueError(f"a type dimension's log factor is not finite: {v}")
     return max(-LOG_SCALE_MAX, min(LOG_SCALE_MAX, v))
 
 
@@ -615,14 +617,16 @@ def main() -> int:
             wd = person_world_args(a.world, a.icc, a.k)
         except ValueError as e:
             ap.error(str(e))
+        if a.run_mode is None:  # checked before anything is written (cross-review 2)
+            ap.error("--run-mode is required with a person world")
+        if a.smoke != (a.run_mode == "smoke"):
+            ap.error("--smoke goes with --run-mode smoke and only with it")
         work = Path(a.work)
         (work / "ndjson").mkdir(parents=True, exist_ok=True)
         (work / "labels").mkdir(parents=True, exist_ok=True)
         manifest = generate_person(cfg, seed, work, a.world, wd["icc"], wd["k"], a.smoke)
         (work / "sessions.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
-        if a.run_mode is None:
-            ap.error("--run-mode is required with a person world")
-        wd = {**wd, "seed": seed, "mode": a.run_mode}
+        wd ={**wd, "seed": seed, "mode": a.run_mode}
         (work / "world.json").write_text(json.dumps(wd), encoding="utf-8")
         print(f"generated {len(manifest)} sessions into {work}")
         return 0

@@ -7,14 +7,14 @@
 - `scripts/gen_sessions.py`: `--world person-m|person-r`・`--icc`・`--k` を足した（既存の world はバイトで不変・G0）。
 - `scripts/stage.py`: `PC1-id`・`PCp-`・`PC0-id-`・`PC1-pers`・`PCps-`・`PC0p-`（既存の名前の出力は不変）。
 - `scripts/person.py`（新規）: (5)・(6)・PC-raw・神託・1 位の当たり・R²・k の較正・各 mode（`--ceiling`・`--pilot-k`・`--pilot`・`--apply-pilot`・`--run [--smoke]`）。`checks.judge` を import して使う。
-- `scripts/selftest_person.py`（新規）: design §3.7 の G0〜G5・R1・P1〜P5・Q1〜Q3・J1〜J4 と変異 14 本。`selftest.py` から呼ぶ。
+- `scripts/selftest_person.py`（新規）: design §3.7 の G0〜G5・R1・P1〜P5・Q1〜Q3・J1〜J4 と変異 19 本（2 巡目の後。P6・`test_clip`・`test_speed_only` も）。`selftest.py` から呼ぶ。
 - `config.json`・`run.sh`・`env.md`・`data.md`・`SEED`（20261125）。
 
 ## 設計書が決めていなかった細部（自分で決めたもの）
 
 1. **`config.json` の旧 `ceiling.*`・`pc_stall.lam` を残した。** `checks.judge` が `ceiling.main_auc`・`pc_stall.lower/upper/aim/pilot_grid` を読み、前の自己検査（g050/f200 の下見・`apply_pilot` 等）が `ceiling.steps` を読むため。新しい段は `person.steps`。`ceiling.steps` の g050/f200 はこのタスクでは走らせない。
 2. **名前の写像で `checks.judge` を再利用した。** `PC1-id`→`PC1`・`PCp-X`→`PCs-X`・`PC0-id-X`→`PC0-X`（(6) は `PC1-pers`・`PCps-`・`PC0p-`）と入れ、出力を逆に写す。理由 `weak_stall_pc` は `weak_person_pc` に書き換える。判定を写し直していない（J1）。役の割り当ては `person.ROLES`／`role_prefixes`（J2・変異の対象）。
-3. **変種の名前は `<候補>~ws`、その対照は `PCp-<候補>~ws` など。** 変種の判定は、親の PC1・null・天井をそのまま使い（null は親の値を変種の名前にコピー）、PCp・PC0-id は親の λ の画（同じ stage の系列）の特徴から同じ列を落として当てはめ直す。λ は `person.variant_lam`（親の値）を使い、選び直さない（J3・変異 14）。
+3. **変種の名前は `<候補>~ws`、その対照は `PCp-<候補>~ws` など。** 変種の判定は、親の PC1・null・天井をそのまま使い（null は親の値を変種の名前にコピー）、PCp・PC0-id は親の λ の画（同じ stage の系列）の特徴から同じ列を落として当てはめ直す。λ は `person.variant_lam`（親の値）を使い、選び直さない（J3・変異 14）。※ 判断 10 で変種の対照・λ・null を外し、判断 11 で読みを `variant_record` に固定した（下の 2 つの節）。この項は最初の実装の記録として残す。
 4. **p 値のような「null の変種」は走らせない。** null は親の名前（候補・PCp・PC0-id・PC1-id）だけを 20 回回す（design の「親の null の条件」の読み）。
 5. **要約の SD は母集団の SD（ddof = 0）。** 窓が 1 つのセッションは SD 0。窓の無いセッションは NaN（hgb は欠損をそのまま扱い、lr は中央値補完）。
 6. **要約の基準 A は L300 の表の XA の最初の 11 列（A_NAMES）、A_speed は A ＋ XS の 15〜27 列（WS_NAMES の 13 量）。** design の「A の 11 量」「WS_NAMES の 13 量」の読み。
@@ -87,3 +87,17 @@
 - `--wiring` が合否を `summary.json` の `wiring` に書き、`require_prev` は前の段の `wiring.passed` と、`summary.json` が git で追跡され変更が無いことを見る。
 - `test_q1` は読む側の行が人 p の slot 3〜5 の添字の集合と一致することも見る。
 - 直さなかった・できなかったもの: `--wiring` を書き込む summary は `dump` で書き直す（公開後の書き換え）。git の追跡の判定は bash の分岐の読み合わせだけで、実行していない。
+
+## `/cross-review` 2 巡目（Codex 2 本＋Claude 1 本）を受けた直し（判断 11）
+
+- 変種の道の読みを `variant_record` に固定した: 親の判定と同じ攻撃者（天井の分類器を外す）の `upper_max` で、親が `red_detected` かつ 0.03 未満なら `smooth_path`、ほかは `not_read`。下限の読みは置かない。J3 を振る舞いの検査に替え、変異 14（すべての攻撃者で読む）を入れた。
+- J3 に、変種の要約が滑らかさの列を読まないこと（落とした列だけを動かしても変わらない）と、`lam_key_problems` が最初の値との厳密な一致だけを許すこと（小さな刻みの鎖を拒む）を足した。
+- `FoldAuc.short_calls`: ブートストラップの引きで 1 クラスになった組を落とした回数を数え、`boot_short_folds` として (5) の記録と PC-raw に残す（記述）。PC-raw は点推定の呼び出しを数えない。
+- P6 に、`gain_records`・`point_gains` が組ごとの平均を出すことと、`gain_records`・`point_gains`・`pair_auc_raw`・`ceiling_run` が `fold_auc` だけを通ることを足した（変異 18 が直接の呼び出しだけで殺されていた）。
+- r の段の作りの確かめを `chance_check` にした: `speed_log`（生成の潜在値）と `lg_p50`（観測の 2 秒未満の間隔の対数の中央値）の照合の AUC を、偽の人の同じ AUC の 95 パーセンタイルと比べる（`above_null`・記述）。
+- 切られたセッションの割合が 10% を超えたら `clipped.truncated_world` を真にする（`TRUNC_DECLARE`）。
+- `gen_sessions.py`: 人の world の `--run-mode` の欠けを、何も書く前に拒む。`--smoke` は `--run-mode smoke` とだけ組む。`clip_log_scale` は NaN を拒む。G0 の末尾に入口の検査を 3 つ足した。
+- k の格子は有限で 0 以上 1.0 以下（下側と NaN も拒む）。manifest の `clipped` の既定値を外した（欠けたら止まる）。
+- `--wiring` は読んだ部分の数を `wiring.checked` に書く（判定の無い本番では 0 と残る）。
+- Q2 に `last_diff` の定義と符号の検査を足した。
+- 直さなかったもの: λ のキーの衝突を候補をまたいで照らすこと（名前は別でも止まる。下見の格子の値しか入らないので起きない）。Codex の「`run.sh` が `--run-mode` を常に付ける」（この計器は人の world 専用で、`--pilot-k` は `generate` を通らない）、「集計側の変更が diff に無い」「`K_MAX`・`clipped`・`seed`/`mode` の生成側が無い」（どちらもパス限定で別の呼び出しに入れた側にあり、確かめた）、「P6 などが通常の実行に入っているか」（`selftest.py:test_person` に入っている）は誤検知とした。
