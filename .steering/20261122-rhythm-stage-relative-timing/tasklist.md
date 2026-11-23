@@ -15,4 +15,4 @@
 - [x] 下見 → 本番 → 読み（notes.md・判断 17）
 - [x] 主表を一次の JSON と照らす（`check_notes.py`・bad 0）
 - [x] 次の段（人ごとのリズムの型を持つ world・個人の再識別と個人ごとの読み手）への引き継ぎを `.steering/_handoff/` に書く（判断 5）
-- [ ] `/finish-task`
+- [x] `/finish-task`（2026-11-23・研究者の指示で PR → CI 緑なら merge。台帳の衝突は和で解いた）
