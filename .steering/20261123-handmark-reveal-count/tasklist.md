@@ -31,8 +31,8 @@
 ## レビュー
 - [x] code-reviewer ＋ security-checker（判断 6）
 - [x] /cross-review（判断 7）
-- [ ] /finish-task（schema parity は gse-dataset の写しの PR 待ち）
+- [x] /finish-task（schema parity: gse-dataset の枝 chore/schema-handmark-reveal-count と OK・PR #11）。マージは CI が全部走る 12-01 以降に研究者に確かめてから
 
 ## 引き継ぎ
 - [x] Mac の実機（12-09 以降）と Windows の実機（G-GEAR）の確かめ方（`.steering/_handoff/next-session-gse-handmark-reveal-real-machine.md`）
-- [ ] gse-dataset の schema の写しの PR
+- [x] gse-dataset の schema の写しの PR（gse-dataset #11）
