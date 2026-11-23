@@ -121,6 +121,9 @@
 | daily cap | daily cap | 1日あたりの介入回数上限。通知疲れと過介入を防ぐ | 「Nudge daily cap（6 回/日）に達したので defer」（⚠️ **2026-09-01 訂正 —— 旧例は「Wall daily cap により defer」。Wall は ADR-015 D1 で削除済み**） |
 | cooldown | cooldown | 介入後の再介入禁止時間。**Nudge は 10 分**（実測: `src-tauri/src/analysis/intervention.rs:5` `NUDGE_COOLDOWN_MS = 10 * 60 * 1000`）。⚠️ **2026-09-01 訂正 —— 旧文の「Wall は 60 分」は失効**（ADR-015 D1 で Wall ごと削除。★ 現行に Wall 系の定数は 1 つも無い） | 「cooldown 中なので Nudge を抑制」 |
 | recent dismiss | recent dismiss | 直近で介入が拒否された事実。MVP 初期値では 20 分間、同種介入を抑制する | 「recent dismiss により defer」 |
+| 個人の再識別 | person re-identification | 背景のステージの机上の検査（合成の world）で、画の特徴から、別のセッションの同じ人を当てられるかの問い。人ごとの型を持つ合成の world の上でだけ測り、実在の人の識別を意味しない（2026-11-23・`.steering/20261123-rhythm-stage-person-world/`） | 「倍率だけの world で案 D の画から個人の再識別ができた」 |
+| 個人ごとの読み手 | per-person reader | 同じ人の前のセッションで較正した攻撃者。人の間で共通に較正した攻撃者と並べ、同じ人を知る読み手にだけ停滞が読めるかを測る（2026-11-23・同上） | 「個人ごとの読み手は共通の読み手より停滞を読めた」 |
+| 相対の型 | relative rhythm type | 人ごとの打ち方の型のうち、全体の速さ（打鍵の間隔の中央値）を割り引いた部分。合成の world では間隔のばらつき・burst と休止の長さの比・隣の間隔の相関の 3 つで作る（2026-11-23・同上の判断 3）。人の打鍵の性質の主張ではない | 「相対の型だけの world」 |
 
 ### 表現層 (メディア表現 / 音)
 
