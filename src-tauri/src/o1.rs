@@ -514,6 +514,31 @@ pub fn clock_hwm_in(dir: &Path) -> Option<u64> {
     read_clock_hwm(&dir.join(CLOCK_HWM_FILE_NAME))
 }
 
+/// 高水位の待ちを打ち切ったときの、その高水位の値を置くファイル名（セッション置き場に置く）。
+///
+/// 高水位は孤児の回収が書き、時計がそれより古いと書き直さない。一度未来の値が書かれると下がらず、
+/// 起動のたびに 10 分待つことになる。→ 打ち切った値を覚え、高水位が同じ値の間は待たない（判断 5）。
+/// `gse_` で始まらないので、提出・削除の走査には掛からない。中身は epoch ms が 1 行だけ。
+pub const CLOCK_HWM_GAVE_UP_FILE_NAME: &str = ".o1_clock_hwm_gave_up";
+
+/// 打ち切りを覚えた高水位の値を読む（無い・壊れていれば `None`）。
+pub fn clock_hwm_gave_up_in(dir: &Path) -> Option<u64> {
+    read_clock_hwm(&dir.join(CLOCK_HWM_GAVE_UP_FILE_NAME))
+}
+
+/// 高水位の待ちを打ち切ったことを覚える。
+pub fn record_clock_hwm_gave_up(dir: &Path, hwm: u64) -> std::io::Result<()> {
+    std::fs::write(dir.join(CLOCK_HWM_GAVE_UP_FILE_NAME), format!("{hwm}\n"))
+}
+
+/// 待つべき高水位（純関数）。前に打ち切った値と同じなら待たない（`None`）。
+pub fn hwm_to_wait_for(hwm: Option<u64>, gave_up: Option<u64>) -> Option<u64> {
+    match (hwm, gave_up) {
+        (Some(h), Some(g)) if h == g => None,
+        _ => hwm,
+    }
+}
+
 /// ⚠️★★★ 行の分類規則は **`crate::ndjson_scan` が単一真実源**である。
 ///
 /// ★ 2026-09-03 の cross-review で、同じ規則が `packaging` / `reconcile` / ここの
@@ -1991,6 +2016,46 @@ mod tests {
                 gave_up_below_hwm: false
             }
         );
+    }
+
+    /// 600 回目の眠りの後の読みで高水位に届けば、打ち切りではない（上限の境界の内側）。
+    #[test]
+    fn reaching_the_high_water_mark_on_the_last_allowed_read_is_not_a_give_up() {
+        let mut seq = vec![BIOS_2024; HWM_WAIT_MAX_SLEEPS as usize];
+        seq.push(NOW_2026);
+        let w = run_wait(Some(NOW_2026 - 60_000), &seq);
+        assert_eq!(
+            w,
+            ClockWait {
+                slept: HWM_WAIT_MAX_SLEEPS,
+                gave_up_below_hwm: false
+            }
+        );
+    }
+
+    /// 前に打ち切った高水位と同じなら待たない。高水位が動いたら（別の値なら）また待つ。
+    #[test]
+    fn a_high_water_mark_given_up_once_is_not_waited_for_again() {
+        assert_eq!(hwm_to_wait_for(None, None), None);
+        assert_eq!(hwm_to_wait_for(Some(NOW_2026), None), Some(NOW_2026));
+        assert_eq!(hwm_to_wait_for(Some(NOW_2026), Some(NOW_2026)), None);
+        assert_eq!(
+            hwm_to_wait_for(Some(NOW_2026 + 1), Some(NOW_2026)),
+            Some(NOW_2026 + 1)
+        );
+        assert_eq!(hwm_to_wait_for(None, Some(NOW_2026)), None);
+    }
+
+    #[test]
+    fn gave_up_mark_round_trips_and_stays_out_of_session_scans() {
+        assert!(!CLOCK_HWM_GAVE_UP_FILE_NAME.starts_with("gse_"));
+        let dir = sweep_dir("clock_hwm_gave_up");
+        assert_eq!(clock_hwm_gave_up_in(&dir), None);
+        record_clock_hwm_gave_up(&dir, NOW_2026).unwrap();
+        assert_eq!(clock_hwm_gave_up_in(&dir), Some(NOW_2026));
+        // 高水位そのものには触れない
+        assert_eq!(clock_hwm_in(&dir), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

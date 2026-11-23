@@ -5525,7 +5525,16 @@ pub fn run() {
     //   Builder を組む前なので、待っている間は画面もトレイも無い（起動が遅れるだけ）。
     //   ⚠️ 時刻を使う処理（ファイル名・起点・`meta`・孤児の回収）をこれより前に置かない。
     if o1_source.is_some() {
-        let hwm = crate::o1::clock_hwm_in(&logger::session_log_dir().0);
+        let dir = logger::session_log_dir().0;
+        let seen_hwm = crate::o1::clock_hwm_in(&dir);
+        let gave_up_hwm = crate::o1::clock_hwm_gave_up_in(&dir);
+        // 前に打ち切った高水位と同じ値なら待たない（未来の高水位で毎回 10 分待たない・判断 5）
+        let hwm = crate::o1::hwm_to_wait_for(seen_hwm, gave_up_hwm);
+        if seen_hwm.is_some() && hwm.is_none() {
+            tracing::warn!(
+                "O1: not waiting for the last seen time ({seen_hwm:?}); it was given up before"
+            );
+        }
         let wait = crate::o1::wait_for_plausible_clock(
             hwm,
             epoch_ms,
@@ -5542,9 +5551,15 @@ pub fn run() {
         if wait.gave_up_below_hwm {
             tracing::error!(
                 "O1: system clock is still behind the last seen time ({hwm:?}) after {} s; \
-                 starting anyway (the orphan sweep will skip this run)",
+                 starting anyway (the orphan sweep may skip this run); \
+                 the next launch will not wait for this value",
                 wait.slept
             );
+            if let Some(h) = hwm {
+                if let Err(e) = crate::o1::record_clock_hwm_gave_up(&dir, h) {
+                    tracing::warn!("O1: cannot record the given-up clock mark: {e}");
+                }
+            }
         } else if wait.slept > 0 {
             tracing::info!(
                 "O1: system clock looks right after {} s; starting",

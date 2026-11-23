@@ -8,5 +8,6 @@
 - [x] cargo test（1388 件緑）/ clippy / replay（15 snapshots 一致）/ fmt
 - [x] /cross-review（code-reviewer・security-checker・Codex）1 巡目（判断 3）
 - [x] 高水位の待ち（判断 4）
-- [ ] /cross-review 2 巡目
+- [x] /cross-review 2 巡目（判断 5）
+- [ ] /cross-review 3 巡目（判断 5 の差分）
 - [ ] コミット・push（PR は研究者に確かめる）
