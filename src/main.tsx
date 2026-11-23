@@ -3,13 +3,19 @@ import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import InvitationSettings from "./components/InvitationSettings";
+import HandmarkStage from "./components/HandmarkStage";
+import HandmarkEdgeStrip from "./components/HandmarkEdgeStrip";
 
 // Layer 2: React マウント前にウィンドウ別の背景制御。
 // overlay ウィンドウでは index.html のインライン背景 (#0f172a) を透過に切り替える。
 // main ウィンドウでは #0f172a のままにし、CSS/React 依存なしで黒画面を防止する。
 // getCurrentWindow() は __TAURI_INTERNALS__ を参照する同期 API なので安全。
 const windowLabel = getCurrentWindow().label;
-if (windowLabel === "overlay") {
+// 手跡の背景の窓(段 1 の後期・ADR-051)も透明にする。
+const isHandmarkStage = windowLabel === "handmark-stage";
+// 下の縁の帯の窓(ADR-051)も透明にする。
+const isHandmarkEdgeStrip = windowLabel === "handmark-edge-strip";
+if (windowLabel === "overlay" || isHandmarkStage || isHandmarkEdgeStrip) {
   document.body.style.backgroundColor = "transparent";
 }
 // EH3 の招待の説明と設定の窓は App（メイン窓の処理）を通さずに描く。
@@ -58,7 +64,15 @@ class ErrorBoundary extends React.Component<
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      {isInvitationSettings ? <InvitationSettings /> : <App />}
+      {isHandmarkStage ? (
+        <HandmarkStage />
+      ) : isHandmarkEdgeStrip ? (
+        <HandmarkEdgeStrip />
+      ) : isInvitationSettings ? (
+        <InvitationSettings />
+      ) : (
+        <App />
+      )}
     </ErrorBoundary>
   </React.StrictMode>
 );

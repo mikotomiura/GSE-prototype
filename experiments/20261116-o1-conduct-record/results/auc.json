@@ -1,0 +1,292 @@
+{
+ "people": {
+  "A": {
+   "files_used": 15,
+   "pointer_usable": false,
+   "main": {
+    "stalls_onsets": 300,
+    "excl_no_control": 0,
+    "excl_no_interval": 15,
+    "excl_u_ge_s": 0,
+    "excl_short_gap": 0,
+    "excl_early": 25,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "stalls_used": 300,
+    "controls_used": 600,
+    "pairs": 1500,
+    "files_with_stalls": 10,
+    "days_with_stalls": 10,
+    "n_features": {
+     "K": 18,
+     "KN": 29
+    },
+    "auc_K": 0.586,
+    "auc_KN": 0.624,
+    "delta_auc": 0.037,
+    "signal_auc": {
+     "d_p_stuck": 0.494,
+     "d_ewma_x": 0.499
+    },
+    "ci95": {
+     "K": [
+      0.51,
+      0.615
+     ],
+     "KN": [
+      0.542,
+      0.631
+     ],
+     "delta": [
+      -0.021,
+      0.069
+     ]
+    },
+    "boot_failures": 0
+   },
+   "early_5s": {
+    "stalls_onsets": 300,
+    "excl_no_control": 0,
+    "excl_no_interval": 15,
+    "excl_u_ge_s": 0,
+    "excl_short_gap": 0,
+    "excl_early": 25,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "stalls_used": 300,
+    "controls_used": 300,
+    "pairs": 1500,
+    "files_with_stalls": 10,
+    "days_with_stalls": 10,
+    "n_features": {
+     "K": 18,
+     "KN": 33
+    },
+    "auc_K": 0.599,
+    "auc_KN": 0.601,
+    "delta_auc": 0.002,
+    "signal_auc": {
+     "d_p_stuck": 0.499,
+     "d_ewma_x": 0.497
+    },
+    "ci95": {
+     "K": [
+      0.506,
+      0.641
+     ],
+     "KN": [
+      0.499,
+      0.649
+     ],
+     "delta": [
+      -0.038,
+      0.037
+     ]
+    },
+    "boot_failures": 0
+   }
+  },
+  "B": {
+   "files_used": 0,
+   "pointer_usable": false,
+   "main": {
+    "stalls_onsets": 5,
+    "excl_no_control": 0,
+    "excl_no_interval": 0,
+    "excl_u_ge_s": 0,
+    "excl_short_gap": 0,
+    "excl_early": 0,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "status": "数が足りない",
+    "stalls_used": 5,
+    "days_with_stalls": 0
+   },
+   "early_5s": {
+    "stalls_onsets": 5,
+    "excl_no_control": 0,
+    "excl_no_interval": 0,
+    "excl_u_ge_s": 0,
+    "excl_short_gap": 0,
+    "excl_early": 0,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "status": "数が足りない",
+    "stalls_used": 5,
+    "days_with_stalls": 0
+   }
+  },
+  "C": {
+   "files_used": 25,
+   "pointer_usable": false,
+   "main": {
+    "stalls_onsets": 200,
+    "excl_no_control": 0,
+    "excl_no_interval": 15,
+    "excl_u_ge_s": 0,
+    "excl_short_gap": 0,
+    "excl_early": 45,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "stalls_used": 200,
+    "controls_used": 300,
+    "pairs": 800,
+    "files_with_stalls": 15,
+    "days_with_stalls": 10,
+    "n_features": {
+     "K": 18,
+     "KN": 29
+    },
+    "auc_K": 0.47,
+    "auc_KN": 0.589,
+    "delta_auc": 0.119,
+    "signal_auc": {
+     "d_p_stuck": 0.484,
+     "d_ewma_x": 0.538
+    },
+    "ci95": {
+     "K": [
+      0.351,
+      0.562
+     ],
+     "KN": [
+      0.433,
+      0.652
+     ],
+     "delta": [
+      0.026,
+      0.203
+     ]
+    },
+    "boot_failures": 0
+   },
+   "early_5s": {
+    "stalls_onsets": 200,
+    "excl_no_control": 5,
+    "excl_no_interval": 15,
+    "excl_u_ge_s": 0,
+    "excl_short_gap": 0,
+    "excl_early": 45,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "stalls_used": 200,
+    "controls_used": 200,
+    "pairs": 800,
+    "files_with_stalls": 10,
+    "days_with_stalls": 10,
+    "n_features": {
+     "K": 18,
+     "KN": 33
+    },
+    "auc_K": 0.478,
+    "auc_KN": 0.509,
+    "delta_auc": 0.031,
+    "signal_auc": {
+     "d_p_stuck": 0.504,
+     "d_ewma_x": 0.489
+    },
+    "ci95": {
+     "K": [
+      0.367,
+      0.637
+     ],
+     "KN": [
+      0.387,
+      0.628
+     ],
+     "delta": [
+      -0.143,
+      0.098
+     ]
+    },
+    "boot_failures": 0
+   }
+  },
+  "D": {
+   "files_used": 35,
+   "pointer_usable": true,
+   "main": {
+    "stalls_onsets": 2000,
+    "excl_no_control": 0,
+    "excl_no_interval": 100,
+    "excl_u_ge_s": 10,
+    "excl_short_gap": 5,
+    "excl_early": 100,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "stalls_used": 1700,
+    "controls_used": 3600,
+    "pairs": 8300,
+    "files_with_stalls": 30,
+    "days_with_stalls": 20,
+    "n_features": {
+     "K": 18,
+     "KN": 35
+    },
+    "auc_K": 0.594,
+    "auc_KN": 0.62,
+    "delta_auc": 0.025,
+    "signal_auc": {
+     "d_p_stuck": 0.509,
+     "d_ewma_x": 0.526
+    },
+    "ci95": {
+     "K": [
+      0.562,
+      0.618
+     ],
+     "KN": [
+      0.586,
+      0.639
+     ],
+     "delta": [
+      -0.001,
+      0.046
+     ]
+    },
+    "boot_failures": 0
+   },
+   "early_5s": {
+    "stalls_onsets": 2000,
+    "excl_no_control": 0,
+    "excl_no_interval": 100,
+    "excl_u_ge_s": 10,
+    "excl_short_gap": 5,
+    "excl_early": 100,
+    "excl_no_feat": 0,
+    "excl_dup_u": 0,
+    "stalls_used": 1700,
+    "controls_used": 2200,
+    "pairs": 8300,
+    "files_with_stalls": 30,
+    "days_with_stalls": 20,
+    "n_features": {
+     "K": 18,
+     "KN": 42
+    },
+    "auc_K": 0.57,
+    "auc_KN": 0.645,
+    "delta_auc": 0.075,
+    "signal_auc": {
+     "d_p_stuck": 0.493,
+     "d_ewma_x": 0.512
+    },
+    "ci95": {
+     "K": [
+      0.528,
+      0.586
+     ],
+     "KN": [
+      0.607,
+      0.67
+     ],
+     "delta": [
+      0.05,
+      0.113
+     ]
+    },
+    "boot_failures": 0
+   }
+  }
+ }
+}

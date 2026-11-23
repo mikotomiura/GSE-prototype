@@ -1,0 +1,9 @@
+space                  req 0.623  matched 0.397
+navigation             req 0.095  matched 0.090
+enter                  req 0.095  matched 0.018
+sentence_punctuation   req 0.083  matched 0.040
+backspace              req 0.066  matched 0.105
+punctuation            req 0.026  matched 0.020
+alphabetic             req 0.012  matched 0.327
+numeric                req 0.000  matched 0.002
+P (ms) q25/50/75/90 [271, 648, 1454, 3725] n 3348

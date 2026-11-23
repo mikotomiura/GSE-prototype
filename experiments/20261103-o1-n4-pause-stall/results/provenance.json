@@ -1,0 +1,24 @@
+{
+ "git_head": "b16f6da759833cd806686f02cc1e8dc2fb0191e9",
+ "git_dirty_paths": [],
+ "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+ "gse_unpack_sha256": "c9475ded4858b0336c21754839f1389e2169284dea89d3402a87b841a4fdc282",
+ "symbol_salt_sha256": "414cefe3438e05ddb9e8679709c38aee5c73b6f83857c066542cf7a25f75c270",
+ "input_files_rounded": 100,
+ "plain_sha256_digest": "b2f7c009e65cc9d31faefd8139da3189e92a02c94aaa6b060c713fbf164c8f6c",
+ "prereg_p1_episode_sha256": "dd1bb614021af09e2eab2112e27a7dc9ff42ae219364dfb122acaa68d30f3267",
+ "scripts_sha256": {
+  "experiments/20261103-o1-n4-pause-stall/build_n4.py": "1ea3f3f1cb4b00f5b633935640cf85e7a4e5da7b915f5b08d33f0ad6431e74db",
+  "experiments/20261103-o1-n4-pause-stall/pausestall.py": "0d2d54bf8f9074a7574f86b810e0f554fa5be8746e4c1415d81f2ccc150fb623",
+  "experiments/20261103-o1-n4-pause-stall/mutants.py": "402fa2333903dcd84e8bb0d5d09de2e76449f00eb297d9ebea21640734c481bd",
+  "experiments/20261103-o1-n4-pause-stall/run.sh": "d94ba501e34c2ed6c396d0a4793d262c325ae5291bf5de9f3aad13fb7b670b7a",
+  "experiments/20261103-o1-n4-pause-stall/conditions.md": "9d7b3c27123eb0a2149cbec69ec6bf97082f5bdb68e16b840624f572a74497a9",
+  "experiments/20261103-o1-n4-pause-stall/SEED": "7a4182f0131199200fe48e5d2a633826ccc225c47e3e94fcf7bcc6f1de2984c2",
+  "experiments/20261103-o1-n4-pause-stall/posthoc.py": "2cec378b5613bfa72ed950389e5358b0476c9a108c4e285d98c5812a2b6f88af",
+  "experiments/20261103-stall-candidates-c1c2c6/candidates.py": "03b033183493d8cd6f60391aa1bb030d89750dab1406df0101ca51c93c4199e8",
+  "experiments/20261102-stall-decomposition/types_core.py": "c47b0324576972e15452fbb54c3f586eba1bb91e32ed8aba8fc9937bfaa12b19",
+  "experiments/20261102-stall-decomposition/o1/build_o1.py": "299dbadaf82548c1086dc7673dfb9d0dc0ea6f4aae1df430fd3da5fd3079e118",
+  "experiments/20261102-stall-decomposition/o1/analyze_o1.py": "c31eb63a4380bfd0a421858eef7ddca2fd245879ff192358bedce34fd42771f9",
+  "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22"
+ }
+}

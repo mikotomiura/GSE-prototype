@@ -10,7 +10,7 @@ ML 学習に必要なのは「どんな種類のキーを押したか」であ�
 > ★ **2026-08-23 修正**: 旧版は enum に `Punctuation` を宣言しながら **`from_vk` が 1 つも
 > 割り当てていなかった**（＝ 記号がすべて `Other` へ落ちていた）。⚠️ その結果、匿名化後に
 > `is_text_producing` を復元できず `manual_insert` 系が過小評価されていた
-> （`manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**）。
+> （`manual_contribution_ratio` は 2026-11-15 より前の `research-positioning.md §5` **H-Y の主要アウトカム**だった・`docs/history/research-positioning-2026-11-15.md`）。
 > → ★ **ADR-014 判断 6 で `Punctuation` を実装し、`Tab` も足した。**
 
 ```rust
@@ -66,7 +66,7 @@ impl KeyCategory {
 
 ### ⚠️★★★ `SentencePunctuation` を分けている理由（★ 消さないこと）
 
-★ `personalization-and-online-learning.md §5.2` は **boundary keys を「採用（弁別の前提条件）」** に
+★ `docs/history/personalization-and-online-learning-2026-11-15.md` §5.2（履歴） は **boundary keys を「採用（弁別の前提条件）」** に
 格上げしており（[P121] N=475・2 独立文脈）、その接地は散文の階層
 **語内 < 語間 < 文間 < 段落間** である。
 ⚠️ `Punctuation` へ一括で畳むと **「文間」の段だけが失われる**（`[` `=` `-` と同じラベルになる）。

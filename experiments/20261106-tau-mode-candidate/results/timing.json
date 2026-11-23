@@ -1,0 +1,26 @@
+{
+ "prev_seconds": {
+  "coauthor": 1703.8220913410187,
+  "cs1": 5186.334333181381
+ },
+ "added": {
+  "coauthor": {
+   "full_estep_sec": 0.848370874999091,
+   "mode_eval_sec_per_writer": 0.035484542982885614,
+   "delta_stats_sec": 0.0038714604001143017,
+   "cells": 4536,
+   "added_sec": 18.471413200137615,
+   "added_sec_upper": 55.41423960041284
+  },
+  "cs1": {
+   "full_estep_sec": 3.2330798339971807,
+   "mode_eval_sec_per_writer": 0.1627687499858439,
+   "delta_stats_sec": 0.001525633349956479,
+   "cells": 4536,
+   "added_sec": 10.40767888125265,
+   "added_sec_upper": 31.22303664375795
+  }
+ },
+ "estimate_sec": 6976.7937007665705,
+ "estimate_hours": 1.9379982502129363
+}

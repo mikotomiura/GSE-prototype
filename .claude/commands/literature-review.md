@@ -3,7 +3,7 @@ description: >
   先行研究サーヴェイを 1 ラウンド分実行する。RQ を検証可能な下位問いに分解し、
   複数 angle で探索 → claim 抽出 → 敵対的 3 票検証 → 落合フォーマットのカード生成 →
   docs/references.md への append-only 登録 → docs/literature/_index.md 追記 →
-  research-positioning.md §3/§4 への還元まで行う。「サーベイする」「先行研究を調べる」
+  research-positioning.md §8（新規性として書ける範囲）への還元まで行う。「サーベイする」「先行研究を調べる」
   「この主張の証拠を確かめる」「Epic の go/no-go を文献で判定する」時に実行する。
 allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task,
   Bash(date *), Bash(ls *), Bash(grep *), Bash(git *), Bash(python3 *)
@@ -17,7 +17,7 @@ allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task,
 > **前提 Skill (実行前に Read すること)**
 > - `.claude/skills/literature-card/SKILL.md` — 落合 6 項目・カード契約
 > - `.claude/skills/citation-ssot/SKILL.md` — `[Pn]`/`[Vn]` 名前空間・append-only・provisional
-> - `docs/research-positioning.md` §8 — **エビデンス温度**（過大主張の禁止）
+> - `docs/research-positioning.md` §8・§9 — **新規性として書ける範囲と、主張しないこと**（過大主張の禁止）
 
 ---
 
@@ -101,6 +101,43 @@ print("\n".join(p.extract_text() or "" for p in PdfReader(path).pages))
 ⚠️ 要旨・二次記述だけで採番したなら、`references.md` の備考に
 **「一次全文未取得」と明記する**（★ 黙って一次扱いにしない）。
 
+### 取れなかった本文は Chrome で読む（2026-11-20 研究者の指示）
+
+WebFetch やサブエージェントで本文が取れなかったもの（出版社のサイトの 403 が多い）は、
+抄録だけで済ませる前に、メインが Chrome（claude-in-chrome）で開いて読む。
+S-CX（`docs/literature/20261120-handmark-coexistence-concept.md`）では、Cell・SAGE・MDPI・ACM が
+WebFetch で 403 だったが、Chrome では 4 本とも本文が開けた。
+
+**誰が使うか**: メインだけ。サブエージェントには 403 などで取れなかった文献の名前・DOI・URL を報告させ、
+メインが後でまとめて 1 本ずつ Chrome で読む。サブエージェントに Chrome を使わせない（タブの状態を
+共有するので、並列や入れ子で触らせると取り違える。一次の読解をサブエージェントに代行させない規則とも合う）。
+
+1. 先に `browser-verification` Skill を読む。`document.visibilityState` が `hidden` だと操作が黙って
+   落ちるので、`hidden` なら前面に出してもらってから読む。
+2. 何を取るかを先に決める。1 本ずつ、断定の根拠にするものだけを取る。全件の一括取得には使わない。
+   - 対象は、オープンアクセスの版がある文献に限る。開く URL は OpenAlex の `best_oa_location`
+     （または `locations` のうちオープンアクセスのもの）の URL にし、取得元の URL と版（出版社版か著者版か）を備考に書く。
+   - 有料の本文は使わない（機関のネットワークや認証で有料版が見えても使わない）。ログイン済みのアカウントの画面には触れない。
+   - ペイウォール・ログイン壁・利用規約で拒否される画面が出たら、そこで止める（回避しない）。
+     人間確認（CAPTCHA）で止まったら、ユーザーに通してもらう（Claude は触らない）。
+3. 本文は `javascript_tool` で `document.body.innerText` を文に割り、必要な文を正規表現で抜く。
+   - 抜いた文を逐語にする前に、その前後の段落か、その節を読む（否定・条件・限界を落とさない。
+     `verify-before-claiming` ルール 7 の「長い一次資料を 1 節だけで代表させない」）。
+   - 返すのは本文の文だけにする。`location.href`・`document.cookie`・ナビゲーション・アカウントの領域は返さない。
+   - スクリーンショットで読まない（高い）。
+   - 1 回の出力は約 1000 字で切れる（2026-11-20 の実測）。切れたら問いを分けるか、`slice(start, end)` で位置を分けて取り直す。
+   - 出力が「Cookie/query string data」として塞がれたら、本文に由来する `=`・`?`・`&` だけを空白に置き換えて返す。
+     それ以外の工夫で遮断を迂回しない。
+4. 記録には、本文の取り方と読んだ範囲を分けて書く（`references.md` の備考とカードの検証状態）。
+   - 例: 「本文取得・Chrome（出版社版・OA）／該当節を通読して照合」「本文取得・Chrome／抜粋のみで照合」。
+   - 抜粋だけで照合したものは「全文で照合」と書かない。
+   - Chrome でも本文が取れなかった（抄録しか見えない・止まった）ものは「一次全文未取得」に戻す。
+   - 書誌は Crossref / OpenAlex で別に確かめる。
+5. 終わったらタブを閉じる。
+
+⚠️ curl や urllib で `User-Agent` をブラウザに装って一括で落とすのはやめる（自動モードの分類器に
+止められた。2026-11-20）。
+
 ---
 
 ## Step 3: claim 抽出
@@ -174,8 +211,10 @@ renumber しない。重複は DOI / arXiv / 正規化 URL の key で判定し�
 
 ## Step 8: research-positioning.md への還元
 
-本ラウンドの結果が §3（ランドスケープ）/ §4（差分の主張）を **補強 / 反証 / 精緻化**の
-どれをしたかを判定し、該当箇所を inline `[Pn]`/`[Vn]` 付きで更新する。
+本ラウンドの結果が §8（新規性として書ける範囲・数えないもの）を **補強 / 反証 / 精緻化**の
+どれをしたかを判定し、該当箇所を inline `[Pn]`/`[Vn]` 付きで更新する。主張の範囲が変わるなら §2・§9 も直す。
+先行研究の詳しい整理はカードと `_index.md` に置き、research-positioning には要点だけを書く（ADR-053。
+旧 §3 ランドスケープ・§4 差分は `docs/history/research-positioning-2026-11-15.md` にある）。
 
 **反証だった場合は主張を下げる。** 過去ラウンドでは「摩擦が能力を育てる」→「自力解決の
 機会を保存する」への**主張範囲の縮小**が正しい還元だった。

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # ★ **全員共通**のアプリ配布物を組む（Drive の「アプリダウンロードリンク」に置くもの）。
+#   ⚠️ `--mode s1` だけは例外で、研究者本人の試しの配布物である（共通の Drive に置かない）。
 #
 # 使い方:
-#   ./make-common-app-zip.sh [--mode g1|o1] [--tag vX.Y.Z] [--config <g1-submit.json>]
+#   ./make-common-app-zip.sh [--mode g1|o1|s1] [--tag vX.Y.Z] [--config <g1-submit.json>]
 #   → dist/_common/G1_実施用_macOS.zip   ← ★ Drive に置くのはこれ 1 個
 #     dist/_common/G1_実施用_Windows.zip
 #   ./make-common-app-zip.sh --selftest   # ★ macOS 無しでモード分岐だけ検査する
@@ -12,6 +13,12 @@
 # ============================================================================
 #   g1 … G1 統制タスク実験（70 分・1 回きり）。マーカーは `g1.mode`。
 #   o1 … ★ O1 (R3-a) ふだんの作業の長期記録（数日〜数週間・常時記録）。マーカーは `o1.mode`。
+#   s1 … 段 1（ADR-043）の **本人の試し（R5）だけ**。O1 の器の上で問いを出す。
+#        マーカーは `o1.mode`（0 バイト）と `s1.mode`（中身 `audience=self` の 1 行・本人用の印）。
+#        README は O1 のものを使い、launcher は `launch-s1-windows.bat`（プローブを止める環境変数を付けない）。
+#        ⚠️ 他の参加者に配る組み立ては作らない（R9・段 1 の同意文書の承認の後）。配る前に
+#        `scripts/check-s1-release-readiness.sh --audience self --dist <zip>` を通す
+#        （`.steering/20261107-gse-m5-s1-replay-gate/` の判断 9・10）。
 #
 #   ⚠️★★★ **README を流用しない。** G1 は「70 分の 1 回きりのセッション」、
 #     O1 は「実業務の常時記録」であり、被験者がやることが違う
@@ -71,7 +78,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     # ⚠️★ 値なしで渡されたときに `shift 2` を踏むと、`set -e` で**出力ゼロの exit 1**になり
     #   原因が画面に出ない（★ `sync-session.sh` と同じ形にする）。
-    --mode)   [ $# -ge 2 ] || die "--mode に値がありません（g1 か o1）"; MODE="$2"; shift 2 ;;
+    --mode)   [ $# -ge 2 ] || die "--mode に値がありません（g1 / o1 / s1）"; MODE="$2"; shift 2 ;;
     --tag)    [ $# -ge 2 ] || die "--tag に値がありません"; TAG="$2"; shift 2 ;;
     --config) [ $# -ge 2 ] || die "--config に値がありません"; CONFIG="$2"; shift 2 ;;
     --selftest) SELFTEST=1; shift ;;
@@ -102,8 +109,16 @@ case "$MODE" in
     #   （下の検査が突き合わせる）。
     WIN_LAUNCHER_DST="GSE_起動.bat"
     ;;
+  s1)
+    # ★ 本人の試し（R5）だけ。README は O1 と同じ物を使う（判断 10）。
+    LABEL="S1"
+    MAC_README_SRC="$HERE/dist-readme-macos-o1.txt"
+    WIN_README_SRC="$HERE/dist-readme-windows-o1.txt"
+    WIN_LAUNCHER_SRC="$HERE/launch-s1-windows.bat"
+    WIN_LAUNCHER_DST="GSE_起動.bat"
+    ;;
   *)
-    die "--mode は g1 か o1 です（受け取った値: '$MODE'）"
+    die "--mode は g1 / o1 / s1 です（受け取った値: '$MODE'）"
     ;;
 esac
 
@@ -158,7 +173,7 @@ fi
 #   実機で踏んで確認したうえでの承認）。★ 本関数は**番兵として残す** ——
 #   ⚠️ 万一ドラフト表示が戻ったら、配布物を作る時点で気づけるようにする。
 readme_draft_warn () {
-  [ "$MODE" = o1 ] || return 0
+  [ "$MODE" = o1 ] || [ "$MODE" = s1 ] || return 0
   if grep -q "【ドラフト・未承認】" "$MAC_README_SRC" 2>/dev/null; then
     note "⚠️★★ O1 の README はまだ **ドラフト（未承認）** です。研究者の承認まで被験者に配らないこと。"
   fi
@@ -175,7 +190,7 @@ if [ "$SELFTEST" -eq 1 ]; then
   echo "=== make-common-app-zip --selftest（★ モード分岐と README 文言だけ）==="
 
   # 1. 両モードの持ち物が実在するか
-  for m in g1 o1; do
+  for m in g1 o1 s1; do
     out=$(bash "$SELF" --mode "$m" --selftest-dump 2>/dev/null) || { ng_ "$m: 持ち物を取り出せない"; continue; }
     missing=""
     while IFS= read -r f; do
@@ -241,6 +256,37 @@ if [ "$SELFTEST" -eq 1 ]; then
   else
     ng_ "マーカーの書き出しが見つからない（★ ゲートの検査対象でもある）"
   fi
+  # 7c. 段 1: 本人用の印を macOS と Windows の両方に、段 1 の分岐の中でだけ書く（判断 9・10）。
+  #     ★ O1 の門と段 1 の門が `[ "$MODE" = s1 ] &&` の形で見分けるので、形を崩すと両方の門が赤になる。
+  #     ⚠️ 探す行は実行時に組み立てる（書き出しの形をこの行に書くと、門がこの検査の行を書き出しと数える）。
+  s1_line_ () { printf '[ "$MODE" = s1 ] && printf %s%s%s %s > "$%s/s1%s"' "'" '%s\n' "'" "'audience=self'" "$1" '.mode'; }
+  self_trim="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$SELF")"
+  if grep -qxF -- "$(s1_line_ M)" <<< "$self_trim" && grep -qxF -- "$(s1_line_ W)" <<< "$self_trim"; then
+    ok_ "s1: 本人用の印（audience=self）を macOS と Windows の両方に段 1 の分岐で書く"
+  else
+    ng_ "s1: 本人用の印の書き出しが見つからない（★ 段 1 の門の検査対象でもある）"
+  fi
+  # 7d. 段 1 の launcher はプローブを止める環境変数を付けない（計画の判断 6）。
+  #     ★ 語は実行時に連結する（このファイル自身に一致させない）。
+  dp_word="$(printf '%s%s' 'GSE_DISABLE' '_PROBES')"
+  s1_bat_bad () { tr -d '\r' < "$1" | grep -viE '^[[:space:]]*(rem([[:space:]]|$)|::)' | grep -qiF "$dp_word"; }
+  if s1_bat_bad "$HERE/launch-s1-windows.bat"; then
+    ng_ "s1: 段 1 の launcher がプローブを止める環境変数を付けている"
+  else
+    ok_ "s1: 段 1 の launcher はプローブを止める環境変数を付けない"
+  fi
+  ctl_bat="$(mktemp)"; ctl_bat2="$(mktemp)"
+  printf 'set %s=1\r\n' "$dp_word" > "$ctl_bat"
+  printf 'rem set %s=1\r\n' "$dp_word" > "$ctl_bat2"
+  ctl_bat3="$(mktemp)"
+  # ★ Windows の環境変数は大文字小文字を区別しない（2026-11-07 点検 両者一致）。小文字の対照。
+  printf 'set %s=1\r\n' "$(printf '%s' "$dp_word" | tr 'A-Z' 'a-z')" > "$ctl_bat3"
+  if s1_bat_bad "$ctl_bat" && ! s1_bat_bad "$ctl_bat2" && s1_bat_bad "$ctl_bat3"; then
+    ok_ "s1: 環境変数の検査は付けた行を捕まえ、コメントの行を数えない（★ 陽性対照）"
+  else
+    ng_ "s1: 環境変数の検査が空回りしている"
+  fi
+  rm -f "$ctl_bat" "$ctl_bat2" "$ctl_bat3"
 
   # 7b. ⚠️★★ **同梱しない物を「入っているもの」に書かない**（security-checker 指摘・2026-08-28）。
   #     ★ macOS の配布物に `pubkey.txt` は入らない（鍵は `.app` の中）。⚠️ 書いてあると
@@ -313,11 +359,11 @@ if [ "$SELFTEST" -eq 1 ]; then
     return 0
   }
   batbad=""
-  for b in "$HERE/launch-g1-windows.bat" "$HERE/launch-o1-windows.bat"; do
+  for b in "$HERE/launch-g1-windows.bat" "$HERE/launch-o1-windows.bat" "$HERE/launch-s1-windows.bat"; do
     bom_crlf_ok "$b" || batbad="$batbad $(basename "$b")"
   done
   if [ -z "$batbad" ]; then
-    ok_ "両モードの Windows launcher が BOM ＋ CRLF である"
+    ok_ "3 モードの Windows launcher が BOM ＋ CRLF である"
   else
     ng_ "launcher のバイト形式がそろっていない:$batbad"
   fi
@@ -420,8 +466,8 @@ fi
 #     全弾きするので ★ **`bad name` が毎回返り、その被験者のデータは永久に届かない**。
 #     しかも G1 の secret がより広い範囲に配られる。
 #   → ★ O1 では **明示を必須**にする（★ 暗黙の既定採用を禁止する）。
-if [ "$MODE" = o1 ] && [ "$CONFIG" = "$REPO/g1-submit.json" ]; then
-  die "★ --mode o1 では --config を明示すること（⚠️ 既定は G1 の設定なので、黙って G1 の受け口へ飛ぶ配布物ができる）。
+if { [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; } && [ "$CONFIG" = "$REPO/g1-submit.json" ]; then
+  die "★ --mode ${MODE} では --config を明示すること（⚠️ 既定は G1 の設定なので、黙って G1 の受け口へ飛ぶ配布物ができる）。
     例: --config \"\$REPO/Form_O1/o1_submit.json\""
 fi
 [ -f "$CONFIG" ] || die "送信先の設定がありません: $CONFIG"
@@ -458,13 +504,21 @@ note "タグ $TAG に自動送信あり ✅"
 #   → ★ ソースの有無を**タグの中身で**確かめる（`reconcile.rs` の検査と同じ形）。
 #     ⚠️ ただしこれだけでは足りない（★ タグにソースがあっても資産が古いことはある）
 #       → 実体の検査は下の「4b」。
-if [ "$MODE" = o1 ]; then
+if [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; then
   git -C "$REPO" cat-file -e "$TAG:src-tauri/src/o1.rs" 2>/dev/null \
     || die "★ $TAG に src-tauri/src/o1.rs がありません = **O1 を知らないビルド**です。
     ⚠️ このまま配ると、アプリは o1.mode を読めず**黙って通常モードで動きます**
        （gse_o1_* にならない / 日次ローテートも自動提出も動かない / ランダムプローブが復活する）。
     ★ 先に O1 実装を含むタグを切って release 資産を作ること（--tag でそれを指す）。"
   note "タグ $TAG に O1 実装あり ✅"
+fi
+# ★ 段 1: タグに段 1 の実装（印の判定と駆動役）が入っているか。⚠️ 無いと s1.mode を読めず、問いが出ないまま素の O1 で動く。
+if [ "$MODE" = s1 ]; then
+  for f in s1.rs s1_driver.rs; do
+    git -C "$REPO" cat-file -e "$TAG:src-tauri/src/$f" 2>/dev/null \
+      || die "★ $TAG に src-tauri/src/$f がありません = **段 1 を知らないビルド**です（s1.mode を置いても問いが出ません）。"
+  done
+  note "タグ $TAG に段 1 の実装あり ✅"
 fi
 
 CACHE="$HERE/dist/_release/$TAG"
@@ -502,11 +556,16 @@ cp "$CONFIG" "$M/g1-submit.json"   # ⚠️★ O1 でも名前は g1-submit.json
 #     「開始する」を押すまで記録されず、日次ローテートも自動提出も動かない。
 #     ⚠️★ **その日のデータは丸ごと取れないのに、画面上は何も壊れて見えない。**
 #   ★ だから配布物の側で 1 つだけ置き、下の検査でもう片方の不在を確かめる。
-if [ "$MODE" = o1 ]; then
+if [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; then
   : > "$M/o1.mode"
 else
   : > "$M/g1.mode"
 fi
+# ★ 段 1 の印（本人用・判断 9）。⚠️ この 1 行の形（`[ "$MODE" = s1 ] &&` で始まる）を崩さない:
+#   O1 の門はこの形でだけ s1.mode の書き出しを許し、段 1 の門はこの形が両 OS にあることを見る。
+[ "$MODE" = s1 ] && printf '%s\n' 'audience=self' > "$M/s1.mode"
+# ★ 組んだタグを残す（段 1 の門が [2] のタグと照らす・古いバイナリの使い回しを見つける）。
+[ "$MODE" = s1 ] && printf '%s\n' "$TAG" > "$M/s1-release-tag.txt"
 sed "s/@DMG@/$DMG/g" "$MAC_README_SRC" > "$M/README_先に読む.txt"
 
 # ★★ 初回セットアップスクリプト（preregistration.md 第 13 版 §2.14）。
@@ -535,7 +594,7 @@ codesign --verify --strict "$M/gse-next.app" || die "フォルダへ置いた後
 #       `o1.mode` 0 件 / `GSE_O1_MODE` 0 件 / `gse_o1_` 0 件（`g1.mode` は 3 件あった）。
 #     ⚠️ **文字列が 1 つも無い**ので、マーカーを置いても読む側が存在しない。
 #   ⚠️★ `grep -c` を使う（`grep -q` は SIGPIPE で偽陰性を作る — 既存の gse-submit 検査と同じ理由）。
-if [ "$MODE" = o1 ]; then
+if [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; then
   if command -v strings > /dev/null 2>&1; then
     MACBIN="$M/gse-next.app/Contents/MacOS/gse-next"
     [ -f "$MACBIN" ] || die "実体の検査対象がありません: $MACBIN"
@@ -546,6 +605,13 @@ if [ "$MODE" = o1 ]; then
     ★ O1 実装を含むタグで release 資産を作り直すこと。"
     done
     note "gse-next の実体に O1 あり ✅ (o1.mode / gse_o1_)"
+    if [ "$MODE" = s1 ]; then
+      for lit in 's1.mode' 'GSE_S1_MODE'; do
+        n=$(strings -a "$MACBIN" | LC_ALL=C grep -cF -- "$lit" || true)
+        [ "${n:-0}" -gt 0 ] || die "★ 配布する gse-next の実体に「${lit}」がありません = **段 1 を知らないビルド**です（${TAG}）"
+      done
+      note "gse-next の実体に段 1 あり ✅ (s1.mode / GSE_S1_MODE)"
+    fi
     # ★ 提出側も見る。⚠️ `--o1` が無いと O1 の規則（gse_o1_* 対象・48h 猶予）で包めない。
     # ⚠️★ **無ければ飛ばす、にしない**（code-reviewer / security-checker MEDIUM・2026-08-30）。
     #   ★ すぐ上の MACBIN は die なのにここだけ条件付きだと、将来バンドル構成が変わったとき
@@ -586,11 +652,13 @@ fi
 cp "$PUBKEY_SRC" "$W/"
 cp "$CONFIG" "$W/g1-submit.json"   # ⚠️★ O1 でも名前は g1-submit.json のまま
 # ⚠️★★★ macOS 側と同じ理由で literal で書く（★ ゲートの grep から見えるようにする）。
-if [ "$MODE" = o1 ]; then
+if [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; then
   : > "$W/o1.mode"
 else
   : > "$W/g1.mode"
 fi
+[ "$MODE" = s1 ] && printf '%s\n' 'audience=self' > "$W/s1.mode"
+[ "$MODE" = s1 ] && printf '%s\n' "$TAG" > "$W/s1-release-tag.txt"
 # ★ 実体に自動送信が入っているか（`grep -c` を使う。`grep -q` は SIGPIPE で偽陰性を作る）
 if command -v strings > /dev/null 2>&1; then
   n=$(strings -a "$W/gse-submit.exe" | grep -c -- 'reconcile' || true)
@@ -598,7 +666,7 @@ if command -v strings > /dev/null 2>&1; then
   note "gse-submit.exe の実体に reconcile あり ✅ ($n 箇所)"
   # ⚠️★★★ O1 は **Windows が主ターゲット**である（`docs/agent-shared.md`）。
   #   ★ macOS 側だけ検査して安心する型を作らない（memory: windows-only-code-needs-ci の逆向き）。
-  if [ "$MODE" = o1 ]; then
+  if [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; then
     for lit in 'o1.mode' 'gse_o1_' 'GSE_O1_MODE'; do
       n=$(strings -a "$W/gse-next.exe" | LC_ALL=C grep -cF -- "$lit" || true)
       [ "${n:-0}" -gt 0 ] || die "★ gse-next.exe の実体に「${lit}」がありません = **O1 を知らないビルド**です（${TAG}）"
@@ -606,10 +674,17 @@ if command -v strings > /dev/null 2>&1; then
     n=$(strings -a "$W/gse-submit.exe" | LC_ALL=C grep -cF -- '--o1' || true)
     [ "${n:-0}" -gt 0 ] || die "★ gse-submit.exe の実体に「--o1」がありません = O1 の規則で包めないビルドです（${TAG}）"
     note "Windows の実体に O1 あり ✅ (o1.mode / gse_o1_ / --o1)"
+    if [ "$MODE" = s1 ]; then
+      for lit in 's1.mode' 'GSE_S1_MODE'; do
+        n=$(strings -a "$W/gse-next.exe" | LC_ALL=C grep -cF -- "$lit" || true)
+        [ "${n:-0}" -gt 0 ] || die "★ gse-next.exe の実体に「${lit}」がありません = **段 1 を知らないビルド**です（${TAG}）"
+      done
+      note "Windows の実体に段 1 あり ✅ (s1.mode / GSE_S1_MODE)"
+    fi
   fi
 else
   # ⚠️ O1 では黙って飛ばさない（★ 飛ばすと「O1 を知らないビルド」を配れてしまう）。
-  [ "$MODE" != o1 ] || die "strings がありません。★ O1 の実体検査ができないので配布物を作りません"
+  [ "$MODE" = g1 ] || die "strings がありません。★ O1 の実体検査ができないので配布物を作りません"
   note "⚠️ strings が無いので実体検査を飛ばしました"
 fi
 [ -z "$(echo "$W"/block*.html)" ] || die "共通の配布物に課題ページが入っています"
@@ -631,12 +706,25 @@ codesign --verify --strict "$V/${LABEL}_実施用_macOS/gse-next.app" || die "�
 # ⚠️★★★ **正しいマーカーが 1 つだけ**入っていること。
 #   ★ 「あるか」だけでなく「**もう片方が無いか**」も見る —— 両方あると
 #     `lib.rs` は起動を拒否する（"BOTH g1.mode and o1.mode are present"）。
-if [ "$MODE" = o1 ]; then
+if [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; then
   [ -f "$V/${LABEL}_実施用_macOS/o1.mode" ] || die "展開後に o1.mode がありません"
   [ ! -f "$V/${LABEL}_実施用_macOS/g1.mode" ] || die "⚠️ O1 の配布物に g1.mode が混ざっています（★ G1 が勝ち、O1 として記録されません）"
+  # ★ 段 1 の印の有無と中身・EH3 の印の不在（計画の判断 7・本タスクの判断 9）。
+  [ ! -f "$V/${LABEL}_実施用_macOS/eh3.mode" ] || die "⚠️ 配布物に eh3.mode が混ざっています"
+  if [ "$MODE" = s1 ]; then
+    [ "$(cat "$V/${LABEL}_実施用_macOS/s1.mode" 2>/dev/null)" = "audience=self" ] \
+      || die "展開後の s1.mode が無いか、中身が audience=self ではありません"
+    [ "$(cat "$V/${LABEL}_実施用_macOS/s1-release-tag.txt" 2>/dev/null)" = "$TAG" ] \
+      || die "展開後の s1-release-tag.txt が無いか、$TAG ではありません"
+  else
+    [ ! -f "$V/${LABEL}_実施用_macOS/s1.mode" ] || die "⚠️ O1 の配布物に s1.mode が混ざっています（★ O1 の参加者に段 1 の問いが出る）"
+  fi
 else
   [ -f "$V/${LABEL}_実施用_macOS/g1.mode" ] || die "展開後に g1.mode がありません"
   [ ! -f "$V/${LABEL}_実施用_macOS/o1.mode" ] || die "⚠️ G1 の配布物に o1.mode が混ざっています（★ 取り違えの証拠。配らない）"
+  # ★ Windows の zip の検査（forbid）とそろえる（/cross-review LOW）。
+  [ ! -f "$V/${LABEL}_実施用_macOS/s1.mode" ] || die "⚠️ G1 の配布物に s1.mode が混ざっています"
+  [ ! -f "$V/${LABEL}_実施用_macOS/eh3.mode" ] || die "⚠️ G1 の配布物に eh3.mode が混ざっています"
 fi
 
 # ★★ 初回セットアップスクリプトが**展開後も動く**こと（2026-08-08）。
@@ -660,7 +748,7 @@ esac
 # ⚠️★★ **モードに合った文面**まで見る。★ 「OK: で始まる」だけでは
 #   G1 の案内を O1 の被験者に読ませる取り違えを捕まえられない。
 case "$MODE" in
-  o1) SETUP_MUST="記録中 · 作業の種類" ; SETUP_MUST_NOT="G1 モードで動作しています" ;;
+  o1|s1) SETUP_MUST="記録中 · 作業の種類" ; SETUP_MUST_NOT="G1 モードで動作しています" ;;
   *)  SETUP_MUST="G1 モードで動作しています" ; SETUP_MUST_NOT="記録中 · 作業の種類" ;;
 esac
 case "$SETUP_OUT" in
@@ -688,7 +776,7 @@ done
 
 # ⚠️★★★ O1 固有の文言（★ 落ちると (a) 記録が空の日ができ (b) 同意文書 §4 の
 #   約束が配布物から消える）。★ Windows 側の README も**同じ表で**検査する。
-if [ "$MODE" = o1 ]; then
+if [ "$MODE" = o1 ] || [ "$MODE" = s1 ]; then
   # ⚠️★★ **macOS と Windows の README を両方見る**（code-reviewer 指摘・2026-08-28）。
   #   ★ 旧版は変数名こそ `RW` だったが中身は macOS の README で、
   #     **同じファイルを 2 度検査していた**。⚠️ O1 は Windows が主ターゲットであり、
@@ -746,16 +834,26 @@ if not any(n.startswith(root) for n in names):
 #   macOS 側（展開してマーカー / 署名 / README を検査）より**明らかに弱かった**。
 #   ⚠️ O1 は **Windows が主ターゲット**なので、弱いほうが本命という逆転が起きていた。
 base = {n[len(root):] for n in names if n.startswith(root)}
-mode = "o1" if label == "O1" else "g1"
-other = "g1" if mode == "o1" else "o1"
-missing = [f for f in (f"{mode}.mode", "gse-next.exe", "pubkey.txt", "g1-submit.json") if f not in base]
+mode = {"O1": "o1", "S1": "s1"}.get(label, "g1")
+# ★ 段 1 は O1 の器の上で動くので o1.mode も要る。
+need = {"g1": ["g1.mode"], "o1": ["o1.mode"], "s1": ["o1.mode", "s1.mode"]}[mode]
+forbid = {"g1": ["o1.mode", "s1.mode", "eh3.mode"], "o1": ["g1.mode", "s1.mode", "eh3.mode"],
+          "s1": ["g1.mode", "eh3.mode"]}[mode]
+missing = [f for f in need + ["gse-next.exe", "pubkey.txt", "g1-submit.json"] if f not in base]
 if missing:
     sys.exit(f"[make-common-app-zip] ✗ Windows zip に足りないものがあります: {missing}")
-if f"{other}.mode" in base:
-    sys.exit(f"[make-common-app-zip] ✗ Windows zip に {other}.mode が混ざっています（★ マーカーの取り違え）")
+mixed = [f for f in forbid if f in base]
+if mixed:
+    sys.exit(f"[make-common-app-zip] ✗ Windows zip に {mixed} が混ざっています（★ マーカーの取り違え）")
+if mode == "s1":
+    body = zipfile.ZipFile(p).read(root + "s1.mode").decode("utf-8").strip()
+    if body != "audience=self":
+        sys.exit("[make-common-app-zip] ✗ Windows zip の s1.mode の中身が audience=self ではありません")
+    if root + "s1-release-tag.txt" not in names:
+        sys.exit("[make-common-app-zip] ✗ Windows zip に s1-release-tag.txt がありません")
 if not any(n.endswith(".bat") for n in base):
     sys.exit("[make-common-app-zip] ✗ Windows zip に launcher (.bat) がありません")
-if mode == "o1" and "README_先に読む.txt" not in base:
+if mode in ("o1", "s1") and "README_先に読む.txt" not in base:
     sys.exit("[make-common-app-zip] ✗ O1 の Windows zip に README_先に読む.txt がありません")
 if any(n.startswith("block") and n.endswith(".html") for n in base):
     sys.exit("[make-common-app-zip] ✗ Windows zip に課題ページが入っています（共通側に入れてはならない）")
@@ -767,9 +865,17 @@ PY
 
 echo
 note "できました:"
-for z in "$OUT"/*.zip; do
+# ★ 今回のモードの zip だけを並べる（他のモードの zip を並べると、置く物を取り違える・/cross-review MEDIUM）。
+for z in "$OUT/${LABEL}_実施用_"*.zip; do
   printf '    %s  %s B\n' "$z" "$(wc -c < "$z" | tr -d ' ')"
 done
 echo
-echo "[make-common-app-zip] ★ Drive に置くのは上の **zip だけ**です（フォルダのまま置かない）。"
+if [ "$MODE" = s1 ]; then
+  # ⚠️ 段 1 の本人用（判断 9・10）。他の参加者に渡すと、同意文書の承認の前に問いの出る版が渡る。
+  echo "[make-common-app-zip] ⚠️ これは **研究者本人の試し（R5）の配布物**です。共通の Drive に置かず、他の人に渡さないこと。"
+  echo "[make-common-app-zip] ★ 使う前に通す: bash \"$REPO/scripts/check-s1-release-readiness.sh\" --audience self \\"
+  echo "      --dist \"$OUT/${LABEL}_実施用_Windows.zip\" --dist \"$OUT/${LABEL}_実施用_macOS.zip\""
+else
+  echo "[make-common-app-zip] ★ Drive に置くのは上の **zip だけ**です（フォルダのまま置かない）。"
+fi
 echo "[make-common-app-zip] ⚠️ g1-submit.json はシークレットを含みます。共有範囲に注意してください。"

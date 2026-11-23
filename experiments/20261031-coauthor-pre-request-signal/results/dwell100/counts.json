@@ -1,0 +1,14 @@
+{
+ "sessions_without_writer": 2,
+ "writers_total": 61,
+ "requests_raw": 18089,
+ "requests_c5": 3370,
+ "requests_no_matched_control": 32,
+ "writers_ge_min": 52,
+ "writers_used": 50,
+ "requests_used": 3316,
+ "matched_controls": 16484,
+ "unmatched_controls": 16433,
+ "onsets_in_req_windows": 0,
+ "onsets_in_matched_windows": 0
+}

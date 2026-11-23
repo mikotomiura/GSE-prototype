@@ -1,0 +1,795 @@
+> **履歴の文書（2026-11-15 に移した）。** 元のパスは `docs/design-history.md`。現行の根拠に使わない（ADR-053）。現行は `docs/research-positioning.md`・`docs/architecture/gse-design-map.md`・`docs/adr/`。
+> 写しの元: main `6fdd4023`。本文は移す前のまま変えていない。
+
+# GSE — Design & Engineering History
+
+> Version-by-version record of the cognitive-state engine's evolution (**v2.1 – v2.22**):
+> hysteresis & stability fixes, the IME-detection rework, the Nudge/Wall intervention UI,
+> security & reliability hardening, cross-platform parity, and the macOS overlay work.
+>
+> This deep-dive was split out of the main [README](../README.md) to keep it concise.
+> For the **current** architecture and feature overview, read the README; this file is the
+> archived rationale behind how each piece came to be.
+
+[← Back to README](../README.md) · [日本語版](design-history.ja.md)
+
+---
+
+## Hysteresis & Stability Fixes (v2.1)
+
+Three pathological behaviors were identified from session log analysis and corrected:
+
+---
+
+### Fix ①: Cold-Start Hysteresis (Stuck → Flow window-reset spike)
+
+**Theoretical Note: O(1) Alternative to HSMM**
+Standard HMMs cannot model state duration distributions explicitly (they assume geometric decay). While a Hidden Semi-Markov Model (HSMM) is theoretically optimal for modeling the distinct, non-geometric durations of Incubation and Stuck, it introduces $O(T^2)$ computational complexity and requires massive data to estimate duration parameters (overfitting in $n=1$ environments). The EMA hysteresis layer introduced below acts as an $O(1)$ computational hack to enforce minimum state dwell times without the overhead of an HSMM, making it ideal for edge inference.
+
+**Problem:** At t = 255.2 s a 30-second window advanced past heavy backspacing activity. The deleted events exited the window; fresh-window features looked like Flow. Result: `p_stuck = 0.994 → p_flow = 0.48` in one HMM step (< 1 ms).
+
+**Root cause:** `get_current_state()` returned the raw HMM belief, which is a point estimate with no temporal inertia.
+
+**Fix:** A secondary probability vector `display_probs` is maintained alongside the raw HMM belief. It tracks the raw belief via a slow EMA:
+
+```
+display_t = α · raw_t + (1 − α) · display_{t−1}
+
+α = 0.40  (normal updates → time-constant τ ≈ 2.5 updates ≈ 2.5 s)
+α = 0.60  (backspace-penalty bin during active typing → rapid Stuck onset)
+α = 0.50  (backspace-penalty bin during silence → moderate Stuck onset)
+```
+
+`get_current_state()` returns `display_probs`. A genuine state change now requires approximately 2.5 seconds of sustained evidence to register in the UI and log.
+
+Simulation of the window-reset scenario (α = 0.40, raw p\_stuck ≈ 0 after reset):
+
+| Tick | raw p_flow | display p_stuck |
+|---|---|---|
+| 0 (before reset) | 0.01 | **0.994** |
+| 1 (reset, flow signal) | 0.48 | 0.596 |
+| 2 | 0.52 | 0.358 |
+| 3 | 0.54 | 0.215 |
+| 4 | 0.56 | 0.129 |
+
+The Stuck display probability decays gracefully over ~2.5 seconds rather than collapsing instantly.
+
+---
+
+### Fix ②: Probability Discrete Clustering (step-wise ceilings)
+
+**Problem:** With dynamic emission floor ε = 0.05 added to every bin at runtime, the HMM converged to fixed-point probabilities:
+- `p_flow` clustering at 0.9734 (39.1% of frames)
+- `p_inc` clustering at 0.9381
+- `p_stuck` clustering at 0.9944
+
+These clusters arise because for observation bins dominated by one state, the ratio of emission probabilities determines a unique fixed point. With ε = 0.05 the penalty-bin ratio is only 0.99/0.05 ≈ 20×, blunting the Backspace-streak Stuck signal significantly.
+
+**Fix:** Dynamic additive floor removed. Emission values of exactly 0.00 are replaced with a static **0.01** baked into the emission table. The penalty-bin ratio improves to 0.99/0.01 ≈ 99×, sharply increasing Stuck sensitivity to repeated Backspace bursts. Maximum attainable probability per state now saturates near 0.88–0.90, leaving meaningful mass for competing states.
+
+---
+
+### Fix ③: Inc → Stuck Silence Transition (50 s no-input stays Inc)
+
+**Problem:** Long silences (≥ 50 s) were classified as Incubation because `make_silence_observation()` only populated F5 (pause count). The maximum X (Friction) achievable from F5 alone is:
+
+```
+X_max(F5 only) = 0.20 · φ(F5) = 0.20 · 1.0 = 0.20   → x_bin = 1 (Incubation)
+```
+
+The Stuck-dominant bins require x_bin ≥ 3 (X ≥ 0.60), which was unreachable without F3 or F6.
+
+**Cognitive rationale:** Prolonged output silence is not semantically equivalent to deliberate incubation. When a writer stares at a screen without typing for over 30 seconds, the behavioral interpretation shifts from "thinking" toward "blocked." Synthesizing friction during extreme silence reflects this cognitive transition.
+
+**Fix:** `make_silence_observation()` now generates synthetic friction values with early onset and guaranteed floor values:
+
+```rust
+// F6: onset at 10 s, floor 0.15 at ≥10 s, reaches 1.0 at ~50 s
+F6_synthetic = if silence ≥ 10s { max(clamp((s−10)/40, 0, 1.0), 0.15) }
+              else              { clamp((s−10)/40, 0, 1.0) }
+
+// F3: onset at 15 s, floor 0.20 at ≥10 s, reaches 1.0 at ~65 s
+F3_synthetic = if silence ≥ 10s { max(clamp((s−15)/50, 0, 1.0), 0.20) }
+              else              { clamp((s−15)/50, 0, 1.0) }
+```
+
+Resulting X trajectory (with F5 saturated at φ = 1.0, typical F1):
+
+| Silence | F3_syn | F6_syn | X (Friction) | x_bin | Region |
+|---|---|---|---|---|---|
+| 10 s | 0.20 | 0.15 | ≈ 0.34 | 1 | Incubation |
+| 20 s | 0.20 | 0.25 | ≈ 0.36 | 1 | Boundary |
+| 30 s | 0.30 | 0.50 | ≈ 0.58 | 2 | Boundary |
+| 40 s | 0.50 | 0.75 | ≈ 0.76 | 3 | **Stuck** |
+| 50 s | 0.70 | 1.00 | ≈ 0.90 | 4 | **Deep Stuck** |
+
+The early onset (10 s for F6, 15 s for F3) and guaranteed floor values at ≥10 s ensure that the HMM begins transitioning toward Stuck. The friction cap is released to 1.0 (from 0.45/0.35) to allow full traversal of x_bin range, enabling Nudge and Wall interventions. Combined with the 3-stage EWMA α and hysteresis layers, the Stuck label is confirmed after ~25–30 s of sustained silence.
+
+---
+
+## IME Detection and Context-Aware Baseline (v2.2)
+
+Japanese IME input introduces two distinct challenges for keystroke analysis:
+
+1. **Candidate selection phase** (space → kanji list visible): navigation keystrokes (arrow, Enter) should not pollute feature vectors
+2. **Input mode context** (あ mode vs A mode): flight-time norms differ significantly between Japanese writing and ASCII coding
+
+### Candidate Window Suppression
+
+When the kanji candidate list is visible, analysis is paused and the display state is held at Flow. Two detection layers are used:
+
+| Layer | Method | Notes |
+|---|---|---|
+| **Primary** | `EnumWindows` scan for "CandidateUI" / "IME" window classes | Direct cross-process window scan, no hooks required |
+| **Secondary** | UIAutomation `GetFocusedElement` | Fallback when focused element is the IME candidate panel |
+
+Global TSF hooks (`ITfThreadMgr`) are not used — they are blocked by UIPI across process boundaries.
+
+**MSCTFIME UI is explicitly excluded:** This class belongs to the TSF language bar (the A/あ indicator on the taskbar), which is always visible when Japanese IME is loaded. Including it would cause a permanent false positive.
+
+### IME Mode Detection via VK\_DBE\_\* Keys (v2.2)
+
+**Why `VK_PROCESSKEY` does not work:** `WH_KEYBOARD_LL` fires before the IME engine processes input. Keys typed during composition therefore arrive as their raw codes (`VK_A`, `VK_I`, etc.), not as `VK_PROCESSKEY` (0xE5). This is by design — the low-level hook is below the IME layer.
+
+**What does work:** Windows delivers IME mode-switch keys — `VK_DBE_ALPHANUMERIC` (0xF0), `VK_DBE_HIRAGANA` (0xF2), `VK_DBE_KATAKANA` (0xF1), etc. — to `WH_KEYBOARD_LL` before IME processing, because these are hardware-level input mode toggles. **Empirical confirmation:** `VK_DBE_ALPHANUMERIC` (vk = 240) was observed 14 times in session log `gse_20260222_074741.ndjson`, proving that mode-switch keys reach the hook reliably.
+
+The hook thread maintains `IME_OPEN: AtomicBool`:
+
+| VK Code | Value | Effect on `IME_OPEN` |
+|---|---|---|
+| `VK_DBE_ALPHANUMERIC` (0xF0) | Switch to alphanumeric (A) | → `false` |
+| `VK_DBE_SBCSCHAR` (0xF3) | Single-byte mode | → `false` |
+| `VK_DBE_HIRAGANA` (0xF2) | Hiragana mode (あ) | → `true` |
+| `VK_DBE_KATAKANA` (0xF1) | Katakana mode (カ) | → `true` |
+| `VK_DBE_DBCSCHAR` (0xF4) | Double-byte mode | → `true` |
+| `VK_KANJI` (0x19) | Half/full-width toggle | → flip |
+
+**Limitation:** The initial state is assumed `false` (alphanumeric). The flag becomes accurate after the first mode-switch key is pressed.
+
+### Context-Specific Baseline β (Dual Baseline)
+
+The `φ(x, β)` normalization function uses different reference values depending on the current IME mode, correcting a systematic bias:
+
+| Context | `IME_OPEN` | β\_F1 (ms) | β\_F3 | β\_F4 | β\_F5 | β\_F6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **β\_coding** (A mode) | `false` | 150 | 0.06 | 5.0 | 2.0 | 0.08 |
+| **β\_writing** (あ/カ mode) | `true` | 100 | 0.10 | 2.5 | 1.0 | 0.12 |
+
+**Why this matters:** A coder at 150 ms flight time appears as Flow against β\_coding but would incorrectly appear as Stuck if evaluated against the slower β\_writing baseline (and vice versa). Context switching eliminates this systematic misclassification.
+
+IME mode changes are logged as a new record type:
+
+```jsonc
+// IME mode switch: user pressed VK_DBE_HIRAGANA (→ Japanese writing mode)
+{"type":"ime_state","t":1740000001234,"on":true,"active":false}
+
+// IME mode switch: user pressed VK_DBE_ALPHANUMERIC (→ alphanumeric/coding mode)
+{"type":"ime_state","t":1740000005678,"on":false,"active":false}
+```
+
+---
+
+## IME Mode Detection: Robust Multi-Layer Architecture (v2.3)
+
+Version 2.2 described the initial VK\_DBE\_\* based IME mode detection. Empirical testing on a Surface Pro 8 Type Cover revealed three additional failure modes that required a complete rework of the detection pipeline.
+
+### Bugs Found and Fixed
+
+**Bug 1 — Same-millisecond flapping** (log `gse_20260225_142614.ndjson`):
+The analysis thread emitted `ImeState` entries at the exact same millisecond as the triggering keystroke, producing `on:true` + `on:false` pairs with identical timestamps. Root cause: the analysis thread computed IME state synchronously from the keystroke event timestamp.
+
+**Bug 2 — Zero detections via `ImmGetContext`** (log `gse_20260225_153634.ndjson`):
+A pure polling approach using `ImmGetContext(foreground_hwnd)` returned NULL for all cross-process windows on Windows 10/11. The system silently produced zero `ime_state` entries.
+
+**Bug 3 — Surface Type Cover keyboard asymmetry** (log `gse_20260225_162114.ndjson`):
+On this specific keyboard, `VK_DBE_HIRAGANA` (0xF2) fires **only as key-UP** and `VK_DBE_ALPHANUMERIC` (0xF0) fires **only as key-DOWN**, always paired within the same millisecond. The `is_press`-only handler in v2.2 missed the hiragana key entirely.
+
+**Bug 4 — Initial state never emitted**:
+With `last_state: bool = false` and `IME_OPEN` initialized to `false`, pressing `VK_DBE_ALPHANUMERIC` set `IME_OPEN = false` (no change), making `false != false` evaluate to `false` — no emission.
+
+### v2.3 Architecture: Three Detection Layers
+
+```
+Layer 1 (Primary): ImmGetOpenStatus polling
+  └─ Works when ImmGetContext returns non-NULL (rare: own-process windows only)
+
+Layer 2 (Fallback): VK_DBE_* atomic tracking via IME_STATE_DIRTY flag
+  ├─ hook_callback sets IME_OPEN + IME_STATE_DIRTY on both key-DOWN and key-UP
+  └─ Covers Surface Type Cover asymmetry (VK_DBE_HIRAGANA key-UP only)
+
+Layer 3 (Inference): WinEvent EVENT_OBJECT_IME_CHANGE/SHOW
+  └─ Composition can ONLY start in Japanese mode → infer IME_OPEN=true cross-process
+```
+
+### Anti-Flapping Guarantee
+
+`LogEntry::ImeState` is emitted **exclusively** from the IME Polling Thread, never from the keyboard hook or analysis thread. The flow is:
+
+```
+hook_callback (key-DOWN or key-UP)
+    │  atomic store: IME_OPEN = new_state
+    │  atomic store: IME_STATE_DIRTY = true
+    └─ try_send(()) on bounded(1) wake channel (non-blocking, drops if full)
+
+IME Polling Thread
+    │  recv_timeout(100ms)   ← wakes within 1ms of keypress signal
+    │  sleep(5ms)            ← allows IME engine to settle
+    │  read IME_STATE_DIRTY  ← check if state changed
+    │  emit LogEntry::ImeState { timestamp: SystemTime::now(), on, active }
+    └─ timestamp is always ≥5ms after the triggering keystroke
+```
+
+### Key Atomics (`hook.rs`)
+
+| Atomic | Writer | Reader | Purpose |
+|---|---|---|---|
+| `IME_OPEN` | hook (VK_DBE_* ↑↓, WinEvent), polling thread | analysis thread | Current IME mode |
+| `IME_STATE_DIRTY` | hook (VK_DBE_* ↑↓, WinEvent composition start) | polling thread (`.swap(false)`) | Triggers log emission |
+| `IME_ACTIVE` | WinEvent hook (composition start/end) | ImeMonitor (100ms poll) | Candidate window pause + log emission |
+
+### `Option<bool>` Initial State
+
+The polling thread tracks `last_state: Option<bool> = None` (not `bool = false`). The comparison:
+
+```rust
+if last_state.map_or(true, |prev| prev != current) { emit(); last_state = Some(current); }
+```
+
+ensures the **first detection always emits** regardless of whether the initial state is `false` or `true`.
+
+### Production Verification
+
+Log `gse_20260225_172338.ndjson` confirms the fix:
+
+| Observation | Result |
+|---|---|
+| `ime_state` entries detected | **9** (vs. 0 in v2.2) |
+| Same-timestamp flapping | **None** |
+| Minimum key → ime\_state lag | **5 ms** (VK\_DBE\_* path) |
+| WinEvent composition inference lag | **~23–38 ms** |
+| Alternating on/false pattern | **Correct** |
+
+---
+
+## 1Hz Timer-Driven Inference & Synthetic Friction (v2.4)
+
+### Decoupling from Keystroke Events
+
+In the initial implementation, the HMM was updated synchronously on every keystroke. This caused the EMA hysteresis layer (τ ≈ 4 seconds) to behave inconsistently: during fast typing (10+ keys/sec), the α = 0.25 update accumulated far more than once per second, while during silence the system received no updates at all.
+
+**Fix:** The analysis thread now enforces an **independent 1 Hz timer gate** using `Instant`-based absolute time scheduling. A `next_engine_update` timestamp advances by exactly 1 second after each HMM step. The `recv_timeout` duration is dynamically computed as the remaining time until the next scheduled update:
+
+- **Keystroke arrives:** Event is buffered and features are extracted. The HMM step executes only when `Instant::now() >= next_engine_update`.
+- **Timeout (no input):** A synthetic silence observation is generated via `make_silence_observation()` and fed to the HMM.
+- **Clock drift protection:** If `next_engine_update` falls behind `now` (e.g. after a system sleep), it is reset to `now + 1s` to prevent burst catch-up.
+
+This decoupling ensures exactly **one HMM forward step per second**, making the EMA time constant τ = 1/α ≈ 4 updates = **4 seconds** mathematically precise regardless of typing speed.
+
+### Synthetic Friction
+
+When the 1 Hz timer fires during extended silence, `make_silence_observation()` generates **synthetic friction** — artificial F3 (correction rate) and F6 (pause-after-delete rate) values that ramp up linearly with silence duration. The friction cap is released to 1.0 (v2.18), enabling full x_bin traversal so that prolonged inactivity (≥ 30 s) transitions the HMM from Incubation to Stuck, reflecting the cognitive shift from deliberate pause to unproductive stalling. See **Fix ③** in the Hysteresis section above for the detailed derivation and trajectory table.
+
+---
+
+## Intervention UI: Nudge & Wall (v2.5)
+
+When the intervention policy detects both sufficient Need and a valid Opportunity, the system provides graduated intervention through Tauri's transparent multi-window overlay system.
+
+### Two-Level Intervention
+
+| Level | Name | Trigger | Visual Effect | User Interaction |
+| --- | --- | --- | --- | --- |
+| **Lv1** | Nudge | `InterventionDecision.action == "nudge"` | Small side card that slides in from the right edge | Click-through (transparent to input) |
+| **Lv2** | Wall | `InterventionDecision.action == "wall"` (**suppressed when Monk Mode is ON**) | Full-screen blocking overlay with message; red warning banner on any keyboard input | Blocks all input until unlocked |
+
+### Nudge (Lv1): Gentle Side Cue
+
+The Nudge layer renders a compact card near the right edge of the screen instead of covering the full display with a mist or vignette. It only appears when the Opportunity layer allows intervention, and its opacity scales with the policy's Need score:
+
+```text
+opacity = clamp((need_score − 0.60) / 0.30, 0.2, 1.0)
+```
+
+The overlay window is set to **click-through** mode via Tauri's `setIgnoreCursorEvents(true)`, allowing the user to continue working while receiving a peripheral cue that they may be at a breakpoint. If the Need score is high but the current moment is not receptive (active typing, cooldown, daily cap, recent dismiss, away idle), the policy returns `defer` and no Nudge is shown.
+
+### Wall (Lv2): Forced Break
+
+If the policy's Wall accumulator reaches 30 seconds while need remains high (cumulative, with recovery decay) and the Opportunity constraints allow escalation, the system emits `InterventionDecision.action == "wall"` — a full-screen blocking overlay that requires **physical movement** to dismiss. The overlay displays:
+
+> *"Time to Move! Please stand up and walk around to unlock."*
+
+The Wall is unlocked **exclusively by the smartphone**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code, which opens a 2-minute countdown page on their phone. When the phone connects, a `wall-phone-connected` event is emitted to the frontend, displaying a "Phone connected — Zen Timer running" badge. When the timer reaches 0:00, an **"Unlock Wall" button** appears — the user must **manually tap** the button to POST to `/unlock`, which emits `"sensor-accelerometer"` with `"move"` payload and dismisses the Wall. A subdued **early-unlock button** is also available during the countdown for situations where the user needs to return to work immediately. The phone page also requests `navigator.wakeLock` to prevent screen dimming during the countdown. There is no PC-side fallback timer. If the user does not want the Wall to engage at all, they can enable **Monk Mode** from the Dashboard beforehand. Any keyboard input detected while the Wall is active triggers a **warning banner** on the overlay. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
+
+### Monk Mode (Wall Suppression Toggle)
+
+The Dashboard provides a **Monk Mode** toggle that disables automatic Wall activation. When Monk Mode is **ON**, the intervention policy suppresses `wall` actions while continuing to compute Need, Opportunity, and possible `nudge` / `defer` decisions. Toggling the button emits a `monk-mode-changed` boolean event (Tauri frontend broadcast) which both windows receive and use to sync their `isMonkMode` state. This allows users to enter a focused, uninterrupted deep work session without risk of forced breaks.
+
+### Dashboard Session Indicators
+
+The Dashboard panel shows two live indicators alongside the state bars:
+
+| Indicator | Source | Display |
+| --- | --- | --- |
+| **Session** | `Date.now()` on mount | Stopwatch (`M:SS` or `H:MM:SS`) |
+| **Keyboard** | `get_keyboard_idle_ms()` (reads `LAST_KEY_MS` atomic) | `Active` if idle < 3 s, else `Idle Xs` |
+
+The `get_keyboard_idle_ms` Tauri command returns `now_ms − LAST_KEY_MS`, where `LAST_KEY_MS` is the `AtomicU64` updated on every keystroke in `hook_callback`. This is used for dashboard display only — Wall unlock is driven by the phone timer, not PC-side idle detection.
+
+### Design Rationale
+
+This graduated intervention is grounded in the insight that work blocks often persist because the writer lacks awareness of being stuck (metacognitive failure). The Nudge provides gentle awareness without covering the working surface; the Wall enforces a physical context switch, which research suggests facilitates problem restructuring (Sio & Ormerod, 2009).
+
+---
+
+## Session Start Screen & Engine Reset (v2.6)
+
+### Problem
+
+Previous versions started keystroke detection and HMM inference immediately on app launch. This caused two issues:
+
+1. **Dirty warm-up data**: Keystrokes during app startup fed the HMM before a meaningful session began
+2. **Misleading initial display**: The hardcoded `useState` initial value (`stuck: 0.8`) showed "Stuck: 80%" before any real inference had occurred
+
+### Solution: Explicit Session Boundary
+
+A **Start Screen** is shown on app launch. Detection does not begin until the user clicks "開始する" (Start). On click, `invoke("start_session")` calls the Rust backend which:
+
+1. **Resets `CognitiveStateEngine`**: returns all HMM state to Flow-biased initial priors `[0.80, 0.15, 0.05]` (most users start sessions in a fluent state), clearing `display_probs`, `axes_ewma`, and `backspace_streak`
+2. **Flushes `FeatureExtractor`**: an `Arc<AtomicBool>` signal is set; the analysis thread clears all keystroke buffers and drains any queued key events
+3. **Logs session boundary**: `LogEntry::SessionStart { timestamp }` is written to the NDJSON log
+
+The React session timer starts from the click moment (not from app launch).
+
+### Benefits
+
+| Before (v2.5) | After (v2.6) |
+|---|---|
+| Detection starts immediately on launch | Detection starts on explicit user action |
+| Session timer starts at app launch | Session timer starts when user clicks "Start" |
+| HMM may be dirty from pre-session keystrokes | HMM always starts clean from initial priors |
+| No session boundary in log | `session_start` marker in NDJSON log |
+
+---
+
+## Frontend–Backend Initial State Sync (v2.7)
+
+### Background
+
+After the parameter tuning that updated the backend's initial priors from `[0.5, 0.3, 0.2]` to `[0.80, 0.15, 0.05]`, the React `useState` initial value remained at `{flow: 0.5, incubation: 0.3, stuck: 0.2}`. This caused a visible probability jump (flicker) immediately after the first `get_cognitive_state` poll returned data aligned with the new priors.
+
+### Resolution
+
+The `cognitiveState` initial value in `App.tsx` is synchronized with the backend's `initial_probs`:
+
+```tsx
+const [cognitiveState, setCognitiveState] = useState<CognitiveStateRaw>({
+  flow: 0.80,
+  incubation: 0.15,
+  stuck: 0.05,
+});
+```
+
+The UI now displays consistent values from launch to the first data poll (~500 ms), eliminating the cold-start flicker.
+
+---
+
+## Security & Reliability Hardening (v2.8)
+
+Six independent bugs and reliability gaps were identified and resolved, aligned with the macOS reference implementation.
+
+---
+
+### Fix ①: F1 30-Second Window (Feature Consistency Bug)
+
+**Problem:** `F1` (flight-time median) was computed from the full accumulated `flight_times` buffer (up to 600 events, ~10 min of history), while `F2`–`F6` were computed from a 30-second sliding window. This inconsistency caused F1 to respond far more slowly to recent typing rhythm changes than the other features, systematically biasing the HMM observation toward past behaviour.
+
+**Fix:** `F1` is now computed from the same 30-second `window_fts` vector used for the other features, ensuring all features reflect the same temporal scope.
+
+---
+
+### Fix ②: Pre-Session Event Drain (`SessionActive` gate)
+
+**Problem:** The analysis thread processed keystrokes from app launch, before the user clicked "開始する". Keystrokes typed while navigating the start screen (e.g. alt-tab, window focus) entered the feature buffer and subtly biased the initial HMM prior.
+
+**Fix:** A `SessionActive(Arc<AtomicBool>)` flag is introduced, initialized to `false`. The analysis thread drains (discards) all incoming key events via `try_recv()` until `start_session` sets the flag to `true`. The bounded channel (cap = 64) is also kept from overflowing during the pre-session phase.
+
+---
+
+### Fix ③: Backspace Streak — Atomic Decoupling & Penalty Race Fix
+
+**Problem:** `backspace_streak` was stored as `Arc<Mutex<u32>>`. Every keystroke (including at 10+ keys/sec) acquired and released the mutex twice (once in `register_keystroke`, once in `update()`), adding unnecessary lock overhead. A secondary race condition also existed: if BS×8 set the streak to the penalty threshold and the next non-BS key immediately reset it to 0 before `update()` ran, the penalty was silently dropped.
+
+**Fix:** Changed to `Arc<AtomicU32>`. A new `has_pending_penalty: Arc<AtomicBool>` flag is set by `register_keystroke` when the streak reaches the penalty threshold and is consumed (via `swap(false, AcqRel)`) by `update()` — surviving any streak reset in between. `is_paused` was similarly converted from `Arc<Mutex<bool>>` to `Arc<AtomicBool>`. All three atomics eliminate mutex overhead on the hot path.
+
+---
+
+### Fix ④: Channel-Based Logger Shutdown
+
+**Problem:** `quit_app` used `thread::sleep(400 ms)` to give the logger thread time to flush and close the NDJSON file before proceeding to Python post-processing. This was a race: under load the flush could take longer than 400 ms, corrupting the session file.
+
+**Fix:** `SessionLogger::start()` now returns a `Receiver<()>` (`shutdown_rx`) in addition to the `Sender<LogEntry>`. When `LogEntry::End` is processed and the file is flushed, the logger thread sends `()` on this channel. `quit_app` waits on `shutdown_rx.recv_timeout(2000 ms)` — a correct, bounded synchronization instead of a blind sleep.
+
+---
+
+### Fix ⑤: WallServer Cleanup on Quit
+
+**Problem:** `quit_app` did not stop the WallServer. On app exit the HTTP server thread kept running and the dynamically-added Windows Firewall rule (`GSE-WallServer-<port>`) was left in place.
+
+**Fix:** Added `WallServerState::stop()` which signals the server thread and calls `netsh` to remove the firewall rule. `quit_app` now calls `wall.stop()` as its first action.
+
+---
+
+### Fix ⑥: CSP & Hook Status API
+
+**Content Security Policy:** `tauri.conf.json` `csp` was `null` (no restrictions). Changed to `"default-src 'self'; style-src 'self' 'unsafe-inline'"`, restricting all resource loads to same-origin and limiting inline styles.
+
+**`get_hook_status` command:** Added for macOS API compatibility. The macOS version requires an explicit system permission prompt before the keyboard hook can be installed; this command exposes that status to the frontend. On Windows no prompt is needed, so the command unconditionally returns `true`.
+
+---
+
+## Centralized State Management & Phone Connection Badge (v2.9)
+
+### Unified Polling & Timer in App.tsx
+
+Previously, `App.tsx` used three independent `useEffect` hooks: one for cognitive state polling (500 ms), one for keyboard idle + hook status polling (1000 ms), and one for the Lv2 Wall cumulative timer (triggered by React render). This caused two problems:
+
+1. **Redundant polling**: `get_hook_status` was polled every second despite being a static value (always `true` on Windows; set once at permission grant on macOS).
+2. **Timer drift**: The Lv2 cumulative timer relied on `useEffect` dependency triggers, making its elapsed-time calculation dependent on React's rendering interval rather than wall-clock time.
+
+**Fix:** The three hooks are consolidated into a single architecture:
+
+- **`hookActive`** (`boolean | null`, initial `null`) is fetched **once on mount** — not polled:
+
+```tsx
+useEffect(() => {
+  invoke<boolean>("get_hook_status")
+    .then((active) => setHookActive(active))
+    .catch(() => setHookActive(true)); // optimistic fallback
+}, []);
+```
+
+- **A single 500 ms `setInterval`** fetches `get_cognitive_state` and `get_keyboard_idle_ms` via `Promise.all`, then computes the Lv2 timer in the same block using `Date.now()`-based elapsed time:
+
+```tsx
+const [state, idle] = await Promise.all([
+  invoke<CognitiveStateRaw>("get_cognitive_state"),
+  invoke<number>("get_keyboard_idle_ms"),
+]);
+// Lv2 timer computed here with Date.now() — no render-dependency drift
+```
+
+`Dashboard.tsx` no longer contains any `invoke()` calls or `setInterval` polling — it is a pure presentational component receiving all data via props.
+
+### Permission Warning Banner (Dashboard)
+
+When `hookActive === false`, a rich permission banner (class `permission-banner`) is displayed at the top of the Dashboard. On macOS, it shows step-by-step instructions for granting Input Monitoring access via System Settings. On Windows, it shows a keyboard hook initialization failure message with troubleshooting guidance. Both platforms report actual hook state via `get_hook_status` (backed by the `HOOK_ACTIVE` flag), with automatic retry and recovery.
+
+### Wall Unlock Screen (Overlay)
+
+The Wall overlay (displayed when `isWallActive` is true) provides a user-friendly unlock flow ported from the macOS version:
+
+- **QR container** (`qr-container`): wraps the QR code image with a camera hint ("Open camera app and point at QR code") and the server URL
+- **Network troubleshooting hint** (`wall-network-hint`): reminds the user to ensure PC and phone are on the same Wi-Fi
+- **Phone connection badge**: when the smartphone connects to the Wall Server, a "Phone connected — Zen Timer running" badge appears
+- **Typing warning**: if the user attempts to type during the Wall, a warning banner is shown for 2.5 seconds
+
+---
+
+## EWMA Drift Prevention & Lv2 Timer Stability (v2.10)
+
+### Silence-Specific HMM Update (`update_silence`)
+
+During keyboard inactivity (silence ticks), the standard `update()` method (α=0.30) would feed extreme idle-period features into the EWMA smoother too aggressively, causing rapid drift toward high-Friction values.
+
+**Fix:** A dedicated `update_silence()` method in `engine.rs` performs HMM transition and emission updates with a **3-stage reduced EWMA learning rate** (α=0.15 for initial silence, α=0.18 for ≥15 s, α=0.25 for deep silence ≥25 s). The intermediate α=0.18 gear ensures the Nudge zone (p_stuck 0.60–0.70) is traversed gradually, providing 5–8 seconds of Lv1 intervention before Lv2 Wall activation:
+
+```rust
+pub fn update_silence(&self, features: &Features, ime_open: bool, silence_secs: f64) {
+    let alpha = if silence_secs >= 25.0 {
+        0.25  // fully stuck — accelerated response
+    } else if silence_secs >= 15.0 {
+        0.18  // intermediate gear for gradual Nudge-zone traversal
+    } else {
+        0.15  // initial silence
+    };
+    // EWMA update with reduced α — responds to silence without aggressive drift
+    ewma.0 = alpha * raw_x + (1.0 - alpha) * ewma.0;
+    ewma.1 = alpha * raw_y + (1.0 - alpha) * ewma.1;
+    // HMM forward step uses updated EWMA position
+    // ...
+}
+```
+
+### Ref Mirror Pattern for Lv2 Timer
+
+Previously, `isWallActive` and `isMonkMode` were included in the unified polling `useEffect`'s dependency array. This caused the `setInterval` to be torn down and recreated whenever these values changed, introducing timing gaps in the Lv2 cumulative timer.
+
+**Fix:** State values are mirrored into refs, and the interval reads from refs instead:
+
+```tsx
+const isWallActiveRef = useRef(isWallActive);
+const isMonkModeRef = useRef(isMonkMode);
+useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
+useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
+
+// Dependency array: only [isStarted, windowLabel] — no teardown on Wall/Monk toggle
+```
+
+This ensures the 500 ms interval runs continuously without interruption, and `Date.now()`-based elapsed calculations remain accurate across Wall activation and Monk Mode toggles.
+
+---
+
+## Analysis Engine Parity & Silence Detection (v2.11)
+
+Sixteen fixes from the macOS reference implementation were evaluated for applicability to the Windows version. All platform-independent analysis engine improvements were ported, achieving feature parity between both platforms.
+
+---
+
+### Fix ①: F2 Removal (Dead Feature)
+
+F2 (Flight Time Variance) was not used in either the Cognitive Friction (X) or Productive Silence (Y) axis computations. It was removed from the `Features` struct, `FeatureExtractor::calculate_features()`, `make_silence_observation()`, `LogEntry::Feat`, and the logger format string. This eliminates unnecessary computation and log bloat.
+
+---
+
+### Fix ②: Key Repeat & Non-Typing Key Filtering (Hook + Feature Extractor)
+
+**Problem:** Key repeat events (holding a key down) inflated flight time calculations with artificial zero-interval entries. Non-typing keys (arrow keys, function keys, IME mode keys) introduced noise unrelated to typing rhythm. All raw key events consumed bounded channel capacity (64 slots) regardless of analytical relevance.
+
+**Fix:** Two-layer filtering ensures clean typing data reaches the HMM:
+
+1. **Hook-level gate** (`hook_callback`): `is_typing_key()` filters non-typing keys *before* they enter the crossbeam channel. `PRESSED_KEYS: Mutex<HashSet<u32>>` detects auto-repeat events and tags them with `is_repeat: true` in the `InputEvent` struct (v2.12). Repeat events are forwarded to the analysis thread so that long-press deletions (e.g., holding Backspace) contribute to F3/F5/F6 and trigger the Backspace streak penalty. `LAST_KEY_MS` (idle detection) and `POLL_WAKE_TX` (IME polling wake) remain unconditional for all keys.
+2. **Feature extractor** (`calculate_features()`): F1 (flight time) and F4 (burst length) skip events where `is_repeat == true`, preserving typing rhythm accuracy. F3, F5, and F6 include repeat events to accurately reflect deletion volume.
+
+`is_typing_key()` covers A–Z, 0–9, Numpad keys (0x60–0x6F), OEM symbol keys, Backspace, Enter, Space, Tab, and Delete.
+
+---
+
+### Fix ③: BS Penalty Threshold 8 → 14 (IME Compatibility)
+
+**Problem:** Japanese IME composition routinely generates 8–12 consecutive Backspace presses during normal editing (e.g. deleting a mis-converted word). The threshold of 8 triggered false Stuck penalties during ordinary Japanese writing.
+
+**Fix:** The Backspace streak penalty threshold was raised from 8 to 14. Additionally, the penalty is now guarded by IME mode: when `ime_open == true`, the penalty is suppressed entirely, since Backspace during IME composition is a normal editing operation, not an indicator of cognitive struggle.
+
+---
+
+### Fix ④: β\_writing Recalibration
+
+**Problem:** The β\_writing baseline values (F1=220, F3=0.08, F4=2.0, F5=4.0) were set before empirical IME typing data was available. F1=220 ms was far too high (IME typing typically produces ~100 ms flight times due to rapid romaji input), and F5=4.0 was too lenient (allowing 4 pauses before registering any friction).
+
+**Fix:** Recalibrated to F1=100, F3=0.10, F4=2.5, F5=1.0 based on observed Japanese writing sessions. These values correctly position normal IME typing in the Flow region while remaining sensitive to genuine hesitation.
+
+---
+
+### Fix ⑤: Independent 1Hz Gate Architecture
+
+**Problem:** The original `recv_timeout(1000ms)` approach drifted by the processing time of each iteration (feature extraction + HMM update), accumulating ~50–100 ms error per minute.
+
+**Fix:** Replaced with `Instant`-based absolute time scheduling. A `next_engine_update` timestamp advances by exactly 1 second after each HMM step. The `recv_timeout` duration is dynamically computed as `next_engine_update - now`. If the scheduled time falls behind (e.g. after system sleep), it resets to `now + 1s` to prevent burst catch-up. See the updated v2.4 section for details.
+
+---
+
+### Fix ⑥: Ongoing Silence F5 Augmentation
+
+**Problem:** `calculate_features()` only counts completed pauses within the 30-second window. During an ongoing 12-second silence, only past pauses are counted — the current silence is invisible to F5 until the user resumes typing.
+
+**Fix:** After `calculate_features()` returns, if `silence_secs >= 2.0` and the buffer contains real data (`f1 > 0`), the current silence duration is added to F5: `features.f5_pause_count += silence_secs / 2.0`. This ensures the HMM observes ongoing silence in real time.
+
+---
+
+### Fix ⑦: Silence-Break Protection (3-Keystroke Gate)
+
+**Problem:** A single accidental keypress after a long silence (e.g. bumping the keyboard) would reset the silence timer, causing the HMM to immediately receive a normal `update()` with α=0.30 — snapping the EWMA back toward Flow and erasing the accumulated silence signal.
+
+**Fix:** After ≥10 seconds of silence, the analysis thread requires 3 consecutive key presses before treating input as genuine resumed typing. Until 3 presses are reached, the silence timer continues running and `update_silence()` is used instead of `update()`.
+
+---
+
+### Fix ⑧: `force_flow_state()` Removal
+
+**Problem:** When the IME candidate window was detected, `force_flow_state()` was called to hold the display at Flow. This method destructively overwrote `display_probs`, `axes_ewma`, and HMM beliefs — completely erasing the engine's accumulated cognitive state. After the candidate window closed, the engine had to rebuild state from scratch.
+
+**Fix:** `force_flow_state()` was removed entirely. The IME monitor thread now only calls `engine.set_paused(active)`, which suspends HMM updates without destroying state. When the candidate window closes, the analysis thread clears the keystroke buffer (`extractor.reset()`) to prevent stale pre-pause flight times from contaminating F1, then inference resumes from the preserved HMM state via the silence path. The ImeMonitor thread also emits `LogEntry::ImeState` on each `IME_ACTIVE` state change for post-hoc analysis.
+
+---
+
+### Fix ⑨: Session Start Race Condition
+
+**Problem:** `start_session()` set `session_active = true` before `engine.reset()` completed. The analysis thread could observe the active flag and run an HMM update with stale pre-reset state.
+
+**Fix:** Reordered to `engine.reset()` → `reset_signal.store(true)` → `session_active.store(true)`. The reset signal is also consumed via `swap(false, AcqRel)` instead of separate `load` + `store` to prevent TOCTOU races.
+
+---
+
+### Fix ⑩: `register_keystroke` Cross-Platform Decoupling
+
+**Problem:** `CognitiveStateEngine::register_keystroke()` contained `if vk_code == 0x08` — a Windows-specific virtual key code (`VK_BACK`). On macOS the Delete key is `0x33` (`kVK_Delete`), making the Backspace streak logic non-functional on that platform.
+
+**Fix:** Changed `register_keystroke(vk_code: u32)` → `register_keystroke(is_backspace: bool)`. The OS-specific key code check is now performed at the call site in `lib.rs` (`event.vk_code == 0x08`), keeping the engine fully platform-agnostic. No mathematical or model behavior is changed.
+
+---
+
+## Hook-Level Repeat Event Forwarding (v2.12)
+
+### Problem
+
+The v2.11 hook-level gate discarded auto-repeat events (key held down) entirely, preventing them from reaching the analysis thread. This caused a critical gap in Stuck detection: **holding Backspace to bulk-delete text** — a strong signal of cognitive struggle — was invisible to the engine. The Backspace streak counter (`register_keystroke`) never incremented beyond 1 for a long-press, so the ≥14 consecutive BS penalty never fired.
+
+### Fix
+
+`InputEvent` now carries an `is_repeat: bool` field. The hook's `PRESSED_KEYS` set still detects auto-repeat, but instead of discarding the event, it tags it with `is_repeat: true` and sends it through the channel.
+
+**Feature-level handling:**
+
+| Feature | Repeat events | Rationale |
+|---|---|---|
+| **F1** (Flight Time) | Ignored (`continue`) | Repeats inject artificial zero-interval entries that distort typing rhythm |
+| **F3** (Correction Rate) | Included | Each repeated BS/Del is a real deletion — omitting them understates correction rate |
+| **F4** (Burst Length) | Ignored (`continue`) | Repeats inflate burst length without representing intentional sequential keystrokes |
+| **F5** (Pause Count) | Included | During a long-press, the user is active — gaps between repeats correctly shrink F5 |
+| **F6** (Del-Pause Rate) | Included | Repeated BS fills the gap after the initial press, so F6 only fires when the user truly stops |
+
+**Analysis thread handling:**
+
+- `register_keystroke()`: Repeat events are counted. Holding Backspace now increments the streak counter and fires the ≥14 BS penalty.
+- Silence-break protection (`presses_since_silence`): Repeat events are excluded — automatic key repetition does not constitute intentional typing resumption after silence.
+
+---
+
+## Cross-Platform InputEvent Semantic Extension (v2.13)
+
+### Problem
+
+v2.11 Fix ⑩ decoupled `register_keystroke()` from OS-specific key codes by changing its signature from `register_keystroke(vk_code: u32)` to `register_keystroke(is_backspace: bool)`. However, the decoupling was incomplete — the caller in `lib.rs` still hardcoded `event.vk_code == 0x08` (Windows `VK_BACK`), and the shared analysis core (`features.rs`) still contained OS-specific constants `VK_BACK = 0x08` and `VK_DELETE = 0x2E` used in F3 (correction rate) and F6 (delete-after-pause rate) calculations.
+
+### Fix
+
+Added `is_backspace: bool` to the `InputEvent` struct as a semantic flag that abstracts OS-specific deletion key detection:
+
+```rust
+pub struct InputEvent {
+    pub vk_code: u32,
+    pub timestamp: u64,
+    pub is_press: bool,
+    pub is_repeat: bool,
+    pub is_backspace: bool, // NEW: set by hook layer
+    pub is_paste: bool,     // later: Ctrl+V/Cmd+V flag (count only; clipboard content never read)
+}
+```
+
+**Changes by layer:**
+
+| Layer | File | Change |
+| --- | --- | --- |
+| **Hook (OS-specific)** | `hook.rs` | Sets `is_backspace = vk_code == 0x08 \|\| vk_code == 0x2E` (Windows: `VK_BACK` or `VK_DELETE`) when creating `InputEvent` |
+| **Analysis core (OS-agnostic)** | `features.rs` | Removed `const VK_BACK` / `const VK_DELETE`. F3 and F6 now use `event.is_backspace` instead of `event.vk_code == VK_BACK \|\| event.vk_code == VK_DELETE` |
+| **Orchestration** | `lib.rs` | `register_keystroke(event.is_backspace)` replaces `register_keystroke(event.vk_code == 0x08)` |
+
+**macOS equivalent:** The hook layer would set `is_backspace = keycode == 0x33 || keycode == 0x75` (`kVK_Delete` or `kVK_ForwardDelete`).
+
+With this change, `features.rs` and `lib.rs` have zero OS-specific key code references. The shared analysis core is fully platform-agnostic — it only reads semantic boolean flags set by the OS-specific hook layer. No mathematical or behavioral changes; this is a pure architectural refactor.
+
+---
+
+## Stuck Friction Limiter Release (v2.18)
+
+### Problem
+
+Log analysis revealed that `p_stuck` was structurally capped at ~5%, making it impossible to reach the Nudge threshold (p_stuck > 0.60) or Wall threshold (p_stuck > 0.70). Two root causes were identified:
+
+1. **Friction cap too low:** The `clamp` upper bounds for synthetic friction (F6: 0.45, F3: 0.35) prevented X (Cognitive Friction) from reaching x_bin ≥ 3 (Stuck-dominant emission region).
+2. **Silence path onset too late:** The normal update path (α=0.30) continued for 5 seconds of silence, repeatedly feeding stale window data into the HMM and locking it into Incubation.
+
+### Fix 1: Friction Limiter Release (`lib.rs`, `features.rs`)
+
+The `clamp` upper bound for both friction features was released from 0.45/0.35 to **1.0**, and divisors were reduced for faster ramp-up:
+
+| Parameter | Before | After |
+|---|---|---|
+| f6_floor (lib.rs) | `(s−8)/45`, cap 0.45 | `(s−8)/30`, cap 1.0 |
+| f3_floor (lib.rs) | `(s−10)/50`, cap 0.35 | `(s−10)/40`, cap 1.0 |
+| f6_synthetic (features.rs) | `(s−8)/60`, cap 0.45 | `(s−10)/40`, cap 1.0 |
+| f3_synthetic (features.rs) | `(s−15)/100`, cap 0.35 | `(s−15)/50`, cap 1.0 |
+
+The `max(0.15)` / `max(0.20)` floor guarantees at ≥10 s are preserved.
+
+### Fix 2: Silence Path Early Onset (`lib.rs`)
+
+The threshold for switching from the normal path (α=0.30) to the silence path (α=0.15) was lowered from **5 seconds** to **2 seconds**. This prevents stale buffer data from reinforcing Incubation during early silence.
+
+### Fix 3: Emission Cliff Smoothing (`engine.rs`)
+
+Incubation (State 1) x=1 row y=1 emission probability was reduced from **0.10** to **0.08**, smoothing the sharp transition between Flow-favorable and Incubation-favorable observation bins.
+
+### Effect
+
+Stuck is now reachable at ~30 s of sustained silence (previously ~50 s), enabling both Nudge and Wall interventions to fire as designed.
+
+---
+
+## macOS Parity Sync (v2.19)
+
+Four changes from the macOS reference implementation were ported to achieve full cross-platform parity.
+
+### Emission Table Sync (`engine.rs`)
+
+Friction-boundary tuning at x=2 and x=3 bins was applied to strengthen Stuck detection at moderate friction levels:
+
+| Position | Before | After | Effect |
+|---|---|---|---|
+| Flow x=2 y=3 (obs=13) | 0.06 | 0.01 | Reduce Flow claim at moderate friction |
+| Incubation x=2 y=3 (obs=13) | 0.01 | 0.02 | Slight Incubation increase |
+| Stuck x=2 y=3 (obs=13) | 0.01 | 0.05 | Stronger Stuck at moderate friction |
+| Stuck x=3 y=3 (obs=18) | 0.02 | 0.07 | Stronger Stuck at high friction |
+
+### Friction Floor Minimum Guarantee (`lib.rs`)
+
+When `silence_secs >= 10.0` in the buffer-present silence path, explicit floor values `f6_floor.max(0.15)` and `f3_floor.max(0.20)` are now enforced, matching the guarantees in `make_silence_observation()`.
+
+### Logger Flush Optimization (`logger.rs`)
+
+Changed from per-write `flush()` to 5-second idle timeout buffering via `recv_timeout`. `BufWriter`'s internal buffer is now utilized during high-frequency logging, significantly reducing I/O overhead. Final flush on `LogEntry::End` ensures zero data loss.
+
+### `is_typing_key` Migration (`features.rs` → `hook.rs`)
+
+The `is_typing_key()` function (containing Windows-specific virtual key codes) was moved from `features.rs` to `hook.rs` as a local function. Since the hook already filters non-typing keys before the channel, the redundant checks in `calculate_features()` were removed. `features.rs` now contains zero OS-specific references, completing the platform-agnostic analysis core goal from v2.13.
+
+---
+
+## IME Pause Event Discard & Zen Timer Manual Unlock (v2.20)
+
+Two improvements ported from the macOS reference implementation to improve buffer hygiene and intervention UX.
+
+### IME Pause Event Discard (`lib.rs`)
+
+Previously, `extractor.process_event()` was called unconditionally — even during IME pause (candidate window visible). Since the buffer is cleared via `extractor.reset()` when the pause ends, all events accumulated during the pause were discarded anyway. This wasted CPU cycles and unnecessarily grew the buffer.
+
+**Fix:** The `process_event()` call is now skipped entirely when `engine.get_paused()` returns `true`. Raw key events are still logged to the NDJSON file (logging is independent of feature extraction). When the pause ends, the existing `extractor.reset()` + clean restart path remains unchanged.
+
+### Zen Timer Manual Unlock (`wall_server.rs`)
+
+The smartphone timer page previously auto-POSTed to `/unlock` when the 2-minute countdown reached 0:00. This allowed users to simply wait at their desk without actually taking a break.
+
+**Fix:** When the timer reaches 0:00, an **"Unlock Wall" button** appears instead of auto-unlocking. The user must consciously tap the button to dismiss the Wall. This ensures at least a minimal intentional action after the break period.
+
+### Phone Connection Event (`wall_server.rs`)
+
+The Overlay frontend already listened for `wall-phone-connected` events (to show the "Phone connected" badge), but the backend never emitted this event.
+
+**Fix:** `app.emit("wall-phone-connected", ())` is now called when the phone first connects via the `/shake` endpoint (QR code scan). The connection badge now displays correctly.
+
+### Screen Wake Lock (`wall_server.rs`)
+
+The smartphone timer page now requests `navigator.wakeLock.request('screen')` to prevent the phone screen from dimming during the countdown. The lock is re-acquired on `visibilitychange` events. Non-supporting browsers fall back silently.
+
+---
+
+## Zen Timer Early Unlock Button (v2.21)
+
+The Zen Timer phone page now includes a subdued **early-unlock button** ("早期解除する") that is always visible during the 2-minute countdown. This allows users to dismiss the Wall immediately when they need to return to work urgently, without waiting for the full timer to expire.
+
+- **Primary flow (unchanged):** When the timer reaches 0:00, a prominent green "Unlock Wall" button appears. The early-unlock button is hidden at that point.
+- **Early unlock flow (new):** Tapping the subdued button at any time during the countdown calls the same `/unlock` endpoint and dismisses the Wall.
+- **Double-unlock prevention:** A shared `done` flag ensures `/unlock` is POSTed exactly once regardless of which button is tapped.
+- **Visual hierarchy:** The early-unlock button uses a transparent background with a faint border — intentionally less prominent than the primary button to encourage completing the full break.
+
+This change is confined to the `TIMER_HTML_TEMPLATE` string in `wall_server.rs` (HTML/CSS/JS only). No Rust logic, server routing, or frontend code was modified.
+
+---
+
+## macOS Overlay Click-Through Fix & Probe Window Clamp (v2.22)
+
+Two macOS-specific defects in the intervention overlay were fixed, plus a latent cross-platform window-clamp bug that silently dropped calibration labels.
+
+**Overlay click-through (macOS).** Probe/Nudge cards rendered but their buttons were unclickable — clicks passed through to the app behind. The root cause was a stack of issues; the immediate trigger was a missing Tauri capability:
+
+- **Capability (primary):** the overlay window lacked `core:window:allow-set-size` / `allow-set-position`. The box-resize `setSize` threw a permission exception *before* `setOverlayInteractive(true)` ran, so `ignoresMouseEvents` was never cleared. Both were added; the now-dead `allow-hide` / `allow-maximize` were removed.
+- **NSPanel conversion:** the overlay is converted to a non-activating `NSPanel` (`tauri-nspanel`, Floating level) so clicks route to the WKWebView even though the window never becomes key. New file `src-tauri/src/overlay_panel.rs`.
+- **Rust-authoritative click acceptance:** JS `setIgnoreCursorEvents` has no effect on an NSPanel-converted window, so `set_overlay_interactive` calls `set_ignore_mouse_events` + `resign_key_window` directly.
+- **No focus theft:** `show()` makes the panel key (stealing the editor's typing focus); `resign_key_window()` immediately returns the key. Verified `isKeyWindow=false`.
+- **idle no longer hides the overlay:** hiding put the webview JS to sleep and dropped `probe_triggered`; the overlay now stays visible-but-transparent + click-through.
+- **No maximize on NSPanel:** `maximize()` / `unmaximize()` crash (NSRangeException via `setStyleMask:`); full-screen uses explicit `setSize` / `setPosition`.
+
+**Probe window clamp (cross-platform).** `record_realtime_*` rejected labels with `window_end_ms must be >= window_start_ms` whenever a probe/marker fired within 5 s of session start. `self_marker_window_clamped` clamped only the window **start** to `session_start`, leaving the end at `t − 5 s`, which inverted when the session was younger than 5 s. Fixed by clamping the end too (`we = we.max(ws)`), collapsing to a zero-width window (correctly representing "no pre-session data"). Real scheduler probes are unaffected (31 s warm-up); the M/D self-marker's startup-window loss is also fixed. Regression test added.
+
+Backend touch points: `overlay_panel.rs` (new), `lib.rs`, `analysis/probe_scheduler.rs`, `capabilities/default.json`. Frontend: `Overlay.tsx`. Verified: 228 lib tests pass, replay snapshot unchanged (HMM invariant), real-machine smoke. See `docs/verification-runbook.md` §2.
+

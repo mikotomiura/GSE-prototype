@@ -1169,6 +1169,21 @@ enum ReplayEvent {
     /// 読み飛ばし専用。EH3 の招待を出した時刻（記録のみ・推論へ流さない）。
     #[serde(rename = "invitation_present")]
     InvitationPresent(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。通常のモードで招待を許すセッションの条件（記録のみ・推論へ流さない）。
+    #[serde(rename = "invitation_condition")]
+    InvitationCondition(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。段 1 の問いの枠（記録のみ・推論へ流さない）。`--probes` で読む（M5 の 3 本目）。
+    #[serde(rename = "probe_frame")]
+    ProbeFrame(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。段 1 の出さなかった候補（記録のみ・推論へ流さない）。
+    #[serde(rename = "probe_suppressed")]
+    ProbeSuppressed(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。段 1 の日の終わりの問い（記録のみ・推論へ流さない）。
+    #[serde(rename = "day_question")]
+    DayQuestion(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。手跡のその日の累計の写し（記録のみ・推論へ流さない・ADR-051 D4）。
+    #[serde(rename = "handmark_day")]
+    HandmarkDay(#[allow(dead_code)] serde_json::Value),
     /// ⚠️★★★ **O1 の監査 criterion**（ADR-031 D1）。★ 読み飛ばし専用。
     ///
     /// ⚠️★★★ **2026-09-14 に足し忘れて実測で踏んだ。**★ `activity_label` 行を 1 本足した
@@ -1279,6 +1294,12 @@ impl ReplayEvent {
             // EH3 の 2 行種も記録のみで推論へ流さない。
             ReplayEvent::Eh3Day(_) => None,
             ReplayEvent::InvitationPresent(_) => None,
+            ReplayEvent::InvitationCondition(_) => None,
+            // 段 1 の 3 行種も記録のみで推論へ流さない。
+            ReplayEvent::ProbeFrame(_) => None,
+            ReplayEvent::ProbeSuppressed(_) => None,
+            ReplayEvent::DayQuestion(_) => None,
+            ReplayEvent::HandmarkDay(_) => None,
             // ⚠️★★★ 監査 criterion（ADR-031）。★ 記録のみで推論へ流さない。
             ReplayEvent::ActivityLabel(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
@@ -1528,6 +1549,18 @@ struct Args {
     segments_path: Option<PathBuf>,
     /// --intervention: v2 介入ポリシーをオフライン反実仮想リプレイし HIR/DC 等を算出
     intervention: bool,
+    /// --invitation <trigger.json>: 招待の契機（`TriggerKind` の JSON）を記録から再現し、契機が立った時刻と
+    /// 出した時刻を JSON で出す（ADR-040 D4・`feat` 行の `p_stuck` と `key` 行の押下の時刻だけを読む）。
+    invitation_path: Option<PathBuf>,
+    /// --utc-offset-secs <N>: `--invitation` の現地の日（4:00 区切り）の計算に使う UTC との差（秒・既定 0）。
+    /// `--probes` では任意（無ければ日の問いと no_ask を照合しない）、`--day-questions` では必須。
+    utc_offset_secs: Option<i32>,
+    /// --probes: 段 1 の問いの行を、記録から調停器を回し直して照合する（M5 の 3 本目）。複数の記録を受ける。
+    probes: bool,
+    /// --day-questions: 段 1 の日の問いに答えた後の押下の数を出す。複数の記録を受ける。
+    day_questions: bool,
+    /// --day-state <s1_day_state.json>: `--probes` の前日までの日の問いの状態（任意）。
+    day_state_path: Option<PathBuf>,
     /// --calibration: v0.3 較正解析 (時間隔離窓 C-index / 2段ゲート / MNAR / ビネット)。
     /// 1 被験者の複数セッションを受けるため、追加の positional を `extra_sessions` に積む。
     calibration: bool,
@@ -1540,6 +1573,24 @@ struct Args {
     /// --corr-floor: correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (Step 2)。
     /// `--sweep` と同様に複数セッションを受ける。
     corr_floor: bool,
+    /// --handmark-windows: 手跡の机上の道具（PR 4・ADR-051 D3）。記録から 30 秒の窓ごとの表（A・B_state・T1・T2）を
+    /// 出す。複数の記録を受ける。`--utc-offset-secs`・`--handmark-table`・`--handmark-table-sha` が必須。
+    handmark_windows: bool,
+    /// --handmark-table <path>: 割付の表（`gse-handmark-table` の出力）。
+    hm_table_path: Option<PathBuf>,
+    /// --handmark-table-sha <path>: 表の `.sha256`。合わなければ止める。
+    hm_table_sha_path: Option<PathBuf>,
+    /// --labels recomputed: T1・T2 を記録の `feat` でなく、`key` から計算し直した推定で作る（合成の入力用）。
+    hm_labels_recomputed: bool,
+    /// --frames <path>: 画素を描くためのコマ（バイナリ・`desk::Sample`）を書く先。
+    hm_frames_path: Option<PathBuf>,
+    /// --inject-stuck <λ>: 机上の陽性対照（判断 4）。描き直しの状態に `p_stuck` を混ぜる。0 は混ぜない。
+    hm_inject: f64,
+    /// --samples <n>: 窓あたりの標本の数（30000 を割り切る・既定 10・判断 9）。
+    hm_samples: usize,
+    /// --handmark-redactions <ledger>: 区間指定削除の台帳（`redaction_ledger.jsonl`）。重なる日を感度分析から除く
+    /// （conditions.md C7）。
+    hm_redactions_path: Option<PathBuf>,
     /// --features: ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力する (issue 001-007)。
     /// ⚠️ 手元の解析用中間成果物であり `gse-dataset` へ共有しない (`docs/glossary.md` 逐語)。
     features: bool,
@@ -1554,6 +1605,30 @@ struct Args {
     pole: Option<String>,
     /// `--calibration` / `--sweep` / `--nudge-diag` / `--corr-floor` の 2 個目以降の positional。
     extra_sessions: Vec<PathBuf>,
+}
+
+/// フラグを取り除き、あったかを返す。
+fn take_flag(args: &mut Vec<String>, name: &str) -> bool {
+    match args.iter().position(|a| a == name) {
+        Some(pos) => {
+            args.remove(pos);
+            true
+        }
+        None => false,
+    }
+}
+
+/// `name <value>` を取り除き、値を返す。値が無ければ誤り。
+fn take_value(args: &mut Vec<String>, name: &str) -> Result<Option<String>, String> {
+    let Some(pos) = args.iter().position(|a| a == name) else {
+        return Ok(None);
+    };
+    if pos + 1 >= args.len() {
+        return Err(format!("{name} requires an argument"));
+    }
+    let v = args.remove(pos + 1);
+    args.remove(pos);
+    Ok(Some(v))
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -1625,6 +1700,133 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     } else {
         false
     };
+
+    // --invitation <trigger.json> フラグ (招待の契機の再現)
+    let invitation_path = if let Some(pos) = args.iter().position(|a| a == "--invitation") {
+        if pos + 1 >= args.len() {
+            return Err("--invitation requires a path argument".to_string());
+        }
+        let path = args.remove(pos + 1);
+        args.remove(pos);
+        Some(PathBuf::from(path))
+    } else {
+        None
+    };
+    let utc_offset_secs = if let Some(pos) = args.iter().position(|a| a == "--utc-offset-secs") {
+        if pos + 1 >= args.len() {
+            return Err("--utc-offset-secs requires an integer argument".to_string());
+        }
+        let v = args.remove(pos + 1);
+        args.remove(pos);
+        Some(
+            v.parse::<i32>()
+                .map_err(|_| "--utc-offset-secs requires an integer argument".to_string())?,
+        )
+    } else {
+        None
+    };
+    // --probes / --day-questions（段 1 の再生・M5 の 3 本目）
+    let probes = if let Some(pos) = args.iter().position(|a| a == "--probes") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+    let day_questions = if let Some(pos) = args.iter().position(|a| a == "--day-questions") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+    let day_state_path = if let Some(pos) = args.iter().position(|a| a == "--day-state") {
+        if pos + 1 >= args.len() {
+            return Err("--day-state requires a path argument".to_string());
+        }
+        let path = args.remove(pos + 1);
+        args.remove(pos);
+        Some(PathBuf::from(path))
+    } else {
+        None
+    };
+    let handmark_windows = take_flag(&mut args, "--handmark-windows");
+    let hm_sub_given = [
+        "--handmark-table",
+        "--handmark-table-sha",
+        "--labels",
+        "--frames",
+        "--inject-stuck",
+        "--samples",
+        "--handmark-redactions",
+    ]
+    .iter()
+    .any(|f| args.iter().any(|a| a == f));
+    let hm_table_path = take_value(&mut args, "--handmark-table")?.map(PathBuf::from);
+    let hm_table_sha_path = take_value(&mut args, "--handmark-table-sha")?.map(PathBuf::from);
+    let hm_labels_recomputed = match take_value(&mut args, "--labels")?.as_deref() {
+        None | Some("recorded") => false,
+        Some("recomputed") => true,
+        Some(other) => {
+            return Err(format!(
+                "--labels must be recorded or recomputed, got {other}"
+            ))
+        }
+    };
+    let hm_frames_path = take_value(&mut args, "--frames")?.map(PathBuf::from);
+    let hm_redactions_path = take_value(&mut args, "--handmark-redactions")?.map(PathBuf::from);
+    let hm_inject = match take_value(&mut args, "--inject-stuck")? {
+        None => 0.0,
+        Some(v) => match v.parse::<f64>() {
+            Ok(x) if (0.0..=1.0).contains(&x) => x,
+            _ => {
+                return Err(format!(
+                    "--inject-stuck must be a number in [0, 1], got {v}"
+                ))
+            }
+        },
+    };
+    let hm_samples = match take_value(&mut args, "--samples")? {
+        None => gse_next_lib::analysis::handmark::desk::DEFAULT_SAMPLES,
+        Some(v) => match v.parse::<usize>() {
+            // 区間の標本は全部メモリに持つので、上限を置く（1 日・窓 2880 本・30 時点で約 350 MB）
+            Ok(n) if (1..=30).contains(&n) => n,
+            _ => return Err(format!("--samples must be an integer in 1..=30, got {v}")),
+        },
+    };
+    // 値が既定でも、下位の引数を渡したこと自体を見る（モードなしで黙って無視しない）
+    let hm_sub_flag = hm_sub_given;
+    if hm_sub_flag && !handmark_windows {
+        return Err(
+            "--handmark-table, --handmark-table-sha, --labels, --frames, --inject-stuck, --samples and --handmark-redactions require --handmark-windows"
+                .to_string(),
+        );
+    }
+    if handmark_windows
+        && (utc_offset_secs.is_none() || hm_table_path.is_none() || hm_table_sha_path.is_none())
+    {
+        // ★ 既定の時差・表なしで黙って回さない（日の境と種が変わる）
+        return Err(
+            "--handmark-windows requires --utc-offset-secs, --handmark-table and --handmark-table-sha"
+                .to_string(),
+        );
+    }
+    if utc_offset_secs.is_some()
+        && invitation_path.is_none()
+        && !probes
+        && !day_questions
+        && !handmark_windows
+    {
+        return Err(
+            "--utc-offset-secs requires --invitation, --probes, --day-questions or --handmark-windows"
+                .to_string(),
+        );
+    }
+    if day_questions && utc_offset_secs.is_none() {
+        // ★ 既定 0 で黙って数え違えない（4:00 の切れ目が時差で動く）
+        return Err("--day-questions requires --utc-offset-secs".to_string());
+    }
+    if day_state_path.is_some() && !probes {
+        return Err("--day-state requires --probes".to_string());
+    }
 
     // --calibration フラグ (v0.3 較正解析)
     let calibration = if let Some(pos) = args.iter().position(|a| a == "--calibration") {
@@ -1729,18 +1931,22 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         segments_path.is_some(),
         snapshot_path.is_some(),
         intervention,
+        invitation_path.is_some(),
+        probes,
+        day_questions,
         calibration,
         sweep,
         nudge_diag,
         corr_floor,
         features,
+        handmark_windows,
     ]
     .iter()
     .filter(|&&v| v)
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep, --nudge-diag, --corr-floor, --features are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --invitation, --probes, --day-questions, --calibration, --sweep, --nudge-diag, --corr-floor, --features, --handmark-windows are mutually exclusive"
                 .to_string(),
         );
     }
@@ -1750,7 +1956,15 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     if args.is_empty() {
         return Err("expected at least 1 positional argument (session.ndjson)".to_string());
     }
-    if !calibration && !sweep && !nudge_diag && !corr_floor && args.len() != 1 {
+    if !calibration
+        && !sweep
+        && !nudge_diag
+        && !corr_floor
+        && !probes
+        && !day_questions
+        && !handmark_windows
+        && args.len() != 1
+    {
         return Err(format!(
             "expected 1 positional argument (session.ndjson), got {}",
             args.len()
@@ -1768,16 +1982,530 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         segment,
         segments_path,
         intervention,
+        invitation_path,
+        utc_offset_secs,
+        probes,
+        day_questions,
+        day_state_path,
         calibration,
         sweep,
         nudge_diag,
         corr_floor,
+        handmark_windows,
+        hm_table_path,
+        hm_table_sha_path,
+        hm_labels_recomputed,
+        hm_frames_path,
+        hm_inject,
+        hm_redactions_path,
+        hm_samples,
         features,
         feature_config_path,
         feature_sets,
         pole,
         extra_sessions,
     })
+}
+
+/// `--invitation` の記録の 1 行の上限(1 MiB)。超えたら Err(exit 1)。設定ファイルの上限(64 KiB)は
+/// `invitation_trigger::MAX_CONFIG_BYTES`。
+const INVITATION_MAX_LINE_BYTES: u64 = 1 << 20;
+
+/// `--invitation`: 記録の `feat` 行（`t`・`p_stuck`）と `key` 行（押下の時刻だけ）から tick を組み、
+/// 実機と同じ状態機械で契機を再現する。⚠️ 打鍵の本文は読まない（`key` 行は `t` と `press` だけ）。
+fn run_invitation(
+    session: &Path,
+    trigger_path: &Path,
+    utc_offset_secs: i32,
+) -> Result<serde_json::Value, String> {
+    use std::io::Read;
+    let trigger_text = gse_next_lib::invitation_trigger::read_config_text(trigger_path)
+        .ok()
+        .flatten()
+        .ok_or_else(|| {
+            "trigger file could not be read (missing, not a regular file or over 64 KiB)"
+                .to_string()
+        })?;
+    let kind = gse_next_lib::analysis::invitation::TriggerKind::from_json(&trigger_text)
+        .ok_or_else(|| {
+            "trigger file is invalid (unknown field, missing or out-of-range value)".to_string()
+        })?;
+    let file = File::open(session).map_err(|_| "session file could not be read".to_string())?;
+    let mut reader = BufReader::new(file);
+    let (mut feats, mut presses): (Vec<(u64, f64)>, Vec<u64>) = (Vec::new(), Vec::new());
+    let mut prev_feat: Option<u64> = None;
+    // 無作為の実効 seed を導く開始時刻: 最初の `session_start` 行の `t`(実機の SESSION_START_MS と同じ値)。
+    // 無ければ `meta.session_start`(ファイルを開いた時刻・実機の値とは別なので出力に由来を書く)。
+    let mut session_start_row: Option<u64> = None;
+    let mut meta_session_start: Option<u64> = None;
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        buf.clear();
+        let n = (&mut reader)
+            .take(INVITATION_MAX_LINE_BYTES + 1)
+            .read_until(b'\n', &mut buf)
+            .map_err(|_| "session file could not be read".to_string())?;
+        if n == 0 {
+            break;
+        }
+        let content_len = buf.len() - usize::from(buf.last() == Some(&b'\n'));
+        if content_len as u64 > INVITATION_MAX_LINE_BYTES {
+            return Err("a session line is over 1 MiB".to_string());
+        }
+        let Ok(v) = serde_json::from_slice::<serde_json::Value>(&buf[..content_len]) else {
+            continue;
+        };
+        if v.get("type").and_then(|x| x.as_str()) == Some("meta") {
+            if meta_session_start.is_none() {
+                meta_session_start = v.get("session_start").and_then(|x| x.as_u64());
+            }
+            continue;
+        }
+        let Some(t) = v.get("t").and_then(|x| x.as_u64()) else {
+            continue;
+        };
+        match v.get("type").and_then(|x| x.as_str()) {
+            Some("session_start") => {
+                if session_start_row.is_none() {
+                    session_start_row = Some(t);
+                }
+            }
+            Some("key") => {
+                if v.get("press").and_then(|x| x.as_bool()) == Some(true) {
+                    presses.push(t);
+                }
+            }
+            Some("feat") => {
+                // 時計の戻り・同じ時刻の行は、並べ替えると実際と違う時系列になるので受け付けない
+                if prev_feat.is_some_and(|q| t <= q) {
+                    return Err("feat rows are not strictly increasing in t".to_string());
+                }
+                prev_feat = Some(t);
+                // p_stuck の欠けは 0 にしない(停滞なしと誤読させない)
+                let p = v
+                    .get("p_stuck")
+                    .and_then(|x| x.as_f64())
+                    .ok_or_else(|| "a feat row has no p_stuck".to_string())?;
+                feats.push((t, p));
+            }
+            _ => {}
+        }
+    }
+    let (session_start_ms, session_start_source) = match (session_start_row, meta_session_start) {
+        (Some(t), _) => (t, "session_start_row"),
+        (None, Some(t)) => (t, "meta"),
+        (None, None) => (0, "none"),
+    };
+    if matches!(
+        kind,
+        gse_next_lib::analysis::invitation::TriggerKind::Random { .. }
+    ) && session_start_source == "none"
+    {
+        return Err(
+            "random trigger needs a session start (session_start row or meta) in the recording"
+                .to_string(),
+        );
+    }
+    let ticks = gse_next_lib::invitation_trigger::build_recorded_ticks(&feats, &presses);
+    let run = gse_next_lib::invitation_trigger::replay_recorded(
+        &ticks,
+        kind,
+        session_start_ms,
+        utc_offset_secs,
+    );
+    Ok(serde_json::json!({
+        "trigger": kind,
+        "feat_rows": ticks.len(),
+        "utc_offset_secs": utc_offset_secs,
+        "session_start_ms": session_start_ms,
+        "session_start_source": session_start_source,
+        "triggered": run.triggered,
+        "presented": run.presented,
+    }))
+}
+
+/// 記録を 1 行 1 MiB の上限つきで読む（`--invitation` と同じ上限）。
+fn read_session_text(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+    let name = path.display();
+    let file = File::open(path).map_err(|_| format!("{name}: could not be read"))?;
+    let mut reader = BufReader::new(file);
+    let mut text = String::new();
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        buf.clear();
+        let n = (&mut reader)
+            .take(INVITATION_MAX_LINE_BYTES + 1)
+            .read_until(b'\n', &mut buf)
+            .map_err(|_| format!("{name}: could not be read"))?;
+        if n == 0 {
+            break;
+        }
+        let content_len = buf.len() - usize::from(buf.last() == Some(&b'\n'));
+        if content_len as u64 > INVITATION_MAX_LINE_BYTES {
+            return Err(format!("{name}: a session line is over 1 MiB"));
+        }
+        // ★ UTF-8 でない行は置き換えて読まず、JSON として読めない行として数えさせる（security-checker LOW:
+        //   置き換えると欄の値が化けたまま受理され、数えられずに照合が食い違う）
+        match std::str::from_utf8(&buf[..content_len]) {
+            Ok(line) => text.push_str(line),
+            Err(_) => text.push_str("<not utf-8>"),
+        }
+        text.push('\n');
+    }
+    Ok(text)
+}
+
+/// 割付の表の上限（表は日数ぶんの行だけで小さい）。
+const HM_TABLE_MAX_BYTES: u64 = 1 << 20;
+/// 記録の `feat` の T1 と、計算し直した T1 の一致の下限（設計 v2 §1.4・下回れば止める）。
+const HM_LABEL_AGREEMENT_MIN: f64 = 0.95;
+
+fn read_small(path: &Path, what: &str) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let file = File::open(path).map_err(|_| format!("{what} could not be read"))?;
+    let mut buf = Vec::new();
+    file.take(HM_TABLE_MAX_BYTES + 1)
+        .read_to_end(&mut buf)
+        .map_err(|_| format!("{what} could not be read"))?;
+    if buf.len() as u64 > HM_TABLE_MAX_BYTES {
+        return Err(format!("{what} is over 1 MiB"));
+    }
+    Ok(buf)
+}
+
+/// 机上の陽性対照（判断 4・設計 v2 §2）。製品の写像には入れない（`analysis/` に置かない）。
+/// `λ = 0` か `p_stuck` がまだ無いときは、入力をビットのまま返す。
+fn inject_stuck(
+    s: gse_next_lib::analysis::handmark::state::StageState,
+    p: Option<f64>,
+    lam: f64,
+) -> gse_next_lib::analysis::handmark::state::StageState {
+    match p {
+        Some(p) if lam != 0.0 => gse_next_lib::analysis::handmark::state::StageState {
+            speed: (1.0 - lam) * s.speed + lam * 0.6 * p,
+            irreg: (1.0 - lam) * s.irreg + lam * p,
+            ..s
+        },
+        _ => s,
+    }
+}
+
+/// コマ 1 枚をバイナリで書く（little endian）。
+/// `id u32・t u64・speed irreg phase drift f64・layout_seed u32・場の有無 u8・[480 × i8]・波紋の数 u8・(x f32, y f32, 経過 u16)…`
+/// 場は窓へ送るのと同じ `trace::encode_cells`（i8）で書く（node は画面と同じ `decodeCells` で戻す）。
+fn write_frame(out: &mut Vec<u8>, id: u32, s: &gse_next_lib::analysis::handmark::desk::Sample) {
+    out.extend_from_slice(&id.to_le_bytes());
+    out.extend_from_slice(&s.t.to_le_bytes());
+    for v in [s.state.speed, s.state.irreg, s.state.phase, s.state.drift] {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.extend_from_slice(&s.state.layout_seed.to_le_bytes());
+    match &s.field {
+        Some(cells) => {
+            out.push(1);
+            for v in gse_next_lib::analysis::handmark::trace::encode_cells(cells) {
+                out.push(v as u8);
+            }
+        }
+        None => out.push(0),
+    }
+    let n = s.ripples.len().min(255);
+    out.push(n as u8);
+    for r in &s.ripples[..n] {
+        out.extend_from_slice(&r.0.to_le_bytes());
+        out.extend_from_slice(&r.1.to_le_bytes());
+        out.extend_from_slice(&r.2.to_le_bytes());
+    }
+}
+
+/// 区間指定削除の台帳（1 行 1 件・`from`・`to` を ms で持つ）から区間を読む。読めない行は止める（fail-closed）。
+fn parse_redaction_ledger(bytes: &[u8]) -> Result<Vec<(u64, u64)>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|_| "redaction ledger is not UTF-8")?;
+    let mut out = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = serde_json::from_str(line)
+            .map_err(|_| format!("redaction ledger line {} is not JSON", i + 1))?;
+        let from = v.get("from").and_then(serde_json::Value::as_u64);
+        let to = v.get("to").and_then(serde_json::Value::as_u64);
+        match (from, to) {
+            (Some(a), Some(b)) if a <= b => out.push((a, b)),
+            _ => {
+                return Err(format!(
+                    "redaction ledger line {} has no valid from/to",
+                    i + 1
+                ))
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// `--handmark-windows`: 窓の表を NDJSON の文字列で返す（1 行目がヘッダ・最後の行が要約）。
+/// 誤りのときは stdout に 1 バイトも出さない（全部を作ってから返す）。
+fn run_handmark_windows(args: &Args, paths: &[PathBuf]) -> Result<String, String> {
+    use gse_next_lib::analysis::handmark::{assignment, desk};
+    let offset = args
+        .utc_offset_secs
+        .ok_or_else(|| "--utc-offset-secs is required".to_string())?;
+    let table_path = args
+        .hm_table_path
+        .as_ref()
+        .ok_or("--handmark-table is required")?;
+    let sha_path = args
+        .hm_table_sha_path
+        .as_ref()
+        .ok_or("--handmark-table-sha is required")?;
+    let table_bytes = read_small(table_path, "handmark table")?;
+    let sha_bytes = read_small(sha_path, "handmark table sha")?;
+    let sha_text = String::from_utf8(sha_bytes).map_err(|_| "handmark table sha is not UTF-8")?;
+    let table_sha = match assignment::load_from_bytes(Some(&table_bytes), Some(&sha_text)) {
+        assignment::TableLoad::Ok { sha256, .. } => sha256,
+        other => return Err(format!("handmark table rejected: {other:?}")),
+    };
+    // コマの書き出し先が入力（記録・表）と同じなら止める（打ち間違いで一次の記録を上書き・削除しない）
+    if let Some(fp) = &args.hm_frames_path {
+        let target = std::fs::canonicalize(fp).ok();
+        for q in paths.iter().chain([table_path, sha_path]) {
+            if target.is_some() && std::fs::canonicalize(q).ok() == target {
+                return Err("--frames points at an input file".to_string());
+            }
+        }
+    }
+    let mut files = Vec::new();
+    let mut recomputed: Vec<Vec<desk::Feat>> = Vec::new();
+    for p in paths {
+        let text = read_session_text(p)?;
+        // 出力に書く名前はファイルの中身の SHA-256 の先頭 12 桁（ファイル名には開始の時刻が入るため）
+        let name = assignment::sha256_hex(text.as_bytes())[..12].to_string();
+        let f = desk::parse_file(&name, &text)?;
+        let snaps = run_replay(p)?;
+        // run_replay はファイルを読み直すので、その間に中身が変わっていないかを確かめる
+        if assignment::sha256_hex(read_session_text(p)?.as_bytes())[..12] != name {
+            return Err(format!("input {name} changed while it was being read"));
+        }
+        recomputed.push(
+            snaps
+                .iter()
+                .map(|s| desk::Feat {
+                    t: s.timestamp,
+                    p: [s.p_flow, s.p_inc, s.p_stuck],
+                })
+                .collect(),
+        );
+        files.push(f);
+    }
+    let mut order: Vec<usize> = (0..files.len()).collect();
+    order.sort_by_key(|&i| files[i].session_start);
+    let mut files: Vec<desk::DeskFile> = order.iter().map(|&i| files[i].clone()).collect();
+    let mut recomputed: Vec<Vec<desk::Feat>> =
+        order.iter().map(|&i| recomputed[i].clone()).collect();
+    // 再起動のときの session_end の遅れだけを解き、行が重なれば止める（desk::resolve_overlaps）
+    let ends_clamped = desk::resolve_overlaps(&mut files)?;
+    // 対象の元を差し替える（recomputed）か、照合の相手にする（recorded）
+    if args.hm_labels_recomputed {
+        for (f, r) in files.iter_mut().zip(recomputed.iter_mut()) {
+            f.feats = std::mem::take(r);
+        }
+    }
+    let redactions = match &args.hm_redactions_path {
+        Some(p) => parse_redaction_ledger(&read_small(p, "redaction ledger")?)?,
+        None => Vec::new(),
+    };
+    let cfg = desk::DeskConfig {
+        utc_offset_secs: offset,
+        table_sha256_hex: table_sha.clone(),
+        samples: args.hm_samples,
+        redactions,
+    };
+    let lam = args.hm_inject;
+    let transform = move |s, p| inject_stuck(s, p, lam);
+    // コマは大きい（10 時点で窓 1 本あたり約 11 KB）ので、溜めずにファイルへ順に書く。新しく作るだけで、
+    // 既にあるファイルには書かない（上書き・後始末での削除が自分の作ったファイルだけに及ぶように）。誤りなら消す。
+    let want_frames = args.hm_frames_path.is_some();
+    let mut frame_writer = match &args.hm_frames_path {
+        Some(fp) => Some(std::io::BufWriter::new(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(fp)
+                .map_err(|_| {
+                    "frames file could not be created (it must not exist yet)".to_string()
+                })?,
+        )),
+        None => None,
+    };
+    let mut frame_buf: Vec<u8> = Vec::new();
+    let mut frame_err = false;
+    let built = desk::build(&files, &cfg, &transform, &mut |id, s| {
+        if let Some(w) = frame_writer.as_mut() {
+            frame_buf.clear();
+            write_frame(&mut frame_buf, id, s);
+            if w.write_all(&frame_buf).is_err() {
+                frame_err = true;
+            }
+        }
+    });
+    let flushed = frame_writer.map_or(Ok(()), |mut w| w.flush());
+    let cleanup = || {
+        if let Some(fp) = &args.hm_frames_path {
+            let _ = std::fs::remove_file(fp);
+        }
+    };
+    let out = match built {
+        Ok(o) if !frame_err && flushed.is_ok() => o,
+        Ok(_) => {
+            cleanup();
+            return Err("frames file could not be written".to_string());
+        }
+        Err(e) => {
+            cleanup();
+            return Err(e);
+        }
+    };
+    // 記録の feat を使ったときは、計算し直した T1 と照らす。照らすのは、記録の HMM の版がいまのエンジンと
+    // 同じ記録の窓だけ（版が変わった日は、その日に系が出した判断のまま使う・設計 v2 §1.4）。下回れば止める。
+    let label_check = if args.hm_labels_recomputed {
+        serde_json::Value::Null
+    } else {
+        let mut per_version: std::collections::BTreeMap<String, (usize, usize)> =
+            std::collections::BTreeMap::new();
+        for w in &out.windows {
+            let v = w
+                .hmm_version
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string());
+            let e = per_version.entry(v.clone()).or_insert((0, 0));
+            e.1 += 1;
+            if v != HMM_VERSION {
+                continue;
+            }
+            let r = &recomputed[w.file];
+            let a = r.partition_point(|x| x.t < w.t_start);
+            let b = r.partition_point(|x| x.t < w.t_start + desk::WINDOW_MS);
+            if desk::targets(&r[a..b]).is_some_and(|t| t.t1 == w.t1) {
+                e.0 += 1;
+            }
+        }
+        let (agree, checked) = per_version.get(HMM_VERSION).copied().unwrap_or((0, 0));
+        if !out.windows.is_empty() && checked == 0 {
+            cleanup();
+            return Err(format!(
+                "no window was recorded with the engine's HMM {HMM_VERSION}; the labels cannot be checked"
+            ));
+        }
+        let rate = if checked == 0 {
+            1.0
+        } else {
+            agree as f64 / checked as f64
+        };
+        if rate < HM_LABEL_AGREEMENT_MIN {
+            cleanup();
+            return Err(format!(
+                "recorded and recomputed T1 agree on {agree} of {checked} windows (below {HM_LABEL_AGREEMENT_MIN})"
+            ));
+        }
+        serde_json::json!({
+            "t1_agree": agree,
+            "checked": checked,
+            "rate": rate,
+            "windows_by_hmm_version": per_version.iter().map(|(k, v)| (k.clone(), v.1)).collect::<std::collections::BTreeMap<_, _>>(),
+        })
+    };
+    let mut text = String::new();
+    let header = serde_json::json!({
+        "kind": "header",
+        "mode": "handmark_windows",
+        "desk_version": desk::DESK_VERSION,
+        "engine_hmm_version": HMM_VERSION,
+        "labels": if args.hm_labels_recomputed { "recomputed" } else { "recorded" },
+        "inject_stuck": lam,
+        "samples": cfg.samples,
+        "utc_offset_secs": offset,
+        "table_sha256": table_sha,
+        "inputs": files.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+        "inputs_are": "sha256_prefix_12",
+        "a_names": desk::A_NAMES,
+        "b_state_names": desk::B_STATE_NAMES,
+        "window_ms": desk::WINDOW_MS,
+        "warmup_ms": desk::WARMUP_MS,
+        "min_feats": desk::MIN_FEATS,
+        "t1_p_stuck": desk::T1_P_STUCK,
+        "pair_gap_ms": desk::PAIR_GAP_MS,
+        "frames": want_frames,
+    });
+    text.push_str(&header.to_string());
+    text.push('\n');
+    for w in &out.windows {
+        text.push_str(&serde_json::to_string(w).map_err(|e| e.to_string())?);
+        text.push('\n');
+    }
+    let summary = serde_json::json!({
+        "kind": "summary",
+        "windows": out.windows.len(),
+        "excluded": out.excluded,
+        "seed_mismatch_days": out.seed_mismatch_days,
+        "segments": out.segments,
+        "segments_recorded_t0": out.segments_recorded_t0,
+        "overflow_days": out.overflow_days,
+        "ends_clamped": ends_clamped,
+        "label_check": label_check,
+        "sensitivity": out.sens,
+        "redactions_given": args.hm_redactions_path.is_some(),
+    });
+    text.push_str(&summary.to_string());
+    text.push('\n');
+    Ok(text)
+}
+
+/// `--probes` / `--day-questions`: 記録を読み、段 1 の再生を JSON で返す。
+fn run_s1_replay(args: &Args, paths: &[PathBuf]) -> Result<serde_json::Value, String> {
+    use gse_next_lib::s1_replay;
+    let mut files = Vec::new();
+    for p in paths {
+        let name = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| p.display().to_string());
+        files.push(s1_replay::parse_file(&name, &read_session_text(p)?)?);
+    }
+    let files = s1_replay::order_inputs(files)?;
+    if args.day_questions {
+        let offset = args
+            .utc_offset_secs
+            .ok_or_else(|| "--day-questions requires --utc-offset-secs".to_string())?;
+        let rows = s1_replay::day_question_presses(&files, offset);
+        return Ok(serde_json::json!({
+            "mode": "day_questions",
+            "replay_version": s1_replay::REPLAY_VERSION,
+            "utc_offset_secs": offset,
+            "inputs": files.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+            "rows": rows,
+        }));
+    }
+    let day_state = match &args.day_state_path {
+        None => None,
+        Some(p) => match gse_next_lib::s1_day_state::load(p) {
+            gse_next_lib::s1_day_state::DayStateLoad::Loaded(s) => Some(s),
+            gse_next_lib::s1_day_state::DayStateLoad::Fresh => {
+                return Err(format!("--day-state {}: not found", p.display()))
+            }
+            gse_next_lib::s1_day_state::DayStateLoad::Broken => {
+                return Err(format!("--day-state {}: unreadable or broken", p.display()))
+            }
+        },
+    };
+    let report = s1_replay::replay_probes(
+        &files,
+        &s1_replay::ReplayOptions {
+            utc_offset_secs: args.utc_offset_secs,
+            day_state,
+        },
+    );
+    serde_json::to_value(&report).map_err(|e| format!("report could not be serialized: {e}"))
 }
 
 fn usage() -> String {
@@ -1789,6 +2517,10 @@ fn usage() -> String {
          gse-replay <session.ndjson> --segment\n    \
          gse-replay <session.ndjson> --segments <segments.txt> [--json]\n    \
          gse-replay <session.ndjson> --intervention [--json]\n    \
+         gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs <N>]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --probes [--utc-offset-secs <N>] [--day-state <s1_day_state.json>]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --day-questions --utc-offset-secs <N>\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --handmark-windows --utc-offset-secs <N> --handmark-table <t.json> --handmark-table-sha <t.sha256> [--labels recorded|recomputed] [--frames <path>] [--inject-stuck <λ>] [--samples <n>（既定 10）] [--handmark-redactions <redaction_ledger.jsonl>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
@@ -1800,6 +2532,10 @@ fn usage() -> String {
          --segment           活動境界で分割した .segments.txt を生成\n    \
          --segments <path>   .segments.txt を読み込み範囲マッチングでメトリクス算出\n    \
          --intervention      v2 介入ポリシーを反実仮想リプレイし HIR/Precision/Recall/DC/Burden + reason 別分解を算出\n    \
+         --probes            段 1 の問いの行を記録から調停器を回し直して照合 (一致・欠け・余り・境目・未照合を JSON で)\n    \
+         \x20                   時差が無ければ日の問いと no_ask は未照合。区間の削除をまたぐ記録は一致しない\n    \
+         --day-questions     段 1 の日の問いに答えた後、次の現地 4:00 までの押下の数 (--utc-offset-secs 必須)\n    \
+         --handmark-windows  手跡の机上の道具: 30 秒の窓ごとの表 (A・B_state・T1・T2) を NDJSON で (ADR-051 D3)\n    \
          --calibration       v0.3 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット)。1 被験者の複数セッションを時刻順に渡す\n    \
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
          --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
@@ -2059,6 +2795,67 @@ fn main() -> ExitCode {
             let _ = write!(lock, "{}", format_intervention_pretty(&metrics));
         }
         return ExitCode::SUCCESS;
+    }
+
+    // --handmark-windows 経路: 手跡の机上の道具（PR 4・ADR-051 D3）。窓の表を NDJSON で出す。
+    //   ⚠️ 記録・表が不正なら exit 1 で、stdout には 1 バイトも出さない。
+    if args.handmark_windows {
+        let mut paths = vec![args.session_path.clone()];
+        paths.extend(args.extra_sessions.iter().cloned());
+        return match run_handmark_windows(&args, &paths) {
+            Ok(text) => {
+                let mut out = std::io::stdout().lock();
+                if out
+                    .write_all(text.as_bytes())
+                    .and_then(|_| out.flush())
+                    .is_err()
+                {
+                    tracing::error!("--handmark-windows: stdout could not be written");
+                    return ExitCode::from(1);
+                }
+                ExitCode::SUCCESS
+            }
+            Err(msg) => {
+                tracing::error!("invalid --handmark-windows input: {}", msg);
+                ExitCode::from(1)
+            }
+        };
+    }
+
+    // --probes / --day-questions 経路: 段 1 の問いを記録から再生する（M5 の 3 本目）。HMM・特徴量は通らない。
+    //   ⚠️ 記録・状態ファイルが不正なら exit 1 で、stdout には 1 バイトも出さない。
+    if args.probes || args.day_questions {
+        let mut paths = vec![args.session_path.clone()];
+        paths.extend(args.extra_sessions.iter().cloned());
+        return match run_s1_replay(&args, &paths) {
+            Ok(v) => {
+                let _ = writeln!(std::io::stdout().lock(), "{}", v);
+                ExitCode::SUCCESS
+            }
+            Err(msg) => {
+                tracing::error!("invalid stage 1 replay input: {}", msg);
+                ExitCode::from(1)
+            }
+        };
+    }
+
+    // --invitation 経路: 招待の契機を記録から再現する（ADR-040 D4）。HMM・特徴量は通らない。
+    //   ⚠️ 契機の設定が読めない・記録が不正なら exit 1 で、stdout には 1 バイトも出さない。
+    if let Some(ref trigger_path) = args.invitation_path {
+        return match run_invitation(
+            &args.session_path,
+            trigger_path,
+            args.utc_offset_secs.unwrap_or(0),
+        ) {
+            Ok(v) => {
+                let _ = writeln!(std::io::stdout().lock(), "{}", v);
+                ExitCode::SUCCESS
+            }
+            Err(msg) => {
+                tracing::error!("invalid --invitation: {}", msg);
+                ExitCode::from(1)
+            }
+        };
     }
 
     // --features 経路: ADR-030 の Tier 別 1 Hz tick 単位特徴行を JSON 配列で出力する
@@ -4011,6 +4808,12 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             // EH3 の 2 行種も読み飛ばす。
             | ReplayEvent::Eh3Day(_)
             | ReplayEvent::InvitationPresent(_)
+            | ReplayEvent::InvitationCondition(_)
+            // 段 1 の 3 行種も読み飛ばす。
+            | ReplayEvent::ProbeFrame(_)
+            | ReplayEvent::ProbeSuppressed(_)
+            | ReplayEvent::DayQuestion(_)
+            | ReplayEvent::HandmarkDay(_)
             // ⚠️★★★ 監査 criterion (ADR-031)。★ 記録のみで推論へ流さない。
             | ReplayEvent::ActivityLabel(_)
             | ReplayEvent::SessionMeta { .. }
@@ -4417,6 +5220,620 @@ mod tests {
         p.push("snapshots");
         p.push(name);
         p
+    }
+
+    #[test]
+    fn redaction_ledger_reads_intervals_and_fails_closed() {
+        let ok = b"{\"requested_at\":9,\"from\":100,\"to\":200,\"files_touched\":1,\"lines_removed\":3}\n\n{\"from\":5,\"to\":5}\n";
+        assert_eq!(
+            parse_redaction_ledger(ok).unwrap(),
+            vec![(100, 200), (5, 5)]
+        );
+        for bad in [
+            &b"not json"[..],
+            &b"{\"from\":1}"[..],
+            &b"{\"from\":3,\"to\":2}"[..],
+            &b"{\"from\":\"1\",\"to\":2}"[..],
+            &[0xff, 0xfe][..],
+        ] {
+            assert!(parse_redaction_ledger(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn handmark_windows_mode_args() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let base = [
+            "a.ndjson",
+            "b.ndjson",
+            "--handmark-windows",
+            "--utc-offset-secs",
+            "32400",
+            "--handmark-table",
+            "t.json",
+            "--handmark-table-sha",
+            "t.sha256",
+        ];
+        let p = parse_args_from(v(&base)).expect("minimal");
+        assert!(p.handmark_windows);
+        assert_eq!(p.extra_sessions.len(), 1);
+        assert!(!p.hm_labels_recomputed);
+        assert_eq!(p.hm_inject, 0.0);
+        assert_eq!(p.hm_samples, 10);
+        let mut full = base.to_vec();
+        full.extend([
+            "--labels",
+            "recomputed",
+            "--frames",
+            "f.bin",
+            "--inject-stuck",
+            "0.2",
+            "--samples",
+            "6",
+            "--handmark-redactions",
+            "r.jsonl",
+        ]);
+        let p = parse_args_from(v(&full)).expect("full");
+        assert_eq!(p.hm_redactions_path, Some(PathBuf::from("r.jsonl")));
+        assert!(p.hm_labels_recomputed);
+        assert_eq!(p.hm_frames_path, Some(PathBuf::from("f.bin")));
+        assert_eq!((p.hm_inject, p.hm_samples), (0.2, 6));
+        // 必須のどれかが欠けると止める
+        for drop in [
+            "--utc-offset-secs",
+            "--handmark-table",
+            "--handmark-table-sha",
+        ] {
+            let i = base.iter().position(|a| *a == drop).unwrap();
+            let mut xs = base.to_vec();
+            xs.drain(i..i + 2);
+            assert!(parse_args_from(v(&xs)).is_err(), "{drop}");
+        }
+        // 下位の引数はモード無しでは受けない（既定の値を渡しても）
+        for sub in [
+            &["a.ndjson", "--labels", "recorded"][..],
+            &["a.ndjson", "--inject-stuck", "0"][..],
+            &["a.ndjson", "--samples", "10"][..],
+            &["a.ndjson", "--labels", "recomputed"][..],
+            &["a.ndjson", "--frames", "f"][..],
+            &["a.ndjson", "--inject-stuck", "0.1"][..],
+            &["a.ndjson", "--samples", "6"][..],
+            &["a.ndjson", "--handmark-table", "t"][..],
+            &["a.ndjson", "--handmark-redactions", "r"][..],
+        ] {
+            assert!(parse_args_from(v(sub)).is_err(), "{sub:?}");
+        }
+        // 値の範囲と他のモードとの排他
+        for (k, val) in [
+            ("--inject-stuck", "1.5"),
+            ("--inject-stuck", "x"),
+            ("--labels", "both"),
+            ("--samples", "-1"),
+            ("--samples", "31"),
+        ] {
+            let mut xs = base.to_vec();
+            xs.extend([k, val]);
+            assert!(parse_args_from(v(&xs)).is_err(), "{k} {val}");
+        }
+        let mut xs = base.to_vec();
+        xs.push("--probes");
+        assert!(parse_args_from(v(&xs)).is_err());
+    }
+
+    /// 照合の門: 記録の feat を計算し直した値に合わせた記録は通り、逆にした記録は止まってコマを消す。
+    /// 古い版だけの記録は照らせないので止め、版が混ざれば同じ版の窓だけを照らす。
+    #[test]
+    fn the_label_gate_checks_recorded_against_recomputed_t1() {
+        use gse_next_lib::analysis::handmark::assignment;
+        let dir = std::env::temp_dir().join(format!("gse-replay-hmgate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let table = assignment::generate(3, 20_400, 7, 7, 10).unwrap();
+        let bytes = table.canonical_bytes();
+        let sha = assignment::sha256_hex(&bytes);
+        std::fs::write(dir.join("t.json"), &bytes).unwrap();
+        std::fs::write(dir.join("t.sha256"), format!("{sha}  t.json\n")).unwrap();
+        let start = ((20_407i64 * 86_400 + 4 * 3_600 - 32_400 + 6 * 3_600) * 1000) as u64;
+        // 打鍵だけの記録を作り、計算し直した feat を得る
+        let mut keys = Vec::new();
+        let mut t = start + 200;
+        let mut k = 0u64;
+        while t < start + 600_000 {
+            let cat = if k.is_multiple_of(7) {
+                "backspace"
+            } else {
+                "alphabetic"
+            };
+            keys.push(format!(
+                "{{\"type\":\"key\",\"t\":{t},\"category\":\"{cat}\",\"press\":true}}"
+            ));
+            keys.push(format!(
+                "{{\"type\":\"key\",\"t\":{},\"category\":\"{cat}\",\"press\":false}}",
+                t + 50
+            ));
+            t += if k % 40 < 20 { 150 } else { 900 };
+            k += 1;
+        }
+        let write = |name: &str, version: &str, feats: &[String]| {
+            let mut lines = vec![format!(
+                "{{\"type\":\"meta\",\"session_start\":{start},\"hmm_version\":\"{version}\"}}"
+            )];
+            lines.extend(keys.iter().cloned());
+            lines.extend(feats.iter().cloned());
+            lines.push(format!(
+                "{{\"type\":\"meta\",\"session_end\":{}}}",
+                start + 600_000
+            ));
+            let p = dir.join(name);
+            std::fs::write(&p, lines.join("\n") + "\n").unwrap();
+            p
+        };
+        let bare = write("bare.ndjson", HMM_VERSION, &[]);
+        let snaps = run_replay(&bare).unwrap();
+        let feat_line = |s: &FeatSnapshot, flip: bool| {
+            let ps = if flip { 1.0 - s.p_stuck } else { s.p_stuck };
+            let pf = (1.0 - ps) / 2.0;
+            format!(
+                "{{\"type\":\"feat\",\"t\":{},\"p_flow\":{pf},\"p_inc\":{pf},\"p_stuck\":{ps}}}",
+                s.timestamp
+            )
+        };
+        let same: Vec<String> = snaps.iter().map(|s| feat_line(s, false)).collect();
+        let flipped: Vec<String> = snaps.iter().map(|s| feat_line(s, true)).collect();
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let tj = dir.join("t.json");
+        let ts = dir.join("t.sha256");
+        let frames = dir.join("f.bin");
+        let run = |p: &Path, with_frames: bool| {
+            let mut xs = vec![
+                p.to_str().unwrap(),
+                "--handmark-windows",
+                "--utc-offset-secs",
+                "32400",
+                "--handmark-table",
+                tj.to_str().unwrap(),
+                "--handmark-table-sha",
+                ts.to_str().unwrap(),
+            ];
+            if with_frames {
+                xs.extend(["--frames", frames.to_str().unwrap()]);
+            }
+            run_handmark_windows(&parse_args_from(v(&xs)).unwrap(), &[p.to_path_buf()])
+        };
+        // 一致すれば通り、照らした窓の数が出る
+        let ok = run(&write("same.ndjson", HMM_VERSION, &same), false).unwrap();
+        let summ: serde_json::Value = serde_json::from_str(ok.lines().last().unwrap()).unwrap();
+        assert_eq!(summ["label_check"]["rate"], 1.0);
+        assert!(summ["label_check"]["checked"].as_u64().unwrap() > 0);
+        // 逆にすれば止まり、作ったコマのファイルを消す
+        let flip = write("flip.ndjson", HMM_VERSION, &flipped);
+        assert!(run(&flip, true).unwrap_err().contains("agree"));
+        assert!(!frames.exists());
+        // 古い版だけの記録は照らせないので止める
+        let old = write("old.ndjson", "0.0.1", &flipped);
+        assert!(run(&old, false).unwrap_err().contains("cannot be checked"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn inject_stuck_with_zero_or_no_p_stuck_keeps_the_bits() {
+        use gse_next_lib::analysis::handmark::state::StageState;
+        let s = StageState {
+            speed: 0.123_456_789,
+            irreg: 0.3,
+            phase: 1.5,
+            drift: 7.0,
+            layout_seed: 9,
+        };
+        assert_eq!(inject_stuck(s, Some(0.9), 0.0).bits(), s.bits());
+        assert_eq!(inject_stuck(s, None, 0.4).bits(), s.bits());
+        let j = inject_stuck(s, Some(1.0), 0.5);
+        assert!((j.speed - (0.5 * s.speed + 0.3)).abs() < 1e-15);
+        assert!((j.irreg - (0.5 * 0.3 + 0.5)).abs() < 1e-15);
+        assert_eq!(
+            (j.phase.to_bits(), j.drift.to_bits(), j.layout_seed),
+            (s.phase.to_bits(), s.drift.to_bits(), 9)
+        );
+    }
+
+    #[test]
+    fn a_frame_has_the_documented_layout() {
+        use gse_next_lib::analysis::handmark::desk::Sample;
+        use gse_next_lib::analysis::handmark::state::StageState;
+        let st = StageState {
+            speed: 1.0,
+            irreg: 2.0,
+            phase: 3.0,
+            drift: 4.0,
+            layout_seed: 5,
+        };
+        let mut buf = Vec::new();
+        write_frame(
+            &mut buf,
+            7,
+            &Sample {
+                t: 11,
+                state: st,
+                field: None,
+                ripples: vec![],
+            },
+        );
+        assert_eq!(buf.len(), 4 + 8 + 32 + 4 + 1 + 1);
+        assert_eq!(&buf[..4], &7u32.to_le_bytes());
+        buf.clear();
+        write_frame(
+            &mut buf,
+            7,
+            &Sample {
+                t: 11,
+                state: st,
+                field: Some([[0.5; 3]; 160]),
+                ripples: vec![(0.1, 0.2, 300)],
+            },
+        );
+        assert_eq!(buf.len(), 4 + 8 + 32 + 4 + 1 + 480 + 1 + 10);
+    }
+
+    #[test]
+    fn handmark_windows_runs_end_to_end_and_fails_closed() {
+        use gse_next_lib::analysis::handmark::assignment;
+        let dir = std::env::temp_dir().join(format!("gse-replay-hmw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let table = assignment::generate(3, 20_400, 7, 7, 10).unwrap();
+        let bytes = table.canonical_bytes();
+        let sha = assignment::sha256_hex(&bytes);
+        std::fs::write(dir.join("t.json"), &bytes).unwrap();
+        std::fs::write(dir.join("t.sha256"), format!("{sha}  t.json\n")).unwrap();
+        std::fs::write(
+            dir.join("bad.sha256"),
+            format!("{}  t.json\n", "0".repeat(64)),
+        )
+        .unwrap();
+        // 10:00（JST）から 5 分・150 ms おきに打鍵
+        let start = ((20_407i64 * 86_400 + 4 * 3_600 - 32_400 + 6 * 3_600) * 1000) as u64;
+        let mut lines = vec![format!(
+            "{{\"type\":\"meta\",\"session_start\":{start},\"hmm_version\":\"0.5.0\"}}"
+        )];
+        let mut t = start + 200;
+        while t < start + 300_000 {
+            lines.push(format!(
+                "{{\"type\":\"key\",\"t\":{t},\"category\":\"alphabetic\",\"press\":true}}"
+            ));
+            lines.push(format!(
+                "{{\"type\":\"key\",\"t\":{},\"category\":\"alphabetic\",\"press\":false}}",
+                t + 50
+            ));
+            t += 150;
+        }
+        lines.push(format!(
+            "{{\"type\":\"meta\",\"session_end\":{}}}",
+            start + 300_000
+        ));
+        let rec = dir.join("s.ndjson");
+        std::fs::write(&rec, lines.join("\n") + "\n").unwrap();
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let t_json = dir.join("t.json");
+        let t_sha = dir.join("t.sha256");
+        let frames = dir.join("f.bin");
+        let mk = |sha: &Path, extra: &[&str]| {
+            let mut xs = vec![
+                rec.to_str().unwrap(),
+                "--handmark-windows",
+                "--utc-offset-secs",
+                "32400",
+                "--handmark-table",
+                t_json.to_str().unwrap(),
+                "--handmark-table-sha",
+                sha.to_str().unwrap(),
+            ];
+            xs.extend_from_slice(extra);
+            parse_args_from(v(&xs)).unwrap()
+        };
+        let args = mk(
+            &t_sha,
+            &[
+                "--labels",
+                "recomputed",
+                "--frames",
+                frames.to_str().unwrap(),
+            ],
+        );
+        let paths = vec![rec.clone()];
+        let a = run_handmark_windows(&args, &paths).unwrap();
+        let frames_a = std::fs::read(&frames).unwrap();
+        // 既にあるコマのファイルには書かない（中身も変えない）
+        assert!(run_handmark_windows(&args, &paths).is_err());
+        assert_eq!(std::fs::read(&frames).unwrap(), frames_a);
+        std::fs::remove_file(&frames).unwrap();
+        let b = run_handmark_windows(&args, &paths).unwrap();
+        assert_eq!(a, b, "同じ入力から同じ表");
+        assert_eq!(std::fs::read(&frames).unwrap(), frames_a, "同じコマ");
+        std::fs::remove_file(&frames).unwrap();
+        // 出力にファイル名を書かない（中身の SHA-256 の先頭 12 桁）
+        assert!(!a.contains("s.ndjson"));
+        let rows: Vec<serde_json::Value> = a
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        assert_eq!(rows[0]["kind"], "header");
+        assert_eq!(rows[0]["table_sha256"], sha.as_str());
+        let last = rows.last().unwrap();
+        assert_eq!(last["kind"], "summary");
+        let n = last["windows"].as_u64().unwrap() as usize;
+        assert_eq!(rows.len(), n + 2);
+        assert!(n >= 5, "{n}");
+        assert!(!frames_a.is_empty());
+        // 記録に feat が無いとき、記録の対象では窓が 0（feat が 25 本未満で除く）
+        let rec_args = mk(&t_sha, &[]);
+        let r = run_handmark_windows(&rec_args, &paths).unwrap();
+        let s: serde_json::Value = serde_json::from_str(r.lines().last().unwrap()).unwrap();
+        assert_eq!(s["windows"], 0);
+        assert!(s["excluded"]["few_feats"].as_u64().unwrap() > 0);
+        // SHA が合わない表は止め、コマのファイルを残さない
+        let bad = mk(
+            &dir.join("bad.sha256"),
+            &["--frames", frames.to_str().unwrap()],
+        );
+        assert!(run_handmark_windows(&bad, &paths).is_err());
+        assert!(!frames.exists());
+        // コマを作った後に失敗したら（標本の数が窓を割り切らない）、作ったファイルを消す
+        let late = mk(
+            &t_sha,
+            &[
+                "--labels",
+                "recomputed",
+                "--samples",
+                "7",
+                "--frames",
+                frames.to_str().unwrap(),
+            ],
+        );
+        assert!(run_handmark_windows(&late, &paths).is_err());
+        assert!(!frames.exists());
+        // コマの書き出し先が入力の記録・表なら止め、入力を変えない
+        let rec_bytes = std::fs::read(&rec).unwrap();
+        for target in [&rec, &t_json] {
+            let into_input = mk(
+                &t_sha,
+                &[
+                    "--labels",
+                    "recomputed",
+                    "--frames",
+                    target.to_str().unwrap(),
+                ],
+            );
+            assert!(run_handmark_windows(&into_input, &paths).is_err());
+        }
+        assert_eq!(std::fs::read(&rec).unwrap(), rec_bytes);
+        assert_eq!(std::fs::read(&t_json).unwrap(), bytes);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn probes_and_day_questions_mode_args() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // 複数の記録を受け、時差と状態ファイルは任意
+        let p = parse_args_from(v(&["a.ndjson", "b.ndjson", "--probes"])).expect("probes alone");
+        assert!(p.probes);
+        assert_eq!(p.extra_sessions.len(), 1);
+        assert_eq!(p.utc_offset_secs, None);
+        let p = parse_args_from(v(&[
+            "a.ndjson",
+            "--probes",
+            "--utc-offset-secs",
+            "32400",
+            "--day-state",
+            "s.json",
+        ]))
+        .expect("probes with offset and day state");
+        assert_eq!(p.utc_offset_secs, Some(32400));
+        assert_eq!(p.day_state_path.as_deref(), Some(Path::new("s.json")));
+        let p = parse_args_from(v(&[
+            "a.ndjson",
+            "--day-questions",
+            "--utc-offset-secs",
+            "0",
+        ]))
+        .expect("day questions");
+        assert!(p.day_questions);
+        for bad in [
+            v(&["a.ndjson", "--probes", "--invitation", "t.json"]),
+            v(&[
+                "a.ndjson",
+                "--probes",
+                "--day-questions",
+                "--utc-offset-secs",
+                "0",
+            ]),
+            v(&["a.ndjson", "--probes", "--metrics"]),
+            v(&["a.ndjson", "--probes", "--snapshot", "g.json"]),
+            // ★ 既定 0 で黙って数え違えない
+            v(&["a.ndjson", "--day-questions"]),
+            v(&["a.ndjson", "--day-state", "s.json"]),
+            v(&[
+                "a.ndjson",
+                "--day-questions",
+                "--utc-offset-secs",
+                "0",
+                "--day-state",
+                "s.json",
+            ]),
+            v(&["a.ndjson", "--probes", "--day-state"]),
+        ] {
+            assert!(parse_args_from(bad.clone()).is_err(), "{bad:?}");
+        }
+    }
+
+    /// `--probes` を通しで: 記録が壊れていれば Err（main は exit 1 で stdout を空にする）、読めれば JSON。
+    #[test]
+    fn probes_mode_runs_and_fails_closed() {
+        let dir = std::env::temp_dir().join(format!("gse_replay_probes_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let ok = dir.join("ok.ndjson");
+        std::fs::write(
+            &ok,
+            "{\"type\":\"meta\",\"session_start\":1794042000000}\n{\"type\":\"key\",\"t\":1794042001000,\"category\":\"a\",\"press\":true}\n",
+        )
+        .unwrap();
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let args = parse_args_from(v(&[ok.to_str().unwrap(), "--probes"])).unwrap();
+        let out = run_s1_replay(&args, std::slice::from_ref(&ok)).expect("読める");
+        assert_eq!(out["mode"], "probes");
+        assert_eq!(out["counts"]["match"], 0);
+        let broken = dir.join("broken.ndjson");
+        std::fs::write(
+            &broken,
+            "{\"type\":\"meta\",\"session_start\":1794042000000}\n{\"type\":\"probe_suppressed\",\"t\":\"x\"}\n",
+        )
+        .unwrap();
+        let args = parse_args_from(v(&[broken.to_str().unwrap(), "--probes"])).unwrap();
+        assert!(run_s1_replay(&args, std::slice::from_ref(&broken)).is_err());
+        let missing_state = parse_args_from(v(&[
+            ok.to_str().unwrap(),
+            "--probes",
+            "--day-state",
+            dir.join("none.json").to_str().unwrap(),
+        ]))
+        .unwrap();
+        assert!(run_s1_replay(&missing_state, std::slice::from_ref(&ok)).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `--invitation` は他のモードと相互排他で、パスを要る。`--utc-offset-secs` は `--invitation` 専用。
+    #[test]
+    fn invitation_mode_args() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let p = parse_args_from(v(&["s.ndjson", "--invitation", "t.json"])).expect("alone");
+        assert_eq!(p.invitation_path.as_deref(), Some(Path::new("t.json")));
+        assert_eq!(p.utc_offset_secs, None);
+        let p = parse_args_from(v(&[
+            "s.ndjson",
+            "--invitation",
+            "t.json",
+            "--utc-offset-secs",
+            "32400",
+        ]))
+        .expect("with offset");
+        assert_eq!(p.utc_offset_secs, Some(32400));
+        for bad in [
+            v(&["s.ndjson", "--invitation"]),
+            v(&["s.ndjson", "--invitation", "t.json", "--metrics"]),
+            v(&["s.ndjson", "--invitation", "t.json", "--intervention"]),
+            v(&["s.ndjson", "--invitation", "t.json", "--features"]),
+            v(&["s.ndjson", "--utc-offset-secs", "9"]),
+            v(&[
+                "s.ndjson",
+                "--invitation",
+                "t.json",
+                "--utc-offset-secs",
+                "x",
+            ]),
+        ] {
+            assert!(parse_args_from(bad.clone()).is_err(), "{bad:?}");
+        }
+    }
+
+    /// `--invitation` の本体: 小さな記録から契機と提示を再現する。設定が不正なら出力なしで `Err`。
+    #[test]
+    fn invitation_mode_replays_a_small_recording() {
+        let dir = std::env::temp_dir().join(format!("gse-replay-inv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let t0: u64 = 1_760_000_000_000;
+        // 10 秒目から p_stuck 0.9。打鍵は毎秒（本文は持たない行）。p_stuck 0.9 が 30 秒続く 40 秒目に立つ
+        let mut lines = vec![
+            r#"{"type":"meta","session_start":1760000000000,"hmm_version":"0.5.0"}"#.to_string(),
+        ];
+        for s in 0..120u64 {
+            let t = t0 + s * 1000;
+            lines.push(format!(
+                r#"{{"type":"key","t":{t},"vk":"letter","press":true}}"#
+            ));
+            let p = if s >= 10 { 0.9 } else { 0.1 };
+            lines.push(format!(
+                r#"{{"type":"feat","t":{t},"p_flow":0.05,"p_inc":0.05,"p_stuck":{p}}}"#
+            ));
+        }
+        let session = dir.join("s.ndjson");
+        std::fs::write(&session, lines.join("\n")).unwrap();
+        let trig = |name: &str, body: &str| {
+            let p = dir.join(name);
+            std::fs::write(&p, body).unwrap();
+            p
+        };
+
+        let est = trig(
+            "est.json",
+            r#"{"kind":"estimator","p_stuck":0.6,"hold_ms":30000}"#,
+        );
+        let v = run_invitation(&session, &est, 0).expect("estimator");
+        assert_eq!(v["feat_rows"], 120);
+        assert_eq!(v["triggered"], serde_json::json!([t0 + 40_000]));
+        assert_eq!(v["presented"], serde_json::json!([t0 + 40_000]));
+        assert_eq!(v["trigger"]["kind"], "estimator");
+
+        let none = trig("none.json", r#"{"kind":"none"}"#);
+        let v = run_invitation(&session, &none, 0).expect("none");
+        assert_eq!(v["triggered"], serde_json::json!([]));
+
+        // 設定が不正（未知の欄・欠け・範囲外・無い）は Err
+        for bad in [
+            r#"{"kind":"rising","delta":0.2}"#,
+            r#"{"kind":"none","x":1}"#,
+            r#"{"kind":"random","per_active_hour":0,"seed":1}"#,
+        ] {
+            let p = trig("bad.json", bad);
+            assert!(run_invitation(&session, &p, 0).is_err(), "{bad}");
+        }
+        assert!(run_invitation(&session, &dir.join("missing.json"), 0).is_err());
+
+        // feat の時刻が単調でない記録は Err
+        let broken = dir.join("broken.ndjson");
+        std::fs::write(
+            &broken,
+            format!(
+                "{}\n{}\n",
+                r#"{"type":"feat","t":2000,"p_stuck":0.1}"#,
+                r#"{"type":"feat","t":1000,"p_stuck":0.1}"#
+            ),
+        )
+        .unwrap();
+        assert!(run_invitation(&broken, &est, 0).is_err());
+
+        // p_stuck が欠けた feat 行は 0 にせず Err
+        let nop = dir.join("nop.ndjson");
+        std::fs::write(&nop, "{\"type\":\"feat\",\"t\":1000}\n").unwrap();
+        assert!(run_invitation(&nop, &est, 0).is_err());
+
+        // 上限: 設定 64 KiB・記録の 1 行 1 MiB
+        let big_cfg = dir.join("bigcfg.json");
+        std::fs::write(&big_cfg, vec![b' '; 64 * 1024 + 1]).unwrap();
+        assert!(run_invitation(&session, &big_cfg, 0).is_err());
+        let long = dir.join("long.ndjson");
+        std::fs::write(&long, vec![b'x'; (1 << 20) + 10]).unwrap();
+        assert!(run_invitation(&long, &est, 0).is_err());
+
+        // 無作為: session_start 行の t から実効 seed を導く(行の無い記録は meta、どちらも無ければ Err)
+        let rnd = trig(
+            "rnd.json",
+            r#"{"kind":"random","per_active_hour":60,"seed":7}"#,
+        );
+        let with_row = |start: u64| {
+            let p = dir.join(format!("row{start}.ndjson"));
+            let mut l = vec![format!(r#"{{"type":"session_start","t":{start}}}"#)];
+            l.extend(lines.iter().skip(1).cloned());
+            std::fs::write(&p, l.join("\n")).unwrap();
+            p
+        };
+        let a1 = run_invitation(&with_row(t0), &rnd, 0).unwrap();
+        let a2 = run_invitation(&with_row(t0), &rnd, 0).unwrap();
+        let b = run_invitation(&with_row(t0 + 1), &rnd, 0).unwrap();
+        assert_eq!(a1, a2);
+        assert_eq!(a1["session_start_source"], "session_start_row");
+        assert_ne!(a1["triggered"], b["triggered"], "開始時刻が違えば列も違う");
+        assert!(run_invitation(&nop, &rnd, 0).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// AC4: `--features` は他のモードフラグと同時指定できない (exit ≠ 0 相当の `Err`)。
@@ -6579,6 +7996,26 @@ not json\n";
             (
                 "invitation_present",
                 r#"{"type":"invitation_present","t":1}"#,
+            ),
+            (
+                "invitation_condition",
+                r#"{"type":"invitation_condition","t":1,"condition":"none","hmm_version":"0.5.0"}"#,
+            ),
+            (
+                "probe_frame",
+                r#"{"type":"probe_frame","t":1,"frame_seed":42,"anchor_ms":1,"arbiter_version":"s1-arbiter-1"}"#,
+            ),
+            (
+                "probe_suppressed",
+                r#"{"type":"probe_suppressed","t":1,"candidate_ts":1,"stratum":"random","reason":"away"}"#,
+            ),
+            (
+                "day_question",
+                r#"{"type":"day_question","t":2,"shown_ts":1,"in_eod_window":false,"target_day":20000,"trigger":"pickup","delayed":true,"answered":false,"closed_by":"dismiss","items_version":"dq-draft-1","motivation":null,"latency_ms":null,"duration_ms":null}"#,
+            ),
+            (
+                "handmark_day",
+                r#"{"type":"handmark_day","t":2,"day":20411,"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":0,"visible_ms":null,"toggles":[],"stage_starts":[],"overflow":false,"table_sha256":null,"draw_seed":null,"reason":"table_missing"}"#,
             ),
         ];
 

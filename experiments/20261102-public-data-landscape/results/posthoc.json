@@ -1,0 +1,51 @@
+{
+ "klicke_l4_overlap": {
+  "pastes_counted_by_stall": 29,
+  "pastes_counted_by_away": 38,
+  "shared": 7
+ },
+ "coauthor_normal_share": {
+  "obs_h": 214.35,
+  "normal_obs_h": 39.56,
+  "obs_share": 0.1846,
+  "span_h": 211.02,
+  "normal_span_h": 38.34,
+  "span_share": 0.1817
+ },
+ "l6_pooled_stall_per_h": {
+  "klicke": {
+   "early": {
+    "stalls": 4772,
+    "obs_h": 513.59,
+    "per_h": 9.291
+   },
+   "middle": {
+    "stalls": 7736,
+    "obs_h": 512.64,
+    "per_h": 15.09
+   },
+   "late": {
+    "stalls": 10492,
+    "obs_h": 500.18,
+    "per_h": 20.977
+   }
+  },
+  "coauthor": {
+   "early": {
+    "stalls": 410,
+    "obs_h": 70.07,
+    "per_h": 5.851
+   },
+   "middle": {
+    "stalls": 518,
+    "obs_h": 70.23,
+    "per_h": 7.376
+   },
+   "late": {
+    "stalls": 590,
+    "obs_h": 69.67,
+    "per_h": 8.469
+   }
+  }
+ }
+}

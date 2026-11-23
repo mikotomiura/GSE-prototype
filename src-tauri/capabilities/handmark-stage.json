@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "handmark-stage",
+  "description": "Handmark stage (background layer) and edge strip windows (macOS and Windows). Least privilege: only listening to the state event and unlistening (it returns nothing). Whether this minimal set is enough for the window to run is checked on screen (design-1b section 6). App commands are not restricted per window (no AppManifest), same as the other secondary windows.",
+  "windows": ["handmark-stage", "handmark-edge-strip"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

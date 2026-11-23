@@ -1,6 +1,6 @@
 [package]
 name = "gse-next"
-version = "0.1.40"
+version = "0.1.42"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -198,6 +198,10 @@ windows = { version = "0.58", features = [
     "Win32_System_Power",
     # ⚠️ O1 自動起動 (G-1・2026-09-28): HKCU の Run キーに書く (`RegSetKeyValueW`・`autostart.rs`)。
     "Win32_System_Registry",
+    # 手跡の Windows 版（判断 9・10）: デスクトップの一覧の絵（`PrintWindow`・`handmark_desktop_windows.rs`）。
+    "Win32_Storage_Xps",
+    # 手跡の帯（Windows）: 画面のロック中かを入力のデスクトップの名前で読む（`OpenInputDesktop`）。
+    "Win32_System_StationsAndDesktops",
 ] }
 lazy_static = "1.4"
 

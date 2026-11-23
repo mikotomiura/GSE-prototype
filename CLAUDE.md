@@ -60,7 +60,7 @@
 | `intervention-design` | Nudge / 介入判定 / HIR (⚠️ Wall は ADR-015 で削除) |
 | `data-privacy` | `logger.rs` / `hook.rs` / 匿名化 / 外部送信・ML データ収集 |
 | `git-workflow` | コミット / ブランチ / バージョン / `.steering/` 記録 |
-| `physical-anchor` | Lv3/Lv4 Physical Anchor / Flutter 連携 |
+| `physical-anchor` | Physical Anchor（身体回帰の招待）/ Flutter 連携 |
 | `project-status` | 現在の git / タスク / 進捗を動的に把握したい時 |
 | `implementation-workflow` | 実装タスクの共通骨格 (調査→設計→実装→テスト→レビュー) |
 | ★ `verify-before-claiming` | **事実を断定する前**（「不要」「壊れる」「既知」「〜になる」）／削除・簡略化の提案／memory を根拠に使う時 ／ ★★★ **ADR・裁定・仕様を確定する時**（⚠️ **長い一次資料を 1 節だけ読んで代表させない**＝ルール 7 ／ ⚠️ **「核心」「閉じた」と書く前に同じ語で全文 grep**＝ルール 8。★ 2026-09-13 に ADR-030 で 2 回踏み抜いた） |
@@ -75,7 +75,8 @@
 | `literature-card` | 論文/文献を精読してカード化する (`docs/literature/`・落合フォーマット) |
 | `reproducibility-discipline` | `experiments/` 配下・較正スモーク・seed/lockfile/HMM_VERSION 固定 |
 | `empirical-prompt-tuning` | Skill / コマンド / プロンプトを新規作成・大幅改訂した直後の検証 |
-| `attack-me` | 論文（`papers/`）の**事前登録を凍結する前**・原稿の外枠を書いた後・投稿の前・改訂の後のプレ査読（実在の論文で接地した立場の査読者 3 人＋意図の監査役・指摘は一次で裏取り）。⚠️ 実在の個人を名乗らせない・査読の結果を証拠にしない |
+| `paper-write` | 論文の原稿を書く・組み直す・結果を入れる・指摘で改訂する時（投稿先の適合を一次で調べる・主張と新規性を先に確定・本文と補足資料を分ける・但し書きを 1 か所に・語数を測る）。直しは足すより移す |
+| `attack-me` | 論文（`papers/`）の**事前登録を凍結する前**・原稿の外枠を書いた後・投稿の前・改訂の後のプレ査読（実在の論文で接地した立場の査読者 3 人＋本文だけを読む編集者 1 人（prereg では省く）＋意図の監査役・指摘は一次で裏取り）。⚠️ 実在の個人を名乗らせない・査読の結果を証拠にしない |
 
 ## 作業記録の運用ルール (重要)
 
@@ -131,7 +132,7 @@ Hook は 3 層で動作し、全層の出力がユーザーに明示される (W
 - **サブエージェント**: 収集=`file-finder` `dependency-checker` `impact-analyzer` /
   レビュー=`code-reviewer` `test-analyzer` `security-checker` `cross-reviewer` /
   実行=`test-runner` `build-executor` `log-analyzer` /
-  研究=`paper-reviewer` (`attack-me` の査読者役・監査役。道具は Read・Grep・Glob だけ) (詳細は `.claude/agents/`)
+  研究=`paper-reviewer` (`attack-me` の査読者役・編集者・監査役。道具は Read・Grep・Glob だけ) (詳細は `.claude/agents/`)
 
 <!-- loop:begin -->
 ## Loop Engineering (issue 単位ループ)

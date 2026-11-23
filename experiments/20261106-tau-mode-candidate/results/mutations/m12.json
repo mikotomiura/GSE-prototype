@@ -1,0 +1,13 @@
+{
+ "run_id": "20261106T205818-149",
+ "mutate": [
+  "m12"
+ ],
+ "P-JOINT": {
+  "passed": false,
+  "made_example_found": true,
+  "cand_order_ok": true
+ },
+ "seconds": 0.03260326385498047,
+ "all_passed": false
+}

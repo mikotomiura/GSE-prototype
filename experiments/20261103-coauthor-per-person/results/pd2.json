@@ -1,0 +1,8 @@
+{
+ "rows": 588227,
+ "within_1e3": 588227,
+ "share": 1.0,
+ "worst": 3.3306690738754696e-16,
+ "passed": true,
+ "mutate": []
+}

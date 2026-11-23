@@ -2,15 +2,19 @@
 
 # 🧠 GSE — Generative Struggle Engine
 
-**打鍵のしかたから、作業状態と「介入すべきタイミング」を推定する — プライバシー保護型 HCI。**
+**本文を保存しない打鍵の観測から、作業の停滞についてどこまで言えるかを、予測・定義・漏れの 3 つの検査で確かめる — プライバシー保護型 HCI。**
 
-GSE はあなたの脳内を読みません。読むのは*キーストローク動態*だけ。そこから、
-そっと促す Nudge が「今、本当に役立つか」と、「今は黙っているべきか」を判断します。
+GSE はあなたの脳内を読みません。読むのは*キーストローク動態*（打鍵の時刻と種類）だけで、本文は保存しません。そこから、
+画面から一度離れる招待を「今」差し出すか、それとも黙っているべきかを判断します。招待は開始も完了も測りません。
 
-> **現況:** 稼働している介入は **Nudge のみ**です。全画面の Wall と Monk Mode は
+> **現況:** GSE 本体は**既定では介入を出しません**。Nudge はコードに残っていますが既定で無効です
+> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。全画面の Wall と Monk Mode は
 > **2026-08 に削除しました**（[ADR-015](docs/adr/ADR-015-wall-removal.md)）。
-> Physical Anchor は**設計済み・未実装**です
-> （[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）。
+> 身体回帰の招待（Physical Anchor の PC 面）は検証用の EH3 モードと、通常のモードの第 2 週（開始画面の「第2週 (招待)」・第 1 週・O1・G1 では出ない）で図像として動きます。
+> 散歩の促進とその計測は行いません（2026-11-03）。身体回帰の後は、離席候補（打鍵の途絶 180 秒以上）明けの作業上の状態で見ます。打鍵の再開と受領の有無（[ADR-024](docs/adr/ADR-024-resumption-outcome-without-estimator.md)）に、ウィンドウを離れずに再開したか（フォーカスの遷移）とポインタの動きを併せます。
+>
+> **2026-10-31 の方針:** Nudge は GSE 本体の介入としては出さず、本体の介入は身体回帰の機会を差し出す招待にします
+> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。Nudge の既定は無効にしました。通常のモードの第 2 週に、差し替えられる契機（推定器 / 上がり / 無作為 / なし。研究者の `~/.gse/invitation_trigger.json` で選び、読めなければ出さない）で招待を配線し、`gse-replay --invitation` で記録から再現できます。
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)
@@ -18,7 +22,7 @@ GSE はあなたの脳内を読みません。読むのは*キーストローク
 ![Rust](https://img.shields.io/badge/Rust-1.77+-CE412B?logo=rust&logoColor=white)
 ![License](https://img.shields.io/badge/license-Research%20Prototype-8B8B8B)
 
-[🇺🇸 English README](README.md) · [📐 設計の変遷](docs/design-history.ja.md) · [📥 ダウンロード](https://github.com/mikotomiura/GSE-prototype/releases)
+[🇺🇸 English README](README.md) · [📐 設計の変遷（英語）](docs/history/design-history-2026-11-15.md) · [📥 ダウンロード](https://github.com/mikotomiura/GSE-prototype/releases)
 
 </div>
 
@@ -62,7 +66,7 @@ GSE はあなたの脳内を読みません。読むのは*キーストローク
 ```
 
 `analysis/` は **OS 非依存**。OS 固有のコードはすべて `input/` に隔離されています。
-スレッドモデルとバージョン別の詳細な根拠は **[設計の変遷](docs/design-history.ja.md)** を参照。
+スレッドモデルとバージョン別の詳細な根拠は **[設計の変遷（英語）](docs/history/design-history-2026-11-15.md)** を参照。
 
 ---
 
@@ -89,7 +93,7 @@ Y（生産的沈黙） = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 
 `(X, Y)` を 5×5 グリッド（+ Backspace ペナルティビン）に離散化し、3 状態 HMM
 （**Flow / Incubation / Stuck**）へ前向きアルゴリズム 1 ステップで投入、上層にヒステリシス EMA を重ねます。
-遷移/放出行列・β ベースライン・量子化・チューニング履歴は **[設計の変遷](docs/design-history.ja.md)** に収録。
+遷移/放出行列・β ベースライン・量子化・チューニング履歴は **[設計の変遷（英語）](docs/history/design-history-2026-11-15.md)** に収録。
 
 ---
 
@@ -98,7 +102,7 @@ Y（生産的沈黙） = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 | レベル | トリガー | 効果 | 解除 |
 |---|---|---|---|
 | **Nudge** | `action == nudge` | クリック透過の小カード。不透明度は Need に比例 | 一定時間で自動消去 |
-| **Physical Anchor** | *未実装* | 画面から離れることへの**方向づけ** | — |
+| **Physical Anchor**（招待） | EH3 モード（通常モードは別作業） | 画面から離れることへの**方向づけ** | 60 秒で閉じる |
 | ~~**Wall**~~ | ~~全画面遮断~~ | **2026-08 に削除** — 下記参照 | — |
 
 **抑制（すべて稼働中）**: 能動的にタイプ中（打鍵間隔 < 2 秒）は `defer` / cooldown 10 分 /
@@ -110,8 +114,8 @@ Y（生産的沈黙） = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 `wall_server.rs`・QR / スマホ解除の経路・Monk Mode・Zen Timer・早期解除はすべて削除した。
 **HIR（有害介入率）は残してある** — 変わったのは対象集合だけである。
 
-**Physical Anchor**（[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）が実際に労力を
-担う層であり、**まだ実装されていない**。
+**Physical Anchor**（[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）は画面から離れる
+ことへの招待である。PC 側の招待は EH3 モードで動き、散歩の促進とその計測は行わない（2026-11-03）。身体回帰の後は、離席候補明けの作業上の状態（打鍵の再開と受領の有無・フォーカスの遷移・ポインタ）で見る（ADR-024・ADR-023 D4・ADR-016）。
 ★★★ **系はその開始も完了も判定しない**（[ADR-018](docs/adr/ADR-018-physical-anchor-without-completion.md)）——
 どれだけ離れるか・いつ戻るかに**系の側の閾値を置かず**、**タイマー・カウントダウン・残り時間表示も実装しない**。
 GSE は**身体活動を一切センシングしない**（GPS・歩数計・加速度センサを使わない）。
@@ -216,7 +220,7 @@ Windows 差分、Google Form ビルダー。
 ```bash
 VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
 ```
-詳細は `docs/calibration-smoke-runbook.md` §1.1–1.2。
+詳細は `docs/verification-runbook.md` §2.0。
 </details>
 
 <details>
@@ -256,14 +260,14 @@ src-tauri/src/
   input/             hook_* · ime_*                                              （OS 固有）
   lib.rs · logger.rs · schema_dto.rs · redaction.rs · recording.rs
 src-tauri/bin/       gse-replay（評価 CLI） · emit_schema
-docs/                architecture · functional-design · design-history · runbooks
+docs/                architecture · functional-design · history · runbooks
 ```
 
 ## 📚 ドキュメント
 
 | ファイル | いつ読むか |
 |---|---|
-| [`docs/design-history.ja.md`](docs/design-history.ja.md) | v2.1–v2.22 の詳細（ヒステリシス・IME・介入・パリティ） |
+| [`docs/history/design-history-2026-11-15.md`](docs/history/design-history-2026-11-15.md) | v2.1–v2.22 の詳細（ヒステリシス・IME・介入・パリティ） |
 | `docs/architecture.md` | スレッドモデルとデータフロー |
 | `docs/functional-design.md` | 意図・要件・ユースケース |
 | `docs/development-guidelines.md` | 規約・テスト・レビュー・データ repo 運用 |

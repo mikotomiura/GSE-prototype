@@ -103,10 +103,10 @@
 | A-1 | **Drive の O1 受け取りフォルダ** | ★ 2026-09-28 から受け口は **`<受け取りフォルダ>/<P-ID>/`** に保存する → **その P-ID のフォルダごと**ごみ箱へ（⚠️ **同名の P-ID フォルダが複数ありうる** —— 全部を対象にする）。⚠️ **直下に残る旧形式**の `<pid>_o1day<NN>_gse_o1_*.age` も探す。⚠️★ **フォルダ名だけに頼らず、ファイル名 `<pid>_o1day` で受け取りフォルダ配下（直下＋全サブフォルダ）を検索する** —— 台帳はフォルダ名を問わずファイル名の P-ID で数えるので、手作業で別フォルダへ移ったものも受領に数えている（Codex 指摘 2026-09-28）。⚠️ どちらでも **`_dup-<epoch>.age` を含む**（受け口は重複を消さず別名で並べる）。★ tombstone（A-14）の規則は変えない。⚠️ 端末に未送信分が残っていると再送で **`<P-ID>/` が新しくできる** —— 端末側の削除（B 系）を済ませたあと、**フォルダが再びできていないか**を確かめる | `Form_O1/GSE_O1_Submit.gs` `pidFolder_`（フォルダ）・`saveWithoutOverwriting_`（名前） |
 | A-2 | ⚠️ **Drive のゴミ箱** | A-1 で消したものを**完全に削除**する | ★ ゴミ箱経由にしない（ADR-012 D12-b 4） |
 | A-3 | 研究者端末・受領した `.age` | ダウンロードフォルダ等の `.age`。⚠️ **実名が混入して改名した版**も探す | `docs/pilot-runbook.md:159-165` |
-| A-4 | 研究者端末・**復号済み平文 NDJSON** | `gse-unpack` の出力。⚠️ ★ **`--out` 省略時は `.age` と同じフォルダに落ちる**。慣行の置き場は repo 直下 `inbox/` | `src-tauri/src/bin/unpack.rs:83-86, 197-207` |
+| A-4 | 研究者端末・**復号済み平文 NDJSON** | `gse-unpack` の出力。⚠️ ★ **`--out` 省略時は `.age` と同じフォルダに落ちる**。慣行の置き場は repo 直下 `inbox/`。2026-11-03 追記: 解析の実験で復号した平文は `~/gse-o1-derived/<実験>/plain/<P-ID>/` にも置く（例: `20261103-o1-n4-pause-stall`）。同じフォルダの `*.ok.json`（平文の SHA-256 の印）も一緒に消す。2026-11-16 追記: `~/gse-o1-derived/20261116-o1-conduct-record/plain/<P-ID>/` にも同じ平文の写しがある（n4 の置き場と合わせて **2 か所**・両方を消す）。推定器の値を作るときの一時の写し `stripped-*.ndjson`（作業フォルダの直下）は使った後に消すが、途中で止まると残りうるので探す | `src-tauri/src/bin/unpack.rs:83-86, 197-207`・`experiments/20261103-o1-n4-pause-stall/build_n4.py`・`experiments/20261116-o1-conduct-record/build_cr.py` |
 | A-5 | **gse-dataset の `metrics/<PID>/<os>/`** | ⚠️★★★ **§4 を読むこと。git 履歴が絡む** | `scripts/sync-session.sh:141-186` |
 | A-6 | gse-dataset の派生 | `sessions.csv` の該当行 / `survey/*.csv` / `cohort/cohort_*.json` | `scripts/gen_sessions_manifest.py`, `scripts/run-calibration-cohort.sh` |
-| A-7 | 解析 DB とエクスポート | `analysis.db`（既定 = カレント）と `cross_section` の CSV/Parquet | `scripts/build_analysis_db.py:382-384, 449` |
+| A-7 | 解析 DB とエクスポート | `analysis.db`（既定 = カレント）と `cross_section` の CSV/Parquet。2026-11-03 追記: `~/gse-o1-derived/<実験>/` の中間（`inter/<P-ID>/`）と、P-ID をキーにした派生の JSON（`files.json`・`symbols.json`・`full.json`・`versions.json`・`symbol_salt`）。1 人を消したら、その実験の repo の `results/` と `notes.md` を出し直すか、削除済みと注記する（repo の値は記号で書いてあり、記号と P-ID の対応は `symbols.json` にだけある）。2026-11-16 追記: `~/gse-o1-derived/20261116-o1-conduct-record/` の `inter/<P-ID>/`・`extra/<P-ID>/`（推定器の値・IME の行の時刻・日番号）・`inputs.txt`（ファイル名＝P-ID と日付、と SHA-256）・`files.json`・`symbols.json`・`symbol_salt`・`full.json`・`versions.json`・`conduct.full.json`・`prewin.full.json`・`auc.full.json`・`run*.log`（人ごとの本数が出る）。repo の `experiments/20261116-o1-conduct-record/results/` と `notes.md` も上と同じ扱い | `scripts/build_analysis_db.py:382-384, 449`・`experiments/20261103-o1-n4-pause-stall/`・`experiments/20261116-o1-conduct-record/` |
 | A-8 | `experiments/<日付>-<名前>/` | ⚠️ **NDJSON 本体は入っていない**（sha256 のみ）。★ 該当 hash 行に「削除済み」と注記する | `scripts/repro.sh:13, 21` |
 | **A-9** | ⚠️★★ **最後の回収経路で受け取ったコピー** | ★ 自動送信が詰まると**必ずここを通る**（`submission.rs:47` 逐語「最後の回収経路（被験者のフォルダから研究者が受け取る）は常に生きている」）。メール添付 / **送信済みトレイ** / USB 等の外部メディア / 受領一時フォルダ | code-reviewer 指摘 2026-08-28 |
 | **A-10** | ⚠️★★ **GAS の実行ログ** | `GSE_O1_Submit.gs` の `console.log('doPost failed: ' + err)` は**例外文字列にファイル名（＝ P-ID ＋ 日付）を含みうる**。実行数ページにも時刻が残る。★ 保持期間を確認し、可能なら消す。⚠️ **2026-09-27 追記**: 受領台帳（`GSE_O1_Ledger.gs`・第 3 の Apps Script プロジェクト）の実行ログも同じ扱い —— `o1LedgerCheck()` は**対象外のファイル名を出力する**（名前に P-ID が含まれうる）。★ 実行ログを閉じる・保持期間を確認する対象に**第 3 プロジェクトを足す** | security-checker 指摘 2026-08-28 / 2026-09-27 |
@@ -269,6 +269,20 @@ ADR-014 D8 制約 3 は逐語「削除要求経路と**保管上限**を台帳�
 - [ ] ⚠️★ **公開（public 化 / 外部共有）の前に §6 を確認する** —— ★ 「P-ID ＋ 受付日 ＋ 範囲」は
       **削除を要求した事実**を git 履歴に永久化する。⚠️ 公開範囲を変えるときは必ず読み直す
 - [ ] ⚠️ `scripts/check-o1-release-readiness.sh` が緑になるまで**被験者を 1 人も走らせない**
+
+## §8 段 1（採択前の 3 名の確認・ADR-052）
+
+段 1 は O1 の収集の器（提出・48 時間の猶予・区間の削除・保管の上限）をそのまま使うので、§1〜§6 は段 1 にも当てる。§7 の運用の検査も当てるが、最後の行の門は段 1 では `scripts/check-s1-release-readiness.sh`（`--audience participants`）に読み替える。段 1 で違うところだけをここに書く。
+
+- **同意の正本**: Google フォーム S1-C（`Form_O1/GSE_O1_Form_Builder.gs` の `buildS1ConsentForm`）。文面の上流は `.steering/20261114-gse-stage1-n3-consent/consent-draft-s1.md`（2026-11-14 承認。同日に §4 の 2 番へ一時停止中の表示の文を足し、承認し直した）。
+- **P-ID**: O1 と同じ Phase1 のロスターで採番する。O1 に参加した人は同じ P-ID になる。同じ P-ID の記録は、記録の `meta` の `s1_mode` で O1 の記録と分ける（同意文書の判断 19）。削除の求めが段 1 だけか O1 も含むかを本人に確かめる。
+- **取り消し**: アプリで「問いへの同意を取り消す」を押した人は、段 1 をやめた扱い（判断 8）。取り消した時刻より後の記録は、本人がアプリを終えるまで届きうるので、研究者が削除し研究に使わない（同意文書 §4-2）。§6 に「取り消し・取り消した時刻以降を削除」として残す。それまでの記録を使うか消すかは本人が選ぶ。
+- **区間の削除で残るもの**: その日の手跡の割り当て、記録のファイルの始まりの印と設定（`meta`・`session_meta`・`probe_frame`）は残る（同意文書 §4）。
+- **手跡の累計**: 端末の上の削除は、区間の中の `handmark_day` の行を消すだけでなく、区間より後の同じ日の行と状態ファイルの累計から、区間の直前と直後の行の差を引く（`redaction::handmark_subtractions`・判断 13・`.steering/20261114-handmark-s1-predist-fixes/` 判断 1）。⚠️ 送った後の記録を研究者側で消すときも、行を消すだけでは区間の中の量が後の行の差から読めるので、同じ引き方を、その人のその日の全ファイル（区間より後に送られたものを含む）に当てる。そのための道具はまだ無い（求めが来たら `redaction.rs` の関数を使う道具を作る）。
+- **一時停止**: 一時停止中は手跡の量を足さず、その間の時刻を残さない（同 判断 2）。一時停止の区間は削除の対象ではない（記録していない）。
+- **残る穴（同 判断 9・10）**: 削除の途中でファイルの読み書きに失敗する・アプリが落ちると、手跡の累計が一部だけ引かれ、やり直しで二重に引くか取りこぼすことがある。一時停止中・ローテートの失敗で消した区間は、その日の累計について、再開してから消し直すまで量が残る（画面は「再開してからもう一度」と出す）。
+- **公表の前の確認**: 1 人ずつの数値と図を公表する前に、本人の分を見せる。載せないよう求められたら載せない（同意文書 §5-2・判断 22）。求めの有無を §6 と同じ書式（P-ID・日付・範囲）で残す。
+- **使い道**: 記録と計算した値は、段 1 の確認と、のちに同じ手順で行う確認との比べにだけ使う（判断 15）。
 
 ## 関連
 

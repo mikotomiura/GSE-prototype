@@ -1,0 +1,15 @@
+{
+ "run_id": "20261106T124141-314",
+ "mutate": [
+  "m14"
+ ],
+ "P-SUBSET": {
+  "passed": false,
+  "cells": 192,
+  "differing_cells": 35,
+  "r1_pool_equal": true,
+  "folds_present": true
+ },
+ "seconds": 240.55696630477905,
+ "all_passed": false
+}

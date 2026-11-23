@@ -2,7 +2,7 @@
 
 > 対象: M1 パイロット (n=3-5) で被験者から匿名化セッションを受領し、metrics + survey を
 > `participant_id × phase` で結合して `cross_section` を出すまでの **end-to-end 運用手順**。
-> X 側の対応物は `docs/calibration-smoke-runbook.md`。設計判断は
+> X 側の対応物は `docs/history/calibration-smoke-runbook-2026-11-15.md`。設計判断は
 > `.steering/20260624-pilot-pipeline-runbook/decisions.md` (D-PP1..5) /
 > `.steering/20260624-transfer-pipeline/decisions.md` (D1..7) を参照。
 >
@@ -21,7 +21,7 @@
 > ⚠️★★★ **旧文はここに「Wall の散歩文言は出る前提で、受容性は post survey の自己申告で拾う」と書いていたが、
 > Wall は ADR-015 (2026-08-23) で削除済みであり、この前提は成立しない。**
 > ★ **WoZ という方式自体 (D8) は不変** —— ⚠️ **変わったのは「何が散歩を promptするか」である。**
-> ★ 現行で稼働する介入は **Nudge のみ**で、**Physical Anchor は未実装**である
+> ★ 現行で稼働する介入は **無い**（Nudge は ADR-040 D1 で既定で無効・2026-10-31。招待は EH3 モードと、通常のモードの第 2 週（開始画面の「第2週 (招待)」）で動く。契機は研究者の `~/.gse/invitation_trigger.json` で選ぶ（無ければ推定器の既定・読めなければ招待を出さない）。第 1 週・O1・G1 では出ない。契機の再現は `gse-replay <session.ndjson> --invitation <trigger.json>`）。散歩の促進とその計測は行わず、身体回帰の後は離席候補明けの作業上の状態（打鍵の再開と受領の有無・フォーカスの遷移・ポインタ）で見る〔2026-11-03 研究者の言・ADR-024・ADR-023 D4・ADR-016〕。Physical Anchor の PC 側は採点しない招待である
 > (かつ ADR-018 D1 で完了条件を持たない「方向づけ」に改められた)。
 > → ★ **散歩の prompt を出すなら研究者が口頭・書面で行う (＝ WoZ の本来の形)。**
 

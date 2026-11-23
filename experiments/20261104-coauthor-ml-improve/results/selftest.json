@@ -1,0 +1,239 @@
+{
+ "run_id": "20261104T143158-576",
+ "mutate": [],
+ "P-XI": {
+  "passed": true,
+  "worst_rel": 6.345131925815476e-15
+ },
+ "P-BATCH": {
+  "passed": true,
+  "worst_rel": 4.509117322524223e-15
+ },
+ "P-EM3": {
+  "passed": true,
+  "sum_dev": 4.440892098500626e-16,
+  "at_dev": 4.163336342344337e-17
+ },
+ "P-AR1": {
+  "passed": true,
+  "worst": 0.0
+ },
+ "P-PRIOR": {
+  "passed": true,
+  "max_abs_diff_AB": 0.00010463402369106922,
+  "tau0_equals_base": true,
+  "sbar_sums": [
+   0.9999999999999916,
+   1.0000000000000007
+  ]
+ },
+ "P-C1": {
+  "passed": true,
+  "C_constant": 0.5,
+  "brute_dev": 1.4210854715202004e-14
+ },
+ "P-SIMP": {
+  "passed": true,
+  "pooled_auc": 0.31409884899388313,
+  "C": 0.7351162248309103,
+  "single_coef": -0.41444424873321273,
+  "fe_coef": 0.9416848852257454
+ },
+ "P-OTH": {
+  "passed": true
+ },
+ "P-PROBE": {
+  "passed": true,
+  "blocks": 30
+ },
+ "P-EMPTY": {
+  "passed": true,
+  "train_n_k1": 0,
+  "b0_self_k1": 0.5,
+  "finite": true
+ },
+ "P-S": {
+  "passed": true
+ },
+ "P-CH": {
+  "passed": true,
+  "median": 0.0003063729434973515,
+  "runs": 10
+ },
+ "P-POOL": {
+  "passed": true,
+  "median_other_minus_tau0": {
+   "1": 0.02166457624592777,
+   "15": 2.3525402737867296e-05
+  }
+ },
+ "P-AR": {
+  "passed": true,
+  "median_ar2_minus_r1": {
+   "A": 0.20100126549587394,
+   "B": -0.0001603811362236307
+  }
+ },
+ "P-LEAK": {
+  "passed": true,
+  "medians": {
+   "k1_tau0": -0.060641505991802624,
+   "k1_tau100": -0.04478945960211167,
+   "k1_tau1000": -0.03199470992044251,
+   "k1_tau10000": -0.04644695115809938,
+   "k15_tau0": -0.0041414433262629835,
+   "k15_tau100": -0.004114250558490795,
+   "k15_tau1000": -0.0042659449352719925,
+   "k15_tau10000": -0.01660168421155417,
+   "A_ar2_tau0": -0.14241865124123532,
+   "A_ar2_tau100": -0.13502885834585499,
+   "A_ar2_tau1000": -0.09049554101092916,
+   "A_ar2_tau10000": -0.022297586370278566,
+   "A_ar1_tau0": -0.3437757233663836,
+   "A_ar1_tau100": -0.33928552174174786,
+   "A_ar1_tau1000": -0.31281189085589745,
+   "A_ar1_tau10000": -0.26974027852506843,
+   "B_ar2_tau0": -0.07679984926527483,
+   "B_ar2_tau100": -0.0727444879482877,
+   "B_ar2_tau1000": -0.049413363146380895,
+   "B_ar2_tau10000": -0.011429533448731544,
+   "B_ar1_tau0": -0.07646691499660507,
+   "B_ar1_tau100": -0.07249965978900619,
+   "B_ar1_tau1000": -0.049186199482407655,
+   "B_ar1_tau10000": -0.011352115970050036
+  }
+ },
+ "P-EM2": {
+  "passed": true,
+  "decreases": 0
+ },
+ "P-LAM": {
+  "passed": true,
+  "median_chosen_lambda_30_per_unit": {
+   "A": 0.1,
+   "B": Infinity
+  },
+  "not_gate_3_per_unit": {
+   "A": {
+    "median": 0.1,
+    "counts": {
+     "0.1": 9,
+     "1.0": 4,
+     "10.0": 2,
+     "100.0": 1,
+     "inf": 1
+    }
+   },
+   "B": {
+    "median": 0.1,
+    "counts": {
+     "0.1": 9,
+     "1.0": 1,
+     "10.0": 4,
+     "inf": 3
+    }
+   }
+  }
+ },
+ "P-LINF": {
+  "passed": true,
+  "slope_dev": 0.0,
+  "inf_vs_1e10": 1.1170275593386236e-08,
+  "zero_vs_unpen": 1.6969892158158473e-09
+ },
+ "seconds": 187.9537901878357,
+ "all_passed": true,
+ "mutations": {
+  "m1": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-LEAK": false
+   },
+   "hit": true
+  },
+  "m2": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-AR1": false
+   },
+   "hit": true
+  },
+  "m3": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PRIOR": false
+   },
+   "hit": true
+  },
+  "m4": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-LINF": false
+   },
+   "hit": true
+  },
+  "m5": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-C1": false,
+    "P-SIMP": false
+   },
+   "hit": true
+  },
+  "m6": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-S": false
+   },
+   "hit": true
+  },
+  "m7": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-S": false
+   },
+   "hit": true
+  },
+  "m8": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-OTH": false
+   },
+   "hit": true
+  },
+  "m9": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PROBE": false
+   },
+   "hit": true
+  },
+  "m10": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-LINF": false
+   },
+   "hit": true
+  }
+ }
+}

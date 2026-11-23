@@ -1,0 +1,19 @@
+{
+ "dux": {
+  "sessions_loaded": 32,
+  "excluded_obs_lt_10min": 10
+ },
+ "dux_tab_as_nav": {
+  "excluded_obs_lt_10min": 10
+ },
+ "swell": {
+  "files_loaded": 50,
+  "any_window_activated": true,
+  "window_activated_loaded": 7941,
+  "clicks_loaded": 29203,
+  "files_zero_window_activated": 0,
+  "presses_in_zero_files": 0,
+  "writers_main": 17,
+  "excluded_obs_lt_10min_main": 0
+ }
+}

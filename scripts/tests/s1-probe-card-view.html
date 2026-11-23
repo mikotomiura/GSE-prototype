@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>段 1 のプローブのカード — 実マウント検証ハーネス</title>
+  </head>
+  <!-- index.html と同じ body 背景。 -->
+  <body style="margin:0; background-color:#0f172a;">
+    <div id="root" style="position:relative; width:400px; height:700px;"></div>
+    <script type="module">
+      // 段 1 のプローブのカード（S1ProbeCard）だけを実マウントして、選択肢と問いの文を目で確かめる
+      // （memory ui-changes-need-eyes・ADR-055）。実物のコンポーネントと実スタイルを使う。
+      //
+      // 使い方: worktree で `npx vite --port 5179` を起動し、
+      //   http://localhost:5179/scripts/tests/s1-probe-card-view.html
+      // window.__GSE_CALLS に invoke の呼び出し（コマンド名と引数）が溜まる。window.__GSE_SIZE にカードの実寸。
+      window.__GSE_CALLS = [];
+      window.__TAURI_INTERNALS__ = {
+        metadata: {
+          currentWindow: { label: "overlay" },
+          currentWebview: { windowLabel: "overlay", label: "overlay" },
+        },
+        transformCallback: (cb) => {
+          const id = Math.floor(Math.random() * 1e9);
+          window[`_${id}`] = cb;
+          return id;
+        },
+        invoke: async (cmd, args) => {
+          window.__GSE_CALLS.push({ cmd, args });
+          if (cmd === "plugin:event|listen" || cmd === "plugin:event|unlisten") return 0;
+          return null;
+        },
+      };
+      const React = (await import("react")).default;
+      const { createRoot } = await import("react-dom/client");
+      await import("/src/App.css").catch(() => {});
+      const S1ProbeCard = (await import("/src/components/S1ProbeCard.tsx")).default;
+      createRoot(document.getElementById("root")).render(
+        React.createElement(S1ProbeCard, {
+          probeId: "p-view",
+          onResize: (s) => { window.__GSE_SIZE = s; },
+          onDone: () => { window.__GSE_DONE = true; },
+        }),
+      );
+    </script>
+  </body>
+</html>

@@ -1,0 +1,2 @@
+{"event":"started","run":"20261121T081311Z_93614","phase":"early","commit":"452db5063389056c7bafa1fa7ae78576a05f6a1b","dirty_files":0,"rerun_reason":null}
+{"event": "finished", "run": "20261121T081311Z_93614", "phase": "early", "files": 26, "last_line_cut": 0, "ledger": true, "judged": true, "main": "meets", "sensitivity": "not_run", "overall": "undetermined", "provisional_meets": true, "summary": "summary_early_20261121T081311Z_93614.json"}

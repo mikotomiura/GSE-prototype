@@ -1,0 +1,23 @@
+{
+ "run_id": "20261109T122107-1576",
+ "mutate": [
+  "m32"
+ ],
+ "P-Q": {
+  "passed": false,
+  "bins_equal_rust": true,
+  "q5_equals_obs": false,
+  "penalty": false,
+  "q3_q7_ref": true,
+  "gate_clean": [
+   3000,
+   152
+  ],
+  "gate_one_off": [
+   3000,
+   153
+  ]
+ },
+ "seconds": 0.019268512725830078,
+ "all_passed": false
+}

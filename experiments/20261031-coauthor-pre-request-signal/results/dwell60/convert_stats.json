@@ -1,0 +1,9 @@
+{
+ "user_insert_1": 2293082,
+ "user_insert_multi_dropped": 541,
+ "user_delete": 203930,
+ "user_cursor": 43689,
+ "api_insert_excluded": 12812,
+ "suggestion_events": 145121,
+ "sessions": 1447
+}

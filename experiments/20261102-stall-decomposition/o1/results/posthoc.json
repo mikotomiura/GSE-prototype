@@ -1,0 +1,104 @@
+{
+ "key_category_share": {
+  "alphabetic": 0.761,
+  "enter": 0.077,
+  "navigation": 0.0627,
+  "backspace": 0.0558,
+  "space": 0.0156,
+  "sentence_punctuation": 0.0107,
+  "punctuation": 0.01,
+  "numeric": 0.0057,
+  "escape": 0.0008,
+  "tab": 0.0007
+ },
+ "paste_minus_last_press_ms": {
+  "n": 506,
+  "q1": 0.0,
+  "median": 0.0,
+  "q3": 0.0
+ },
+ "paste_same_ms_as_press": {
+  "num": 506,
+  "den": 506,
+  "ratio": 1.0
+ },
+ "last_press_category_before_paste": {
+  "alphabetic": 506
+ },
+ "stall_theta_s": {
+  "n": 1459,
+  "q1": 27.064,
+  "median": 42.363,
+  "q3": 59.049
+ },
+ "focus_rows_per_obs_h": 52.34,
+ "stall_pre_window_class_share": {
+  "focus": {
+   "num": 895,
+   "den": 1459,
+   "ratio": 0.6134
+  },
+  "move_or_click": {
+   "num": 269,
+   "den": 1459,
+   "ratio": 0.1844
+  },
+  "delete2": {
+   "num": 2,
+   "den": 1459,
+   "ratio": 0.0014
+  },
+  "silence": {
+   "num": 293,
+   "den": 1459,
+   "ratio": 0.2008
+  }
+ },
+ "random_window_class_share": {
+  "same_length": {
+   "focus": {
+    "num": 6705,
+    "den": 14590,
+    "ratio": 0.4596
+   },
+   "move_or_click": {
+    "num": 2641,
+    "den": 14590,
+    "ratio": 0.181
+   },
+   "delete2": {
+    "num": 240,
+    "den": 14590,
+    "ratio": 0.0164
+   },
+   "silence": {
+    "num": 5004,
+    "den": 14590,
+    "ratio": 0.343
+   }
+  },
+  "fixed_30s": {
+   "focus": {
+    "num": 3839,
+    "den": 14590,
+    "ratio": 0.2631
+   },
+   "move_or_click": {
+    "num": 3364,
+    "den": 14590,
+    "ratio": 0.2306
+   },
+   "delete2": {
+    "num": 402,
+    "den": 14590,
+    "ratio": 0.0276
+   },
+   "silence": {
+    "num": 6985,
+    "den": 14590,
+    "ratio": 0.4788
+   }
+  }
+ },
+ "random_windows_per_stall": 10
+}

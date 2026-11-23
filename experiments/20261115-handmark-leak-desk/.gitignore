@@ -1,0 +1,4 @@
+# コマ（窓ごとの時刻と状態）・窓の表・画素の特徴は repo に入れない（中間は WORK に置く）
+*.bin
+*.ndjson
+node_modules/

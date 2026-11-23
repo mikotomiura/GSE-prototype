@@ -56,7 +56,7 @@ GSE の Physical Anchor（**離席・歩行という身体的回帰への方向�
 ### 適用しないもの
 - ⚠️ **Wall / Zen Timer / Monk Mode** —— ★ **2026-08-23 に全削除された**（ADR-015 D1 / D2）
 - 表現層の内部仕様（層 0–3 / 禁止帯 / 粒子率）→ `docs/glossary.md` §表現層
-- 介入判断そのもの → `intervention-design` Skill / `docs/architecture/intervention-decision-engine.md`
+- 介入判断そのもの → `intervention-design` Skill / `docs/history/intervention-decision-engine-2026-11-15.md`
 
 ---
 

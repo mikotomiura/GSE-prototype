@@ -1,0 +1,17 @@
+{
+ "run_id": "20261104T143158-576",
+ "mutate": [
+  "m3"
+ ],
+ "P-PRIOR": {
+  "passed": false,
+  "max_abs_diff_AB": 0.03473888973775642,
+  "tau0_equals_base": true,
+  "sbar_sums": [
+   0.9999999999999916,
+   1.0000000000000007
+  ]
+ },
+ "seconds": 1.7468621730804443,
+ "all_passed": false
+}

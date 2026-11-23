@@ -2,14 +2,22 @@
 
 # 🧠 GSE — Generative Struggle Engine
 
-**Privacy-preserving work-state & intervention timing, inferred from how you type.**
+**Tests how far content-free keystroke observation can speak about work stalls, with three checks: prediction, definition, and leakage — privacy-preserving HCI.**
 
-GSE doesn't read your mind. It reads *keystroke dynamics* — and decides when a gentle nudge
-is actually likely to help, and when to stay out of the way.
+GSE doesn't read your mind. It reads *keystroke dynamics* (key timing and key type only; no text is stored) — and decides
+whether to offer an invitation to step away from the screen now, or to stay out of the way. The invitation never measures whether you started or finished.
 
-> **Status:** the shipping intervention is **Nudge only**. The full-screen Wall and Monk Mode
-> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Physical Anchor
-> is **designed but not implemented** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)).
+> **Status:** GSE itself shows **no intervention by default**. Nudge remains in the code but is off by default
+> ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). The full-screen Wall and Monk Mode
+> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)). The invitation to physical return
+> (the PC side of Physical Anchor) runs as a glyph in the EH3 study mode and in the normal mode's week 2 (session declaration "第2週 (招待)"; not in week 1, O1 or G1). Walking promotion and its measurement are
+> not pursued (2026-11-03); what follows the invitation is read from work after a candidate away gap (typing resumes, whether
+> an external answer is received, window focus changes, and pointer activity) ([ADR-024](docs/adr/ADR-024-resumption-outcome-without-estimator.md)).
+>
+> **Direction as of 2026-10-31:** Nudge will no longer be shown as an intervention in GSE itself; the core intervention
+> becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). Nudge is now off by default;
+> the invitation is wired into the normal mode's week 2 with a swappable trigger (estimator / rising / random / none, chosen in
+> the researcher's `~/.gse/invitation_trigger.json`; fail-closed) and reproducible offline with `gse-replay --invitation`.
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)
@@ -17,7 +25,7 @@ is actually likely to help, and when to stay out of the way.
 ![Rust](https://img.shields.io/badge/Rust-1.77+-CE412B?logo=rust&logoColor=white)
 ![License](https://img.shields.io/badge/license-Research%20Prototype-8B8B8B)
 
-[🇯🇵 日本語版 README](README.ja.md) · [📐 Design History](docs/design-history.md) · [📥 Download](https://github.com/mikotomiura/GSE-prototype/releases)
+[🇯🇵 日本語版 README](README.ja.md) · [📐 Design History](docs/history/design-history-2026-11-15.md) · [📥 Download](https://github.com/mikotomiura/GSE-prototype/releases)
 
 </div>
 
@@ -61,7 +69,7 @@ Any app ──▶ Keyboard hook (Rust)            Win: WH_KEYBOARD_LL · Mac: CG
 ```
 
 `analysis/` is **platform-agnostic**; all OS-specific code is isolated in `input/`.
-For the thread model and the full version-by-version rationale, see **[Design History](docs/design-history.md)**.
+For the thread model and the full version-by-version rationale, see **[Design History](docs/history/design-history-2026-11-15.md)**.
 
 ---
 
@@ -88,7 +96,7 @@ Y (Productive Silence) = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 
 `(X, Y)` is discretized into a 5×5 grid (+1 Backspace-penalty bin) and fed to a 3-state HMM
 (**Flow / Incubation / Stuck**) via a one-step Forward Algorithm with a hysteresis EMA on top.
-Matrices, β baselines, quantization, and the tuning history live in **[Design History](docs/design-history.md)**.
+Matrices, β baselines, quantization, and the tuning history live in **[Design History](docs/history/design-history-2026-11-15.md)**.
 
 ---
 
@@ -97,7 +105,7 @@ Matrices, β baselines, quantization, and the tuning history live in **[Design H
 | Level | Trigger | Effect | Dismiss |
 |---|---|---|---|
 | **Nudge** | `action == nudge` | Small click-through side card; opacity scales with Need | auto-dismisses |
-| **Physical Anchor** | *not implemented* | An invitation to step away from the screen | — |
+| **Physical Anchor** (invitation) | EH3 study mode (normal mode: separate task) | An invitation to step away from the screen | closes after 60 s |
 | ~~**Wall**~~ | ~~full-screen block~~ | **Removed 2026-08** — see below | — |
 
 **Suppression** (all shipping): `defer` while actively typing (IKI < 2 s), 10-min cooldown,
@@ -109,8 +117,8 @@ suppressing is narrower than that ("taking the answer as-is"), and a screen bloc
 `wall_server.rs`, the QR/phone-unlock path, Monk Mode, the Zen Timer, and early unlock were all
 removed; **HIR (harmful-intervention rate) was kept** — only its target set changed.
 
-**Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is the level that
-actually imposes effort, and it is **not implemented yet**.
+**Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is an invitation
+to step away from the screen. Its PC-side invitation runs in the EH3 study mode; walking promotion and its measurement are not pursued (2026-11-03), and what follows is read from work after a candidate away gap: typing, focus changes, and pointer activity (ADR-024, ADR-023 D4, ADR-016).
 **The system judges neither the start nor the completion of it**
 ([ADR-018](docs/adr/ADR-018-physical-anchor-without-completion.md)): there is no threshold on how
 long you stay away or how you come back, and **no timer, countdown, or remaining-time display**.
@@ -215,7 +223,7 @@ Debug features are guarded by two flags; participants run with **none** (fully b
 ```bash
 VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
 ```
-See `docs/calibration-smoke-runbook.md` §1.1–1.2.
+See `docs/verification-runbook.md` §2.0.
 </details>
 
 <details>
@@ -255,14 +263,14 @@ src-tauri/src/
   input/             hook_* · ime_*                                              (OS-specific)
   lib.rs · logger.rs · schema_dto.rs · redaction.rs · recording.rs
 src-tauri/bin/       gse-replay (eval CLI) · emit_schema
-docs/                architecture · functional-design · design-history · runbooks
+docs/                architecture · functional-design · history · runbooks
 ```
 
 ## 📚 Docs
 
 | File | Read when |
 |---|---|
-| [`docs/design-history.md`](docs/design-history.md) | the v2.1–v2.22 deep dive (hysteresis, IME, intervention, parity) |
+| [`docs/history/design-history-2026-11-15.md`](docs/history/design-history-2026-11-15.md) | the v2.1–v2.22 deep dive (hysteresis, IME, intervention, parity) |
 | `docs/architecture.md` | thread model & data flow |
 | `docs/functional-design.md` | intent, requirements, use cases |
 | `docs/development-guidelines.md` | conventions, testing, review, dataset workflow |
