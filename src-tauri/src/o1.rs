@@ -2049,6 +2049,8 @@ mod tests {
     #[test]
     fn gave_up_mark_round_trips_and_stays_out_of_session_scans() {
         assert!(!CLOCK_HWM_GAVE_UP_FILE_NAME.starts_with("gse_"));
+        assert!(!is_o1_session_file_name(CLOCK_HWM_GAVE_UP_FILE_NAME));
+        assert!(!is_o1_age_file_name(CLOCK_HWM_GAVE_UP_FILE_NAME));
         let dir = sweep_dir("clock_hwm_gave_up");
         assert_eq!(clock_hwm_gave_up_in(&dir), None);
         record_clock_hwm_gave_up(&dir, NOW_2026).unwrap();

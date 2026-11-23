@@ -9,5 +9,5 @@
 - [x] /cross-review（code-reviewer・security-checker・Codex）1 巡目（判断 3）
 - [x] 高水位の待ち（判断 4）
 - [x] /cross-review 2 巡目（判断 5）
-- [ ] /cross-review 3 巡目（判断 5 の差分）
-- [ ] コミット・push（PR は研究者に確かめる）
+- [x] /cross-review 3 巡目（判断 6・新しい問題なし）
+- [x] コミット・push（PR は研究者に確かめる）
