@@ -130,8 +130,10 @@ require_prev() {
   for s in $STEP_ORDER; do
     if [ "$s" = "$1" ]; then
       [ -z "$prev" ] || { [ -f "$EXP_DIR/results/$prev/main/summary.json" ] \
-        && "$PY" -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); assert d.get('smoke') is False and d.get('five') and d.get('six') and all('verdicts' in v for v in list(d['five'].values()) + [d['six']])" "$EXP_DIR/results/$prev/main/summary.json" 2>/dev/null; } \
-        || { echo "step $1 comes after $prev: results/$prev/main/summary.json is missing or holds no verdicts (commit each step's main result first)" >&2; exit 2; }
+        && "$PY" -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); assert d.get('smoke') is False and d.get('five') and d.get('six') and all('verdicts' in v for v in list(d['five'].values()) + [d['six']]) and d.get('wiring', {}).get('passed') is True" "$EXP_DIR/results/$prev/main/summary.json" 2>/dev/null \
+        && git -C "$EXP_DIR" ls-files --error-unmatch "results/$prev/main/summary.json" >/dev/null 2>&1 \
+        && [ -z "$(git -C "$EXP_DIR" status --porcelain -- "results/$prev/main/summary.json")" ]; } \
+        || { echo "step $1 comes after $prev: results/$prev/main/summary.json is missing or holds no verdicts, a passed wiring check or a committed, unchanged file (commit each step's main result first)" >&2; exit 2; }
       return 0
     fi
     prev="$s"
@@ -189,7 +191,7 @@ generate() {
   mkdir -p "$work" || return 1
   echo "$seed" > "$work/SEED.run" || return 1
   # shellcheck disable=SC2086  # WORLD_ARGS is a few words
-  "$PY" gen_sessions.py "$EXP_DIR/config.json" "$work/SEED.run" "$work" --hmm-version "$HMM_VERSION" $WORLD_ARGS "$@" \
+  "$PY" gen_sessions.py "$EXP_DIR/config.json" "$work/SEED.run" "$work" --hmm-version "$HMM_VERSION" $WORLD_ARGS --run-mode "$MODE" "$@" \
     || return 1
   local caps_tmp="$work/.capabilities.json.tmp"
   PYTHONUTF8=1 "$PY" "$REPO_ROOT/scripts/capabilities_gate.py" "$work/ndjson" --require key --json > "$caps_tmp" || return 1

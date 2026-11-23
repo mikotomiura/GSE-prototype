@@ -375,6 +375,15 @@ def r_speed(z0: float, eps0: float, sigma_t: float) -> float:
     return sigma_t * eps0
 
 
+LOG_SCALE_MAX = 1.5  # design 1.2 (decisions 10): k h_j x_j is cut to [-1.5, 1.5]
+K_MAX = 1.0  # the largest k (the top of the k grid)
+
+
+def clip_log_scale(v: float) -> float:
+    """The log factor of a type dimension cut to [-LOG_SCALE_MAX, LOG_SCALE_MAX] (a seam: selftest and the mutant)."""
+    return max(-LOG_SCALE_MAX, min(LOG_SCALE_MAX, v))
+
+
 def sigmas(cfg: dict, icc: float) -> tuple[float, float, float]:
     """(sigma_b, sigma_w, sigma_t): sigma_w = sigma_b sqrt((1 - ICC) / ICC), sigma_t = sqrt(sigma_b^2 + sigma_w^2)."""
     sb = float(cfg["person"]["sigma_b"])
@@ -391,8 +400,11 @@ def session_latents(cfg: dict, world: str, icc: float, k: float, z: np.ndarray, 
     x = [float(mix(z[j], eps_s[j], icc)) for j in (1, 2, 3)]
     speed = r_speed(float(z[0]), float(eps_s[0]), st_)
     h = DIM_H
-    return (Mods(shift=speed, s1=k * h[0] * x[0], s2=k * h[1] * x[1], s3=k * h[2] * x[2]),
-            {"x1": x[0], "x2": x[1], "x3": x[2], "speed_log": speed})
+    raw = [k * h[j] * x[j] for j in range(3)]
+    s = [clip_log_scale(v) for v in raw]
+    return (Mods(shift=speed, s1=s[0], s2=s[1], s3=s[2]),
+            {"x1": x[0], "x2": x[1], "x3": x[2], "speed_log": speed,
+             "clipped": [bool(a != b) for a, b in zip(raw, s)]})
 
 
 def draw_sequence(rng: np.random.Generator, total_ms: int, cfg: dict) -> list[tuple[str, int, int]]:
@@ -520,8 +532,8 @@ def person_world_args(world: str, icc: float | None, k: float | None) -> dict:
         raise ValueError(world)
     if icc is None or not (0.0 < icc < 1.0):
         raise ValueError("--icc in (0, 1) is required with a person world")
-    if world == "person-r" and (k is None or not (math.isfinite(k) and 0.0 <= k <= 4.0)):
-        raise ValueError("--k in [0, 4] is required with --world person-r")
+    if world == "person-r" and (k is None or not (math.isfinite(k) and 0.0 <= k <= K_MAX)):
+        raise ValueError(f"--k in [0, {K_MAX}] is required with --world person-r")
     if world == "person-m" and k is not None:
         raise ValueError("--k is for person-r only")
     return {"world": world, "icc": float(icc), "k": None if world == "person-m" else float(k)}
@@ -576,6 +588,8 @@ def main() -> int:
     ap.add_argument("--c", type=float, default=None, help="confound, factor and drift worlds only: the width c >= 0")
     ap.add_argument("--icc", type=float, default=None, help="person worlds only: the share of between-person variance")
     ap.add_argument("--k", type=float, default=None, help="person-r only: the common size of the three type dimensions")
+    ap.add_argument("--run-mode", choices=("ceiling", "pilot", "smoke", "main"), default=None,
+                    help="person worlds only: the mode this input is for (written to world.json with the seed)")
     ap.add_argument("--p-n", type=int, default=None,
                     help="round 2 pilot only (design 3.10): the number of P sessions; the default output is unchanged")
     a = ap.parse_args()
@@ -606,9 +620,14 @@ def main() -> int:
         (work / "labels").mkdir(parents=True, exist_ok=True)
         manifest = generate_person(cfg, seed, work, a.world, wd["icc"], wd["k"], a.smoke)
         (work / "sessions.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+        if a.run_mode is None:
+            ap.error("--run-mode is required with a person world")
+        wd = {**wd, "seed": seed, "mode": a.run_mode}
         (work / "world.json").write_text(json.dumps(wd), encoding="utf-8")
         print(f"generated {len(manifest)} sessions into {work}")
         return 0
+    if a.run_mode is not None:
+        ap.error("--run-mode is for the person worlds only")
     if a.icc is not None or a.k is not None:
         ap.error("--icc and --k are for the person worlds only")
 

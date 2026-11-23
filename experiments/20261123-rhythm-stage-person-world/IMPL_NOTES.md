@@ -74,3 +74,16 @@
 直さなかったもの
 - fail-closed の記録検査（`require_*`・`lam_problems`・`wiring_problems`）への変異は足していない。単体の検査（`test_records`）で落ちることは確かめたが、変異 14 本＋新しい 3 本の枠には入れなかった。
 - `run.sh --pilot`／`--smoke`／`--main` の通しは禁止のため実行していない（`--wiring` の呼び出しと `require_prev` の bash の分岐は読み合わせだけ）。
+
+## `/cross-review` 1 巡目（Codex）を受けた直し（design・判断 10 に合わせた）
+
+- (5) の照合の AUC を、検証の組ごとの AUC の 5 つの平均にした（`FoldAuc`・`fold_auc`。ブートストラップ・帰無・PC-raw・k の較正・下見・ceiling の値も同じ量）。P2 を組ごとに作り直し、P6 と変異 18（組の得点を併せる）を足した。
+- 変種（`~ws`）は判定の語を付けない記述にした（`summary.json` の `variants` に親と変種の上乗せ・区間。(5)・(6) とも）。変種のための PC の当てはめ・変種の null・`variant_lam`・J3 の旧検査・変異 14 は要らなくなったので外した（J3 は「変種を判定しない・λ の丸めの衝突を拒む」検査に替えた）。`verdicts` に変種は入らない。
+- (6) の記述に `last_auc_diff`（AUC(A＋候補|人ごと) − AUC(A＋候補|共通) と 95% 区間・候補ごと・攻撃者ごと）を足した。
+- 神託と PC-raw の比べは判定にも確かめにも使わず記述だけ。r の段で `speed_log` だけの距離の AUC を記述に出し、作り物の引きで 0.5 ± 0.03 を確かめる（`test_speed_only`）。
+- 相対の型の `k h_j x_j` を [−1.5, 1.5] に切る（`gs.clip_log_scale`・変異 19）。`--k` は 1.0 以下。切った割合は `pilot-k.json` の `clipped_share_any`・`clipped_share_by_dim` と summary の `clipped` に記録（manifest に `clipped`）。k = 1.0 と極端な x で完走する検査（`test_clip`）。k = 0 のバイト一致（G3）は保たれる。
+- `world.json` に生成の seed と mode を書き（`--run-mode` は人の層の world で必須）、`--ceiling`/`--pilot`/`--run` が自分の mode と seed と照らして違えば止まる（`check_world`）。
+- `apply_pilot` が pilot-k.json・pilot.json の code の指紋も照らす。λ のキー（`.3f`）の衝突を拒む（`lam_key_problems`・下見 1 の格子と `stage_specs`）。
+- `--wiring` が合否を `summary.json` の `wiring` に書き、`require_prev` は前の段の `wiring.passed` と、`summary.json` が git で追跡され変更が無いことを見る。
+- `test_q1` は読む側の行が人 p の slot 3〜5 の添字の集合と一致することも見る。
+- 直さなかった・できなかったもの: `--wiring` を書き込む summary は `dump` で書き直す（公開後の書き換え）。git の追跡の判定は bash の分岐の読み合わせだけで、実行していない。

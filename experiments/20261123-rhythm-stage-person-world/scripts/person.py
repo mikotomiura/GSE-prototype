@@ -151,11 +151,6 @@ def variant_name(c: str) -> str:
     return c + VAR
 
 
-def variant_lam(parent_lam: dict, base: str, cand: str) -> float:
-    """design 1.5: a variant's controls use the parent's lambda (not chosen again). A seam for the mutant."""
-    return float(parent_lam[base][cand])
-
-
 # ---------------------------------------------------------------------------
 # Summaries (design 1.5; R1: a closed input, no person number and no latent value)
 # ---------------------------------------------------------------------------
@@ -281,6 +276,25 @@ def fold_of_person(seed: int, n_persons: int, folds: int, tag: str = "folds") ->
     return f
 
 
+class FoldAuc:
+    """The matching AUC as the mean of the validation folds' own AUCs (each fold has its own fitted classifier, so the
+    scores of two folds are not on one scale: design 1.5, decisions 10). Called with pair weights (or none)."""
+
+    def __init__(self, score: np.ndarray, y: np.ndarray, pf: np.ndarray):
+        self.groups = [(np.nonzero(pf == f)[0]) for f in np.unique(pf)]
+        self.preps = [ck.auc_prep(score[g], y[g]) for g in self.groups]
+
+    def __call__(self, w: np.ndarray | None = None) -> float:
+        v = [ck.auc_w(p, np.ones(len(g)) if w is None else w[g]) for g, p in zip(self.groups, self.preps)]
+        v = [x for x in v if np.isfinite(x)]
+        return float(np.mean(v)) if v else float("nan")
+
+
+def fold_auc(score: np.ndarray, y: np.ndarray, pf: np.ndarray) -> FoldAuc:
+    """Seam: the per-fold AUC object (the mutant pools the folds' scores)."""
+    return FoldAuc(score, y, pf)
+
+
 def eval_pairs(fold_s: np.ndarray, folds: int) -> tuple[np.ndarray, np.ndarray]:
     """The pairs i < j of sessions inside the same validation fold, fold by fold."""
     I, J = [], []
@@ -365,7 +379,7 @@ def _map(fn, tasks: list, jobs: int) -> dict:
 
 def fit5(mats: dict, vbase: np.ndarray, person: np.ndarray, seed: int, folds: int, jobs: int,
          fold_tag: str = "folds") -> tuple[dict, dict, tuple]:
-    """mats: name -> {fs: V}. Returns ({(name, fs, kind): scores}, {kind: base scores}, (I, J, y))."""
+    """mats: name -> {fs: V}. Returns ({(name, fs, kind): scores}, {kind: base scores}, (I, J, y, fold of each pair))."""
     n_p = int(person.max()) + 1
     fop = fold_of_person(seed, n_p, folds, fold_tag)
     fold_s = fop[person]
@@ -378,24 +392,23 @@ def fit5(mats: dict, vbase: np.ndarray, person: np.ndarray, seed: int, folds: in
     I, J = eval_pairs(fold_s, folds)
     y = (person[I] == person[J]).astype(np.int64)
     base = {k: got[("__base__", "-", k)] for k in KINDS}
-    return {k: v for k, v in got.items() if k[0] != "__base__"}, base, (I, J, y)
+    return {k: v for k, v in got.items() if k[0] != "__base__"}, base, (I, J, y, fold_s[I])
 
 
 def gain_records(scores: dict, base: dict, pairs: tuple, person: np.ndarray, M: np.ndarray | None) -> tuple[dict, dict]:
     """name -> attacker -> {"gain", "ci95", "auc"} and the base's AUC per kind. M: the bootstrap multiplicities."""
-    I, J, y = pairs
+    I, J, y, pf = pairs
     pi, pj = person[I], person[J]
-    ones = np.ones(len(y))
-    auc_b = {k: ck.weighted_auc(base[k], y, ones) for k in KINDS}
-    prep_b = {k: ck.auc_prep(base[k], y) for k in KINDS}
+    fa_b = {k: fold_auc(base[k], y, pf) for k in KINDS}
+    auc_b = {k: fa_b[k]() for k in KINDS}
     ws = None if M is None else [pair_weights(m, pi, pj) for m in M]
     out: dict = {}
     for (name, fs, k), s in scores.items():
-        auc = ck.weighted_auc(s, y, ones)
+        fa = fold_auc(s, y, pf)
+        auc = fa()
         rec = {"gain": auc - auc_b[k], "auc": auc}
         if ws is not None:
-            prep = ck.auc_prep(s, y)
-            d = np.array([ck.auc_w(prep, w) - ck.auc_w(prep_b[k], w) for w in ws])
+            d = np.array([fa(w) - fa_b[k](w) for w in ws])
             rec["ci95"] = ck.ci95(d)
         out.setdefault(name, {})[f"{fs}/{k}"] = rec
     return out, auc_b
@@ -403,12 +416,11 @@ def gain_records(scores: dict, base: dict, pairs: tuple, person: np.ndarray, M: 
 
 def point_gains(scores: dict, base: dict, pairs: tuple) -> dict:
     """name -> attacker -> gain (no interval): what a permutation records."""
-    I, J, y = pairs
-    ones = np.ones(len(y))
-    auc_b = {k: ck.weighted_auc(base[k], y, ones) for k in KINDS}
+    I, J, y, pf = pairs
+    auc_b = {k: fold_auc(base[k], y, pf)() for k in KINDS}
     out: dict = {}
     for (name, fs, k), s in scores.items():
-        out.setdefault(name, {})[f"{fs}/{k}"] = ck.weighted_auc(s, y, ones) - auc_b[k]
+        out.setdefault(name, {})[f"{fs}/{k}"] = fold_auc(s, y, pf)() - auc_b[k]
     return out
 
 
@@ -440,10 +452,10 @@ def pair_auc_raw(V: np.ndarray, person: np.ndarray, seed: int, folds: int, M: np
     pi, pj = person[I], person[J]
     out = {}
     for k in KINDS:
-        rec = {"auc": ck.weighted_auc(got[k], y, np.ones(len(y)))}
+        fa = fold_auc(got[k], y, fold_s[I])
+        rec = {"auc": fa()}
         if M is not None:
-            prep = ck.auc_prep(got[k], y)
-            d = np.array([ck.auc_w(prep, pair_weights(m, pi, pj)) for m in M])
+            d = np.array([fa(pair_weights(m, pi, pj)) for m in M])
             rec["ci95"] = ck.ci95(d)
         out[k] = rec
     best = max(KINDS, key=lambda k: (-1.0 if not np.isfinite(out[k]["auc"]) else out[k]["auc"]))
@@ -622,7 +634,9 @@ def six_records(got: dict, M: np.ndarray | None) -> tuple[dict, dict]:
             continue
         d = six_D(v, got[("__A__", "-", k)])
         valid = np.isfinite(d["D"])
-        rec = {"gain": float(d["D"][valid].mean()) if valid.any() else float("nan"),
+        last = v[0] - v[1]  # AUC(A + name | per-person) - AUC(A + name | common), per person
+        rec = {"last_diff": float(last[valid].mean()) if valid.any() else float("nan"),
+               "gain": float(d["D"][valid].mean()) if valid.any() else float("nan"),
                "d_pers": float(d["dp"][valid].mean()) if valid.any() else float("nan"),
                "d_comm": float(d["dc"][valid].mean()) if valid.any() else float("nan"), "n_persons": int(valid.sum())}
         if M is not None:
@@ -631,6 +645,10 @@ def six_records(got: dict, M: np.ndarray | None) -> tuple[dict, dict]:
             with np.errstate(invalid="ignore", divide="ignore"):
                 draws = (M * Dp[None, :]).sum(axis=1) / den
             rec["ci95"] = ck.ci95(draws[np.isfinite(draws)]) if np.isfinite(draws).any() else [float("nan")] * 2
+            dl = np.where(valid, last, 0.0)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                dr = (M * dl[None, :]).sum(axis=1) / den
+            rec["last_diff_ci95"] = ck.ci95(dr[np.isfinite(dr)]) if np.isfinite(dr).any() else [float("nan")] * 2
         out.setdefault(name, {})[f"{fs}/{k}"] = rec
     return out, auc_a
 
@@ -680,9 +698,9 @@ def _k_init(cfg: dict) -> None:
 
 def _k_task(args: tuple):
     seed, world, icc, k, i, dur_s = args
-    segs, _ = gs.person_session(seed, _KCFG, world, icc, k, i, dur_s)
+    segs, lat = gs.person_session(seed, _KCFG, world, icc, k, i, dur_s)
     times, _, _, dur_ms = gs.assemble(segs)
-    return (k, i), raw_features(times, dur_ms // 1000, _KCFG["person"]["pc_raw"])
+    return (k, i), (raw_features(times, dur_ms // 1000, _KCFG["person"]["pc_raw"]), lat.get("clipped", [False] * 3))
 
 
 def kgrid_curve(cfg: dict, seed: int, world: str, icc: float, grid: list[float], jobs: int, dur_s: int | None = None
@@ -700,9 +718,11 @@ def kgrid_curve(cfg: dict, seed: int, world: str, icc: float, grid: list[float],
     person = np.arange(n_p * slots) // slots
     out = []
     for k in grid:
-        V = np.stack([got[(k, i)] for i in range(n_p * slots)])
+        V = np.stack([got[(k, i)][0] for i in range(n_p * slots)])
+        cl = np.array([got[(k, i)][1] for i in range(n_p * slots)], dtype=bool)
         rec = pair_auc_raw(V, person, seed, cfg["person"]["folds"], None, jobs)
-        out.append({"k": k, "auc_hgb": rec["hgb"]["auc"], "auc_lr": rec["lr"]["auc"], "auc": rec["best"]["auc"]})
+        out.append({"k": k, "auc_hgb": rec["hgb"]["auc"], "auc_lr": rec["lr"]["auc"], "auc": rec["best"]["auc"],
+                    "clipped_share_any": float(cl.any(axis=1).mean()), "clipped_share_by_dim": cl.mean(axis=0).tolist()})
     return out
 
 
@@ -738,9 +758,24 @@ def load_step(work: Path, cfg: dict, scratch: Path | None = None) -> dict:
     return {"ms": ms, "sids": sids, "person": person, "slot": slot, "tab": tab, "n": len(sids)}
 
 
+def lam_key_problems(values) -> list[str]:
+    """Two different lambdas that print alike with three decimals would share a stage key: refuse them."""
+    seen: dict = {}
+    out = []
+    for v in values:
+        k = f"{float(v):.3f}"
+        if k in seen and abs(seen[k] - float(v)) > 1e-12:
+            out.append(f"lambdas {seen[k]} and {v} both print as {k}")
+        seen[k] = float(v)
+    return out
+
+
 def stage_specs(cands: list[str], lam5: dict, lam6: dict | None, with5: bool, with6: bool) -> list[tuple]:
     """(key, name, lambda) of every stage run: the candidates, the (5) controls (PCp and PC0-id at each base's lambda)
     and the (6) controls. lam5: base -> cand -> lambda; lam6: cand -> lambda."""
+    bad = lam_key_problems([x for b in lam5 for x in lam5[b].values()] + list((lam6 or {}).values()))
+    if bad:
+        raise SystemExit(f"lambda keys collide: {bad}")
     specs = [(c, c, None) for c in cands]
     if with5:
         specs.append(("PC1-id", "PC1-id", None))
@@ -767,11 +802,12 @@ def step_k(cfg: dict, step: str):
     return None if k is None else float(k)
 
 
-def check_world(work: Path, cfg: dict, step: str) -> dict:
-    """The work directory was made for this step: its world, ICC and k are the config's."""
+def check_world(work: Path, cfg: dict, step: str, mode: str, seed: int) -> dict:
+    """The work directory was made for this step, mode and seed: its world, ICC, k, seed and mode are the caller's."""
     w = json.loads((work / "world.json").read_text(encoding="utf-8"))
     s = cfg["person"]["steps"][step]
-    want = {"world": s["world"], "icc": float(s["icc"]), "k": None if s["world"] == "person-m" else step_k(cfg, step)}
+    want = {"world": s["world"], "icc": float(s["icc"]), "k": None if s["world"] == "person-m" else step_k(cfg, step),
+            "seed": seed, "mode": mode}
     if w != want:
         raise SystemExit(f"{work}/world.json is {w}, not {want} (step {step})")
     return w
@@ -873,7 +909,7 @@ def bases_of(tab: dict, n: int) -> dict:
 def ceiling_run(cfg: dict, seed: int, step: str, work: Path, out: Path, jobs: int) -> dict:
     """design 3.0: AUC(A) and AUC(A_speed) of (5), PC-raw and its lower bound, (6)'s readers on model A; the status of
     each question. No gse-replay (the baselines and the raw keystrokes read the press times and the labels only)."""
-    check_world(work, cfg, step)
+    check_world(work, cfg, step, "ceiling", seed)
     d = load_step(work, cfg)
     n, person, tab = d["n"], d["person"], d["tab"]
     n_p = int(person.max()) + 1
@@ -884,8 +920,8 @@ def ceiling_run(cfg: dict, seed: int, step: str, work: Path, out: Path, jobs: in
     five, five_status = {}, {}
     for b, vb in bases_of(tab, n).items():
         _, base, pairs = fit5({}, vb, person, seed, cfg["person"]["folds"], jobs)
-        I, J, y = pairs
-        five[b] = {k: ck.weighted_auc(base[k], y, np.ones(len(y))) for k in KINDS}
+        I, J, y, pf = pairs
+        five[b] = {k: fold_auc(base[k], y, pf)() for k in KINDS}
         five_status[b] = ceiling_status(five[b], main_auc)
     t = tab[ck.TAG]
     fop = fold_of_person(seed, n_p, cfg["person"]["folds"])
@@ -925,6 +961,8 @@ def kgrid_run(cfg: dict, base_seed: int, step: str, out: Path, jobs: int, root: 
         raise SystemExit(f"{tgt_f}: {bad}")
     target = float(tdoc["pc_raw"]["best"]["auc"])
     seed = run_seed("pilot-k", base_seed, cfg)
+    if any(float(k) > gs.K_MAX for k in cfg["person"]["k_grid"]):
+        raise SystemExit(f"the k grid goes above {gs.K_MAX}")
     curve = kgrid_curve(cfg, seed, "person-r", s["icc"], [float(k) for k in cfg["person"]["k_grid"]], jobs)
     ch = choose_k([c["k"] for c in curve], [c["auc"] for c in curve], target, cfg["person"]["k_tolerance"])
     doc = {"step": step, "seed": seed, "target_step": s["target_step"], "target": target, "curve": curve, "choice": ch,
@@ -956,8 +994,10 @@ def pilot_stop_of(use: list[str], pc1: dict | None, sel: dict, cfg: dict) -> str
 def pilot_run(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: int, with5: bool, with6: bool) -> dict:
     """design 1.7: PCp and PCps on the lambda grid, per base and candidate; PC1-id and PC1-pers; PC-raw."""
     seed = run_seed("pilot", base_seed, cfg)
-    check_world(work, cfg, step)
+    check_world(work, cfg, step, "pilot", seed)
     grid = [float(x) for x in cfg["pc_stall"]["pilot_grid"]]
+    if lam_key_problems(grid):
+        raise SystemExit(f"the pilot grid's keys collide: {lam_key_problems(grid)}")
     cands = st.candidates()
     scratch = Path(tempfile.mkdtemp(prefix="pilot-", dir=work))
     try:
@@ -1034,6 +1074,8 @@ def apply_pilot(cfg_path: Path, step: str, what: str) -> int:
             raise SystemExit("pilot-k.json is not this step's at the k grid's seed")
         if p["config_fingerprint"] != cfg_fingerprint(cfg):
             raise SystemExit("pilot-k.json was made under another config.json")
+        if p.get("code_fingerprint") != code_fingerprint():
+            raise SystemExit("pilot-k.json was made by other instruments (code fingerprint)")
         if p["choice"]["k"] is None:
             raise SystemExit(f"{step}: k_unreached (nearest k {p['choice']['nearest_k']}): no k is written (design 1.7)")
         cfg["person"]["k"][step] = p["choice"]["k"]
@@ -1045,6 +1087,8 @@ def apply_pilot(cfg_path: Path, step: str, what: str) -> int:
             raise SystemExit("pilot.json is not this step's at the pilot's seed")
         if p["config_fingerprint"] != cfg_fingerprint(cfg):
             raise SystemExit("pilot.json was made under another config.json")
+        if p.get("code_fingerprint") != code_fingerprint():
+            raise SystemExit("pilot.json was made by other instruments (code fingerprint)")
         if p.get("k") != step_k(cfg, step):
             raise SystemExit("pilot.json was made at another k than config.json's")
         grid = [float(x) for x in cfg["pc_stall"]["pilot_grid"]]
@@ -1083,7 +1127,7 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
     cands = st.candidates()
     lam5 = cfg["pc_person"]["lam"].get(step, {})
     lam6 = cfg["pc_pers"]["lam"].get(step)
-    check_world(work, cfg, step)
+    check_world(work, cfg, step, mode, seed)
     ceil_doc = require_ceiling(cfg, base_seed, step, step_dir)
     gate = ceil_doc["gate"]
     pilot_doc = require_pilot(cfg, base_seed, step, step_dir, gate)
@@ -1119,7 +1163,7 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
         gate_raw = raw_gate(raw, cfg)
         res["pc_raw"], res["pc_raw_gate"] = raw, gate_raw
         vbs = bases_of(tab, n)
-        names_all = cands + [variant_name(c) for c in cands]
+        names_all = list(cands)
         res["five"] = {}
         for b in BASES:
             label = BASE_NAME[b]
@@ -1132,26 +1176,23 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
             vb = vbs[b]
             mats = {"PC1-id": variant_mats(F["PC1-id"], rows, G, n, vb, None)}
             for c in cands:
-                lam = variant_lam(lam5, b, c)
+                lam = lam5[b][c]
                 keys = {"": c, "PCp-": f"PCp-{c}@{lam:.3f}", "PC0-id-": f"PC0-id-{c}@{lam:.3f}"}
                 for pre, key in keys.items():
                     mats[f"{pre}{c}"] = variant_mats(F[key], rows, G, n, vb, None)
-                    mats[f"{pre}{variant_name(c)}"] = variant_mats(F[key], rows, G, n, vb, pcfg["variant_drop"])
+                # the variant is a description: the candidate's picture without the smoothness features, no control
+                mats[variant_name(c)] = variant_mats(F[c], rows, G, n, vb, pcfg["variant_drop"])
             sc, base, pairs = fit5(mats, vb, person, seed, folds, jobs)
             rec, auc_b = gain_records(sc, base, pairs, person, M)
             attk = attk_of(rec)
             null_names = ["PC1-id"] + [f"{p}{c}" for c in cands for p in ("", "PCp-", "PC0-id-")]
             nulls = (null5({k: mats[k] for k in null_names}, vb, n, pcfg["sessions_per_person"], seed, folds, nperm, jobs)
                      if nperm else None)
-            vnulls = (None if nulls is None else
-                      {**nulls, **{f"{p}{variant_name(c)}": nulls[f"{p}{c}"] for c in cands for p in ("", "PCp-", "PC0-id-")}})
             par = {k: v for k, v in attk.items() if VAR not in k}
-            var = {k: v for k, v in attk.items() if VAR in k or k == "PC1-id"}
             j = judge_q("id", par, nulls, auc_b, cands, cfg, False)
-            jv = judge_q("id", var, vnulls, auc_b, [variant_name(c) for c in cands], cfg, False)
-            verd = {**{c: j["verdicts"][c] for c in cands},
-                    **{variant_name(c): jv["verdicts"][variant_name(c)] for c in cands}}
-            res["five"][label] = {"verdicts": verd, "judge": j, "judge_variants": jv, "auc_base": auc_b, "records": rec}
+            verd = {c: j["verdicts"][c] for c in cands}
+            variants = {c: {"parent": attk[c], "without_smooth": attk[variant_name(c)]} for c in cands}  # no verdict word
+            res["five"][label] = {"verdicts": verd, "variants": variants, "judge": j, "auc_base": auc_b, "records": rec}
             print(f"(5) {label} done at {time.time() - t0:.0f} s", flush=True)
         if with6:
             XA, sess_all = t["XA"], t["G_all"]
@@ -1159,8 +1200,8 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
             for c in cands:
                 for pre, key in (("", c), ("PCps-", f"PCps-{c}@{lam6[c]:.3f}"), ("PC0p-", f"PC0p-{c}@{lam6[c]:.3f}")):
                     Xs[f"{pre}{c}"] = {fs: window_X(XA, None, G, sess_all, rows, F[key], fs, None) for fs in FSETS}
-                    Xs[f"{pre}{variant_name(c)}"] = {fs: window_X(XA, None, G, sess_all, rows, F[key], fs,
-                                                                  pcfg["variant_drop"]) for fs in FSETS}
+                Xs[variant_name(c)] = {fs: window_X(XA, None, G, sess_all, rows, F[c], fs, pcfg["variant_drop"])
+                                       for fs in FSETS}
             fop = fold_of_person(seed, n_p, folds)
             ts = tuple(pcfg["reader"]["train_slots"])
             got = fit6(Xs, XA, t["Y"], person[G], slot[G], fop, seed, jobs, ts)
@@ -1169,16 +1210,14 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
             null_names = ["PC1-pers"] + [f"{p}{c}" for c in cands for p in ("", "PCps-", "PC0p-")]
             nulls = (null6({k: Xs[k] for k in null_names}, XA, t["Y"], G, n, pcfg["sessions_per_person"], seed, nperm,
                            jobs, ts, folds) if nperm else None)
-            vnulls = (None if nulls is None else
-                      {**nulls, **{f"{p}{variant_name(c)}": nulls[f"{p}{c}"] for c in cands for p in ("", "PCps-", "PC0p-")}})
             auc_s = {k: auc_a[k]["max"] for k in KINDS}
             par = {k: v for k, v in attk.items() if VAR not in k}
-            var = {k: v for k, v in attk.items() if VAR in k or k == "PC1-pers"}
             j = judge_q("pers", par, nulls, auc_s, cands, cfg, False)
-            jv = judge_q("pers", var, vnulls, auc_s, [variant_name(c) for c in cands], cfg, False)
-            verd = {**{c: j["verdicts"][c] for c in cands},
-                    **{variant_name(c): jv["verdicts"][variant_name(c)] for c in cands}}
-            res["six"] = {"verdicts": verd, "judge": j, "judge_variants": jv, "auc_A": auc_a, "records": rec}
+            verd = {c: j["verdicts"][c] for c in cands}
+            variants = {c: {"parent": attk[c], "without_smooth": attk[variant_name(c)]} for c in cands}  # no verdict word
+            res["six"] = {"verdicts": verd, "variants": variants, "judge": j, "auc_A": auc_a, "records": rec,
+                          "last_auc_diff": {n: {a: {"diff": v["last_diff"], "ci95": v.get("last_diff_ci95")}
+                                                for a, v in d_.items()} for n, d_ in rec.items() if VAR not in n}}
             print(f"(6) done at {time.time() - t0:.0f} s", flush=True)
         else:
             sp_ = pilot_doc.get("six", {}).get("stop")
@@ -1188,6 +1227,11 @@ def run_main(cfg: dict, base_seed: int, step: str, work: Path, out: Path, jobs: 
         lat = latent_names(world)[: (1 if world == "person-m" else 3)]
         L = np.array([[m[k] for k in lat] for m in ms])
         desc["e1_oracle"] = {"auc": oracle_auc(L, person), "latents": lat}
+        if world == "person-r":  # the speed shift alone must not identify a person (it is tied to no person)
+            sp_only = np.array([[m["speed_log"]] for m in ms])
+            desc["e1_speed_log_only"] = {"auc": oracle_auc(sp_only, person)}
+            cl = np.array([m["clipped"] for m in ms], dtype=bool)
+            res["clipped"] = {"share_any": float(cl.any(axis=1).mean()), "share_by_dim": cl.mean(axis=0).tolist()}
         desc["e2_top1"] = {"oracle": top1_hit(L, person), "pc_raw": top1_hit(raw_V, person),
                            **{BASE_NAME[b]: top1_hit(vbs[b], person) for b in BASES}}
         desc["e3_r2"] = {}
@@ -1223,7 +1267,11 @@ def main() -> int:
     ap.add_argument("--wiring", default=None, help="check a main summary.json's wiring (design 3.7) and exit")
     a = ap.parse_args()
     if a.wiring:
-        bad = wiring_problems(json.loads(Path(a.wiring).read_text(encoding="utf-8")))
+        sp_ = Path(a.wiring)
+        doc = json.loads(sp_.read_text(encoding="utf-8"))
+        bad = wiring_problems(doc)
+        doc["wiring"] = {"passed": not bad, "problems": bad}
+        dump(sp_, doc)
         for b in bad:
             print("WIRING FAILED:", b)
         if bad:

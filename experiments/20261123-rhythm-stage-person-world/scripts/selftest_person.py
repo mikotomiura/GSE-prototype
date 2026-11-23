@@ -116,7 +116,8 @@ def test_g1(chk, cfg: dict) -> None:
                     ok &= abs(lr[f"x{j}"] - (math.sqrt(icc) * z[j] + math.sqrt(1 - icc) * e[j])) < 1e-12
                 ok &= abs(lr["speed_log"] - st_ * e[0]) < 1e-12
     chk(ok, "G1: the manifests' m_log, x1-x3 and speed_log come from the same z and eps (ICC 0.494 and 0.679)")
-    chk(all(v[0] == v[1] for v in by_k.values()), "G1: person-r's latent values do not depend on k")
+    keys_ = ("x1", "x2", "x3", "speed_log")
+    chk(all(all(v[0][q] == v[1][q] for q in keys_) for v in by_k.values()), "G1: person-r's latent values do not depend on k")
     other = [(seg_signature(s), gs.seg_labels(s, SHORT_S).tobytes())
              for s in (gs.person_session(TEST_SEED + 1, cfg, "person-m", 0.494, None, i, SHORT_S)[0] for i in ids)]
     chk(other != sigs[0], "G1: another seed draws other sequences (negative control)")
@@ -406,35 +407,45 @@ def test_p1(chk) -> None:
 
 
 def test_p2(chk) -> None:
+    """P2: the bootstrap's weighted per-fold AUC (mean of the folds) equals the same mean on the duplicated persons' pairs."""
     rng = np.random.default_rng(11)
-    n_p, S = 5, 3
+    n_p, S = 6, 3
     person = np.repeat(np.arange(n_p), S)
+    fold_p = np.array([0, 0, 0, 1, 1, 1])
     a, b = np.triu_indices(len(person), 1)
-    score = rng.normal(size=len(a)) + 0.8 * (person[a] == person[b])
+    keep = fold_p[person[a]] == fold_p[person[b]]  # pairs inside a validation fold only
+    a, b = a[keep], b[keep]
+    pf = fold_p[person[a]]
+    score = rng.normal(size=len(a)) + 0.8 * (person[a] == person[b]) + 3.0 * pf  # the folds' scales differ
     y = (person[a] == person[b]).astype(int)
-    m = np.array([2.0, 0.0, 1.0, 3.0, 1.0])
+    m = np.array([2.0, 0.0, 1.0, 3.0, 1.0, 2.0])
     w = pe.pair_weights(m, person[a], person[b])
-    got = ck.weighted_auc(score, y, w)
-    # the duplicated data: person p repeated m_p times; the copies of one person are not paired with each other
+    got = pe.fold_auc(score, y, pf)(w)
     copies = [(i, c) for i in range(len(person)) for c in range(int(m[person[i]]))]
-    sc, ys = [], []
-    idx = {}
-    for t, (i, j) in enumerate(zip(a, b)):
-        idx[(i, j)] = t
+    idx = {(i, j): t for t, (i, j) in enumerate(zip(a, b))}
+    per_fold = {0: ([], []), 1: ([], [])}
     for u in range(len(copies)):
         for v in range(u + 1, len(copies)):
             (i, ci), (j, cj) = copies[u], copies[v]
-            if person[i] == person[j] and ci != cj:
+            if i == j or (person[i] == person[j] and ci != cj) or (min(i, j), max(i, j)) not in idx:
                 continue
-            if i == j:
-                continue
-            key = (min(i, j), max(i, j))
-            sc.append(score[idx[key]])
-            ys.append(y[idx[key]])
-    want = ck.weighted_auc(np.array(sc), np.array(ys), np.ones(len(sc)))
-    chk(abs(got - want) < 1e-12, f"P2: weighted AUC {got:.6f} equals the AUC of the duplicated persons' pairs {want:.6f}")
-    sess_w = pe.pair_weights(np.ones(5), person[a], person[b])
-    chk(np.all(sess_w == 1.0), "P2: all multiplicities 1 -> unit weights")
+            t = idx[(min(i, j), max(i, j))]
+            per_fold[int(pf[t])][0].append(score[t])
+            per_fold[int(pf[t])][1].append(y[t])
+    want = float(np.mean([ck.weighted_auc(np.array(sc), np.array(ys), np.ones(len(sc))) for sc, ys in per_fold.values()]))
+    chk(abs(got - want) < 1e-12, f"P2: weighted per-fold AUC {got:.6f} equals the duplicated persons' per-fold AUC mean {want:.6f}")
+    chk(np.all(pe.pair_weights(np.ones(n_p), person[a], person[b]) == 1.0), "P2: all multiplicities 1 -> unit weights")
+
+
+def test_p6(chk) -> None:
+    """P6: the matching AUC is the mean of the validation folds' AUCs, not the AUC of the pooled scores."""
+    rng = np.random.default_rng(13)
+    y = np.tile([0, 1], 200)
+    pf = np.repeat(np.arange(5), 80)
+    score = (y + rng.normal(0, 0.05, 400)) * 1.0 - 5.0 * pf  # perfect inside each fold, folds on other scales
+    got = pe.fold_auc(score, y, pf)()
+    pooled = ck.weighted_auc(score, y, np.ones(400))
+    chk(got > 0.99 and pooled < 0.9, f"P6: per-fold mean {got:.3f} is not the pooled AUC {pooled:.3f}")
 
 
 def test_p3(chk) -> None:
@@ -517,6 +528,8 @@ def test_q1(chk) -> None:
     ok = True
     for p in range(n_p):
         tr, te = pe.personal_split(person_w, slot_w, p, ts)
+        ok &= bool(np.array_equal(tr, np.nonzero((person_w == p) & (slot_w <= 2))[0])
+                   and np.array_equal(te, np.nonzero((person_w == p) & (slot_w >= 3))[0]))
         ok &= bool(np.all(person_w[tr] == p) and np.all(slot_w[tr] <= 2) and np.all(slot_w[te] >= 3)
                    and len(tr) == 3 * W and len(te) == 3 * W)
     chk(ok, "Q1: a person's reader learns from that person's slots 0-2 only and reads slots 3-5")
@@ -629,10 +642,14 @@ def test_j2(chk, cfg: dict) -> None:
 
 
 def test_j3(chk, cfg: dict) -> None:
-    lam = {"A": {"D-run-hold-sec": 0.1, "S-raw-hold-sec": 0.15}, "S": {"D-run-hold-sec": 0.3, "S-raw-hold-sec": 0.075}}
-    ok = all(pe.variant_lam(lam, b, c) == lam[b][c] for b in lam for c in lam[b])
-    chk(ok, "J3: a variant's controls use the parent's lambda, not a chosen one")
-    chk(pe.variant_name("D-run-hold-sec") == "D-run-hold-sec~ws", "J3: the variant's name")
+    """J3: the without-smooth variants carry no verdict word and need no controls of their own (decisions 10)."""
+    src = inspect.getsource(pe.run_main)
+    chk("judge_variants" not in src and "variant_lam" not in inspect.getsource(pe) and "vnulls" not in src,
+        "J3: run_main does not judge the variants and has no variant lambda or null")
+    chk(pe.variant_name("D-run-hold-sec") == "D-run-hold-sec~ws" and '"without_smooth"' in src,
+        "J3: the variant is reported as a description (parent and without_smooth records)")
+    chk(pe.lam_key_problems([0.025, 0.05]) == [] and pe.lam_key_problems([0.1, 0.1004]) != [],
+        "J3: two lambdas that print alike with three decimals are refused")
 
 
 def test_j4(chk, cfg: dict) -> None:
@@ -819,9 +836,11 @@ def mutant_list(cfg: dict) -> list:
     def m13(mode, base_seed, cfg_):  # the k grid at the main run's seed
         return base_seed if mode == "pilot-k" else base_seed + int(cfg_["person"]["seed_offsets"][pe.SEED_MODE[mode]])
 
-    def m14(parent_lam, base, cand):  # lambda chosen again for the variant
-        return float(ck.select_lambda([0.025, 0.05, 0.075, 0.1], [0.01, 0.03, 0.06, 0.09], [0.0, 0.02, 0.035, 0.05], 0.055,
-                                      0.03, 0.08)["lam"])
+    def m18(score, y, pf):  # the folds' scores pooled
+        return pe.FoldAuc(score, y, np.zeros_like(pf))
+
+    def m19(v):  # no cut
+        return v
 
     T = lambda f, *a: (lambda chk: f(chk, *a))
     return [
@@ -839,10 +858,11 @@ def mutant_list(cfg: dict) -> list:
         ("11 PC0p with a sign per person", st, "pc0p_sign", m11, lambda chk: test_q2(chk)),
         ("12 the summary reads the person number", pe, "summarize", m12, lambda chk: test_r1(chk)),
         ("13 the k grid at the main seed", pe, "run_seed", m13, T(test_seed_rules, cfg)),
-        ("14 a variant's lambda chosen again", pe, "variant_lam", m14, T(test_j3, cfg)),
         ("15 the PC-stall and PC0 roles swapped", pe, "role_prefixes", m15, T(test_j2, cfg)),
         ("16 dimension 2's factors on the wrong things", gs, "dim2_scales", m16, T(test_g4, cfg)),
         ("17 the AR(1) not redrawn at a burst start", gs, "ar1_reset", m17, T(test_g4, cfg)),
+        ("18 the validation folds' scores pooled", pe, "fold_auc", m18, lambda chk: (test_p2(chk), test_p6(chk))),
+        ("19 the type factors not cut", gs, "clip_log_scale", m19, T(test_clip, cfg)),
     ]
 
 
@@ -881,9 +901,12 @@ def test_records(chk, cfg: dict, tmp: Path) -> None:
     chk(pe.lam_problems(gate, {"five": {}, "six": pilot["six"]}, *ok_cfg) != [], "records: the gate runs (5) but the pilot has none -> a problem")
     w = tmp / "rec" / "work"
     w.mkdir(parents=True, exist_ok=True)
-    (w / "world.json").write_text(json.dumps({"world": "person-m", "icc": 0.494, "k": None}), encoding="utf-8")
-    chk(not stops(pe.check_world, w, cfg, "m049") and stops(pe.check_world, w, cfg, "m068"),
+    (w / "world.json").write_text(json.dumps({"world": "person-m", "icc": 0.494, "k": None, "seed": 5, "mode": "main"}),
+                                  encoding="utf-8")
+    chk(not stops(pe.check_world, w, cfg, "m049", "main", 5) and stops(pe.check_world, w, cfg, "m068", "main", 5),
         "records: world.json must be the step's world and ICC")
+    chk(stops(pe.check_world, w, cfg, "m049", "smoke", 5) and stops(pe.check_world, w, cfg, "m049", "main", 6),
+        "records: world.json must be made for this mode and seed")
     good_summary = {"five": {"A": {"judge": {"maxima": {"PC1-id": {"gain_max": 0.4, "upper_max": 0.5},
                                                         "PC0-id-X": {"gain_max": 0.0, "upper_max": 0.01}}}}}, "six": {}}
     chk(pe.wiring_problems(good_summary) == [], "wiring: PC1-id above 0.10 and PC0-id below 0.03 -> no problem")
@@ -891,3 +914,46 @@ def test_records(chk, cfg: dict, tmp: Path) -> None:
     bad["five"]["A"]["judge"]["maxima"]["PC1-id"]["gain_max"] = 0.05
     bad["five"]["A"]["judge"]["maxima"]["PC0-id-X"]["upper_max"] = 0.05
     chk(len(pe.wiring_problems(bad)) == 2, "wiring: a weak PC1-id and a high PC0-id are both reported")
+
+
+def test_clip(chk, cfg: dict) -> None:
+    """The type dimensions' log factors are cut to [-1.5, 1.5]; k is at most 1; k = 1 with extreme x runs to the end."""
+    z = np.array([0.0, 6.0, -6.0, 6.0])
+    e = np.array([0.0, 6.0, -6.0, 6.0])
+    mods, lat = gs.session_latents(cfg, "person-r", 0.494, 1.0, z, e)
+    chk(mods.s1 == gs.LOG_SCALE_MAX and mods.s2 == -gs.LOG_SCALE_MAX and mods.s3 == gs.LOG_SCALE_MAX
+        and lat["clipped"] == [True, True, True], "clip: k h x = +-8.5 is cut to +-1.5 and recorded as clipped")
+    mods, lat = gs.session_latents(cfg, "person-r", 0.494, 0.1, z * 0.1, e * 0.1)
+    chk(lat["clipped"] == [False, False, False] and abs(mods.s1) < 1.5, "clip: small values are not cut")
+    chk(gs.K_MAX == 1.0, "clip: k is at most 1.0")
+    try:
+        gs.person_world_args("person-r", 0.494, 1.5)
+        refused = False
+    except ValueError:
+        refused = True
+    chk(refused and gs.person_world_args("person-r", 0.494, 1.0)["k"] == 1.0, "clip: --k above 1.0 is refused")
+    ok = True
+    for sgn in (1.0, -1.0):
+        for dims in ((6, 6, 6), (6, -6, 6), (-6, 6, -6)):
+            zz = np.array([0.0, *[sgn * d for d in dims]])
+            mods, _ = gs.session_latents(cfg, "person-r", 0.494, 1.0, zz, zz)
+            segs = gs.person_segments(TEST_SEED, 0, gs.person_cfg(cfg), mods, 1800 * 1000, 60 * 1000)
+            t = gs.assemble(segs)[0]
+            ok &= bool(len(t) > 100 and np.all(np.isfinite(t)) and np.all(np.diff(t) >= 0))
+    chk(ok, "clip: k = 1.0 with extreme x draws a finite, ordered session to the end (6 cases)")
+
+
+def test_speed_only(chk, cfg: dict) -> None:
+    """In person-r a person's speed shift alone does not identify the person (made-up draws, no generation of keys)."""
+    n_p, S = 200, 6
+
+    def lat(world: str, p: int, sl: int) -> dict:
+        z, e = gs.raw_latents(TEST_SEED + 1000, p, S)
+        return gs.session_latents(cfg, world, 0.494, 0.5 if world == "person-r" else 0.0, z, e[sl])[1]
+
+    person = np.repeat(np.arange(n_p), S)
+    sp = np.array([[lat("person-r", p, sl)["speed_log"]] for p in range(n_p) for sl in range(S)])
+    auc = pe.oracle_auc(sp, person)
+    chk(abs(auc - 0.5) < 0.03, f"speed only: person-r's speed_log alone matches at chance ({auc:.3f}, within 0.5 +- 0.03)")
+    spm = np.array([[lat("person-m", p, sl)["m_log"]] for p in range(n_p) for sl in range(S)])
+    chk(pe.oracle_auc(spm, person) > 0.55, "speed only: person-m's m_log does identify (negative control)")

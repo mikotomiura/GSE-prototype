@@ -39,8 +39,8 @@
   "_comment_merge_2026_11_19_handmark_windows": "2026-11-19: feature/handmark-windows に origin/main（PR #429 の merge 後）を取り込んだ際、台帳の today が衝突した。共通の起点（1aef2ad6）の today は 11-10 で、11-19 の記帳は両側とも起点の後に始まっている。和を採った: 本ブランチ 78271 / 2 回（手跡の /cross-review 2 巡の Codex） ＋ origin/main 96111 / 2 回（CI の優先度の /cross-review 2 巡の Codex） = 174382 / 4 回。",
   "today": {
     "date": "2026-11-23",
-    "tokens_used": 249208,
-    "invocations": 6
+    "tokens_used": 407874,
+    "invocations": 10
   },
   "history": [
     {
