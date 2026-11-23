@@ -43,6 +43,12 @@ pub struct InputToggle {
     pub on: bool,
 }
 
+/// 回数の累計（どけた回数）から区間の中の回数を引く（飽和）。`subtract_totals` と同じく、区間の削除で行
+/// （`redaction.rs`）と走行中の累計（[`DayRecord::subtract`]）の両方がこの 1 つの式を使う。
+pub fn subtract_count(count: u64, sub: u64) -> u64 {
+    count.saturating_sub(sub)
+}
+
 /// 累計 `(shown, visible)` から `(sub_shown, sub_visible)` を引く（飽和・visible ≤ shown を保つ）。
 /// 区間の削除で、行（`redaction.rs`）と走行中の累計（[`DayRecord::subtract`]）の両方がこの 1 つの式を使う
 /// （片方だけ変わると、行と走行中の累計の差から区間の量が読める）。
@@ -81,6 +87,10 @@ pub struct DayRecord {
     /// クリックの入力を切っている。
     #[serde(default)]
     pub click_off: bool,
+    /// その日に「ほかの窓をどける」を選んだ回数（どけただけ数え、戻したのは数えない・時刻は持たない）。
+    /// 古い状態ファイルには無い（0 として読む）。
+    #[serde(default)]
+    pub reveal_count: u64,
 }
 
 impl DayRecord {
@@ -98,6 +108,7 @@ impl DayRecord {
             input_toggles: Vec::new(),
             cursor_off: false,
             click_off: false,
+            reveal_count: 0,
         }
     }
 
@@ -138,6 +149,11 @@ impl DayRecord {
     /// `first_shown_day` は `add_shown` の仕事なので触れない。
     pub fn add_visible(&mut self, ms: u64) {
         self.visible_ms = self.visible_ms.saturating_add(ms);
+    }
+
+    /// 「ほかの窓をどける」を 1 回数える（呼び出し側が、出している間で一時停止中でないときだけ呼ぶ）。
+    pub fn add_reveal(&mut self) {
+        self.reveal_count = self.reveal_count.saturating_add(1);
     }
 
     /// 切った／戻した（`off` が切った）。上限を超えたら記録は足さず `overflow` を立てる。
@@ -193,9 +209,10 @@ impl DayRecord {
     }
 
     /// 区間の削除: 累計から区間の中の量を引く（呼び出し側が前後の行の差で求めた量・visible ≤ shown を保つ）。
-    pub fn subtract(&mut self, shown_ms: u64, visible_ms: u64) {
+    pub fn subtract(&mut self, shown_ms: u64, visible_ms: u64, reveals: u64) {
         (self.shown_ms, self.visible_ms) =
             subtract_totals(self.shown_ms, self.visible_ms, shown_ms, visible_ms);
+        self.reveal_count = subtract_count(self.reveal_count, reveals);
     }
 
     /// 読み込んだ中身を検める。
@@ -220,6 +237,7 @@ mod tests {
         r.add_visible(3_000);
         r.set_off(1, true);
         r.note_stage_start(2);
+        r.add_reveal();
         assert_eq!(r.first_shown_day, Some(10));
         assert!(!r.roll_to(10));
         assert_eq!(r.shown_ms, 5_000);
@@ -227,6 +245,7 @@ mod tests {
         assert_eq!(r.day, 11);
         assert_eq!(r.shown_ms, 0);
         assert_eq!(r.visible_ms, 0, "日の変わり目で 0 に戻る");
+        assert_eq!(r.reveal_count, 0, "どけた回数も日の変わり目で 0 に戻る");
         assert!(r.toggles.is_empty() && r.stage_starts.is_empty());
         assert!(!r.off && !r.overflow);
         assert_eq!(r.first_shown_day, Some(10));
@@ -322,6 +341,7 @@ mod tests {
         assert!(r.is_valid() && r.off);
         assert_eq!(r.visible_ms, 0, "visible_ms の無い古いファイルは 0");
         assert!(r.input_toggles.is_empty() && !r.cursor_off && !r.click_off);
+        assert_eq!(r.reveal_count, 0, "reveal_count の無い古いファイルは 0");
         assert_eq!(r.toggles, vec![Toggle { t: 5, on: false }]);
     }
 
@@ -332,13 +352,15 @@ mod tests {
         r.set_input(6, PointerInput::Cursor, false);
         r.set_input(7, PointerInput::Click, false);
         r.set_input(8, PointerInput::Cursor, true);
+        r.add_reveal();
+        r.add_reveal();
         assert_eq!(
             serde_json::to_string(&r).unwrap(),
             concat!(
                 r#"{"version":1,"day":20410,"shown_ms":0,"visible_ms":0,"toggles":[{"t":5,"on":false}],"off":true,"#,
                 r#""first_shown_day":null,"stage_starts":[],"overflow":false,"#,
                 r#""input_toggles":[{"t":6,"input":"cursor","on":false},{"t":7,"input":"click","on":false},{"t":8,"input":"cursor","on":true}],"#,
-                r#""cursor_off":false,"click_off":true}"#
+                r#""cursor_off":false,"click_off":true,"reveal_count":2}"#
             )
         );
         let back: DayRecord = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
@@ -389,5 +411,27 @@ mod tests {
         let back: DayRecord = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
         assert_eq!(back.visible_ms, 42);
         assert_eq!(back, r);
+    }
+
+    #[test]
+    fn reveal_count_adds_subtracts_and_is_not_kept_by_the_minimal_shape() {
+        let mut r = DayRecord::new(4);
+        r.add_reveal();
+        r.add_reveal();
+        r.add_reveal();
+        r.add_shown(100);
+        r.subtract(10, 0, 2);
+        assert_eq!((r.shown_ms, r.reveal_count), (90, 1));
+        r.subtract(0, 0, 5);
+        assert_eq!(r.reveal_count, 0, "引きすぎは 0 で止まる");
+        assert_eq!(subtract_count(3, 1), 2);
+        assert_eq!(subtract_count(1, 3), 0);
+        // 区間の削除で時刻を消しても回数は量なので変わらない
+        r.add_reveal();
+        assert!(!r.scrub_range(0, u64::MAX));
+        assert_eq!(r.reveal_count, 1);
+        // 時刻を落とす最小の形は量を持たない
+        r.set_off(1, true);
+        assert_eq!(r.minimal_keeping_off().reveal_count, 0);
     }
 }

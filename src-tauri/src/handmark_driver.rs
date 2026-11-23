@@ -52,6 +52,28 @@ impl TrayItem {
     }
 }
 
+/// トレイの「ほかの窓をどける」の項目（窓を出している間だけ出す・handmark-reveal-count 判断 4）。
+/// 文言は同意文書の語にそろえ、手跡の語と状態の名前を出さない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevealItem {
+    Hidden,
+    /// どけていないので「ほかの窓をどける」。
+    Reveal,
+    /// どけているので「窓を戻す」。
+    Return,
+}
+
+impl RevealItem {
+    /// メニューの文言（`Hidden` は出さない）。
+    pub fn label(self) -> Option<&'static str> {
+        match self {
+            RevealItem::Hidden => None,
+            RevealItem::Reveal => Some("ほかの窓をどける"),
+            RevealItem::Return => Some("窓を戻す"),
+        }
+    }
+}
+
 /// 窓の層が知らせる窓の様子(窓を作れない・出せないときは `Failed`)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowStatus {
@@ -73,6 +95,11 @@ pub enum Effect {
     State(StageState),
     Row(HandmarkDayRow),
     TrayItem(TrayItem),
+    /// ほかのアプリの窓をどける（`true`）・戻す（`false`）。どける側は、押した時に見えていたものだけを覚え、
+    /// 戻す側はそれだけを戻す（覚えた一覧は OS の層のメモリにだけ置き、記録しない）。
+    Reveal(bool),
+    /// トレイの「ほかの窓をどける」／「窓を戻す」の項目。
+    RevealItem(RevealItem),
     /// ポインタのスレッドへの入れ切り（窓を出している・カーソルが入っている・クリックが入っている）。
     /// 窓を開く・閉じる・入れ切りが変わる・日が変わる・門が閉じるたびに、その時点の値で 1 回出す。
     /// `open` は窓を出していること（全体の「やめる」で閉じれば false。入力ごとの状態は保つ）。
@@ -100,8 +127,9 @@ impl Effect {
             Effect::OpenWindow { .. }
             | Effect::CloseWindow
             | Effect::State(_)
-            | Effect::PointerGate { .. } => Destination::Window,
-            Effect::TrayItem(_) => Destination::Tray,
+            | Effect::PointerGate { .. }
+            | Effect::Reveal(_) => Destination::Window,
+            Effect::TrayItem(_) | Effect::RevealItem(_) => Destination::Tray,
         }
     }
 }
@@ -155,6 +183,9 @@ pub struct HandmarkDriver {
     last_tray: TrayItem,
     /// 最後に出した `(open, cursor, click)`（閉じた初期の値から始める。変わらなければ出さない）。
     last_gate: (bool, bool, bool),
+    /// いまほかの窓をどけている（`Effect::Reveal(true)` を出し、まだ戻していない）。
+    revealed: bool,
+    last_reveal_item: RevealItem,
     /// 記録の一時停止中（本タスクの判断 2）。量を足さず、時刻の要素を状態に残さない。
     paused: Option<PauseMark>,
 }
@@ -190,6 +221,8 @@ impl HandmarkDriver {
             last_tick_ms: now,
             last_tray: TrayItem::Hidden,
             last_gate: (false, true, true),
+            revealed: false,
+            last_reveal_item: RevealItem::Hidden,
             paused: None,
         };
         let mut fx = Vec::new();
@@ -237,6 +270,72 @@ impl HandmarkDriver {
             self.last_tray = t;
             fx.push(Effect::TrayItem(t));
         }
+        self.sync_reveal_item(fx);
+    }
+
+    /// 「ほかの窓をどける」の項目の今の状態（窓を出している間だけ出す）。
+    pub fn reveal_item(&self) -> RevealItem {
+        match (self.window_open, self.revealed) {
+            (false, _) => RevealItem::Hidden,
+            (true, false) => RevealItem::Reveal,
+            (true, true) => RevealItem::Return,
+        }
+    }
+
+    fn sync_reveal_item(&mut self, fx: &mut Vec<Effect>) {
+        let item = self.reveal_item();
+        if item != self.last_reveal_item {
+            self.last_reveal_item = item;
+            fx.push(Effect::RevealItem(item));
+        }
+    }
+
+    /// どけていれば戻す（窓を閉じる・日が変わる・終了するとき・判断 4）。戻しは数えない。
+    fn return_revealed(&mut self, fx: &mut Vec<Effect>) {
+        if self.revealed {
+            self.revealed = false;
+            fx.push(Effect::Reveal(false));
+        }
+    }
+
+    /// トレイの「ほかの窓をどける」／「窓を戻す」。`shown` は押された項目の、メニューに出ていた側。
+    /// 駆動役の今の項目と違う（表示が古い）・窓を出していないときは何もしない。
+    ///
+    /// どけるときは、記録の一時停止中でなければ日の累計の回数を 1 足して状態ファイルへ保存する。行は書かない
+    /// （行の `t` に押した時刻が出るため・回数は次の 5 分ごとの行に載る・判断 2）。戻すときは数えない。
+    pub fn toggle_reveal(
+        &mut self,
+        fs: &dyn HandmarkFs,
+        shown: RevealItem,
+        now: u64,
+    ) -> Vec<Effect> {
+        let mut fx = Vec::new();
+        if shown == RevealItem::Hidden || shown != self.reveal_item() {
+            return fx;
+        }
+        match shown {
+            RevealItem::Reveal => {
+                // 先に数えて保存し、書けたときだけどける。書けなければ閉じる側に倒れ、どけない
+                // （どけた直後に戻すと、Windows の非同期の最小化が戻しの後に走り、窓が最小化されたまま
+                // 残るため・/cross-review の Codex の指摘）
+                if self.paused.is_none() {
+                    self.ev.add_reveal();
+                    self.save_or_clean_up(fs, now, &mut fx);
+                    if !self.window_open {
+                        return fx;
+                    }
+                }
+                self.revealed = true;
+                fx.push(Effect::Reveal(true));
+                self.sync_reveal_item(&mut fx);
+            }
+            RevealItem::Return => {
+                self.return_revealed(&mut fx);
+                self.sync_reveal_item(&mut fx);
+            }
+            RevealItem::Hidden => {}
+        }
+        fx
     }
 
     /// ポインタの入れ切りを出す。値が変わったとき（`force` なら変わらなくても）1 回。
@@ -408,6 +507,8 @@ impl HandmarkDriver {
     }
 
     fn close_window(&mut self, fx: &mut Vec<Effect>) {
+        // 窓を閉じる前に、どけた窓を戻す（やめる・門が閉じる・窓の失敗・保存の失敗のどれでも）
+        self.return_revealed(fx);
         self.window_open = false;
         self.window_confirmed = false;
         self.strip_visible = false;
@@ -443,6 +544,8 @@ impl HandmarkDriver {
         self.last_tick_ms = now;
 
         if day_changed {
+            // 日が変わったら、どけた窓を戻す（新しい日の回数は 0 から・判断 4）
+            self.return_revealed(&mut fx);
             // 前の日の最後の行 → 門を検め直す → 新しい日の最初の行
             self.push_row(now, &mut fx);
             let was_open = self.window_open;
@@ -634,6 +737,8 @@ impl HandmarkDriver {
     /// 終了: 保存して最後の行。
     pub fn on_quit(&mut self, fs: &dyn HandmarkFs, now: u64) -> Vec<Effect> {
         let mut fx = Vec::new();
+        // どけた窓を戻してから終わる（判断 4）
+        self.return_revealed(&mut fx);
         // 一時停止のまま終わる: 再開と同じに時刻を片づけてから保存する(次の起動の行に一時停止中の時刻を残さない)
         if let Some(m) = self.paused.take() {
             self.end_pause(fs, m, now, &mut fx);
@@ -1559,6 +1664,7 @@ mod tests {
                 t: T0 + 10_000,
                 shown_ms: 10_000,
                 visible_ms: 9_000,
+                reveals: 0,
                 skipped: false,
             },
             HandmarkSnap {
@@ -1566,6 +1672,7 @@ mod tests {
                 t: T0 + 20_000,
                 shown_ms: 20_000,
                 visible_ms: 19_000,
+                reveals: 0,
                 skipped: false,
             },
         ];
@@ -1657,11 +1764,205 @@ mod tests {
             t,
             shown_ms: s,
             visible_ms: s,
+            reveals: 0,
             skipped: false,
         };
         let snaps = [snap(T0 - 50_000, 100), snap(T0 - 10_000, 300)];
         let (_, _, subs) = d.on_redact(&fs, T0 - 40_000, T0 - 20_000, &snaps, false, T0 + 1_000);
         assert_eq!(subs.get(&(ON_DAY - 1)).map(|s| s.shown_ms), Some(200));
         assert!(!subs.contains_key(&ON_DAY));
+    }
+
+    fn reveals(d: &HandmarkDriver) -> u64 {
+        d.evaluation().record.as_ref().map_or(0, |r| r.reveal_count)
+    }
+    fn reveal_fx(fx: &[Effect]) -> Vec<bool> {
+        fx.iter()
+            .filter_map(|e| match e {
+                Effect::Reveal(b) => Some(*b),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// 「ほかの窓をどける」: 窓を出している間だけ項目が出て、どけると 1 回数え、戻すのは数えない。
+    /// どけたときに行は書かない（押した時刻を行の t に出さない）。回数は次の 5 分の行に載る。
+    #[test]
+    fn reveal_counts_only_the_reveal_and_writes_no_row_at_the_press() {
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Reveal)));
+        assert_eq!(d.reveal_item(), RevealItem::Reveal);
+        let fx = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        assert_eq!(reveal_fx(&fx), vec![true]);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Return)));
+        assert!(
+            !has(&fx, |e| matches!(e, Effect::Row(_))),
+            "押した時刻を行に出さない: {fx:?}"
+        );
+        assert_eq!(reveals(&d), 1);
+        // 状態ファイルにも保存した
+        let DayLoadCheck(n) = saved_reveals(&fs);
+        assert_eq!(n, 1);
+        // 古い文言の押下は捨てる(どけている間の「ほかの窓をどける」)
+        assert!(d
+            .toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_500)
+            .is_empty());
+        assert!(d
+            .toggle_reveal(&fs, RevealItem::Hidden, T0 + 1_500)
+            .is_empty());
+        // 戻すのは数えない
+        let fx = d.toggle_reveal(&fs, RevealItem::Return, T0 + 2_000);
+        assert_eq!(reveal_fx(&fx), vec![false]);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Reveal)));
+        assert_eq!(reveals(&d), 1);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 3_000);
+        let _ = d.toggle_reveal(&fs, RevealItem::Return, T0 + 4_000);
+        assert_eq!(reveals(&d), 2);
+        // 次の 5 分の行に回数が載る
+        let mut rows = Vec::new();
+        let mut now = T0 + 4_000;
+        while now < T0 + ROW_MS + 5_000 {
+            now += 250;
+            rows.extend(d.tick(&fs, now, ON_DAY));
+        }
+        let counts: Vec<Option<u64>> = rows
+            .iter()
+            .filter_map(|e| match e {
+                Effect::Row(r) => Some(r.reveal_count),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(counts, vec![Some(2)]);
+        // 記録に向かうのは Row だけ
+        assert_eq!(
+            Effect::Reveal(true).destination(),
+            Destination::Window,
+            "どける操作は記録に向かわない"
+        );
+        assert_eq!(
+            Effect::RevealItem(RevealItem::Reveal).destination(),
+            Destination::Tray
+        );
+    }
+
+    struct DayLoadCheck(u64);
+    fn saved_reveals(fs: &MemFs) -> DayLoadCheck {
+        use crate::handmark_store::{parse_state, DayLoad};
+        match parse_state(&fs.read_state()) {
+            DayLoad::Loaded(r) => DayLoadCheck(r.reveal_count),
+            _ => DayLoadCheck(u64::MAX),
+        }
+    }
+
+    /// 窓を出していない日（出さない日・切った日）は項目が出ず、押しても何もしない。
+    #[test]
+    fn reveal_is_hidden_and_inert_when_the_window_is_not_shown() {
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, OFF_DAY);
+        assert!(!has(&fx, |e| matches!(e, Effect::RevealItem(_))));
+        assert_eq!(d.reveal_item(), RevealItem::Hidden);
+        assert!(d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1).is_empty());
+        assert_eq!(reveals(&d), 0);
+        // 出す日でも「やめる」の後は出さない
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let fx = d.turn_off(&fs, T0 + 1_000);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Hidden)));
+        assert!(d
+            .toggle_reveal(&fs, RevealItem::Reveal, T0 + 2_000)
+            .is_empty());
+        assert_eq!(reveals(&d), 0);
+    }
+
+    /// 記録の一時停止中はどけても数えない（量を足さない・判断 2 の作法）。どける・戻す自体は効く。
+    #[test]
+    fn reveal_during_a_pause_is_not_counted() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_paused(&fs, true, T0 + 500);
+        let fx = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        assert_eq!(reveal_fx(&fx), vec![true]);
+        assert_eq!(reveals(&d), 0);
+        let _ = d.toggle_reveal(&fs, RevealItem::Return, T0 + 1_500);
+        let _ = d.on_paused(&fs, false, T0 + 2_000);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 3_000);
+        assert_eq!(reveals(&d), 1, "再開の後は数える");
+    }
+
+    /// どけている間に「やめる」・日の変わり目・門が閉じる・窓の失敗・終了があれば、窓を戻す（判断 4）。
+    /// 戻す出来事は窓を閉じる出来事より前に出る。
+    #[test]
+    fn revealed_windows_are_returned_on_stop_day_change_failure_and_quit() {
+        let returned_before_close = |fx: &[Effect]| {
+            let r = fx.iter().position(|e| *e == Effect::Reveal(false));
+            let c = fx.iter().position(|e| matches!(e, Effect::CloseWindow));
+            matches!((r, c), (Some(r), Some(c)) if r < c)
+        };
+        // やめる
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.turn_off(&fs, T0 + 2_000);
+        assert!(returned_before_close(&fx), "{fx:?}");
+        assert_eq!(d.reveal_item(), RevealItem::Hidden);
+        // 日の変わり目（出す日が続いても戻し、新しい日は 0 から）
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let day = 86_400_000;
+        let fx = d.tick(&fs, T0 + day, OFF_DAY);
+        assert_eq!(reveal_fx(&fx), vec![false], "{fx:?}");
+        assert!(returned_before_close(&fx), "{fx:?}");
+        assert_eq!(reveals(&d), 0);
+        // 日の変わり目で出す日が続く（窓は閉じない）ときも戻し、項目は「ほかの窓をどける」に戻る
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.tick(&fs, T0 + day * 3, NEXT_ON_DAY);
+        assert!(d.is_window_open(), "出す日が続く");
+        assert!(!closed(&fx), "{fx:?}");
+        assert_eq!(reveal_fx(&fx), vec![false], "{fx:?}");
+        assert_eq!(d.reveal_item(), RevealItem::Reveal);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Reveal)));
+        assert_eq!(reveals(&d), 0, "新しい日は 0 から");
+        // 窓の失敗で門が閉じる
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.on_window_status(WindowStatus::Failed, T0 + 2_000);
+        assert!(returned_before_close(&fx), "{fx:?}");
+        // 終了
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.on_quit(&fs, T0 + 2_000);
+        assert_eq!(reveal_fx(&fx), vec![false]);
+        // どけていなければ戻す出来事は出ない（対照）
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert!(reveal_fx(&d.turn_off(&fs, T0 + 1_000)).is_empty());
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert!(reveal_fx(&d.on_quit(&fs, T0 + 1_000)).is_empty());
+    }
+
+    /// 保存に失敗したら閉じる側に倒れ、どけない（どけてすぐ戻す組を出さない。Windows では非同期の最小化が
+    /// 戻しの後に走って窓が残るため）。
+    #[test]
+    fn a_failed_save_at_reveal_closes_without_revealing() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        fs.fail_state_write.set(true);
+        let fx = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        assert!(reveal_fx(&fx).is_empty(), "{fx:?}");
+        assert!(closed(&fx));
+        assert_eq!(d.reveal_item(), RevealItem::Hidden);
+        // 対照: 書ければどける
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert_eq!(
+            reveal_fx(&d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000)),
+            vec![true]
+        );
     }
 }

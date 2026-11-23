@@ -186,6 +186,7 @@ fn the_handmark_day_schema_has_exactly_the_designed_fields() {
         "first_shown_day",
         "shown_ms",
         "visible_ms",
+        "reveal_count",
         "toggles",
         "input_toggles",
         "stage_starts",
