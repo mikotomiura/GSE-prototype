@@ -1,5 +1,5 @@
 {
-  "_comment": "Rhythm stage desk check, relative timing (plan D; synthetic traces only, no participants; .steering/20261122-rhythm-stage-relative-timing/design.md: copied from experiments/20261015-rhythm-stage-speed-shape-world/config.json (1cf9fcb9), changed: ceiling.steps are g050 (the graded world at t = 0.5) and f200 (the factor world at c = 2) with their worlds in ceiling.worlds; pc_stall.lam emptied and keyed by step then base (A, S); pc_stall.lam_1800, pc_r, split and compare removed (L300 only, no r-side control, no cause split, no comparison table: decisions 8, 9); plan_d added (the constants of plan D, checked against stage.py by selftest.py); describe.d2_smooth added. The copied comment follows: Rhythm stage desk check, shape world (synthetic traces only, no participants; .steering/20261015-rhythm-stage-speed-shape-world/design.md: copied from experiments/20261014-rhythm-stage-speed-confound-world/config.json (7d38df98), changed: ceiling.steps are f100 / f200 / d100 / d200 with their worlds in ceiling.worlds, pc_stall.lam and pc_stall.lam_1800 emptied, pc_r, split and compare added). The copied comment follows: Rhythm stage desk check, confound world (synthetic traces only, no participants; .steering/20261014-rhythm-stage-speed-confound-world/design.md: copied from experiments/20261014-rhythm-stage-graded-world/config.json (424d9500), changed: ceiling.steps are the widths c050 / c100 / c200, speed_confound added). The copied comment follows: graded world Copied from experiments/20261013-rhythm-stage-round2/config.json (d98103a0); this task changes only ceiling (the three steps and their rule), pc_stall.lam (a table per step, empty until the pilot of the step) and pc_stall.lam_1800 (new, the same) (.steering/20261014-rhythm-stage-graded-world/design.md 0, 1.2, 1.3 and 3.0). The graded world's STRUGGLE settings are made by gen_sessions.py from segments_v4 and segments_v2 (_comment_graded) and are not written here. Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
+  "_comment": "Rhythm stage desk check, person world (synthetic traces only, no participants; .steering/20261123-rhythm-stage-person-world/design.md: copied from experiments/20261122-rhythm-stage-relative-timing/config.json, changed: the new blocks person (the four steps m049 m068 r049 r068, 40 persons x 6 sessions, sigma_b 0.536 and the two ICCs of decisions 7, the grid of k, the PC-raw gate, the smoke sizes), pc_person (the lambda of PCp per step, base and candidate; empty until the pilot) and pc_pers (the lambda of PCps per step and candidate; empty until the pilot). Kept as they were because checks.py's judge and the earlier self-tests read them: ceiling (steps g050 and f200 are the earlier task's, not run here; only ceiling.main_auc is used by the person pipeline), pc_stall (lower, upper, aim, pilot_grid are the band and the grid of PCp and PCps too), e13 (folds, bootstrap, null_perms, margin, pc_lower, long_s and strata for the L300 tables), speed, plan_d, describe. The generator settings are unchanged; the person worlds draw from the graded segments at speed_confound.base_t = 0.5. The copied comment follows: Rhythm stage desk check, relative timing (plan D; synthetic traces only, no participants; .steering/20261122-rhythm-stage-relative-timing/design.md: copied from experiments/20261015-rhythm-stage-speed-shape-world/config.json (1cf9fcb9), changed: ceiling.steps are g050 (the graded world at t = 0.5) and f200 (the factor world at c = 2) with their worlds in ceiling.worlds; pc_stall.lam emptied and keyed by step then base (A, S); pc_stall.lam_1800, pc_r, split and compare removed (L300 only, no r-side control, no cause split, no comparison table: decisions 8, 9); plan_d added (the constants of plan D, checked against stage.py by selftest.py); describe.d2_smooth added. The copied comment follows: Rhythm stage desk check, shape world (synthetic traces only, no participants; .steering/20261015-rhythm-stage-speed-shape-world/design.md: copied from experiments/20261014-rhythm-stage-speed-confound-world/config.json (7d38df98), changed: ceiling.steps are f100 / f200 / d100 / d200 with their worlds in ceiling.worlds, pc_stall.lam and pc_stall.lam_1800 emptied, pc_r, split and compare added). The copied comment follows: Rhythm stage desk check, confound world (synthetic traces only, no participants; .steering/20261014-rhythm-stage-speed-confound-world/design.md: copied from experiments/20261014-rhythm-stage-graded-world/config.json (424d9500), changed: ceiling.steps are the widths c050 / c100 / c200, speed_confound added). The copied comment follows: graded world Copied from experiments/20261013-rhythm-stage-round2/config.json (d98103a0); this task changes only ceiling (the three steps and their rule), pc_stall.lam (a table per step, empty until the pilot of the step) and pc_stall.lam_1800 (new, the same) (.steering/20261014-rhythm-stage-graded-world/design.md 0, 1.2, 1.3 and 3.0). The graded world's STRUGGLE settings are made by gen_sessions.py from segments_v4 and segments_v2 (_comment_graded) and are not written here. Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
   "session": {
     "duration_s": 10800,
     "final_flow_s": 60,
@@ -447,5 +447,104 @@
     "min_ivl": 8,
     "min_pairs": 5,
     "init": 0.5
+  },
+  "person": {
+    "n_persons": 40,
+    "sessions_per_person": 6,
+    "sigma_b": 0.536,
+    "icc": {
+      "049": 0.494,
+      "068": 0.679
+    },
+    "h": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "order": [
+      "m049",
+      "m068",
+      "r049",
+      "r068"
+    ],
+    "steps": {
+      "m049": {
+        "world": "person-m",
+        "icc": 0.494
+      },
+      "m068": {
+        "world": "person-m",
+        "icc": 0.679
+      },
+      "r049": {
+        "world": "person-r",
+        "icc": 0.494,
+        "target_step": "m049"
+      },
+      "r068": {
+        "world": "person-r",
+        "icc": 0.679,
+        "target_step": "m068"
+      }
+    },
+    "k": {},
+    "k_grid": [
+      0.01,
+      0.015,
+      0.02,
+      0.03,
+      0.045,
+      0.07,
+      0.1,
+      0.15,
+      0.22,
+      0.33,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "k_tolerance": 0.02,
+    "pc_raw": {
+      "gate_lower": 0.53,
+      "short_ms": 2000,
+      "burst_ms": 600,
+      "pause_max_ms": 20000
+    },
+    "seed_offsets": {
+      "main": 0,
+      "pilot": 1,
+      "kgrid": 1,
+      "ceiling": 1,
+      "smoke": 2
+    },
+    "folds": 5,
+    "bootstrap": 2000,
+    "null_perms": 20,
+    "smoke": {
+      "duration_scale": 0.05,
+      "bootstrap": 200,
+      "null_perms": 2
+    },
+    "reader": {
+      "train_slots": [
+        0,
+        1,
+        2
+      ],
+      "test_slots": [
+        3,
+        4,
+        5
+      ]
+    },
+    "ridge_alpha": 1.0,
+    "variant_drop": "smooth"
+  },
+  "_comment_person": "design 1.2-1.8, 3.0, 9: person.steps names the four steps (world, ICC, and for the person-r steps the m step whose pilot's PC-raw AUC is the target of k); person.sigma_b = ln(481.03 / 121.70) / (2 x 1.2816) (decisions 7); person.icc are the two reproducibility levels of the within-word key-interval mean of [P642]; person.k is written by --apply-pilot from the step's pilot-k (r steps only); person.k_grid and k_tolerance are design 1.7; person.pc_raw.gate_lower 0.53 is design 3.0 (the same value judges PC-raw works); person.seed_offsets are design 1.3 (main 0, pilot 1, k grid 1, smoke 2); person.smoke is design 6 (the sessions' length x 0.05, bootstrap 200, 2 permutations); person.bootstrap and person.null_perms are e13's.",
+  "pc_person": {
+    "lam": {}
+  },
+  "pc_pers": {
+    "lam": {}
   }
 }

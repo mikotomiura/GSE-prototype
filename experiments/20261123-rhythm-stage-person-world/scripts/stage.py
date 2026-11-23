@@ -32,6 +32,17 @@ Plan D (design 1.2): D-<set>-hold-sec, set "run" or "all".
   has fewer than MIN_IVL intervals; r is 0.5 (held under MIN_PAIRS, so 0.5 throughout). Then the same points, stop and
   clip as the candidate. PC0- is the same at lam = 0.
 
+Person controls (.steering/20261123-rhythm-stage-person-world/design.md 1.5, 1.8; added after the copied file; the names
+above and their output are unchanged, selftest.py compares them with the shape world's file):
+- (5) PC1-id: a = Phi(z'_p), the person's own standard normal from a stream of its own (derive_rng(seed, "pcid", p)),
+  on every second; r = 0.5. PCp-<candidate> (lam): per 60 s block, the block value is Phi(z'_p) if U < lam else N (the
+  PC-stall's U and N); the rest as PCs-. PC0-id-<candidate> (lam): the signal is Phi(e'_s), one value per session
+  (derive_rng(seed, "pcid0", i)), not tied to the person. r is 0.5 throughout.
+- (6) PC1-pers: per block, a = 0.5 + s_p (q - 0.5) with q the stall share of the preceding 300 s and s_p = +-1 per person
+  (derive_rng(seed, "pcsign"): half of the persons each); r = 0.5. PCps-<candidate> (lam): the same signal where
+  U < lam. PC0p-<candidate> (lam): s_p = +1 for everybody (this is the PC-stall's picture).
+These read the session's id (to get the person) and the labels (q) only; never the generator's latent values.
+
 The seams d_inputs, d_window_bounds, d_select and d_spread are separate functions so that selftest.py can put the
 mutants of design 3.7 in their place.
 """
@@ -45,6 +56,9 @@ from pathlib import Path
 
 import numpy as np
 from scipy.signal import lfilter
+from scipy.special import ndtr
+
+import gen_sessions as gs
 
 HZ = 10
 DT = 1.0 / HZ
@@ -85,6 +99,9 @@ RESOLUTIONS = ("sec", "sub")
 ALLOWED_INPUT = ("presses", "active", "keys", "f1", "f4")
 D_INPUT = ("presses", "active")  # design 1.2: what plan D reads
 STALL_CODES = (1, 3)
+SLOTS = 6  # sessions per person (config person.sessions_per_person; checked by selftest.py)
+N_PERSONS = 40
+PERSON_NAMES = ("PC1-id", "PCp-", "PC0-id-", "PC1-pers", "PCps-", "PC0p-")
 FEAT_NAMES = tuple(f"{p}_{q}" for p in ("a", "r") for q in ("mean", "sd", "p10", "p50", "p90", "ground", "absdiff",
                                                              "ac1", "end", "since_change"))
 D_CANDIDATES = ("D-run-hold-sec", "D-all-hold-sec")
@@ -476,13 +493,94 @@ def candidate_series(inp: StageInput, name: str, seed: int, key_seed: int) -> tu
     ua, ur, stopped = drive(inp, r)
     return shape(ua, ur, stopped, m, s, seed, key_seed)
 
+# ---------------------------------------------------------------------------
+# Person controls (design 1.5, 1.8)
+# ---------------------------------------------------------------------------
 
-def series(sess: Session, name: str, seed: int, lam: float | None = None, mutation: str | None = None
-           ) -> tuple[np.ndarray, np.ndarray]:
+def person_of(sid: str, slots: int = SLOTS) -> int:
+    """The person of session P<i>: i // slots (a session's name is all the controls read of the person)."""
+    return int(sid[1:]) // slots
+
+
+def pers_sign(seed: int, p: int, n_persons: int = N_PERSONS) -> float:
+    """s_p: +1 for half of the persons and -1 for the others, drawn from derive_rng(seed, "pcsign")."""
+    order = gs.derive_rng(seed, "pcsign").permutation(n_persons)
+    s = np.full(n_persons, -1.0)
+    s[order[: n_persons // 2]] = 1.0
+    return float(s[p])
+
+
+def pc0p_sign(seed: int, p: int, n_persons: int = N_PERSONS) -> float:
+    """PC0p: the same direction for everybody (seam: selftest Q2 and the mutant)."""
+    return 1.0
+
+
+def pcid_value(seed: int, p: int) -> float:
+    """Phi(z'_p): a person's own value, from a stream the generator does not use."""
+    return float(ndtr(gs.derive_rng(seed, "pcid", p).standard_normal()))
+
+
+def pcid0_value(seed: int, i: int) -> float:
+    """Phi(e'_s): one value per session, tied to no person."""
+    return float(ndtr(gs.derive_rng(seed, "pcid0", i).standard_normal()))
+
+
+def person_blocks(sess: "Session", seed: int, lam: float, kind: str, n_persons: int, slots: int) -> np.ndarray:
+    """The block values of a person control: U, N and q as pc_blocks; the signal replaces q where U < lam."""
+    blk = pc_blocks(sess.seg, sess.duration_s, sess.key_seed, seed, lam)
+    i, p = int(sess.sid[1:]), person_of(sess.sid, slots)
+    if kind == "id":
+        sig = np.full_like(blk["q"], pcid_value(seed, p))
+    elif kind == "id0":
+        sig = np.full_like(blk["q"], pcid0_value(seed, i))
+    elif kind == "pers":
+        sig = 0.5 + pers_sign(seed, p, n_persons) * (blk["q"] - 0.5)
+    elif kind == "p0":
+        sig = 0.5 + pc0p_sign(seed, p, n_persons) * (blk["q"] - 0.5)
+    else:
+        raise ValueError(kind)
+    return np.where(blk["U"] < lam, sig, blk["N"])
+
+
+def person_series(sess: "Session", name: str, seed: int, lam: float | None, n_persons: int, slots: int
+                  ) -> tuple[np.ndarray, np.ndarray]:
+    """(a, r) of the person controls (names PERSON_NAMES). The picture of a block control is built as the PC-stall's:
+    an anchor takes the block value as its drive (r = 0.5) and its own stop; a plan D candidate takes it in place of
+    the spread."""
+    n = sess.duration_s * HZ
+    if name in ("PC1-id", "PC1-pers"):
+        if name == "PC1-id":
+            a = np.full(n, pcid_value(seed, person_of(sess.sid, slots)))
+        else:
+            blk = person_blocks(sess, seed, 1.0, "pers", n_persons, slots)  # lam 1: every block is the signal
+            a = np.repeat(blk, PC_BLOCK_S * HZ)[:n]
+        return a, np.full(n, 0.5)
+    for prefix, kind in (("PCp-", "id"), ("PC0-id-", "id0"), ("PCps-", "pers"), ("PC0p-", "p0")):
+        if name.startswith(prefix):
+            cand = name[len(prefix):]
+            break
+    else:
+        raise ValueError(name)
+    assert lam is not None, f"{name} needs lam"
+    blk = person_blocks(sess, seed, lam, kind, n_persons, slots)
+    inp = stage_input(sess)
+    if cand.startswith("D-"):
+        a_block = blk[np.arange(sess.duration_s) // PC_BLOCK_S]
+        return d_series(inp, cand, seed, sess.key_seed, a_block=a_block)
+    m, s, r = parse(cand)
+    _, _, stopped = drive(inp, r)
+    ua = np.repeat(blk, PC_BLOCK_S * HZ)[:n]
+    return shape(ua, np.full(n, 0.5), stopped, m, s, seed, sess.key_seed)
+
+
+def series(sess: Session, name: str, seed: int, lam: float | None = None, mutation: str | None = None,
+           n_persons: int = N_PERSONS, slots: int = SLOTS) -> tuple[np.ndarray, np.ndarray]:
     """(a, r) at 10 Hz of a candidate or a control. Names: S-..., D-..., PC1, PCs-<candidate>(lam),
     PC0-<candidate>, PC-corr. mutation "seg" (selftest only): the candidate's amplitude mixed half and half with the
     stall indicator of the last completed second."""
     n = sess.duration_s * HZ
+    if name == "PC1-id" or name == "PC1-pers" or name.startswith(("PCp-", "PC0-id-", "PCps-", "PC0p-")):
+        return person_series(sess, name, seed, lam, n_persons, slots)  # design 1.5, 1.8
     inp = stage_input(sess)
     if name.startswith(("S-", "D-")):
         a, r = candidate_series(inp, name, seed, sess.key_seed)

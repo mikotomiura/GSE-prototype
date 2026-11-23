@@ -325,6 +325,236 @@ def jitter(rng: np.random.Generator, times: np.ndarray, vks: np.ndarray, dwells:
     return t[order], vks[order], dwells[order]
 
 
+# ---------------------------------------------------------------------------
+# The person worlds (person-m, person-r): .steering/20261123-rhythm-stage-person-world/design.md 1.2.
+# Everything above this line is the copied file's and writes what it wrote (selftest G0). Everything below, up to
+# main(), is new and is used only by --world person-m and person-r.
+# ---------------------------------------------------------------------------
+
+PERSON_WORLDS = ("person-m", "person-r")
+DIM_H = (1.0, 1.0, 1.0)  # design 1.2 / section 9 item 4: the scale of the three dimensions (h_1 = h_2 = h_3 = 1)
+
+
+@dataclass
+class Mods:
+    """What a session's person draws change in gen_typing_person. shift: added to the log median of a key interval in
+    a burst. s1 = k h1 x1 (the log of the factor on the SD of the log interval), s2 = k h2 x2 (burst durations times
+    exp(+s2 / 2), the pause median and cap times exp(-s2 / 2)), s3 = k h3 x3 (rho = tanh(s3))."""
+    shift: float = 0.0
+    s1: float = 0.0
+    s2: float = 0.0
+    s3: float = 0.0
+
+
+def seq_rng(seed: int, i: int) -> np.random.Generator:
+    """The stream of session i's segment sequence (kinds and lengths): apart from the keys and the latents."""
+    return derive_rng(seed, "seq", i)
+
+
+def keys_rng(seed: int, i: int, n: object) -> np.random.Generator:
+    """The stream of the keys of segment n of session i."""
+    return derive_rng(seed, "keys", i, n)
+
+
+def raw_latents(seed: int, p: int, slots: int) -> tuple[np.ndarray, np.ndarray]:
+    """The standard normals of person p: z (4,) from derive_rng(seed, "pz", p) and eps (slots, 4), one row per
+    session, each from derive_rng(seed, "pe", p, s). They do not depend on the world, the ICC or k."""
+    z = derive_rng(seed, "pz", p).standard_normal(4)
+    eps = np.stack([derive_rng(seed, "pe", p, s).standard_normal(4) for s in range(slots)])
+    return z, eps
+
+
+def mix(z, eps, icc: float):
+    """x = sqrt(ICC) z + sqrt(1 - ICC) eps: unit variance, the share ICC of it between persons (seam: selftest G2)."""
+    return math.sqrt(icc) * z + math.sqrt(1.0 - icc) * eps
+
+
+def r_speed(z0: float, eps0: float, sigma_t: float) -> float:
+    """person-r: the session's speed shift sigma_t * eps0. It does not read z0 (the person's own value): design 1.2
+    (seam: selftest G5 and the mutant)."""
+    return sigma_t * eps0
+
+
+def sigmas(cfg: dict, icc: float) -> tuple[float, float, float]:
+    """(sigma_b, sigma_w, sigma_t): sigma_w = sigma_b sqrt((1 - ICC) / ICC), sigma_t = sqrt(sigma_b^2 + sigma_w^2)."""
+    sb = float(cfg["person"]["sigma_b"])
+    sw = sb * math.sqrt((1.0 - icc) / icc)
+    return sb, sw, math.sqrt(sb * sb + sw * sw)
+
+
+def session_latents(cfg: dict, world: str, icc: float, k: float, z: np.ndarray, eps_s: np.ndarray) -> tuple[Mods, dict]:
+    """The Mods and the manifest's latents of one session from the person's z (4,) and the session's eps (4,)."""
+    sb, sw, st_ = sigmas(cfg, icc)
+    if world == "person-m":
+        m = sb * float(z[0]) + sw * float(eps_s[0])
+        return Mods(shift=m), {"m_log": m}
+    x = [float(mix(z[j], eps_s[j], icc)) for j in (1, 2, 3)]
+    speed = r_speed(float(z[0]), float(eps_s[0]), st_)
+    h = DIM_H
+    return (Mods(shift=speed, s1=k * h[0] * x[0], s2=k * h[1] * x[1], s3=k * h[2] * x[2]),
+            {"x1": x[0], "x2": x[1], "x3": x[2], "speed_log": speed})
+
+
+def draw_sequence(rng: np.random.Generator, total_ms: int, cfg: dict) -> list[tuple[str, int, int]]:
+    """The segments of a session as markov draws them, from one stream and without the keys: (kind, the drawn length,
+    the length used). The last segment is cut at total_ms."""
+    trans = cfg["transitions"]
+    out: list[tuple[str, int, int]] = []
+    used = 0
+    state = None
+    while used < total_ms:
+        table = trans["START"] if state is None else trans[state]
+        kinds = list(table)
+        state = str(rng.choice(kinds, p=[table[k] for k in kinds]))
+        p = cfg["segments"][state]
+        if state == "AWAY":
+            band = int(rng.choice(len(p["bands_s"]), p=p["band_p"]))
+            lo, hi = p["bands_s"][band]
+            full = int(rng.uniform(lo, hi) * 1000)
+        else:
+            full = int(rng.uniform(p["dur_min_s"], p["dur_max_s"]) * 1000)
+        d = min(full, total_ms - used)
+        out.append((state, full, d))
+        used += d
+    return out
+
+
+def ar1_reset(e_prev):
+    """The AR(1) state at the start of a burst: none (the first interval is a fresh draw; selftest and the mutant)."""
+    return None
+
+
+def ar1_step(e_prev: float, rho: float, eta: float) -> float:
+    """One step of a unit-variance AR(1): rho e_prev + sqrt(1 - rho^2) eta (seam: selftest G4 and the mutant)."""
+    return rho * e_prev + math.sqrt(1.0 - rho * rho) * eta
+
+
+def interval_params(median_ms: float, sigma0: float, shift: float, s1: float) -> tuple[float, float]:
+    """(mu, sigma) of a key interval in a burst: the log median (median_ms times exp(shift), not moved by s1) and the
+    SD sigma0 exp(s1) (seam: selftest G4 and the mutant)."""
+    return float(np.log(median_ms)) + shift, sigma0 * math.exp(s1)
+
+
+def dim2_scales(s2: float) -> tuple[float, float]:
+    """(the factor on a burst's duration limits, the factor on the pause median and cap): exp(+s2 / 2), exp(-s2 / 2)."""
+    return math.exp(s2 / 2.0), math.exp(-s2 / 2.0)
+
+
+def gen_typing_person(rng: np.random.Generator, kind: str, dur_ms: int, cfg: dict, mods: Mods,
+                      collect: list | None = None, trace: list | None = None) -> Segment:
+    """gen_typing's by-duration path (bursts of a drawn time) with a person's Mods. With mods.s1 = s2 = s3 = 0 and a
+    constant shift it draws what gen_typing draws with a constant Speed (selftest G3). collect: when a list, it
+    receives (the log of every drawn key interval, the burst number) for the self-test (G4)."""
+    p = cfg["segments"][kind]
+    p_space = cfg["keys"]["p_space"]
+    if "burst_dur_min_s" not in p:
+        raise ValueError("the person worlds need bursts by duration")
+    bm, gm = dim2_scales(mods.s2)
+    rho = math.tanh(mods.s3)
+    seg = Segment(kind, dur_ms)
+    t = float(rng.uniform(0, 300))
+    nburst = 0
+    e_prev = None
+    while t < dur_ms:
+        last_vk = None
+        burst_start = t
+        burst_end = t + float(rng.uniform(p["burst_dur_min_s"] * bm, p["burst_dur_max_s"] * bm)) * 1000
+        e_prev = ar1_reset(e_prev)
+        nburst += 1
+        while t < dur_ms:
+            last_vk = pick_vk(rng, p["p_backspace"], p_space)
+            seg.presses.append((int(t), last_vk, draw_dwell(rng, cfg)))
+            mu, sigma = interval_params(p["flight_median_ms"], p["flight_sigma"], mods.shift, mods.s1)
+            if rho == 0.0:  # an AR(1) of rho 0 is independent draws: the same call as gen_typing's
+                dt = float(rng.lognormal(mu, sigma))
+            else:
+                eta = float(rng.standard_normal())
+                e = eta if e_prev is None else ar1_step(e_prev, rho, eta)
+                e_prev = e
+                dt = math.exp(mu + sigma * e)
+            if collect is not None:
+                collect.append((math.log(dt), nburst))
+            nxt = t + dt
+            if not nxt > t:
+                raise ValueError(f"a key interval does not advance the time ({t} ms, mu {mu})")
+            if nxt >= burst_end:
+                t = burst_end
+                break
+            t = nxt
+        gap = min(float(rng.lognormal(np.log(p["gap_median_ms"] * gm), p["gap_sigma"])), p["gap_cap_ms"] * gm)
+        if trace is not None:  # (the drawn burst length in ms, the drawn pause in ms, the pause cap in ms)
+            trace.append((burst_end - burst_start, gap, p["gap_cap_ms"] * gm))
+        if (kind == "STRUGGLE" and "p_pause_after_bs" in p and last_vk == VK_BACKSPACE
+                and rng.random() < p["p_pause_after_bs"]):
+            gap = max(gap, p["pause_after_bs_min_ms"] + float(rng.uniform(0, p["pause_after_bs_extra_ms"])))
+        t += gap
+    return seg
+
+
+def person_segments(seed: int, i: int, cfg: dict, mods: Mods, dur_ms: int, fin_ms: int) -> list[Segment]:
+    """Session i: the sequence from the "seq" stream first, then each typing segment's keys from a stream of its own
+    ("keys", i, n), so that the sequence and the labels do not depend on the keys (the world, ICC and k)."""
+    seq = draw_sequence(seq_rng(seed, i), dur_ms - fin_ms, cfg)
+    segs: list[Segment] = []
+    for n, (kind, full, used) in enumerate(seq):
+        if kind in TYPING:
+            seg = gen_typing_person(keys_rng(seed, i, n), kind, full, cfg, mods)
+            if used < full:
+                seg = truncate(seg, used)
+        else:
+            seg = Segment(kind, used)
+        segs.append(seg)
+    segs.append(gen_typing_person(keys_rng(seed, i, "final"), "FLOW", fin_ms, cfg, mods))
+    return segs
+
+
+def person_cfg(cfg: dict) -> dict:
+    """The config the person worlds draw from: the graded segments at t = 0.5 (the base of design 0)."""
+    out = copy.deepcopy(cfg)
+    out["segments"] = graded_segments(cfg, cfg["speed_confound"]["base_t"])
+    return out
+
+
+def person_world_args(world: str, icc: float | None, k: float | None) -> dict:
+    if world not in PERSON_WORLDS:
+        raise ValueError(world)
+    if icc is None or not (0.0 < icc < 1.0):
+        raise ValueError("--icc in (0, 1) is required with a person world")
+    if world == "person-r" and (k is None or not (math.isfinite(k) and 0.0 <= k <= 4.0)):
+        raise ValueError("--k in [0, 4] is required with --world person-r")
+    if world == "person-m" and k is not None:
+        raise ValueError("--k is for person-r only")
+    return {"world": world, "icc": float(icc), "k": None if world == "person-m" else float(k)}
+
+
+def person_session(seed: int, cfg: dict, world: str, icc: float, k: float | None, i: int, dur_s: int
+                   ) -> tuple[list[Segment], dict]:
+    """Session i of a person world (cfg: the file's config): its segments and the manifest's latents."""
+    slots = int(cfg["person"]["sessions_per_person"])
+    p, s = divmod(i, slots)
+    z, eps = raw_latents(seed, p, slots)
+    mods, lat = session_latents(cfg, world, icc, k or 0.0, z, eps[s])
+    segs = person_segments(seed, i, person_cfg(cfg), mods, dur_s * 1000, cfg["session"]["final_flow_s"] * 1000)
+    return segs, lat
+
+
+def generate_person(cfg: dict, seed: int, work: Path, world: str, icc: float, k: float | None, smoke: bool) -> list[dict]:
+    """Write the 40 x 6 P sessions of a person world (no other set: they are not used) and return the manifest."""
+    n_persons, slots = int(cfg["person"]["n_persons"]), int(cfg["person"]["sessions_per_person"])
+    sc = cfg["session"]
+    dur_s = int(round(sc["duration_s"] * (0.05 if smoke else 1.0)))
+    manifest: list[dict] = []
+    for i in range(n_persons * slots):
+        segs, lat = person_session(seed, cfg, world, icc, k, i, dur_s)
+        times, vks, dwells, dur_ms = assemble(segs)
+        labels = seg_labels(segs, dur_ms // 1000)
+        start_ms = sc["epoch_ms"] + i * sc["session_spacing_ms"]
+        write_session(work, f"P{i:03d}", start_ms, times, vks, dwells, dur_ms // 1000, labels, cfg)
+        manifest.append({"sid": f"P{i:03d}", "set": "P", "duration_s": int(dur_ms // 1000),
+                         "key_seed": key_seed(seed, "P", i), "person": i // slots, "slot": i % slots, **lat})
+    return manifest
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
@@ -332,16 +562,20 @@ def main() -> int:
     ap.add_argument("work")
     ap.add_argument("--hmm-version", required=True)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--world", choices=("v1", "v2", "v3", "v4", "graded", "confound", "factor", "drift"), default="v1",
+    ap.add_argument("--world", choices=("v1", "v2", "v3", "v4", "graded", "confound", "factor", "drift", "person-m", "person-r"),
+                    default="v1",
                     help="v1 = frozen design 1.2; v2 = deviation: same pause structure for FLOW and STRUGGLE; "
                          "v3 = v2 with FLOW's key intervals in STRUGGLE and v1's pause after a backspace; "
                          "v4 = v2 with FLOW's key intervals in STRUGGLE (the stall shows only in corrections); "
                          "graded = between v4 (t = 0) and v2 (t = 1) in STRUGGLE's key intervals (needs --t); "
                          "confound = graded at speed_confound.base_t with a speed factor and drift of width c "
                          "(needs --c); factor / drift = the confound world with the factor only / the drift only "
-                         "(needs --c)")
+                         "(needs --c); person-m / person-r = the person worlds (needs --icc; person-r also --k; "
+                         "design 1.2 of 20261123-rhythm-stage-person-world)")
     ap.add_argument("--t", type=float, default=None, help="graded world only: the step t in [0, 1]")
     ap.add_argument("--c", type=float, default=None, help="confound, factor and drift worlds only: the width c >= 0")
+    ap.add_argument("--icc", type=float, default=None, help="person worlds only: the share of between-person variance")
+    ap.add_argument("--k", type=float, default=None, help="person-r only: the common size of the three type dimensions")
     ap.add_argument("--p-n", type=int, default=None,
                     help="round 2 pilot only (design 3.10): the number of P sessions; the default output is unchanged")
     a = ap.parse_args()
@@ -360,6 +594,23 @@ def main() -> int:
     elif a.world in SPEED_WORLDS:
         cfg["segments"] = graded_segments(cfg, cfg["speed_confound"]["base_t"])
     seed = int(Path(a.seed_file).read_text().strip())
+    if a.world in PERSON_WORLDS:  # design 1.2: the person worlds write their own P sessions and nothing else
+        if a.c is not None or a.t is not None or a.p_n is not None:
+            ap.error("--c, --t and --p-n are not for the person worlds")
+        try:
+            wd = person_world_args(a.world, a.icc, a.k)
+        except ValueError as e:
+            ap.error(str(e))
+        work = Path(a.work)
+        (work / "ndjson").mkdir(parents=True, exist_ok=True)
+        (work / "labels").mkdir(parents=True, exist_ok=True)
+        manifest = generate_person(cfg, seed, work, a.world, wd["icc"], wd["k"], a.smoke)
+        (work / "sessions.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+        (work / "world.json").write_text(json.dumps(wd), encoding="utf-8")
+        print(f"generated {len(manifest)} sessions into {work}")
+        return 0
+    if a.icc is not None or a.k is not None:
+        ap.error("--icc and --k are for the person worlds only")
 
     def mk(names: tuple, duration_s: int) -> Speed | None:
         """confound world design 1.3: the speed series of a unit (a session or a pair); None outside the world."""

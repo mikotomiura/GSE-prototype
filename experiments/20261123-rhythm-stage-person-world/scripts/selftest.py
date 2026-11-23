@@ -25,6 +25,11 @@ Added (design 3.7):
 - --mutants: each mutant of design 3.7 is put in place in turn and must make its self-test fail (the unmutated test
   passes first).
 
+Person world (.steering/20261123-rhythm-stage-person-world/design.md 3.7; the tests are in selftest_person.py): G0-G5 (the
+generator), R1 (the closed input), P1-P5 ((5)), Q1-Q3 ((6)), J1-J4 (the verdict and the stops) and 14 more mutants.
+gen_sessions.py and stage.py are no longer the copied files: G0 compares what the earlier worlds write, the stage test
+compares the earlier names' output, both with the shape world's files.
+
 A failing test stops the run. A failure is fixed in the instruments; the definitions of design 1 and 3 are not changed.
 
 Usage: selftest.py <config.json> <tmp dir> --hmm-version V [--gse-replay BIN]
@@ -51,7 +56,9 @@ import baseline as bl
 import ceiling as ce
 import checks as ck
 import gen_sessions as gs
+import person as pe
 import replay_all as ra
+import selftest_person as sp
 import stage as st
 import twins as tw
 
@@ -64,7 +71,7 @@ SRC_SHA = {"gen_sessions.py": "b6e9e0c9c515c2756ea4ddc459992e69e3ab8646da91d6dc7
            "twins.py": "db6e603b3529808cc47480fdec1bc3cee99dd2fb207cac08cd05d0ad0e4e2903",
            "stage.py": "7258f9a910479073e5ea055dc08327ebae33566db14df6a409c5e5a8696fe9b7",
            "checks.py": "59ca507b1d3c5bd5a248983b16f4bf7cb610390eab0336cecc23cd7f85d4112b"}
-UNCHANGED = ("gen_sessions.py", "baseline.py", "replay_all.py", "twins.py")
+UNCHANGED = ("baseline.py", "replay_all.py", "twins.py")  # gen_sessions.py: the person worlds are added (G0 instead)
 STEPS = {"g050": 0.5, "f200": 2.0}
 WORLDS = {"g050": "graded", "f200": "factor"}
 GRADED_05 = (219.08902300206645, 0.3)  # STRUGGLE's flight median and sigma at t = 0.5 (the copied selftest's values)
@@ -94,6 +101,7 @@ def test_unchanged() -> None:
     for f in UNCHANGED:
         check(sha_lf(HERE / f) == SRC_SHA[f], f"unchanged: our {f} equals the source's byte for byte (LF)")
     check(sha_lf(HERE / "stage.py") != SRC_SHA["stage.py"], "unchanged: stage.py does differ (negative control)")
+    check(sha_lf(HERE / "gen_sessions.py") != SRC_SHA["gen_sessions.py"], "unchanged: gen_sessions.py does differ (G0 compares its output)")
 
 
 def test_config(cfg: dict) -> None:
@@ -101,7 +109,7 @@ def test_config(cfg: dict) -> None:
     check(c["steps"] == STEPS and c["worlds"] == WORLDS and c["main_auc"] == 0.9 and c["P"] == 240
           and c["seed_offset"] == 1, "config: steps g050 (graded, t 0.5) and f200 (factor, c 2), P 240, SEED + 1, 0.90")
     seed = int((HERE.parent / "SEED").read_text().strip())
-    check(seed == 20261122, "config: SEED is 20261122 (design section 9 item 1)")
+    check(seed == 20261125, "config: SEED is 20261125 (person-world design section 9 item 1)")
     d = cfg["plan_d"]
     check(d == {"n_win": st.N_WIN, "max_age_s": st.MAX_AGE_S, "run_k": st.RUN_K, "spread_scale": "log 10",
                 "irreg_scale": st.IRREG_SCALE, "min_ivl": st.MIN_IVL, "min_pairs": st.MIN_PAIRS, "init": st.D_INIT}
@@ -116,6 +124,22 @@ def test_config(cfg: dict) -> None:
           "config: pc_stall.lam is keyed by the steps (none copied over)")
     check("pc_r" not in cfg and "split" not in cfg and "lam_1800" not in cfg["pc_stall"],
           "config: no r-side control, cause split or L1800 lambda (decisions 8, 9)")
+    p = cfg["person"]
+    check(p["n_persons"] == st.N_PERSONS == 40 and p["sessions_per_person"] == st.SLOTS == 6 and p["order"] == [
+        "m049", "m068", "r049", "r068"] and sorted(p["steps"]) == sorted(p["order"]),
+          "config: person: 40 persons x 6 sessions (= stage.py's), the four steps m049 m068 r049 r068")
+    check(abs(p["sigma_b"] - math.log(481.03 / 121.70) / (2 * 1.2816)) < 5e-4 and p["icc"] == {"049": 0.494, "068": 0.679},
+          "config: sigma_b is ln(481.03 / 121.70) / (2 x 1.2816) = 0.536 and the ICCs 0.494 / 0.679 (decisions 7)")
+    check(p["steps"]["m049"] == {"world": "person-m", "icc": 0.494} and p["steps"]["r068"]["world"] == "person-r"
+          and p["steps"]["r068"]["target_step"] == "m068" and p["k_grid"] == sorted(p["k_grid"]) and len(p["k_grid"]) == 13
+          and p["k_grid"][0] == 0.01 and p["k_grid"][-1] == 1.0 and p["k_tolerance"] == 0.02
+          and p["pc_raw"]["gate_lower"] == 0.53 and p["bootstrap"] == cfg["e13"]["bootstrap"]
+          and p["null_perms"] == cfg["e13"]["null_perms"] and p["folds"] == cfg["e13"]["folds"],
+          "config: the steps' worlds and ICCs, the 13-point k grid, the 0.02 tolerance, the 0.53 gate, e13's sizes")
+    check(list(gs.DIM_H) == p["h"] == [1.0, 1.0, 1.0] and p["seed_offsets"] == {"main": 0, "pilot": 1, "kgrid": 1,
+                                                                              "ceiling": 1, "smoke": 2},
+          "config: h = 1 and the seed offsets (design 1.3, section 9 item 4)")
+    check(set(cfg["pc_person"]) == {"lam"} and set(cfg["pc_pers"]) == {"lam"}, "config: pc_person.lam and pc_pers.lam exist")
 
 
 # ---------------------------------------------------------------------------
@@ -1214,6 +1238,34 @@ def _diff_spread(v):
     return float(np.clip((p90 - p10) / 1000.0, 0.0, 1.0))
 
 
+def test_person(cfg: dict, config: Path, tmp: Path, hmm: str) -> None:
+    """design 3.7: G0-G5, R1, P1-P5, Q1-Q3, J1-J4 and the seed rules (selftest_person.py)."""
+    sp.test_g0(check, cfg, config, tmp, hmm)
+    sp.test_g1(check, cfg)
+    sp.test_g2(check, cfg)
+    sp.test_g3(check, cfg)
+    sp.test_g4(check, cfg)
+    sp.test_g5(check, cfg)
+    sp.test_r1(check)
+    sp.test_r1_stage(check, tmp)
+    sp.test_records(check, cfg, tmp)
+    sp.test_p1(check)
+    sp.test_p2(check)
+    sp.test_p3(check)
+    sp.test_p4(check)
+    sp.test_p5(check)
+    sp.test_q1(check)
+    sp.test_q2(check)
+    sp.test_q3(check)
+    sp.test_j1(check, cfg)
+    sp.test_j2(check, cfg)
+    sp.test_j3(check, cfg)
+    sp.test_j4(check, cfg)
+    sp.test_seed_rules(check, cfg)
+    sp.test_person_stage(check, fake_session)
+    sp.test_raw(check, cfg)
+
+
 def mutants(cfg: dict, tmp: Path, jobs: int) -> list[tuple[str, object, str, object, object]]:
     """(name, module, attribute, replacement, the self-test it must fail)."""
     other = {"A": "S", "S": "A"}
@@ -1227,7 +1279,8 @@ def mutants(cfg: dict, tmp: Path, jobs: int) -> list[tuple[str, object, str, obj
         ("the PC-stall lambda shared between the bases (A's)", ck, "lam_of", lambda lams, b: lams["A"],
          lambda: test_apply_pilot(cfg)),
         ("the step stopped by AUC(A_speed)", ce, "GATE_MODEL", "A_speed", lambda: test_auc_and_choice(cfg)),
-    ]
+    ] + [(f"person {name}", mod, attr, repl, (lambda t: (lambda: t(check)))(thunk))
+         for name, mod, attr, repl, thunk in sp.mutant_list(cfg)]
 
 
 def run_mutants(cfg: dict, tmp: Path, jobs: int) -> int:
@@ -1275,6 +1328,9 @@ def main() -> int:
     if a.mutants:
         return run_mutants(cfg, tmp, a.jobs)
     test_unchanged()
+    if FAILS:  # the copied files are not what they were: nothing from them is run
+        print(f"selftest: {len(FAILS)} failed: {FAILS}")
+        return 1
     test_config(cfg)
     test_speed(cfg)
     test_tables(cfg, tmp)
@@ -1295,6 +1351,7 @@ def main() -> int:
     test_build_x_drop(tmp)
     test_apply_pilot(cfg)
     test_ceiling_gate(cfg)
+    test_person(cfg, config, tmp, a.hmm_version)
     if a.gse_replay:
         test_replay_causal(a.gse_replay, works["g050"], tmp)
     else:
