@@ -1,0 +1,21 @@
+{
+ "seed": 20261020,
+ "step": "f200",
+ "smoke": false,
+ "jobs": 12,
+ "git": {
+  "commit": "1374d879972063d3ce55becb0a82877ee570afb0",
+  "dirty": false
+ },
+ "config_sha256": "bffeab65df05efac58041780262340f325f1662032d70af611652b98989a7dba",
+ "main_dir": "C:\\wt\\rhythm-stage-speed-confound\\experiments\\20261015-rhythm-stage-speed-shape-world\\results\\f200\\main",
+ "gse_replay_sha256": "71d09dab44526f2322a05833ae1a0fb33ffcc4908bfba796258276f083d78986",
+ "python": "3.11.9",
+ "packages": {
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "sklearn": "1.9.1",
+  "threadpoolctl": "3.7.0"
+ },
+ "wall_s": 13507.518518209457
+}

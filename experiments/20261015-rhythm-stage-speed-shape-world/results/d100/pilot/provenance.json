@@ -1,0 +1,27 @@
+{
+ "mode": "pilot",
+ "git_commit": "d90448b2e2bf65e3b086a06fe50b1ca0cf4c30fb",
+ "experiment_dir_dirty": false,
+ "config_sha256": "21e0d411f5d6d15f021c4ab0f5da6556987a653ca2ef61eaac967c049f52cffa",
+ "hmm_version_in_meta": "0.5.0",
+ "gse_replay": {
+  "path": "C:/wt/_target-portrait-eh1/release/gse-replay.exe",
+  "sha256": "71d09dab44526f2322a05833ae1a0fb33ffcc4908bfba796258276f083d78986"
+ },
+ "seed": 20261021,
+ "worlds": [
+  "drift"
+ ],
+ "step": "d100",
+ "c": 1.0,
+ "python": "3.11.9",
+ "platform": "Windows-10-10.0.26300-SP0",
+ "cpu_count": 16,
+ "jobs": 12,
+ "packages": {
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "scikit-learn": "1.9.1",
+  "threadpoolctl": "3.7.0"
+ }
+}

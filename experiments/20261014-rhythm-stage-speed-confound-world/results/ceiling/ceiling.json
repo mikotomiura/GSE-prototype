@@ -1,0 +1,218 @@
+{
+ "design": ".steering/20261014-rhythm-stage-speed-confound-world/design.md 3.0",
+ "seed": 20261021,
+ "P": {
+  "c050": 240,
+  "c100": 240,
+  "c200": 240
+ },
+ "folds": 5,
+ "main_auc": 0.9,
+ "config_fingerprint": "ff60037bd5bcdeea79fa982589a741a92aaf8b9b84231a09cd36ac9e42ad4835",
+ "code_fingerprint": "7da1a18321f1475e60d8f6f4e8427b5a82089b9840f3c35fc021e2f43f96c911",
+ "results": {
+  "c050": {
+   "L300": {
+    "n_rows": 42240,
+    "n_pos": 11166,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7560074351644755,
+     "auc_A_speed": 0.985550645595658,
+     "speed_minus_A": 0.22954321043118242,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.742802894884826,
+     "auc_A_speed": 0.9387250135518029,
+     "speed_minus_A": 0.19592211866697695,
+     "fit_failed": false
+    }
+   },
+   "L60": {
+    "n_rows": 43200,
+    "n_pos": 11444,
+    "n_sessions": 240,
+    "n_features_A": 11,
+    "n_features_A_speed": 24,
+    "hgb": {
+     "auc_A": 0.7524326276701161,
+     "auc_A_speed": 0.9609780964201917,
+     "speed_minus_A": 0.20854546875007562,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7160984480845053,
+     "auc_A_speed": 0.9318538894900248,
+     "speed_minus_A": 0.2157554414055195,
+     "fit_failed": false
+    }
+   },
+   "L1800": {
+    "n_rows": 36240,
+    "n_pos": 5356,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7320070469672394,
+     "auc_A_speed": 0.8781445874364349,
+     "speed_minus_A": 0.14613754046919547,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7653322705821848,
+     "auc_A_speed": 0.8658919402957067,
+     "speed_minus_A": 0.10055966971352193,
+     "fit_failed": false
+    }
+   }
+  },
+  "c100": {
+   "L300": {
+    "n_rows": 42240,
+    "n_pos": 10890,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7461992419482633,
+     "auc_A_speed": 0.9353337155812145,
+     "speed_minus_A": 0.18913447363295122,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7455768325563888,
+     "auc_A_speed": 0.8555662731417407,
+     "speed_minus_A": 0.10998944058535187,
+     "fit_failed": false
+    }
+   },
+   "L60": {
+    "n_rows": 43200,
+    "n_pos": 11194,
+    "n_sessions": 240,
+    "n_features_A": 11,
+    "n_features_A_speed": 24,
+    "hgb": {
+     "auc_A": 0.74157913720193,
+     "auc_A_speed": 0.9205066667696787,
+     "speed_minus_A": 0.1789275295677487,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7235763319614307,
+     "auc_A_speed": 0.8467732053009401,
+     "speed_minus_A": 0.12319687333950946,
+     "fit_failed": false
+    }
+   },
+   "L1800": {
+    "n_rows": 36240,
+    "n_pos": 4762,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7069086857032794,
+     "auc_A_speed": 0.7350266616880001,
+     "speed_minus_A": 0.028117975984720767,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7397690990839946,
+     "auc_A_speed": 0.7624854304489613,
+     "speed_minus_A": 0.022716331364966758,
+     "fit_failed": false
+    }
+   }
+  },
+  "c200": {
+   "L300": {
+    "n_rows": 42240,
+    "n_pos": 11000,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7452963115469677,
+     "auc_A_speed": 0.8095525098940752,
+     "speed_minus_A": 0.0642561983471075,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7341484867884996,
+     "auc_A_speed": 0.7614077435688511,
+     "speed_minus_A": 0.02725925678035146,
+     "fit_failed": false
+    }
+   },
+   "L60": {
+    "n_rows": 43200,
+    "n_pos": 11309,
+    "n_sessions": 240,
+    "n_features_A": 11,
+    "n_features_A_speed": 24,
+    "hgb": {
+     "auc_A": 0.7355954786292782,
+     "auc_A_speed": 0.8273344250885705,
+     "speed_minus_A": 0.09173894645929226,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7209890671264438,
+     "auc_A_speed": 0.7618360149569845,
+     "speed_minus_A": 0.04084694783054066,
+     "fit_failed": false
+    }
+   },
+   "L1800": {
+    "n_rows": 36240,
+    "n_pos": 5270,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7132267469467606,
+     "auc_A_speed": 0.7155191747660556,
+     "speed_minus_A": 0.002292427819295062,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7431485081663776,
+     "auc_A_speed": 0.747089679122662,
+     "speed_minus_A": 0.003941170956284434,
+     "fit_failed": false
+    }
+   }
+  }
+ },
+ "steps": {
+  "c050": {
+   "c": 0.5,
+   "L300_auc_A_speed": [
+    0.985550645595658,
+    0.9387250135518029
+   ],
+   "status": "ceiling"
+  },
+  "c100": {
+   "c": 1.0,
+   "L300_auc_A_speed": [
+    0.9353337155812145,
+    0.8555662731417407
+   ],
+   "status": "go"
+  },
+  "c200": {
+   "c": 2.0,
+   "L300_auc_A_speed": [
+    0.8095525098940752,
+    0.7614077435688511
+   ],
+   "status": "go"
+  }
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "ok": true,
+ "tol": 1e-09,
+ "n_compared": 866,
+ "n_expected": 866,
+ "max_abs_diff": 0.0,
+ "missing": [],
+ "nonfinite": [],
+ "over_tol": [],
+ "n_over_tol": 0,
+ "e13": "C:\\wt\\rhythm-stage-speed-confound\\experiments\\20261015-rhythm-stage-speed-shape-world\\results\\d100\\main\\e13.json",
+ "e13_sha256": "187f5d36916a0097358a5d09c37a82f1785e0dc0c0ec1e76e7fa3c292be9f235"
+}

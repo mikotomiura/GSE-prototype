@@ -1,0 +1,88 @@
+{
+ "design": ".steering/20261122-rhythm-stage-relative-timing/design.md 3.0",
+ "seed": 20261123,
+ "P": {
+  "g050": 240,
+  "f200": 240
+ },
+ "folds": 5,
+ "main_auc": 0.9,
+ "config_fingerprint": "f787c1d94b2c0205f1bc0fed804c02048deec79cff810f7067e0ae4e5b0bade2",
+ "code_fingerprint": "45cf8817cde0269d862b19a30414809c22f612220a0b2fed0b764447c3cc9c35",
+ "results": {
+  "g050": {
+   "L300": {
+    "n_rows": 42240,
+    "n_pos": 10671,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7673981433567748,
+     "auc_A_speed": 0.9984634170478098,
+     "speed_minus_A": 0.23106527369103502,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7470878733667066,
+     "auc_A_speed": 0.9966788027904859,
+     "speed_minus_A": 0.24959092942377936,
+     "fit_failed": false
+    }
+   }
+  },
+  "f200": {
+   "L300": {
+    "n_rows": 42240,
+    "n_pos": 10332,
+    "n_sessions": 240,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.7579114528407771,
+     "auc_A_speed": 0.9816420069925192,
+     "speed_minus_A": 0.22373055415174214,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7523337729683642,
+     "auc_A_speed": 0.8838143614449809,
+     "speed_minus_A": 0.1314805884766167,
+     "fit_failed": false
+    }
+   }
+  }
+ },
+ "steps": {
+  "g050": {
+   "world": "graded",
+   "t": 0.5,
+   "L300_auc_A": [
+    0.7673981433567748,
+    0.7470878733667066
+   ],
+   "L300_auc_A_speed": [
+    0.9984634170478098,
+    0.9966788027904859
+   ],
+   "status_A": "go",
+   "status_A_speed": "ceiling",
+   "status": "go"
+  },
+  "f200": {
+   "world": "factor",
+   "c": 2.0,
+   "L300_auc_A": [
+    0.7579114528407771,
+    0.7523337729683642
+   ],
+   "L300_auc_A_speed": [
+    0.9816420069925192,
+    0.8838143614449809
+   ],
+   "status_A": "go",
+   "status_A_speed": "go",
+   "status": "go"
+  }
+ }
+}

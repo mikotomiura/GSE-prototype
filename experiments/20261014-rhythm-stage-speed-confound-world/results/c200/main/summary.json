@@ -1,0 +1,1186 @@
+{
+ "S-raw-hold-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-raw-hold-sub": {
+  "L300": "red_detected",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-raw-decay-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-raw-decay-sub": {
+  "L300": "red_detected",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-raw-ground-sec": {
+  "L300": "green",
+  "L60": "green",
+  "L1800": "green"
+ },
+ "S-raw-ground-sub": {
+  "L300": "red_detected",
+  "L60": "red_detected",
+  "L1800": "green"
+ },
+ "S-smooth-hold-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "S-smooth-hold-sub": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-smooth-decay-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-smooth-decay-sub": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-smooth-ground-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-smooth-ground-sub": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-rank-hold-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-rank-hold-sub": {
+  "L300": "red_unconfirmed",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-rank-decay-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-rank-decay-sub": {
+  "L300": "red_unconfirmed",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-rank-ground-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "S-rank-ground-sub": {
+  "L300": "red_unconfirmed",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "S-jitter-hold-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-jitter-hold-sub": {
+  "L300": "red_unconfirmed",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-jitter-decay-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-jitter-decay-sub": {
+  "L300": "red_unconfirmed",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-jitter-ground-sec": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "S-jitter-ground-sub": {
+  "L300": "red_detected",
+  "L60": "undecidable",
+  "L1800": "green"
+ },
+ "_controls": {
+  "PC1": {
+   "L300": "works",
+   "L60": "works",
+   "L1800": "descriptive"
+  },
+  "PCs-S-raw-hold-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-raw-hold-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-raw-decay-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-raw-decay-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-raw-ground-sec": {
+   "L300": "works",
+   "L60": "works",
+   "L1800": "descriptive"
+  },
+  "PCs-S-raw-ground-sub": {
+   "L300": "works",
+   "L60": "works",
+   "L1800": "descriptive"
+  },
+  "PCs-S-smooth-hold-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-smooth-hold-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-smooth-decay-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-smooth-decay-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-smooth-ground-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-smooth-ground-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-rank-hold-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-rank-hold-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-rank-decay-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-rank-decay-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-rank-ground-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-rank-ground-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-jitter-hold-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-jitter-hold-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-jitter-decay-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-jitter-decay-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-jitter-ground-sec": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PCs-S-jitter-ground-sub": {
+   "L300": "works",
+   "L60": "fails",
+   "L1800": "descriptive"
+  },
+  "PC0-S-raw-hold-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-raw-hold-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-raw-decay-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-raw-decay-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-raw-ground-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-raw-ground-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-smooth-hold-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-smooth-hold-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-smooth-decay-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-smooth-decay-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-smooth-ground-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-smooth-ground-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-rank-hold-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-rank-hold-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-rank-decay-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-rank-decay-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-rank-ground-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-rank-ground-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-jitter-hold-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-jitter-hold-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-jitter-decay-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-jitter-decay-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-jitter-ground-sec": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC0-S-jitter-ground-sub": {
+   "L300": "baseline_below",
+   "L60": "baseline_below",
+   "L1800": "baseline_below"
+  },
+  "PC-corr": {
+   "L300": "descriptive",
+   "L60": "descriptive",
+   "L1800": "descriptive"
+  },
+  "PC1-1800": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-raw-hold-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-raw-hold-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-raw-decay-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-raw-decay-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-raw-ground-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-raw-ground-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-smooth-hold-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "fails"
+  },
+  "PCl-S-smooth-hold-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-smooth-decay-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-smooth-decay-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-smooth-ground-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-smooth-ground-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-rank-hold-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-rank-hold-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-rank-decay-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-rank-decay-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-rank-ground-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "fails"
+  },
+  "PCl-S-rank-ground-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "fails"
+  },
+  "PCl-S-jitter-hold-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-jitter-hold-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-jitter-decay-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-jitter-decay-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-jitter-ground-sec": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  },
+  "PCl-S-jitter-ground-sub": {
+   "L300": null,
+   "L60": null,
+   "L1800": "works"
+  }
+ },
+ "_detector": {
+  "L300": {
+   "auc_A_speed": {
+    "hgb": 0.8100894815992653,
+    "lr": 0.7703879106130369
+   },
+   "auc_A": {
+    "hgb": 0.7586645595506026,
+    "lr": 0.7533055110520882
+   },
+   "ceiling_kinds": [],
+   "pc1_ok": true,
+   "null_all_73_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "detector": {
+    "S-raw-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    }
+   },
+   "pilot_stop_1800": null
+  },
+  "L60": {
+   "auc_A_speed": {
+    "hgb": 0.8318421794184688,
+    "lr": 0.7692655330710008
+   },
+   "auc_A": {
+    "hgb": 0.74912626058669,
+    "lr": 0.7357485065361369
+   },
+   "ceiling_kinds": [],
+   "pc1_ok": true,
+   "null_all_73_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "detector": {
+    "S-raw-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-hold-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-decay-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-decay-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-hold-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-decay-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-decay-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-ground-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-ground-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-decay-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-decay-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-ground-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-ground-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-hold-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-decay-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-decay-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-ground-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-ground-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    }
+   },
+   "pilot_stop_1800": null
+  },
+  "L1800": {
+   "auc_A_speed": {
+    "hgb": 0.7347630803743816,
+    "lr": 0.7489431770957836
+   },
+   "auc_A": {
+    "hgb": 0.7270968023095452,
+    "lr": 0.7495241233473696
+   },
+   "ceiling_kinds": [],
+   "pc1_ok": true,
+   "null_all_73_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "detector": {
+    "S-raw-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-smooth-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-ground-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-ground-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-decay-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-decay-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-ground-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-jitter-ground-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    }
+   },
+   "pilot_stop_1800": null
+  }
+ },
+ "_step": {
+  "step": "c200",
+  "c": 2.0
+ },
+ "_wall_s": 17567.2844517231
+}
