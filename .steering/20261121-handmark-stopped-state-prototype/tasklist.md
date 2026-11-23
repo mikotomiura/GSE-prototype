@@ -32,9 +32,9 @@
 - [x] 今ある基層（`drift`）の扱いを (iii) の結果で研究者に確かめる → E8 の条件に当たらない（判断 16）
 
 ## 完了処理
-- [ ] /cross-review 2 巡
-- [ ] 次のタスク（研究者自身の試し・値の確定・ADR-056 の「決めずに残すもの」1）の引き継ぎ
-- [ ] /finish-task
+- [x] /cross-review 2 巡（判断 17・18）
+- [x] 次のタスク（研究者自身の試し・値の確定・ADR-056 の「決めずに残すもの」1）の引き継ぎ → `.steering/_handoff/next-session-handmark-stopped-trial-and-values.md`
+- [x] /finish-task（security-checker は判断 19・2026-11-23: cargo test --workspace 1407 passed・2 ignored、clippy -D warnings 緑、fmt 緑、tsc 緑、npm run test:handmark 55 passed、selftest ok）
 
 ## 注
 

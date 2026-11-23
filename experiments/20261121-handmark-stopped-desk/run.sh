@@ -56,7 +56,8 @@ setup_work() {
   case "${r}/" in
     "${w}"/*) echo "WORK が repo を含む: ${WORK}" >&2; exit 2 ;;
   esac
-  chmod 700 "$WORK"
+  # 自分で作った場所だけ 700 にする（指定の WORK の権限は変えない。回ごとの場所は呼び手が 700 で作る）
+  [ -z "${CLEAN:-}" ] || chmod 700 "$WORK"
 }
 
 # replay の共通の引数（記録の写し・表・時差・対象）。LABELS は records では recorded、合成では recomputed
