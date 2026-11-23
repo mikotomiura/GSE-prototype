@@ -5519,25 +5519,37 @@ pub fn run() {
         );
     }
 
-    // O1: 起動直後に時計が範囲の外なら、合うまで待ってから記録の名前・起点を決める。
+    // O1: 起動直後に時計が範囲の外か、前回の起動の高水位より古ければ、合うまで待ってから記録の名前・起点を決める。
     //   2026-11-22、この Mac の起動直後に時計が 1976 年になっており、その時刻で記録と段 1 の枠を始めた結果、
     //   時計が合った最初の 1 秒で 50 年分の候補が 1 行ずつ書かれた（`.steering/20261123-clock-jump-gate/`）。
     //   Builder を組む前なので、待っている間は画面もトレイも無い（起動が遅れるだけ）。
+    //   ⚠️ 時刻を使う処理（ファイル名・起点・`meta`・孤児の回収）をこれより前に置かない。
     if o1_source.is_some() {
-        let slept = crate::o1::wait_for_plausible_clock(
+        let hwm = crate::o1::clock_hwm_in(&logger::session_log_dir().0);
+        let wait = crate::o1::wait_for_plausible_clock(
+            hwm,
             epoch_ms,
             || thread::sleep(Duration::from_secs(1)),
             |n, now| {
-                if n == 1 || n % 60 == 0 {
+                if n == 1 || n.is_multiple_of(60) {
                     tracing::warn!(
-                        "O1: system clock is outside the plausible range (now_ms={now}); \
+                        "O1: system clock looks wrong (now_ms={now}, last seen {hwm:?}); \
                          waiting before opening the session log (waited {n} s)"
                     );
                 }
             },
         );
-        if slept > 0 {
-            tracing::info!("O1: system clock became plausible after {slept} s; starting");
+        if wait.gave_up_below_hwm {
+            tracing::error!(
+                "O1: system clock is still behind the last seen time ({hwm:?}) after {} s; \
+                 starting anyway (the orphan sweep will skip this run)",
+                wait.slept
+            );
+        } else if wait.slept > 0 {
+            tracing::info!(
+                "O1: system clock looks right after {} s; starting",
+                wait.slept
+            );
         }
     }
 
