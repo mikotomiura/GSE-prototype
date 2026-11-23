@@ -25,23 +25,30 @@ def load(step, name):
     return json.loads((exp / "results" / step / "main" / name).read_text(encoding="utf-8"))
 
 
-def rows(prefix, ncols=None, nrows=1):
+def rows(prefix, *ncols):
+    """All rows starting with prefix; there must be exactly one per entry of ncols, with those cell counts in that
+    order (every matching row is counted, so a malformed duplicate fails too)."""
     out = [[x.strip() for x in ln.strip().strip("|").split("|")] for ln in notes.splitlines() if ln.startswith(prefix)]
-    if ncols is not None:
-        out = [r for r in out if len(r) == ncols]
-    if len(out) != nrows:
-        fail(f"rows {prefix}: {len(out)} found with {ncols} cells, want {nrows}")
+    if [len(r) for r in out] != list(ncols):
+        fail(f"rows {prefix}: cell counts {[len(r) for r in out]}, want {list(ncols)}")
         raise SystemExit(1)
     return out
 
 
 def nums(cell):
-    return [float(x) for x in re.findall(r"-?\d+\.\d+", cell)]
+    return re.findall(r"-?\d+\.\d+", cell)
 
 
-def close(got, want, tag, tol=0.00051):
-    if len(got) != len(want) or any(abs(g - w) > tol for g, w in zip(got, want)):
-        fail(f"{tag}: notes {got} json {[round(w, 3) for w in want]}")
+def close(got, want, tag):
+    """Each number in notes must equal the JSON value rounded half up to the digits written."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    def shown(w, s):
+        q = Decimal(1).scaleb(-len(s.split(".")[1]))
+        return Decimal(repr(float(w))).quantize(q, rounding=ROUND_HALF_UP)
+
+    if len(got) != len(want) or any(Decimal(g) != shown(w, g) for g, w in zip(got, want)):
+        fail(f"{tag}: notes {got} json {[round(w, 4) for w in want]}")
 
 
 for step in ("g050", "f200"):
@@ -54,13 +61,14 @@ for step in ("g050", "f200"):
             if AB.get(ab) != s["verdicts"][key][c]:
                 fail(f"verdict {step} {key} {c}: notes {ab} json {s['verdicts'][key][c]}")
     # AUC and speed_minus_A
-    cells = rows(f"| {step} | 0.", 4)[0]
+    auc_row, gain_row = rows(f"| {step} | 0.", 4, 1 + len(CANDS))
+    cells = auc_row
     close(nums(cells[1]), [s["auc"]["A"]["hgb"], s["auc"]["A"]["lr"]], f"aucA {step}")
     close(nums(cells[2]), [s["auc"]["A_speed"]["hgb"], s["auc"]["A_speed"]["lr"]], f"aucS {step}")
     sm = s["speed_minus_A"]
     close(nums(cells[3]), [sm["hgb"]["diff"], *sm["hgb"]["ci95"], sm["lr"]["diff"], *sm["lr"]["ci95"]], f"sma {step}")
     # max gains over A
-    cells = rows(f"| {step} | 0.", 1 + len(CANDS))[0][1:]
+    cells = gain_row[1:]
     for c, cell in zip(CANDS, cells):
         x = e["A"]["configs"][c]
         close(nums(cell), [x["gain_max"], x["lower_max"], x["upper_max"]], f"gain {step} {c}")
@@ -78,7 +86,7 @@ for step in ("g050", "f200"):
         if key.startswith("d2_u") and step == "g050":
             continue
         cells = rows(f"| {step} | {lab} |", 2 + len(names))[0][2:]
-        close([float(x) for x in cells], [d[n][key] for n in names], f"d2 {step} {key}")
+        close(cells, [d[n][key] for n in names], f"d2 {step} {key}")
 
 print("bad", bad)
 sys.exit(1 if bad else 0)
