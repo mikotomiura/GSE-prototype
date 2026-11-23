@@ -454,6 +454,36 @@ pub const MAX_PLAUSIBLE_EPOCH_MS: u64 = 2_208_988_800_000;
 /// ⚠️ 中身は epoch ms が 1 行だけ。★ 被験者を特定できるものは 1 バイトも書かない。
 pub const CLOCK_HWM_FILE_NAME: &str = ".o1_clock_hwm";
 
+/// 今の時計が O1 の記録に使える範囲（[`MIN_PLAUSIBLE_EPOCH_MS`]〜[`MAX_PLAUSIBLE_EPOCH_MS`]）にあるか（純関数）。
+pub fn clock_is_plausible(now_ms: u64) -> bool {
+    (MIN_PLAUSIBLE_EPOCH_MS..=MAX_PLAUSIBLE_EPOCH_MS).contains(&now_ms)
+}
+
+/// 時計が範囲に入るまで待つ。眠った回数を返す（範囲の内なら 0）。
+///
+/// 2026-11-22、この Mac の起動直後の数分、時計が 1976 年になっていた。O1 はその時刻で記録を開き、
+/// 段 1 の無作為の枠の起点も 1976 年になった。時計が合った最初の 1 秒で、調停器が 50 年分の候補を
+/// 1 つずつ離席として抑え、1,907,310 行の `probe_suppressed` を書いた（208 MB）。
+/// → 記録のファイル名・起点・`meta` を決める前に、ここで待つ（`.steering/20261123-clock-jump-gate/`）。
+///
+/// 上限は置かない（同じ記録を作るだけなので・判断 2）。`on_wait` は眠った回数を受ける（警告の間引きは呼び出し側）。
+pub fn wait_for_plausible_clock(
+    mut now_ms: impl FnMut() -> u64,
+    mut sleep: impl FnMut(),
+    mut on_wait: impl FnMut(u64, u64),
+) -> u64 {
+    let mut slept = 0u64;
+    loop {
+        let now = now_ms();
+        if clock_is_plausible(now) {
+            return slept;
+        }
+        slept += 1;
+        on_wait(slept, now);
+        sleep();
+    }
+}
+
 /// ⚠️★★★ 行の分類規則は **`crate::ndjson_scan` が単一真実源**である。
 ///
 /// ★ 2026-09-03 の cross-review で、同じ規則が `packaging` / `reconcile` / ここの
@@ -1768,5 +1798,74 @@ mod tests {
         let id = install_id_from_bytes([0, 1, 0xab, 0xcd, 0xef, 0x10, 0x20, 0xff]);
         assert_eq!(id, "0001abcdef1020ff");
         assert!(is_valid_install_id(&id));
+    }
+
+    #[test]
+    fn plausible_clock_bounds() {
+        assert!(!clock_is_plausible(0));
+        assert!(!clock_is_plausible(197_132_474_227), "1976 年は範囲の外");
+        assert!(!clock_is_plausible(MIN_PLAUSIBLE_EPOCH_MS - 1));
+        assert!(clock_is_plausible(MIN_PLAUSIBLE_EPOCH_MS));
+        assert!(
+            clock_is_plausible(1_795_335_817_091),
+            "2026-11-22 は範囲の内"
+        );
+        assert!(clock_is_plausible(MAX_PLAUSIBLE_EPOCH_MS));
+        assert!(!clock_is_plausible(MAX_PLAUSIBLE_EPOCH_MS + 1));
+    }
+
+    #[test]
+    fn wait_returns_at_once_when_the_clock_is_plausible() {
+        let mut slept = 0u64;
+        let mut waits = Vec::new();
+        let n = wait_for_plausible_clock(
+            || 1_795_335_817_091,
+            || slept += 1,
+            |k, t| waits.push((k, t)),
+        );
+        assert_eq!((n, slept), (0, 0));
+        assert!(waits.is_empty());
+    }
+
+    /// 2026-11-22 の形: 1976 年で起動し、数回後に 2026 年へ合う。合うまで眠り、合ったら抜ける。
+    #[test]
+    fn wait_sleeps_until_the_clock_becomes_plausible() {
+        let clock = std::cell::Cell::new(0usize);
+        let seq = [
+            197_132_424_000u64,
+            197_132_425_000,
+            197_132_426_000,
+            1_795_335_817_091,
+        ];
+        let mut slept = 0u64;
+        let mut waits = Vec::new();
+        let n = wait_for_plausible_clock(
+            || seq[clock.get().min(seq.len() - 1)],
+            || {
+                slept += 1;
+                clock.set(clock.get() + 1);
+            },
+            |k, t| waits.push((k, t)),
+        );
+        assert_eq!((n, slept), (3, 3));
+        assert_eq!(waits.len(), 3);
+        assert_eq!(waits[0], (1, 197_132_424_000));
+    }
+
+    /// 未来側にずれた時計（2040 年より後）も待つ。
+    #[test]
+    fn wait_also_waits_for_a_clock_in_the_far_future() {
+        let clock = std::cell::Cell::new(0usize);
+        let seq = [MAX_PLAUSIBLE_EPOCH_MS + 1, 1_795_335_817_091];
+        let mut slept = 0u64;
+        let n = wait_for_plausible_clock(
+            || seq[clock.get().min(seq.len() - 1)],
+            || {
+                slept += 1;
+                clock.set(clock.get() + 1);
+            },
+            |_, _| {},
+        );
+        assert_eq!((n, slept), (1, 1));
     }
 }

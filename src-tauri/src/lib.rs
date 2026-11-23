@@ -5519,6 +5519,28 @@ pub fn run() {
         );
     }
 
+    // O1: 起動直後に時計が範囲の外なら、合うまで待ってから記録の名前・起点を決める。
+    //   2026-11-22、この Mac の起動直後に時計が 1976 年になっており、その時刻で記録と段 1 の枠を始めた結果、
+    //   時計が合った最初の 1 秒で 50 年分の候補が 1 行ずつ書かれた（`.steering/20261123-clock-jump-gate/`）。
+    //   Builder を組む前なので、待っている間は画面もトレイも無い（起動が遅れるだけ）。
+    if o1_source.is_some() {
+        let slept = crate::o1::wait_for_plausible_clock(
+            epoch_ms,
+            || thread::sleep(Duration::from_secs(1)),
+            |n, now| {
+                if n == 1 || n % 60 == 0 {
+                    tracing::warn!(
+                        "O1: system clock is outside the plausible range (now_ms={now}); \
+                         waiting before opening the session log (waited {n} s)"
+                    );
+                }
+            },
+        );
+        if slept > 0 {
+            tracing::info!("O1: system clock became plausible after {slept} s; starting");
+        }
+    }
+
     // セッションロガー — ★ **ここではまだ NDJSON を作らない** (follow-up F-3)。
     //
     // ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、止められる前に
