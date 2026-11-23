@@ -25,10 +25,13 @@ def load(step, name):
     return json.loads((exp / "results" / step / "main" / name).read_text(encoding="utf-8"))
 
 
-def rows(prefix):
+def rows(prefix, ncols=None, nrows=1):
     out = [[x.strip() for x in ln.strip().strip("|").split("|")] for ln in notes.splitlines() if ln.startswith(prefix)]
-    if not out:
-        fail(f"no row {prefix}")
+    if ncols is not None:
+        out = [r for r in out if len(r) == ncols]
+    if len(out) != nrows:
+        fail(f"rows {prefix}: {len(out)} found with {ncols} cells, want {nrows}")
+        raise SystemExit(1)
     return out
 
 
@@ -36,7 +39,7 @@ def nums(cell):
     return [float(x) for x in re.findall(r"-?\d+\.\d+", cell)]
 
 
-def close(got, want, tag, tol=0.0015):
+def close(got, want, tag, tol=0.00051):
     if len(got) != len(want) or any(abs(g - w) > tol for g, w in zip(got, want)):
         fail(f"{tag}: notes {got} json {[round(w, 3) for w in want]}")
 
@@ -45,25 +48,25 @@ for step in ("g050", "f200"):
     s, e, d = load(step, "summary.json"), load(step, "e13.json"), load(step, "describe.json")
     # verdicts
     for base, key in (("A（主）", "A"), ("A_speed（副）", "A_speed")):
-        cells = rows(f"| {step} | {base} |")[0][2:]
+        cells = rows(f"| {step} | {base} |", 2 + len(CANDS))[0][2:]
         for c, cell in zip(CANDS, cells):
             ab = cell.split("（")[0].strip()
             if AB.get(ab) != s["verdicts"][key][c]:
                 fail(f"verdict {step} {key} {c}: notes {ab} json {s['verdicts'][key][c]}")
     # AUC and speed_minus_A
-    cells = [r for r in rows(f"| {step} | 0.") if len(r) == 4][0]
+    cells = rows(f"| {step} | 0.", 4)[0]
     close(nums(cells[1]), [s["auc"]["A"]["hgb"], s["auc"]["A"]["lr"]], f"aucA {step}")
     close(nums(cells[2]), [s["auc"]["A_speed"]["hgb"], s["auc"]["A_speed"]["lr"]], f"aucS {step}")
     sm = s["speed_minus_A"]
     close(nums(cells[3]), [sm["hgb"]["diff"], *sm["hgb"]["ci95"], sm["lr"]["diff"], *sm["lr"]["ci95"]], f"sma {step}")
     # max gains over A
-    cells = [r for r in rows(f"| {step} | 0.") if len(r) == 7][0][1:]
+    cells = rows(f"| {step} | 0.", 1 + len(CANDS))[0][1:]
     for c, cell in zip(CANDS, cells):
         x = e["A"]["configs"][c]
         close(nums(cell), [x["gain_max"], x["lower_max"], x["upper_max"]], f"gain {step} {c}")
     # dropped
     for c, short in (("D-run-hold-sec", "D-run"), ("D-all-hold-sec", "D-all")):
-        cells = rows(f"| {step} | {short} |")[0][2:]
+        cells = rows(f"| {step} | {short} |", 6)[0][2:]
         att = e["A"]["configs"][c]["attackers"]
         close(nums(cells[0]), [att[k]["gain"] for k in KINDS], f"none {step} {c}")
         for cell, w in zip(cells[1:], ("without_a", "without_r", "without_smooth")):
@@ -74,7 +77,8 @@ for step in ("g050", "f200"):
                      ("セッションの倍率 `u`（全量）", "d2_u_r2"), ("セッションの倍率 `u`（滑らかさだけ）", "d2_u_r2_smooth")):
         if key.startswith("d2_u") and step == "g050":
             continue
-        cells = rows(f"| {step} | {lab} |")[0][2:]
+        cells = rows(f"| {step} | {lab} |", 2 + len(names))[0][2:]
         close([float(x) for x in cells], [d[n][key] for n in names], f"d2 {step} {key}")
 
 print("bad", bad)
+sys.exit(1 if bad else 0)
