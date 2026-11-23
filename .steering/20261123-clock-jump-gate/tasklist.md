@@ -14,4 +14,5 @@
 - [x] PR #435 を出した（研究者の選択: PR まで。マージと版上げは研究者が確かめてから）
   - CI（run 45128616213）: check (mac self-hosted) 緑。check (win self-hosted) は `link.exe not found` でコンパイル前に赤 —— 同じ日の他の 2 本の枝（45102450969・45097217086）も同じ赤で、11-19 までは緑。G-GEAR のランナーの環境の問題で、この変更とは関係ない。frontend-check は 1 歩も走らず（11 月の Actions の無料分の枯渇）。
 - [ ] Windows でのコンパイルの確かめ（G-GEAR のランナーが直った後に re-run）
-- [ ] マージ → 版上げ（v0.1.43）→ 配り直し（研究者が確かめてから）
+- [ ] マージ（Windows の check の緑の後）→ 版上げの PR（v0.1.43）→ タグと配布は研究者が確かめてから（判断 7）
+- 引き継ぎ: `.steering/_handoff/next-session-gse-clock-gate-merge-and-v0.1.43.md`（本線のチェックアウト）
