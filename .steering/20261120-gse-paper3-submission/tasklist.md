@@ -8,3 +8,4 @@
 - [x] 研究者がカバーレターを確かめる（このまま使う・2026-11-20）
 - [x] 投稿（SNAPP・Submission ID 1d92fbfb…・2026-11-21 JST・submission-record.md）
 - [x] 投稿後: memory と記録・返事を待つ引き継ぎ（_handoff/20261121-paper3-umuai-response.md）
+- [x] 判定の記録（2026-11-25・不採録・査読者のコメントなし・submission-record.md）
