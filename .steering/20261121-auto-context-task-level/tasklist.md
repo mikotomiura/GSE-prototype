@@ -20,13 +20,13 @@
 - [x] `evaluate.py`: synth / real（主の問い・照合・循環の検査・識別子の見積もり）（照合・循環の検査・判定・識別子の見積もり）
 - [x] 合成の対照（主の問いの 4 経路 × seed 6 本・v2 の 3 本は記述）を終了コードで確かめる（判断 14）
 - [x] `criteria.json` を研究者と確定し、実データより前にコミットする（判断 15）
-- [ ] 本人の入力の写しを取って固定し、`data.md` に SHA-256 の要約値を書く
+- [x] 本人の入力の写しを取って固定し、`data.md` に SHA-256 の要約値を書く（2026-11-24）
 
 ## 実データ
-- [ ] 本人と O1 の 3 人の判定を notes.md に書く
-- [ ] 識別子の要否の見積もりを decisions に残す（判断 4）
+- [x] 本人と O1 の 3 人の判定を notes.md に書く（判断 19）
+- [x] 識別子の要否の見積もりを decisions に残す（判断 4・判断 19。K = 1 で見積もりにならなかった）
 
 ## レビュー・完了
-- [ ] code-reviewer と security-checker を並列で回す
-- [ ] /finish-task で /cross-review（diff だけを Codex へ）
+- [x] code-reviewer と security-checker を並列で回す（判断 21）
+- [x] /finish-task（Codex は記録の集計を含むため回さず・判断 21）
 - [ ] コミット。push と PR は研究者に確かめてから
