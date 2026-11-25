@@ -1,0 +1,32 @@
+{
+ "run_id": "20261126T014010-44965",
+ "stage": "report",
+ "git_head": "6775dcc6e3ea334603e8f6cdf5dc3d10e4d178bd",
+ "uncommitted": [],
+ "jobs": 8,
+ "seed": 2026112201,
+ "code_hash": "1665a0b2f83fef22dcea3bed18041f8a467dac2c769b65237e6b15092ac27142",
+ "python": "3.11.9",
+ "numpy": "2.4.4",
+ "machine": "macOS-27.0.1-arm64-arm-64bit",
+ "scripts": {
+  "check_mutations.py": "6be00baf339bb00b38debca95cbfc21ba3b880d15272d3b1060bac45d4425a95",
+  "check_xmach.py": "2151b6fcc744165c82abbbc93d28cb4df0f9772febd8906dfd0c115042a74f3e",
+  "choose.py": "aca2f16e2e1e96750d818fa970e9514054a96a7c81114930b9f3e3d22a1220bb",
+  "d6_local.py": "c4a597f8d8657693c1efafe8335ac37bab10799116d83726987e56cb5a7dfa19",
+  "d6_report.py": "b1094e07fc1729bba92f41bd5797e426f56eac5fd35840687fd8084a6ae3fb29",
+  "d9.py": "f50f3995839dfaf1fbc009a20c5344cea9e86ca15e78b50e81a55b85a1032ac8",
+  "eye.py": "0a966e86dcebebe811cc3442f3b96d5bf72707818f3cba1c17c1676010f1e435",
+  "gen.py": "396cf2c00123c1b574066c604db87e6aaed795f554815b55fb3cc9e30fde1cf1",
+  "run_eye.py": "bd86ee58e92ced0abdd44a84e7d82accc316e4bb43c3e3fab87c1527e737fea1",
+  "selftest.py": "c9b9214a79e21ccf18f33031de1970e60ee10bf32dcc9a7b5c3f0d91f34c472b",
+  "summarize.py": "f9b36e74bc523a0017b12465d6e18404a8abb4af19aaf6f8aa98623e12abeb33"
+ },
+ "run_sh": "9d3fe74da32a9c8783d38763f58539845efa9d81da998031f81ff7a1606a8d14",
+ "conditions": "e0f7863657ce32588a9d9bd96a1090a3d37e85aad624771aabb36ae264638189",
+ "pinned": {
+  "../20261110-per-person-sensitivity/scripts/synth.py": "41c60dd5ec954f6d1bd526560c318f96847641533e31f3826f099fb443d64ee3",
+  "../20261110-per-person-sensitivity/scripts/pinned.py": "02317ec7174be93aa60c18a022ba411d5652cc1f97aab7fd1c0408e254ab8006",
+  "../20261110-per-person-sensitivity/results/calibration.json": "d8c8c55f05e03f70e6c44b49789af4b46c95f3d6f99bcd570851a8bb2fe3f18d"
+ }
+}
