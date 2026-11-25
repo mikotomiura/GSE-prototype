@@ -1,0 +1,15 @@
+{
+ "a": {
+  "sha256": "68b8da877869b295fdd4f9906847e57b903de32397a36f41e40c65954146a346",
+  "python": "3.11.9",
+  "numpy": "2.4.4",
+  "machine": "Windows-10-10.0.26200-SP0"
+ },
+ "b": {
+  "sha256": "68b8da877869b295fdd4f9906847e57b903de32397a36f41e40c65954146a346",
+  "python": "3.11.9",
+  "numpy": "2.4.4",
+  "machine": "macOS-27.0.1-arm64-arm-64bit"
+ },
+ "ok": true
+}
