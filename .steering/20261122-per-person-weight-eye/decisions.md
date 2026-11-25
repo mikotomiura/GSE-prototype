@@ -232,3 +232,9 @@ HP Z2 の手順は手順 2 で止まった（`report-hpz2-v1-select2-stopped.md`
 - 回し直し: commit 823e9b53 で Mac の V1 と変異をはじめから回した（run_id `v1-20261125T134543`）。V1 は緑（赤なし）、変異 6 個とも名指しの対照が赤。新しい code_hash は `e38db3af7cfe…`。P-XMACH の記号の列の SHA-256 は `68b8da877869…` で前と同じ（直しは記号の生成に触れない）。
 - 環境の側: `core.autocrlf=true` の worktree では P-HASH が赤になった（固定したファイルの改行が CRLF になる）。コードは変えず、引き継ぎの手順 1 を `git -c core.autocrlf=false worktree add` にした。
 - まだ本計算（選びの組・報告の組）はどの機械でも回していないので、止めた組の回し直しはない。
+
+## 判断 41: D5 で E3 を選んだ（2026-11-25・choose.py の機械的な選び）
+
+- 第 1 の帰無の選びの組（Mac）と第 2 の帰無の選びの組（HP Z2）を同じ code_hash `e38db3af7cfe…` で回し、`choose.py` が D5 の 1〜4 の順で E3 を選んだ。量は `experiments/20261122-per-person-weight-eye/notes.md` の D5 の節。
+- E1 は許しの門の重ね（86）と量（70）が 68 を超えて外れた。D6 では E1 も常に出す（判断 9・29）。
+- 次: d5.json と summary 2 つ・plan をコミットしてから報告の組（Mac: `run.sh report`、HP Z2: `report2`）。私が結果を見て選んだのではなく、規則の出力をそのまま採る。

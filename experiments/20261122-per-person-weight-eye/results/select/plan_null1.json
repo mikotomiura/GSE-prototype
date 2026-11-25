@@ -1,0 +1,24 @@
+{
+ "run_id": "select1-20261125T140656",
+ "which": "select",
+ "null": 1,
+ "code_hash": "e38db3af7cfe34409a2a0b1f5a932368e320588ed588b149866e493a5c8ff591",
+ "jobs": 8,
+ "budget_hours": 24.0,
+ "per_rep_seconds": {
+  "null1_dose_coauthor_0.0": 0.23940463066101075,
+  "null1_dose_coauthor_0.001": 0.22959816455841064,
+  "null1_dose_coauthor_0.003": 0.23847906589508056,
+  "null1_dose_coauthor_0.01": 0.23029706478118897,
+  "null1_dose_coauthor_0.03": 0.2339329242706299,
+  "null1_dist_coauthor_0.03": 0.23192071914672852,
+  "null1_struct_coauthor_0.0": 0.2807120084762573,
+  "null1_wobble_coauthor_0.0": 0.7018523931503295,
+  "null1_drift_coauthor_0.0": 3.6230765342712403,
+  "null1_volume_coauthor_0.0": 0.33810226917266845,
+  "null1_stack_coauthor_0.0": 3.6108782291412354
+ },
+ "estimate_hours": 0.32556041785412365,
+ "rows": 8500,
+ "seconds_total": 1437.9580290317535
+}

@@ -1,0 +1,132 @@
+{
+ "code_hash": "e38db3af7cfe34409a2a0b1f5a932368e320588ed588b149866e493a5c8ff591",
+ "cell": "k5_g0",
+ "allow": {
+  "E1": {
+   "counts": {
+    "null1_dose_coauthor_0.0": 51,
+    "null2_dose_coauthor_0.0": 44,
+    "null1_struct_coauthor_0.0": 54,
+    "null1_wobble_coauthor_0.0": 51,
+    "null1_volume_coauthor_0.0": 70,
+    "null1_drift_coauthor_0.0": 37,
+    "null1_stack_coauthor_0.0": 86
+   },
+   "ok": false
+  },
+  "E2": {
+   "counts": {
+    "null1_dose_coauthor_0.0": 50,
+    "null2_dose_coauthor_0.0": 37,
+    "null1_struct_coauthor_0.0": 53,
+    "null1_wobble_coauthor_0.0": 52,
+    "null1_volume_coauthor_0.0": 56,
+    "null1_drift_coauthor_0.0": 36,
+    "null1_stack_coauthor_0.0": 67
+   },
+   "ok": true
+  },
+  "E3": {
+   "counts": {
+    "null1_dose_coauthor_0.0": 39,
+    "null2_dose_coauthor_0.0": 51,
+    "null1_struct_coauthor_0.0": 57,
+    "null1_wobble_coauthor_0.0": 41,
+    "null1_volume_coauthor_0.0": 56,
+    "null1_drift_coauthor_0.0": 42,
+    "null1_stack_coauthor_0.0": 58
+   },
+   "ok": true
+  }
+ },
+ "drop": {
+  "E2": {
+   "power": 1.0,
+   "keep": true
+  },
+  "E3": {
+   "power": 1.0,
+   "keep": true
+  }
+ },
+ "stages": [
+  {
+   "stage": "段 1: 第 1 の帰無の 3e-3",
+   "values": {
+    "E2": 0.374,
+    "E3": 0.49
+   },
+   "max": 0.49,
+   "kept": [
+    "E3"
+   ]
+  }
+ ],
+ "pairs": {
+  "null2_dose_coauthor_0.03": {
+   "E1-E2": {
+    "diff": 0.0,
+    "se": 0.0
+   },
+   "E1-E3": {
+    "diff": 0.0,
+    "se": 0.0
+   },
+   "E2-E3": {
+    "diff": 0.0,
+    "se": 0.0
+   }
+  },
+  "null1_dose_coauthor_0.003": {
+   "E1-E2": {
+    "diff": 0.124,
+    "se": 0.01859945912545628
+   },
+   "E1-E3": {
+    "diff": 0.008,
+    "se": 0.017218156982084915
+   },
+   "E2-E3": {
+    "diff": -0.116,
+    "se": 0.018702608779266612
+   }
+  },
+  "null1_dose_coauthor_0.01": {
+   "E1-E2": {
+    "diff": 0.014,
+    "se": 0.005259593772650756
+   },
+   "E1-E3": {
+    "diff": 0.0,
+    "se": 0.0
+   },
+   "E2-E3": {
+    "diff": -0.014,
+    "se": 0.005259593772650756
+   }
+  },
+  "null1_dist_coauthor_0.03": {
+   "E1-E2": {
+    "diff": 0.37,
+    "se": 0.021613289165165816
+   },
+   "E1-E3": {
+    "diff": -0.008,
+    "se": 0.006320751838793801
+   },
+   "E2-E3": {
+    "diff": -0.378,
+    "se": 0.02170655082451827
+   }
+  }
+ },
+ "after_allow": [
+  "E2",
+  "E3"
+ ],
+ "after_drop": [
+  "E2",
+  "E3"
+ ],
+ "chosen": "E3"
+}
