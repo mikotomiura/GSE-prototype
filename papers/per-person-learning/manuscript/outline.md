@@ -1,5 +1,29 @@
 # Outline — per-person learning in sequence models of keystroke logs
 
+## Rewrite v2 (2026-11-25, after the UMUAI desk decision; numbers unchanged)
+
+Target venue: to be chosen (venue-fit.md in .steering/20261125-paper3-next-venue/paper-write/). Reader assumed until then: researchers who build or evaluate user models from behaviour logs (learning analytics, writing research, HCI), familiar with basic statistics and predictive models, not with HMM estimation.
+
+Take-home: In sequence models of keystroke behaviour, most of the per-person gain that a same-structure comparison shows vanishes against stronger comparisons: a per-person 3-state HMM beats a same-structure shared model by up to 0.19 nats per symbol but loses to the writer's own first-order Markov chain, and against a stronger structure chosen on other writers the advantage at k = 5 and 15 shrinks more than thirtyfold (about 5e-4 at the fixed smoothing; 3.4e-3 and 5.2e-3 in the symmetric refit, post hoc). The own chain is a cheap check that exposes the weak comparison.
+
+Central question and the type of its answer (paper-write Step 1):
+- Original question: do stable per-person differences remain? Answer type: unknown (remainders not attributed; planted up to 3e-2 not reliably detected; symmetric refit not checked synthetically).
+- Chosen (b) by the researcher on 2026-11-25 (decisions.md 判断 2): restate the question the paper answers — how much of the per-person gain survives stronger comparisons chosen on other people? Answer type: present, with size (remainders and intervals in Tables 2 and 3). The original question is stated as open, once, in Limitations. Option (a) stays possible through the weight-eye study (判断 3); its section would go after Results and before Discussion.
+
+Contributions:
+C1 Finding (new for keystroke sequence models; DeMasi 2017 and Saeb 2017 for the general pattern): gain over a same-structure shared model is more than thirtyfold larger than the remainder against a stronger comparison chosen on other people. Evidence: 4.1, 4.3, Table 2, Figure 3. Strength: measured in CoAuthor at both smoothings; exploratory. Who changes what: researchers evaluating per-person user models from logs stop reading a gain over a same-structure shared model as support for per-person modelling.
+C2 Check (known parts, new comparison here; Shirley 2010, Singer 2014): the person's own first-order chain beats the weak per-person HMM for every CoAuthor writer. Evidence: 4.2, Figure 3b. Strength: measured; depends on overlapping windows (non-overlapping returns the gain direction, S13). Who changes what: designers fit the chain next to any per-person sequence model before deciding to collect per-person data.
+C3 Reporting practice (assembled; Cawley 2010, Liu and Meng 2016): checks stating what a remainder can and cannot be attributed to (writer split, smoothing chosen on others, data swap, synthetic planted differences). Evidence: 4.4, 4.5, Table 3. Strength: conditional (post hoc parts, one null construction). Who changes what: authors and reviewers ask for the detection limit next to any reported remainder.
+
+Novelty type: knowledge (C1, C2) and a reporting practice (C3); no new method. Generalization: CoAuthor and one symbolization; the mechanism (overlapping windows make inputs dependent) suggests other domains, not checked — stated as such.
+Not claimed: that per-person differences are absent or present; results for other datasets, symbolizations or languages; any downstream benefit for adaptation.
+
+Structure: abstract, introduction (purpose in paragraph 1, method in three steps in paragraph 3, answer in paragraph 4, contributions with who changes what), related work, methods (status defined once in 3.4), results 4.1–4.5 (claim headings), [slot for the weight-eye section], discussion (take-home and who; established vs not; designer's reading; earlier findings; three recommendations), limitations (single place; first item is the open scientific question), conclusion (same words as abstract).
+
+---
+
+## Earlier outline (v1, 2026-11-11, kept as the record)
+
 Status: outline of claims, evidence and placement, revised 2026-11-11. Target: User Modeling and User-Adapted Interaction (empirical research paper). Numbers are medians over writers from four sequentially designed analyses and five later checks, each with its conditions committed before its code or, for reanalyses of stored values, before its computation (3.4). Panels: CoAuthor 15-session panel (17 writers), CoAuthor 30-session panel (9 writers), CS1 five-assignment panel (23 writers); all-writer panels in S4. Model labels: hmm3 and hmm10 are HMMs with 3 and 10 states; ar1, ar2 and ar3 are AR(1)-HMMs with 1 to 3 states (ar1 is a first-order Markov chain). The shrinkage grid is in S8.
 
 ## Take-home
