@@ -1,0 +1,18 @@
+{
+ "run_id": "20261126T015021-823",
+ "which": "report",
+ "null": 2,
+ "code_hash": "1665a0b2f83fef22dcea3bed18041f8a467dac2c769b65237e6b15092ac27142",
+ "jobs": 16,
+ "budget_hours": 24.0,
+ "per_rep_seconds": {
+  "null2_dose_coauthor_0.0": 0.1823368787765503,
+  "null2_dose_coauthor_0.001": 0.1708078622817993,
+  "null2_dose_coauthor_0.003": 0.1706549882888794,
+  "null2_dose_coauthor_0.01": 0.16887881755828857,
+  "null2_dose_coauthor_0.03": 0.16843099594116212
+ },
+ "estimate_hours": 0.009057694632146094,
+ "rows": 3000,
+ "seconds_total": 50.88458466529846
+}
