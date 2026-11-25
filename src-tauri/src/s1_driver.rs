@@ -22,6 +22,9 @@
 
 use serde::Serialize;
 
+// ★ 型だけを借りる（7 択の値と、Q1・Q2 を聞くかの規則 `asks_scales`）。行は書かない。
+use crate::logger::ActivityCategory;
+
 use crate::analysis::probe_arbiter::{
     Action, Arbiter, ArbiterConfig, DayClosedBy, DayQuestion, DayState, DayTrigger, OpenCard,
     Stratum, SuppressReason, TickInput,
@@ -59,6 +62,111 @@ pub struct ProbeCard {
     pub window_end_ms: u64,
     /// 研究者の画面の確かめ用に出したカード（`debug_show_probe`）。★ 行に `"debug":true` を付ける（3 本目の判断 3）。
     pub debug: bool,
+    /// カードを出した時刻（壁時計）。★ 回答の遅れ（`latency_ms`）の起点（ADR-057 D4）。
+    pub shown_ts: u64,
+    /// 途中の答え（ADR-057）。★ Q3 を押したら入る。閉じるときに `Some` なら answered の行を書く。
+    pub answer: Option<ProbeAnswer>,
+}
+
+/// 段 1 のカードで押した答え（ADR-057）。★ Q3 の後、詰まり・熟考・作業なら Q1・Q2 を続けて聞く。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProbeAnswer {
+    pub category: ActivityCategory,
+    /// Q3 を押した時刻（壁時計）。
+    pub q3_ts: u64,
+    pub q1: Option<u8>,
+    pub q2: Option<u8>,
+    /// 最後に押した時刻（壁時計）。
+    pub last_ts: u64,
+}
+
+/// いま画面で尋ねている問い（ADR-057 D1・D2）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProbeStep {
+    /// 何をしていたか（7 択）。
+    Q3,
+    /// 摩擦（1〜5）。
+    Q1,
+    /// 前進（1〜5）。
+    Q2,
+}
+
+impl ProbeStep {
+    /// この問いの選択肢の数（★ キーの登録の数と画面のボタンの数）。
+    pub fn choice_count(self) -> u8 {
+        match self {
+            Self::Q3 => ActivityCategory::ALL.len() as u8,
+            Self::Q1 | Self::Q2 => 5,
+        }
+    }
+}
+
+/// 押した答え（クリックもキーも同じ形で渡る）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnswerInput {
+    Activity(ActivityCategory),
+    Scale(u8),
+}
+
+impl ProbeCard {
+    /// 次に尋ねる問い。★ `None` は答え終わった（カードを閉じて行を書く）。
+    pub fn step(&self) -> Option<ProbeStep> {
+        match &self.answer {
+            None => Some(ProbeStep::Q3),
+            Some(a) if !a.category.asks_scales() => None,
+            Some(a) if a.q1.is_none() => Some(ProbeStep::Q1),
+            Some(a) if a.q2.is_none() => Some(ProbeStep::Q2),
+            Some(_) => None,
+        }
+    }
+
+    /// 押した答えを当てたカードを返す（★ 自分は変えない。行を書けてから [`S1Driver::commit_probe_answer`]）。
+    ///
+    /// ★ `expected` は押した側が見ていた問い。いまの問いと違えば拒む（二重押し・替わった後の押下・
+    ///   キーの押しっぱなしの繰り返しで、Q1 の答えが Q2 に入らないように）。
+    pub fn with_answer(
+        &self,
+        expected: ProbeStep,
+        input: AnswerInput,
+        wall: u64,
+    ) -> Result<ProbeCard, String> {
+        let step = self
+            .step()
+            .ok_or_else(|| "このカードは答え終わっています。".to_string())?;
+        if step != expected {
+            return Err(format!("問いが替わっています（{expected:?} → {step:?}）。"));
+        }
+        let mut next = self.clone();
+        match (step, input) {
+            (ProbeStep::Q3, AnswerInput::Activity(category)) => {
+                next.answer = Some(ProbeAnswer {
+                    category,
+                    q3_ts: wall,
+                    q1: None,
+                    q2: None,
+                    last_ts: wall,
+                });
+            }
+            (ProbeStep::Q1 | ProbeStep::Q2, AnswerInput::Scale(v)) if (1..=5).contains(&v) => {
+                let a = next
+                    .answer
+                    .as_mut()
+                    .ok_or_else(|| "Q3 の答えがありません。".to_string())?;
+                if step == ProbeStep::Q1 {
+                    a.q1 = Some(v);
+                } else {
+                    a.q2 = Some(v);
+                }
+                a.last_ts = wall;
+            }
+            (_, AnswerInput::Scale(v)) => return Err(format!("invalid scale: {v}")),
+            (_, AnswerInput::Activity(_)) => {
+                return Err("この問いは 1〜5 で答えます。".to_string());
+            }
+        }
+        Ok(next)
+    }
 }
 
 /// 開いている日の問いのカード（1 枚まで）。
@@ -90,6 +198,8 @@ pub enum S1CardView {
         probe_id: String,
         window_start_ms: u64,
         window_end_ms: u64,
+        /// いま尋ねている問い（ADR-057）。
+        step: ProbeStep,
     },
     Day {
         card_id: u64,
@@ -144,6 +254,9 @@ pub enum Effect {
     },
     /// 層化のカードを無作為に差し替えた（`realtime_label`・`activity_label` を `superseded` で 2 行）。
     Superseded { t: u64, card: ProbeCard },
+    /// 途中まで答えたカードが閉じた（差し替え・一時停止・終了）。★ 押した分を answered の 2 行で書く
+    /// （ADR-057 D3）。`card.answer` は必ず `Some`。
+    ProbeAnswered { t: u64, card: ProbeCard },
     /// `day_question` 行。
     DayRow(DayRowData),
     /// 画面のカードが変わった（`s1_card_state` を emit する）。
@@ -299,6 +412,8 @@ impl S1Driver {
                 probe_id: p.probe_id.clone(),
                 window_start_ms: p.window_start_ms,
                 window_end_ms: p.window_end_ms,
+                // ★ 答え終わったカードは持たない（`commit_probe_answer` が閉じる）ので `None` は来ない
+                step: p.step().unwrap_or(ProbeStep::Q3),
             },
             (None, Some(d)) => S1CardView::Day {
                 card_id: d.card_id,
@@ -404,7 +519,12 @@ impl S1Driver {
                         .is_some_and(|p| p.stratum != Stratum::Random)
                     {
                         if let Some(card) = self.probe.take() {
-                            out.push(Effect::Superseded { t: wall, card });
+                            // ★ Q3 まで答えていれば、押した分を answered で残す（ADR-057 D3）
+                            out.push(if card.answer.is_some() {
+                                Effect::ProbeAnswered { t: wall, card }
+                            } else {
+                                Effect::Superseded { t: wall, card }
+                            });
                             out.push(Effect::CardChanged);
                         }
                     }
@@ -430,6 +550,8 @@ impl S1Driver {
                         window_start_ms,
                         window_end_ms,
                         debug: false,
+                        shown_ts: wall,
+                        answer: None,
                     });
                     out.push(Effect::CardChanged);
                 }
@@ -491,6 +613,25 @@ impl S1Driver {
     /// いまのプローブのカードが `probe_id` のものなら、その控えを返す（コマンドが行を書く前に照らす）。
     pub fn probe_card(&self, probe_id: &str) -> Option<&ProbeCard> {
         self.probe.as_ref().filter(|p| p.probe_id == probe_id)
+    }
+
+    /// いま開いているプローブのカード（キーのハンドラが、いまの問いを知るため）。
+    pub fn open_probe(&self) -> Option<&ProbeCard> {
+        self.probe.as_ref()
+    }
+
+    /// [`ProbeCard::with_answer`] で作ったカードを据える（★ 答え終わっていなければ。行はまだ書かない）。
+    /// 答え終わったカードは、行を書けてから [`Self::close_probe`] で閉じる。
+    pub fn commit_probe_answer(&mut self, next: ProbeCard) -> Vec<Effect> {
+        let same = self
+            .probe
+            .as_ref()
+            .is_some_and(|p| p.probe_id == next.probe_id);
+        if !same || next.step().is_none() {
+            return Vec::new();
+        }
+        self.probe = Some(next);
+        vec![Effect::CardChanged]
     }
 
     /// 行を書けたプローブのカードを閉じる。
@@ -558,7 +699,12 @@ impl S1Driver {
     pub fn on_pause_requested(&mut self, wall: u64, utc_offset_secs: i32) -> Vec<Effect> {
         self.pause_handled = true;
         let mut out = Vec::new();
-        if self.probe.take().is_some() {
+        if let Some(card) = self.probe.take() {
+            // ★ Q3 まで答えていれば押した分を残す（ADR-057 D3）。⚠️ 止まった後に気づいた（tick の予備の）
+            //   ときは `run_s1_effects` の停止の門が落とす（止めた後は行を書けない）。
+            if card.answer.is_some() {
+                out.push(Effect::ProbeAnswered { t: wall, card });
+            }
             out.push(Effect::CardChanged);
         }
         // ★ tick と同じく遅らせた時刻で日と分を引く（4:00 の境目の 2 秒で日がずれないように）
@@ -613,10 +759,13 @@ impl S1Driver {
         }
     }
 
-    /// 終了の直前（`End` の前）。開いている日の問いを `closed_by = quit` で書き、プローブは行なしで下ろす。
+    /// 終了の直前（`End` の前）。開いている日の問いを `closed_by = quit` で書き、プローブは行なしで下ろす
+    /// （★ Q3 まで答えていれば押した分を answered で残す・ADR-057 D3）。
     pub fn finish_before_end(&mut self, wall: u64) -> Vec<Effect> {
         let mut out = Vec::new();
-        self.probe = None;
+        if let Some(card) = self.probe.take().filter(|c| c.answer.is_some()) {
+            out.push(Effect::ProbeAnswered { t: wall, card });
+        }
         if let Some(d) = self.day {
             if let Some(row) =
                 self.day_row_for_close(d.card_id, wall, None, DayClosedBy::Quit, None, None)
@@ -630,6 +779,7 @@ impl S1Driver {
     }
 
     /// 同意の取り消し（本タスクの判断 2）。カードは行を書かずに下ろし、調停器を捨てる（以後の行は 0）。
+    /// ★ 途中まで答えたカードも書かない（取り消しの後に `activity_label` を出さない・ADR-057 D3）。
     pub fn revoke(&mut self) -> Vec<Effect> {
         self.probe = None;
         if let Some(d) = self.day.take() {
@@ -1293,5 +1443,253 @@ mod tests {
         let json = serde_json::to_string(&d.visible_card(false)).unwrap();
         assert!(json.contains("\"kind\":\"probe\""));
         assert!(!json.contains("stratum") && !json.contains("low_operation"));
+    }
+
+    // ---- 答え方（ADR-057: Q3 → 詰まり・熟考・作業なら Q1 → Q2・途中で閉じても押した分を残す） ----
+
+    fn fire(d: &mut S1Driver, stratum: Stratum, wall: u64) -> String {
+        d.apply(
+            &[Action::FireProbe {
+                stratum,
+                scheduled_ts: wall,
+            }],
+            wall,
+            &mut ids(),
+        );
+        d.open_probe().expect("card").probe_id.clone()
+    }
+
+    fn step_of(d: &S1Driver) -> Option<ProbeStep> {
+        match d.visible_card(false) {
+            S1CardView::Probe { step, .. } => Some(step),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn q1_and_q2_follow_only_stuck_deliberating_and_working() {
+        for c in ActivityCategory::ALL {
+            let mut d = driver_with_frame(1_000_000);
+            fire(&mut d, Stratum::Random, 2_000_000);
+            let card = d.open_probe().unwrap().clone();
+            let next = card
+                .with_answer(ProbeStep::Q3, AnswerInput::Activity(c), 2_003_000)
+                .unwrap();
+            let asks = matches!(
+                c,
+                ActivityCategory::Stuck
+                    | ActivityCategory::Deliberating
+                    | ActivityCategory::Working
+            );
+            assert_eq!(next.step(), asks.then_some(ProbeStep::Q1), "{c:?}");
+        }
+    }
+
+    #[test]
+    fn answering_walks_q3_q1_q2_and_then_the_card_is_done() {
+        let mut d = driver_with_frame(1_000_000);
+        let id = fire(&mut d, Stratum::Random, 2_000_000);
+        assert_eq!(step_of(&d), Some(ProbeStep::Q3));
+        assert_eq!(d.open_probe().unwrap().shown_ts, 2_000_000);
+
+        let c = d.open_probe().unwrap().clone();
+        let n = c
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Stuck),
+                2_004_000,
+            )
+            .unwrap();
+        // ★ 据えるまでは変わらない（行を書けてから変える作法）
+        assert_eq!(step_of(&d), Some(ProbeStep::Q3));
+        assert!(matches!(
+            d.commit_probe_answer(n).as_slice(),
+            [Effect::CardChanged]
+        ));
+        assert_eq!(step_of(&d), Some(ProbeStep::Q1));
+
+        let c = d.open_probe().unwrap().clone();
+        let n = c
+            .with_answer(ProbeStep::Q1, AnswerInput::Scale(4), 2_006_000)
+            .unwrap();
+        d.commit_probe_answer(n);
+        assert_eq!(step_of(&d), Some(ProbeStep::Q2));
+
+        let c = d.open_probe().unwrap().clone();
+        let done = c
+            .with_answer(ProbeStep::Q2, AnswerInput::Scale(2), 2_007_500)
+            .unwrap();
+        assert_eq!(done.step(), None);
+        let a = done.answer.unwrap();
+        assert_eq!(
+            (a.category, a.q1, a.q2),
+            (ActivityCategory::Stuck, Some(4), Some(2))
+        );
+        assert_eq!((a.q3_ts, a.last_ts), (2_004_000, 2_007_500));
+        // ★ 答え終わったカードは据えない（行を書いてから `close_probe` で閉じる）
+        assert!(d.commit_probe_answer(done).is_empty());
+        assert!(matches!(
+            d.close_probe(&id).as_slice(),
+            [Effect::CardChanged]
+        ));
+        assert_eq!(d.visible_card(false), S1CardView::None);
+    }
+
+    #[test]
+    fn answers_for_a_different_step_or_shape_are_refused() {
+        let mut d = driver_with_frame(1_000_000);
+        fire(&mut d, Stratum::Random, 2_000_000);
+        let c = d.open_probe().unwrap().clone();
+        // Q3 に 1〜5 で答えない・Q1 として押した答えを Q3 に入れない
+        assert!(c
+            .with_answer(ProbeStep::Q3, AnswerInput::Scale(3), 1)
+            .is_err());
+        assert!(c
+            .with_answer(ProbeStep::Q1, AnswerInput::Scale(3), 1)
+            .is_err());
+        let n = c
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Working),
+                1,
+            )
+            .unwrap();
+        // ★ 押しっぱなしで同じ Q3 がもう一度来ても、Q1 には入らない
+        assert!(n
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Working),
+                2
+            )
+            .is_err());
+        // 目盛りの外は拒む（丸めない）
+        assert!(n
+            .with_answer(ProbeStep::Q1, AnswerInput::Scale(0), 2)
+            .is_err());
+        assert!(n
+            .with_answer(ProbeStep::Q1, AnswerInput::Scale(6), 2)
+            .is_err());
+        assert!(n
+            .with_answer(
+                ProbeStep::Q1,
+                AnswerInput::Activity(ActivityCategory::Stuck),
+                2
+            )
+            .is_err());
+        // 聞かない選択肢では Q3 で答え終わり、それ以上は受けない
+        let away = c
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Away),
+                1,
+            )
+            .unwrap();
+        assert_eq!(away.step(), None);
+        assert!(away
+            .with_answer(ProbeStep::Q1, AnswerInput::Scale(3), 2)
+            .is_err());
+    }
+
+    #[test]
+    fn commit_ignores_a_card_that_is_no_longer_open() {
+        let mut d = driver_with_frame(1_000_000);
+        let id = fire(&mut d, Stratum::Random, 2_000_000);
+        let c = d.open_probe().unwrap().clone();
+        let n = c
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Stuck),
+                2_001_000,
+            )
+            .unwrap();
+        d.close_probe(&id);
+        assert!(d.commit_probe_answer(n).is_empty());
+        assert!(d.open_probe().is_none());
+    }
+
+    /// Q3 まで答えたカードを開いたままにする。
+    fn partly_answered(d: &mut S1Driver, stratum: Stratum) -> String {
+        let id = fire(d, stratum, 2_000_000);
+        let c = d.open_probe().unwrap().clone();
+        let n = c
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Deliberating),
+                2_002_000,
+            )
+            .unwrap();
+        d.commit_probe_answer(n);
+        id
+    }
+
+    fn answered_card(fx: &[Effect]) -> Option<&ProbeCard> {
+        fx.iter().find_map(|e| match e {
+            Effect::ProbeAnswered { card, .. } => Some(card),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn pause_quit_and_supersede_keep_what_was_pressed() {
+        // 一時停止
+        let mut d = driver_with_frame(1_000_000);
+        let id = partly_answered(&mut d, Stratum::Random);
+        let fx = d.on_pause_requested(2_005_000, JST);
+        let card = answered_card(&fx).expect("pause keeps the answer");
+        assert_eq!(card.probe_id, id);
+        assert_eq!(card.answer.unwrap().q1, None);
+        assert!(d.open_probe().is_none());
+
+        // 終了
+        let mut d = driver_with_frame(1_000_000);
+        partly_answered(&mut d, Stratum::Random);
+        let fx = d.finish_before_end(2_005_000);
+        assert!(answered_card(&fx).is_some());
+        assert!(d.open_probe().is_none());
+
+        // 層化のカードの差し替え: answered で残し、superseded の行は出さない
+        let mut d = driver_with_frame(1_000_000);
+        partly_answered(&mut d, Stratum::LowOperationEnd);
+        let fx = d.apply(&[Action::SupersedeOpenStrat], 2_005_000, &mut ids());
+        assert!(answered_card(&fx).is_some());
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Superseded { .. })));
+    }
+
+    #[test]
+    fn closing_an_unanswered_card_writes_nothing_new() {
+        // 答えていなければ今までどおり（一時停止・終了は行なし、差し替えは superseded）
+        let mut d = driver_with_frame(1_000_000);
+        fire(&mut d, Stratum::Random, 2_000_000);
+        assert!(answered_card(&d.on_pause_requested(2_005_000, JST)).is_none());
+
+        let mut d = driver_with_frame(1_000_000);
+        fire(&mut d, Stratum::Random, 2_000_000);
+        assert!(answered_card(&d.finish_before_end(2_005_000)).is_none());
+
+        let mut d = driver_with_frame(1_000_000);
+        fire(&mut d, Stratum::LowOperationEnd, 2_000_000);
+        let fx = d.apply(&[Action::SupersedeOpenStrat], 2_005_000, &mut ids());
+        assert!(fx.iter().any(|e| matches!(e, Effect::Superseded { .. })));
+        assert!(answered_card(&fx).is_none());
+    }
+
+    #[test]
+    fn revoke_drops_a_partly_answered_card_without_rows() {
+        // ★ 取り消しの後に `activity_label` を出さない
+        let mut d = driver_with_frame(1_000_000);
+        partly_answered(&mut d, Stratum::Random);
+        let fx = d.revoke();
+        assert!(answered_card(&fx).is_none());
+        assert!(d.open_probe().is_none());
+    }
+
+    #[test]
+    fn probe_view_carries_the_step_in_snake_case() {
+        let mut d = driver_with_frame(1_000_000);
+        partly_answered(&mut d, Stratum::Random);
+        let json = serde_json::to_string(&d.visible_card(false)).unwrap();
+        assert!(json.contains("\"step\":\"q1\""), "{json}");
+        // ★ 答えの中身は画面に送らない（段だけ）
+        assert!(!json.contains("deliberating"), "{json}");
     }
 }

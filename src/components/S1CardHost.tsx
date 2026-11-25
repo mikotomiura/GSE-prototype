@@ -50,7 +50,15 @@ const S1CardHost: React.FC<S1CardHostProps> = ({ onActiveChange, onResize }) => 
   }, [card, onActiveChange, onResize]);
 
   if (card.kind === "probe") {
-    return <S1ProbeCard key={card.probe_id} probeId={card.probe_id} onResize={onResize} onDone={refresh} />;
+    return (
+      <S1ProbeCard
+        key={card.probe_id}
+        probeId={card.probe_id}
+        step={card.step}
+        onResize={onResize}
+        onDone={refresh}
+      />
+    );
   }
   if (card.kind === "day") {
     return (
