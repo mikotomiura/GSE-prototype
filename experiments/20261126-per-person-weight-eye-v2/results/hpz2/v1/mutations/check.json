@@ -1,0 +1,85 @@
+{
+ "run_id": "20261126T010817-1271",
+ "code_hash": "1665a0b2f83fef22dcea3bed18041f8a467dac2c769b65237e6b15092ac27142",
+ "base_red": [],
+ "mutations": {
+  "w1": {
+   "exit": 3,
+   "red": [
+    "P-HAND",
+    "P-NULL",
+    "P-UNIF"
+   ],
+   "named": [
+    "P-NULL"
+   ],
+   "ok": true
+  },
+  "w2": {
+   "exit": 3,
+   "red": [
+    "P-HAND",
+    "P-POS"
+   ],
+   "named": [
+    "P-HAND",
+    "P-POS"
+   ],
+   "ok": true
+  },
+  "w3": {
+   "exit": 3,
+   "red": [
+    "P-HAND",
+    "P-EQ",
+    "P-NULL",
+    "P-UNIF"
+   ],
+   "named": [
+    "P-HAND"
+   ],
+   "ok": true
+  },
+  "w4": {
+   "exit": 3,
+   "red": [
+    "P-HAND"
+   ],
+   "named": [
+    "P-HAND"
+   ],
+   "ok": true
+  },
+  "w5": {
+   "exit": 3,
+   "red": [
+    "P-HAND"
+   ],
+   "named": [
+    "P-HAND"
+   ],
+   "ok": true
+  },
+  "w6": {
+   "exit": 3,
+   "red": [
+    "P-STAT"
+   ],
+   "named": [
+    "P-STAT"
+   ],
+   "ok": true
+  },
+  "w7": {
+   "exit": 3,
+   "red": [
+    "P-EQ"
+   ],
+   "named": [
+    "P-EQ"
+   ],
+   "ok": true
+  }
+ },
+ "ok": true
+}
