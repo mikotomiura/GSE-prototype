@@ -10,25 +10,30 @@ GSE-prototype の枝 exp/gse-per-person-weight-eye の .steering/20261122-per-pe
 
 ## 前提
 
-- 枝 `exp/gse-per-person-weight-eye`（Mac が push 済み）。Mac の V1 は commit c7645298 で緑、code_hash は `646328e370c9…`（`results/v1/selftest.json` の `code_hash`）。
+- 枝 `exp/gse-per-person-weight-eye`（Mac が push 済み）。Mac の V1 は 2026-11-25 に回し直して緑、code_hash は `e38db3af7cfe…`（`results/v1/selftest.json` の `code_hash`）。1 回目の HP Z2 の手順は手順 2 で止まり（`report-hpz2-v1-select2-stopped.md`）、パスの区切りを `/` に揃えて直した（decisions 判断 40）。旧値 `646328e370c9…` は使わない。
 - Python 3.11.9・numpy 2.4.4（nfs と同じ版）。`run.sh` は版が違うと止まる。
 - 第 2 の帰無の m0 の npz は repo の外（nfs と同じ置き場。既定は `$HOME/gse-public-data/landscape/null_from_shared_m0.npz`）。値も要約も見ない・出さない。
 - git-bash で回す。
 
 ## 手順
 
-1. 枝を取り出す（既存のチェックアウトを汚さないよう worktree で）:
+1. 枝を取り出す（既存のチェックアウトを汚さないよう worktree で）。改行を変換させないため `core.autocrlf=false` で作る（`true` のままだと P-HASH が赤になる。1 回目の報告の 1）:
    ```bash
    git fetch origin
-   git worktree add ../GSE-prototype-weight-eye exp/gse-per-person-weight-eye
+   git -c core.autocrlf=false worktree add ../GSE-prototype-weight-eye exp/gse-per-person-weight-eye
    cd ../GSE-prototype-weight-eye/experiments/20261122-per-person-weight-eye
+   ```
+   1 回目で作った worktree（`autocrlf=false` で作り直したもの）が残っていれば、作り直さずに最新にする:
+   ```bash
+   cd ../GSE-prototype-weight-eye && git status --short   # 何も出ないこと
+   git pull --ff-only && cd experiments/20261122-per-person-weight-eye
    ```
 2. 改行の変換でハッシュが変わっていないか（変わっていれば止める）:
    ```bash
    PY=<Python 3.11.9 のパス>
    "$PY" -I -X utf8 -c "import sys; sys.path.insert(0, 'scripts'); import run_eye; print(run_eye.code_hash())"
    ```
-   先頭が `646328e370c9` でなければ止めて研究者に返す（`git config core.autocrlf` の値も添える）。
+   先頭が `e38db3af7cfe` でなければ止めて研究者に返す（`git config core.autocrlf` の値も添える）。
 3. V1（第 2 の帰無の P-HASH を含む）:
    ```bash
    NPZ=<npz のパス> PYTHON="$PY" JOBS=16 OUT=results/hpz2 bash run.sh v1

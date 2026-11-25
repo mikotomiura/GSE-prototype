@@ -1,8 +1,8 @@
 {
- "run_id": "v1-20261123T011038",
+ "run_id": "v1-20261125T134543",
  "mutate": "w2",
  "seed": 2026112201,
- "code_hash": "646328e370c9a00f2cee78b7788876dce9305db0ea58619be886f62bbe21a44a",
+ "code_hash": "e38db3af7cfe34409a2a0b1f5a932368e320588ed588b149866e493a5c8ff591",
  "P-HASH": {
   "hashes": {
    "/Users/johnd/GSE-prototype-weight-eye/experiments/20261110-per-person-sensitivity/scripts/synth.py": "41c60dd5ec954f6d1bd526560c318f96847641533e31f3826f099fb443d64ee3",
@@ -317,5 +317,5 @@
   "P-HAND",
   "P-POS"
  ],
- "seconds": 19.208606958389282
+ "seconds": 22.649514198303223
 }
