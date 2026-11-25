@@ -12,6 +12,7 @@
 両機で同じ c になることは d6_report.py が確かめる。
 """
 import glob
+import hashlib
 import json
 import math
 import os
@@ -43,18 +44,34 @@ def is_null(g):
 
 
 def load_groups(out, null, ch):
+    """計画（run_eye.plan("report")）の群と種がすべて揃っているときだけ読む（D8: 分母は計画したすべての複製）。"""
+    plan = {}
+    for r in RE.plan("report"):
+        if r["null"] == null:
+            plan.setdefault(RE.group(r), {})[r["seed"]] = r
     G = {}
-    for p in sorted(glob.glob(os.path.join(out, "report", "null%d_*.jsonl" % null))):
-        name = os.path.basename(p)[:-6]
+    for name, want in plan.items():
+        p = os.path.join(out, "report", name + ".jsonl")
+        if not os.path.exists(p):
+            sys.exit("計画の群の jsonl が無い: %s" % p)
         rows = [json.loads(x) for x in open(p)]
         if {r["code_hash"] for r in rows} != {ch}:
             sys.exit("%s にコードのハッシュが違う行がある" % p)
-        if {r["row"]["null"] for r in rows} != {null}:
-            sys.exit("%s に帰無の番号が違う行がある" % p)
+        if len(rows) != len(want) or {r["seed"] for r in rows} != set(want):
+            sys.exit("群 %s の複製が計画と合わない（途中のまま回していないか）" % name)
+        for r in rows:
+            w = want[r["seed"]]
+            if any(r["row"][k] != w[k] for k in ("null", "strand", "shape", "step")):
+                sys.exit("%s の行の群がファイル名と合わない（種 %d）" % (p, r["seed"]))
         G[name] = sorted(rows, key=lambda r: r["seed"])
-    if not G:
-        sys.exit("報告の組の jsonl が無い: %s" % os.path.join(out, "report"))
+    extra = set(os.path.basename(x)[:-6] for x in glob.glob(os.path.join(out, "report", "null%d_*.jsonl" % null))) - set(plan)
+    if extra:
+        sys.exit("計画に無い群の jsonl がある: %r" % sorted(extra))
     return G
+
+
+def self_sha():
+    return hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest()
 
 
 def mean_se(x):
@@ -115,7 +132,7 @@ def main():
     null = int(opt["--null"])
     ch = RE.code_hash()
     G = load_groups(out, null, ch)
-    R = dict(code_hash=ch, null=null, quantile=Q, quant={}, desc={}, groups={g: len(r) for g, r in G.items()})
+    R = dict(code_hash=ch, script_sha256=self_sha(), null=null, quantile=Q, quant={}, desc={}, groups={g: len(r) for g, r in G.items()})
     for g, rows in G.items():
         R["desc"][g] = {cell: describe(rows, cell) for cell in rows[0]["cells"]}
         if is_null(g):

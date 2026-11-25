@@ -1,10 +1,11 @@
 """D6 の報告（報告の組の集計から機械的に）と、追記 3 の論文 3 への統合の判定。
 
-使い方: python3 -I d6_report.py <out_dir>
+使い方: python3 -I d6_report.py <out_dir>（D9 は <out_dir>/d9_null1.json と <out_dir>/hpz2/d9_null2.json も読む）
 読む: <out_dir>/select/d5.json・<out_dir>/report/summary_null1.json・<out_dir>/hpz2/report/summary_null2.json・
       <out_dir>/report/d6_local_null1.json・<out_dir>/hpz2/report/d6_local_null2.json（どちらも c と率ありの版）
 出力: <out_dir>/report/d6.json
 """
+import hashlib
 import json
 import math
 import os
@@ -18,9 +19,10 @@ from d6_local import NULL_GROUPS  # noqa: E402
 GATE_MAX = 73          # D6 のセルの門（1,000 複製で 73 以下）
 GAP_MIN = 35           # 間を空けたセルの基準（500 複製で 35 以上なら超えた）
 WOBBLE_MARGIN = 0.03   # 揺れの筋の案どうしの比べ
-CELLS = dict(coauthor=["k1_g0", "k5_g0", "k15_g0", "k5_g5", "k5_g10"], cs1=["k1_g0", "k5_g0", "k1_g1", "k1_g4"])
+CELLS = {shape: ["k%d_g%d" % kg for kg in cells] for shape, cells in RE.CELLS.items()}
 GAP = dict(coauthor=["k5_g5", "k5_g10"], cs1=["k1_g1", "k1_g4"])
-ADJ = dict(coauthor="k5_g0", cs1="k1_g0")
+ADJ = {shape: [c for c in cells if c.endswith("_g0")] for shape, cells in CELLS.items()}   # 隣り合う（g = 0）全セル
+assert all(c in CELLS[sh] for sh in GAP for c in GAP[sh])
 DOSE = ["0.001", "0.003", "0.01", "0.03"]
 # 論文 3 の数（D6「論文 3 との並べ」・10 種）
 PAPER3 = {1: {"k5_g0": [0.0, 0.2, 0.9, 1.0], "k15_g0": [0.1, 0.6, 0.9, 1.0]},
@@ -58,12 +60,20 @@ def main():
     out = sys.argv[1]
     ch = RE.code_hash()
     d5 = load(os.path.join(out, "select", "d5.json"))
+    if "stop" in d5 or "chosen" not in d5:
+        sys.exit("D5 が止めで終わっている: %s" % d5.get("stop"))
+    D9 = {1: load(os.path.join(out, "d9_null1.json")), 2: load(os.path.join(out, "hpz2", "d9_null2.json"))}
+    for n in (1, 2):
+        if D9[n]["code_hash"] != ch or D9[n]["null"] != n:
+            sys.exit("d9_null%d.json のコードのハッシュか帰無が違う" % n)
+    kl_drift = {r["step"]: r["kl_median"] for r in D9[1]["rows"] if r["strand"] == "drift"}
     S = {1: load(os.path.join(out, "report", "summary_null1.json")),
          2: load(os.path.join(out, "hpz2", "report", "summary_null2.json"))}
     L = {1: load(os.path.join(out, "report", "d6_local_null1.json")),
          2: load(os.path.join(out, "hpz2", "report", "d6_local_null2.json"))}
     for n in (1, 2):
-        if S[n]["code_hash"] != ch or S[n]["which"] != "report" or L[n]["code_hash"] != ch:
+        if (S[n]["code_hash"] != ch or S[n]["which"] != "report" or L[n]["code_hash"] != ch
+                or S[n]["null"] != n or L[n]["null"] != n):
             sys.exit("null%d の集計のコードのハッシュか組が違う" % n)
         if "c" not in L[n]:
             sys.exit("null%d の d6_local に c が無い（--peer を渡して回し直す）" % n)
@@ -81,7 +91,10 @@ def main():
     def rate(g, cell, e, a="0.05"):
         return cell_of(g, cell)[e][a]
 
-    R = dict(code_hash=ch, chosen=chosen, c=L[1]["c"], gates={}, gap={}, adjacent_drift={}, wobble={},
+    R = dict(code_hash=ch, script_sha256=hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest(),
+             inputs_sha256={"d6_local_null%d" % n: L[n].get("script_sha256") for n in (1, 2)},
+             d9={1: D9[1]["rows"], 2: D9[2]["rows"]},
+             chosen=chosen, c=L[1]["c"], gates={}, gap={}, gap_cells={}, adjacent_drift={}, wobble={},
              secondary={}, paper3=[], judgments=[], writer_level={}, desc={1: L[1]["desc"], 2: L[2]["desc"]})
 
     # セルの門（55）
@@ -96,38 +109,42 @@ def main():
             sys.exit("門の数が 55 でない: %d" % len(G))
         R["gates"][e] = dict(all_ok=all(x["ok"] for x in G), n_red=sum(not x["ok"] for x in G), gates=G)
 
-    # 間を空けたセルの基準（漂い ρ = 0.5・0.9）と、隣り合うセルの記述
+    # 間を空けたセルの基準（漂い ρ = 0.5・0.9）と、隣り合うセル（g = 0 の全セル・ρ = 0・0.5・0.9）の記述。
+    # どの行にも ρ ごとの D9 の単位ごとのずれ（KL の中央値）を添える（判断 35）。
     for e in eyes:
-        R["gap"][e], R["adjacent_drift"][e] = [], []
+        R["gap"][e], R["adjacent_drift"][e], R["gap_cells"][e] = [], [], {}
         for shape in CELLS:
-            for rho in ("0.5", "0.9"):
-                g = "null1_drift_%s_%s" % (shape, rho)
-                for cell in GAP[shape]:
+            for cell in GAP[shape]:
+                any_ex = False
+                for rho in ("0.5", "0.9"):
+                    g = "null1_drift_%s_%s" % (shape, rho)
                     r = rate(g, cell, e)
+                    ex = r["n_rej"] >= GAP_MIN
+                    any_ex = any_ex or ex
                     R["gap"][e].append(dict(group=g, cell=cell, n_rej=r["n_rej"], rate=r["rate"], se=r["se"],
-                                            exceeded=r["n_rej"] >= GAP_MIN))
-                r = rate(g, ADJ[shape], e)
-                R["adjacent_drift"][e].append(dict(group=g, cell=ADJ[shape], rate=r["rate"], se=r["se"]))
+                                            exceeded=ex, kl_median=kl_drift[float(rho)]))
+                R["gap_cells"][e]["%s/%s" % (shape, cell)] = "安定と漂いを分けない" if any_ex else "基準を超えなかった"
+            for rho in ("0.0", "0.5", "0.9"):
+                g = "null1_drift_%s_%s" % (shape, rho)
+                for cell in ADJ[shape]:
+                    r = rate(g, cell, e)
+                    R["adjacent_drift"][e].append(dict(group=g, cell=cell, rate=r["rate"], se=r["se"],
+                                                       kl_median=kl_drift[float(rho)]))
 
     # 揺れの筋の案どうしの比べ（CoAuthor k = 5）
     for step in ("0.01", "0.03"):
         g = "null1_wobble_coauthor_%s" % step
-        v = {e: rate(g, "k5_g0", e)["rate"] for e in EY.EYES}
-        others = [e for e in EY.EYES if e != chosen and v[chosen] <= v[e] - WOBBLE_MARGIN]
-        R["wobble"][step] = dict(rates=v, others_higher_by_margin=others)
+        v = {e: rate(g, "k5_g0", e) for e in EY.EYES}
+        n = cell_of(g, "k5_g0")["n"]
+        m = round(WOBBLE_MARGIN * n)   # 0.03 を件数で（500 複製なら 15）。浮動小数の丸めで「以上」を落とさない
+        others = [e for e in EY.EYES if e != chosen and v[chosen]["n_rej"] <= v[e]["n_rej"] - m]
+        R["wobble"][step] = dict(rates={e: v[e]["rate"] for e in EY.EYES}, n=n, margin_count=m,
+                                 others_higher_by_margin=others)
 
-    # 副次の水準（選んだ案・p ≤ 0.01・0.001）: 用量の検出力と差なしの拒否率
+    # 副次の水準（選んだ案・p ≤ 0.01・0.001）: 報告の組のすべての群とセル（差なしの拒否率を含む）
     for a in ("0.01", "0.001"):
-        rows = {}
-        for n, shapes in ((1, ("coauthor", "cs1")), (2, ("coauthor",))):
-            for shape in shapes:
-                for st in ["0.0"] + DOSE:
-                    g = "null%d_dose_%s_%s" % (n, shape, st)
-                    rows[g] = {cell: rate(g, cell, chosen, a) for cell in CELLS[shape]}
-        for shape in CELLS:
-            for g in NULL_GROUPS[shape]:
-                rows.setdefault(g, {cell: rate(g, cell, chosen, a) for cell in CELLS[shape]})
-        R["secondary"][a] = rows
+        R["secondary"][a] = {g: {cell: v[chosen][a] for cell, v in cells.items()}
+                             for n in (1, 2) for g, cells in S[n]["groups"].items()}
 
     # 論文 3 との並べ（記述）と合成の段の読み（12 の判定）
     for n in (1, 2):

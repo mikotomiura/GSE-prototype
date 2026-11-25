@@ -14,6 +14,7 @@
 - KL = 単位の表 ∥ m0 の表の行ごとの KL を、m0 の系列の行の占有 π で重み付けた和。書き手 × 単位の中央値。
 - 表は D1 の数え方（系列・単位をまたがない隣り合う組）に 0.5 を足して行で割る。
 """
+import hashlib
 import json
 import os
 import sys
@@ -166,7 +167,8 @@ def main():
         sys.exit("第 2 の帰無だけ --npz を渡す")
     jobs = int(opt.get("--jobs", "8"))
     GN.assert_clean()
-    R = dict(code_hash=RE.code_hash(), null=null, n_writers=N_W, length=L_ALL, rows=[])
+    R = dict(code_hash=RE.code_hash(), script_sha256=hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest(),
+             null=null, n_writers=N_W, length=L_ALL, rows=[])
     with ProcessPoolExecutor(jobs, initializer=_init, initargs=(npz,)) as ex:
         for strand, step in plan(null):
             res = list(ex.map(one_writer, [(null, strand, step, s) for s in SEEDS]))
