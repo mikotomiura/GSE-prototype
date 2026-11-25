@@ -1,0 +1,170 @@
+{
+ "code_hash": "1665a0b2f83fef22dcea3bed18041f8a467dac2c769b65237e6b15092ac27142",
+ "cell": "k5_g0",
+ "allow": {
+  "E1": {
+   "counts": {
+    "null1_dose_coauthor_0.0": 46,
+    "null2_dose_coauthor_0.0": 40,
+    "null1_struct_coauthor_0.0": 49,
+    "null1_wobble_coauthor_0.0": 38,
+    "null1_volume_coauthor_0.0": 38,
+    "null1_drift_coauthor_0.0": 46,
+    "null1_stack_coauthor_0.0": 49
+   },
+   "ok": true
+  },
+  "E2": {
+   "counts": {
+    "null1_dose_coauthor_0.0": 42,
+    "null2_dose_coauthor_0.0": 41,
+    "null1_struct_coauthor_0.0": 45,
+    "null1_wobble_coauthor_0.0": 35,
+    "null1_volume_coauthor_0.0": 44,
+    "null1_drift_coauthor_0.0": 37,
+    "null1_stack_coauthor_0.0": 47
+   },
+   "ok": true
+  },
+  "E3": {
+   "counts": {
+    "null1_dose_coauthor_0.0": 45,
+    "null2_dose_coauthor_0.0": 37,
+    "null1_struct_coauthor_0.0": 59,
+    "null1_wobble_coauthor_0.0": 36,
+    "null1_volume_coauthor_0.0": 47,
+    "null1_drift_coauthor_0.0": 45,
+    "null1_stack_coauthor_0.0": 52
+   },
+   "ok": true
+  }
+ },
+ "drop": {
+  "E1": {
+   "power": 1.0,
+   "keep": true
+  },
+  "E2": {
+   "power": 1.0,
+   "keep": true
+  },
+  "E3": {
+   "power": 1.0,
+   "keep": true
+  }
+ },
+ "stages": [
+  {
+   "stage": "段 1: 第 1 の帰無の 3e-3",
+   "values": {
+    "E1": 0.468,
+    "E2": 0.338,
+    "E3": 0.444
+   },
+   "max": 0.468,
+   "kept": [
+    "E1",
+    "E3"
+   ]
+  },
+  {
+   "stage": "段 2: 第 1 の帰無の 1e-2",
+   "values": {
+    "E1": 1.0,
+    "E3": 1.0
+   },
+   "max": 1.0,
+   "kept": [
+    "E1",
+    "E3"
+   ]
+  },
+  {
+   "stage": "段 3: 分布の筋",
+   "values": {
+    "E1": 0.96,
+    "E3": 0.974
+   },
+   "max": 0.974,
+   "kept": [
+    "E1",
+    "E3"
+   ]
+  },
+  {
+   "stage": "段 4: E1 > E2 > E3 の順",
+   "kept": [
+    "E1"
+   ]
+  }
+ ],
+ "pairs": {
+  "null2_dose_coauthor_0.03": {
+   "E1-E2": {
+    "diff": 0.0,
+    "se": 0.0
+   },
+   "E1-E3": {
+    "diff": 0.0,
+    "se": 0.0
+   },
+   "E2-E3": {
+    "diff": 0.0,
+    "se": 0.0
+   }
+  },
+  "null1_dose_coauthor_0.003": {
+   "E1-E2": {
+    "diff": 0.13,
+    "se": 0.020273678602764134
+   },
+   "E1-E3": {
+    "diff": 0.024,
+    "se": 0.01831717876956362
+   },
+   "E2-E3": {
+    "diff": -0.106,
+    "se": 0.01892734764772803
+   }
+  },
+  "null1_dose_coauthor_0.01": {
+   "E1-E2": {
+    "diff": 0.016,
+    "se": 0.0056170367814719555
+   },
+   "E1-E3": {
+    "diff": 0.0,
+    "se": 0.0
+   },
+   "E2-E3": {
+    "diff": -0.016,
+    "se": 0.0056170367814719555
+   }
+  },
+  "null1_dist_coauthor_0.03": {
+   "E1-E2": {
+    "diff": 0.388,
+    "se": 0.021814300984787705
+   },
+   "E1-E3": {
+    "diff": -0.014,
+    "se": 0.007728353958626613
+   },
+   "E2-E3": {
+    "diff": -0.402,
+    "se": 0.021948929609938706
+   }
+  }
+ },
+ "after_allow": [
+  "E1",
+  "E2",
+  "E3"
+ ],
+ "after_drop": [
+  "E1",
+  "E2",
+  "E3"
+ ],
+ "chosen": "E1"
+}
