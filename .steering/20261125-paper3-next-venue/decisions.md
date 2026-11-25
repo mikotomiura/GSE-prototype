@@ -21,3 +21,10 @@
 - 要旨: (a) 選んだ案の 55 の門がすべて通り、(b) 12 の判定のうち 1 つ以上が「拾った」なら、実データの結果を有無にかかわらず論文 3 に入れる。満たさなければ限界の 1 文と補足の 1 節だけを入れ、別の論文にはしない。
 - 理由: 別の論文だと同じデータ・パネル・問いで切り分けと読まれ、合成だけでは薄い。結果を見てから決めると選んだと読まれる。
 - 進め方: 数値を変えない書き直しと誌の調べは先に進める（どちらに転んでも要る）。目の結果が出たら基準を当て、統合するなら書き直しの上に目の節を足す。統合するなら投稿は実データの段の後になる。
+
+## 判断 4: 次の投稿先と進め方（2026-11-25・研究者の選択・推奨案）
+- 書き直し v2（3e49aad7・数値は不変・本文 6,984 → 6,215 語）の後、`paper-write/venue-fit.md` で 11 誌を比べた。無料・AI の門・範囲の門 1 と 3 を通るのは TMLR・Behavior Research Methods・Machine Learning（Springer）。推奨は TMLR（規程が "novelty of the studied method is not a necessary criterion" と "even if the contribution or significance of the work is modest" を明言しており、答えが決着しない今の論文の性質に合う）。
+- 研究者の情報: TMLR は年内は投稿できない状態。研究者の選択: TMLR の再開を待つ。
+- 研究者の問い「weight-eye を統合する場合でも TMLR か」への答え: TMLR のまま。目は年内に終わる見込みで再開に間に合い、統合すると「本人ごとの差はパラメータのどこにあるか」が加わって TMLR の範囲の一句（学習の振る舞いに新しい洞察を与える実験的な研究）に入る。ただし統合した版で venue-fit の範囲の門を当て直してから確定する（一言の分類が変われば BRM・Machine Learning を見直す）。
+- 待つ間に行うこと: 目の結果に判断 3 の基準を当てる → 統合するなら目の節を Results の後に足す → TMLR の LaTeX への移しと匿名化 → attack-me（Codex を加える・E は TMLR の一次で接地）→ プレプリントの新しい版にするかを研究者に問う。
+- TMLR の注意（研究者に伝えた）: 査読は OpenReview で公開（"papers, reviews, and discussion are visible to the public"）・二重盲・既存のプレプリントは残してよい。
