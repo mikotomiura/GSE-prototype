@@ -30,7 +30,7 @@ def code_hash():
     for f in CORE:
         h.update(f.encode() + open(os.path.join(HERE, f), "rb").read())
     for p, v in sorted(GN.PIN1.items()):
-        h.update((os.path.relpath(p, GN.EXP) + v).encode())
+        h.update((os.path.relpath(p, GN.EXP).replace(os.sep, "/") + v).encode())   # 区切りを / に揃え、機械によらず同じ値にする（判断 40）
     return h.hexdigest()
 
 

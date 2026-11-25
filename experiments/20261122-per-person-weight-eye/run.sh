@@ -33,7 +33,7 @@ P = dict(run_id=run_id, stage=stage, git_head=head, uncommitted=dirty.splitlines
          machine=platform.platform(),
          scripts={os.path.basename(p): h(p) for p in sorted(glob.glob(os.path.join(exp, "scripts", "*.py")))},
          run_sh=h(os.path.join(exp, "run.sh")), conditions=h(os.path.join(exp, "conditions.md")),
-         pinned={os.path.relpath(p, exp): v for p, v in gen.PIN1.items()})
+         pinned={os.path.relpath(p, exp).replace(os.sep, "/"): v for p, v in gen.PIN1.items()})
 json.dump(P, open(out, "w"), indent=1)
 PY
 }
