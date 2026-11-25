@@ -13,7 +13,15 @@ def one(seed):
     rng = np.random.default_rng([seed, 7])
     perms = EY.draw_perms(rng, P)
     out = EY.eval_cell(UC, P, sh["H"], K, 0, perms)
-    rk = lambda x: np.argsort(np.argsort(x))
+    def rk(x):   # 平均の順位（同点は平均を振る）
+        x = np.asarray(x, float)
+        o = np.argsort(x, kind="mergesort")
+        r = np.empty(len(x))
+        r[o] = np.arange(len(x))
+        for v in np.unique(x):
+            m = x == v
+            r[m] = r[m].mean()
+        return r
     return {e: float(np.corrcoef(rk(vol), rk(np.array(out[e]["auc"])))[0, 1]) for e in EY.EYES}, {e: out[e]["p"] for e in EY.EYES}
 if __name__ == "__main__":
     with ProcessPoolExecutor(8) as ex:

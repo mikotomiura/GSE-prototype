@@ -29,7 +29,7 @@
 - [ ] 凍結のコミット（実データの読み込みより前）
 
 ## 完了処理
-- [ ] /cross-review
+- [x] /cross-review（判断 46・結果を変える誤りなし）
 - [ ] design.md の最終化・glossary
 - [ ] 次のタスク（実データへの適用）の引き継ぎ
 - [ ] push・PR は研究者に確かめる（docs だけなら [skip ci]）
