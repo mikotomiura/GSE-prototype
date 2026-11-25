@@ -35,10 +35,10 @@ def write(path, lines):
         f.write("\n".join(json.dumps(x) for x in lines) + "\n")
 
 
-def probe(pid, t, stratum, cat, answered=True, debug=False):
+def probe(pid, t, stratum, cat, answered=True, debug=False, latency=5000):
     a = {"type": "probe_assignment", "probe_id": pid, "scheduled_ts": t, "session_elapsed_ms": 1000, "stratum": stratum}
     lab = {"type": "activity_label", "t": t + 5000, "probe_id": pid, "category": cat if answered else "cannot_answer",
-           "answered": answered, "latency_ms": 5000, "recall_window_start_ms": t - 31_000, "recall_window_end_ms": t - 1000}
+           "answered": answered, "latency_ms": latency, "recall_window_start_ms": t - 31_000, "recall_window_end_ms": t - 1000}
     if debug:
         a["debug"] = True
         lab["debug"] = True
@@ -97,6 +97,15 @@ def main():
     lines += probe("b", t4 + 61_000 + 1000, "random", "stuck")    # 窓の終わり 4:01:01 → この日
     c = run_count([lines], [{"C1": [], "C2": []}])
     check("4:00 の区切りで 2 日に分かれる", c["observed_days"] == 2)
+
+    # ---- 回答の遅れの上限（S1-A4・10 分ちょうどは数え、超えたら未回答と同じ）
+    tl = day_start_ms(0) + 6 * H
+    lines = [{"type": "meta", "session_start": tl, "s1_mode": "marker"}]
+    lines += probe("l1", tl, "random", "stuck", latency=600_000)
+    lines += probe("l2", tl + H, "random", "stuck", latency=600_001)
+    c = run_count([lines], [{"C1": [], "C2": []}])
+    check("遅れ 10 分ちょうどは数え、超えた回答は数えない",
+          c["random_answered"] == 1 and c["random_stuck"] == 1 and c["random_over_latency_cap"] == 1)
 
     # ---- 窓が日の切れ目をまたぐ回答は数えない（S1-D1）
     lines = [{"type": "meta", "session_start": t4, "s1_mode": "marker"}]
@@ -179,7 +188,7 @@ def main():
     allowed = {"elapsed_days", "observed_days", "probes_by_stratum", "answered_by_stratum", "random_unanswered",
                "random_answered", "random_stuck", "random_nonstuck", "random_excluded", "in_C1", "in_C2",
                "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day", "pi_stuck", "rules",
-               "window_days", "random_cross_day"}
+               "window_days", "random_cross_day", "random_over_latency_cap"}
     check("出力のキーは件数・率・要約だけ", set(c) == allowed)
 
     print("SELFTEST", "FAIL" if FAILS else "PASS", "mutate=%s" % sr.MUTATE)

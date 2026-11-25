@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MUTANTS = ("strat", "unanswered", "cutoff0", "early", "gt", "nowindow", "crossday")
+MUTANTS = ("strat", "unanswered", "cutoff0", "early", "gt", "nowindow", "crossday", "nolatcap")
 
 
 def main():
