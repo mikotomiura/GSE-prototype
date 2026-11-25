@@ -1,0 +1,823 @@
+{
+  "_comment": "Rhythm stage desk check, shape world (synthetic traces only, no participants; .steering/20261015-rhythm-stage-speed-shape-world/design.md: copied from experiments/20261014-rhythm-stage-speed-confound-world/config.json (7d38df98), changed: ceiling.steps are f100 / f200 / d100 / d200 with their worlds in ceiling.worlds, pc_stall.lam and pc_stall.lam_1800 emptied, pc_r, split and compare added). The copied comment follows: Rhythm stage desk check, confound world (synthetic traces only, no participants; .steering/20261014-rhythm-stage-speed-confound-world/design.md: copied from experiments/20261014-rhythm-stage-graded-world/config.json (424d9500), changed: ceiling.steps are the widths c050 / c100 / c200, speed_confound added). The copied comment follows: graded world Copied from experiments/20261013-rhythm-stage-round2/config.json (d98103a0); this task changes only ceiling (the three steps and their rule), pc_stall.lam (a table per step, empty until the pilot of the step) and pc_stall.lam_1800 (new, the same) (.steering/20261014-rhythm-stage-graded-world/design.md 0, 1.2, 1.3 and 3.0). The graded world's STRUGGLE settings are made by gen_sessions.py from segments_v4 and segments_v2 (_comment_graded) and are not written here. Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
+  "session": {
+    "duration_s": 10800,
+    "final_flow_s": 60,
+    "epoch_ms": 1700000000000,
+    "session_spacing_ms": 1000000000
+  },
+  "segments": {
+    "FLOW": {
+      "dur_min_s": 180,
+      "dur_max_s": 900,
+      "burst_min": 6,
+      "burst_max": 20,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 800,
+      "gap_sigma": 0.5,
+      "gap_cap_ms": 1900,
+      "p_backspace": 0.03
+    },
+    "STRUGGLE": {
+      "dur_min_s": 120,
+      "dur_max_s": 600,
+      "burst_min": 1,
+      "burst_max": 5,
+      "flight_median_ms": 320,
+      "flight_sigma": 0.35,
+      "gap_median_ms": 3500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 20000,
+      "p_backspace": 0.25,
+      "p_pause_after_bs": 0.6,
+      "pause_after_bs_min_ms": 2000,
+      "pause_after_bs_extra_ms": 3000
+    },
+    "THINK": {
+      "dur_min_s": 10,
+      "dur_max_s": 90
+    },
+    "STALL_SILENT": {
+      "dur_min_s": 30,
+      "dur_max_s": 180
+    },
+    "AWAY": {
+      "bands_s": [
+        [
+          60,
+          300
+        ],
+        [
+          300,
+          1200
+        ],
+        [
+          1200,
+          5400
+        ]
+      ],
+      "band_p": [
+        0.4,
+        0.4,
+        0.2
+      ]
+    }
+  },
+  "segments_v2": {
+    "FLOW": {
+      "dur_min_s": 180,
+      "dur_max_s": 900,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.03
+    },
+    "STRUGGLE": {
+      "dur_min_s": 120,
+      "dur_max_s": 600,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 320,
+      "flight_sigma": 0.35,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.25
+    },
+    "THINK": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "STALL_SILENT": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "AWAY": {
+      "bands_s": [
+        [
+          60,
+          300
+        ],
+        [
+          300,
+          1200
+        ],
+        [
+          1200,
+          5400
+        ]
+      ],
+      "band_p": [
+        0.4,
+        0.4,
+        0.2
+      ]
+    }
+  },
+  "_comment_segments_v2": "Deviation after the freeze (design section 8, 2026-10-09): world v2 gives FLOW and STRUGGLE the same burst duration and pause distributions, and THINK and STALL_SILENT the same length, so that the stall regime shows only in corrections, key intervals and burst length, not in the presence pattern. Reason: in v1 the presence-only model reaches AUC 0.997, which leaves no room for the positive controls (E1-3 undecidable by construction).",
+  "_comment_segments_v3": "design 1.6: world v3 = world v2 with two changes in STRUGGLE: flight_median_ms and flight_sigma as FLOW (150, 0.25), and world v1's pause after a backspace (p_pause_after_bs 0.6, pause_after_bs_min_ms 2000, pause_after_bs_extra_ms 3000, the values of segments.STRUGGLE). Everything else is as in segments_v2.",
+  "segments_v3": {
+    "FLOW": {
+      "dur_min_s": 180,
+      "dur_max_s": 900,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.03
+    },
+    "STRUGGLE": {
+      "dur_min_s": 120,
+      "dur_max_s": 600,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.25,
+      "p_pause_after_bs": 0.6,
+      "pause_after_bs_min_ms": 2000,
+      "pause_after_bs_extra_ms": 3000
+    },
+    "THINK": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "STALL_SILENT": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "AWAY": {
+      "bands_s": [
+        [
+          60,
+          300
+        ],
+        [
+          300,
+          1200
+        ],
+        [
+          1200,
+          5400
+        ]
+      ],
+      "band_p": [
+        0.4,
+        0.4,
+        0.2
+      ]
+    }
+  },
+  "transitions": {
+    "START": {
+      "FLOW": 0.6,
+      "STRUGGLE": 0.4
+    },
+    "FLOW": {
+      "THINK": 0.5,
+      "STRUGGLE": 0.3,
+      "AWAY": 0.2
+    },
+    "THINK": {
+      "FLOW": 0.6,
+      "STRUGGLE": 0.4
+    },
+    "STRUGGLE": {
+      "STALL_SILENT": 0.5,
+      "FLOW": 0.3,
+      "AWAY": 0.2
+    },
+    "STALL_SILENT": {
+      "STRUGGLE": 0.4,
+      "FLOW": 0.3,
+      "AWAY": 0.3
+    },
+    "AWAY": {
+      "FLOW": 0.6,
+      "STRUGGLE": 0.4
+    }
+  },
+  "keys": {
+    "dwell_ms": 80,
+    "dwell_jitter_ms": 20,
+    "p_space": 0.2
+  },
+  "sets": {
+    "P": {
+      "n": 240
+    },
+    "O": {
+      "pairs": 40,
+      "prefix_s": 3600,
+      "shared_suffix_s": 1200
+    },
+    "J": {
+      "jitter_ms": 50
+    },
+    "D_shuffled": {
+      "pairs": 20,
+      "duration_s": 5400
+    },
+    "D_diffend": {
+      "pairs": 20,
+      "shared_prefix_s": 3600,
+      "suffix_s": 1200
+    },
+    "D_noobs": {
+      "n": 5,
+      "duration_s": 1800,
+      "keys": 5
+    },
+    "D_continuous": {
+      "n": 5,
+      "duration_s": 10800
+    },
+    "D_sleep": {
+      "n": 5,
+      "duration_s": 12600,
+      "sleep_start_s": 3600,
+      "sleep_s": 7200
+    },
+    "pilot": {
+      "seed_offset": 1,
+      "P": 240,
+      "bootstrap": 2000
+    }
+  },
+  "e13": {
+    "window_s": 60,
+    "folds": 5,
+    "bootstrap": 2000,
+    "null_perms": 20,
+    "margin": 0.03,
+    "pc_lower": 0.1,
+    "strata_edges": [
+      0,
+      1,
+      16,
+      46,
+      61
+    ],
+    "lags": 2,
+    "long_s": 300,
+    "strata_edges_long": [
+      0,
+      1,
+      76,
+      226,
+      301
+    ],
+    "long_s_1800": 1800,
+    "strata_edges_1800": [
+      0,
+      1,
+      451,
+      1351,
+      1801
+    ]
+  },
+  "_comment_segments_v4": "design 1.6 (researcher, decisions 16, after pilot 0 found no usable world): world v4 = world v2 with STRUGGLE's flight_median_ms and flight_sigma as FLOW (150, 0.25) and no pause after a backspace, so the key timing of FLOW and STRUGGLE is drawn alike; the stall regime shows only in the backspace rate (0.25 vs 0.03) and in the segment structure (lengths and transitions). Everything else is as in segments_v2.",
+  "segments_v4": {
+    "FLOW": {
+      "dur_min_s": 180,
+      "dur_max_s": 900,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.03
+    },
+    "STRUGGLE": {
+      "dur_min_s": 120,
+      "dur_max_s": 600,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.25
+    },
+    "THINK": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "STALL_SILENT": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "AWAY": {
+      "bands_s": [
+        [
+          60,
+          300
+        ],
+        [
+          300,
+          1200
+        ],
+        [
+          1200,
+          5400
+        ]
+      ],
+      "band_p": [
+        0.4,
+        0.4,
+        0.2
+      ]
+    }
+  },
+  "_comment_ceiling": "shape world design 1.2, 3.0: steps f100 / f200 (the factor world at c = 1 / 2) and d100 / d200 (the drift world); ceiling.worlds gives each step's world (gen_sessions.py --world). The rest as the copied comment: graded world design 3.0, kept by the confound world (steps = widths c; pilot 0, after the freeze, before any pilot 1): SEED + seed_offset, P sessions of each step in steps (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A step is ceiling when both classifiers' L300 AUC(A_speed) are >= main_auc (equality is at the ceiling), unmeasured when a fit failed or a value is NaN, else go. Only go steps run the pilot 1, the smoke and the main run. The steps are not moved after pilot 0 (round 1 decisions 16). main_auc (round 1 design 3.2): in the main run and the pilot 1, a classifier whose AUC(A_speed) of a label is >= main_auc is at the ceiling and left out of every maximum of that label. Round 1 and 2's prefer and usable_max are removed.",
+  "ceiling": {
+    "seed_offset": 1,
+    "P": 240,
+    "steps": {
+      "f100": 1.0,
+      "f200": 2.0,
+      "d100": 1.0,
+      "d200": 2.0
+    },
+    "main_auc": 0.9,
+    "worlds": {
+      "f100": "factor",
+      "f200": "factor",
+      "d100": "drift",
+      "d200": "drift"
+    }
+  },
+  "_comment_speed": "design 1.5: the five speed quantities of a span [s, e). Intervals are differences of consecutive press times inside the span (ms); quantities 2 and 3 use the intervals below short_ms; a run (quantity 4) continues while the interval is below run_ms; quantity 5 counts the presses of the final last_s seconds; at L60 model A_speed adds quantities 1 and 2 of the lags earlier windows (a window before the session start has 0 presses and quantity 2 = short_ms).",
+  "speed": {
+    "short_ms": 2000,
+    "run_ms": 200,
+    "last_s": 10,
+    "lags": 4
+  },
+  "_comment_pc_stall": "graded world design 1.2: lam and lam_1800 are tables per step (lam.<step>.<candidate>), written after the pilot of the step by checks.py --apply-pilot config.json results/<step>/pilot/pilot.json <step> (lam_1800.<step> is not written when the pilot's L1800 part stopped). The main run checks them against the step's pilot.json. Round 2 design 3.9: the pilot 1 (SEED + sets.pilot.seed_offset, sets.pilot.P sessions, L300, sets.pilot.bootstrap) runs [0] + pilot_grid; per candidate the lambdas with lower bound max > lower and point estimate max <= upper are in the band, and of those (else of all) the one whose isotonic point estimate is closest to aim wins (checks.select_lambda). A candidate with no finite point estimate stops the pilot. lam is written after the pilot by checks.py --apply-pilot. As round 1 (design 1.4, 3.2): the PC-stall of a candidate works when the lower bound of the max over the attackers > lower and the point estimate <= upper (and its PC0's upper < e13.margin). Round 1's target (0.05) is replaced by aim.",
+  "pc_stall": {
+    "lower": 0.03,
+    "upper": 0.08,
+    "pilot_grid": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3
+    ],
+    "lam": {
+      "d100": {
+        "S-raw-hold-sec": 0.3,
+        "S-raw-hold-sub": 0.3,
+        "S-raw-decay-sec": 0.3,
+        "S-raw-decay-sub": 0.3,
+        "S-raw-ground-sec": 0.3,
+        "S-raw-ground-sub": 0.3,
+        "S-smooth-hold-sec": 0.3,
+        "S-smooth-hold-sub": 0.3,
+        "S-smooth-decay-sec": 0.3,
+        "S-smooth-decay-sub": 0.3,
+        "S-smooth-ground-sec": 0.3,
+        "S-smooth-ground-sub": 0.3,
+        "S-rank-hold-sec": 0.3,
+        "S-rank-hold-sub": 0.3,
+        "S-rank-decay-sec": 0.3,
+        "S-rank-decay-sub": 0.3,
+        "S-rank-ground-sec": 0.3,
+        "S-rank-ground-sub": 0.3,
+        "S-jitter-hold-sec": 0.3,
+        "S-jitter-hold-sub": 0.3,
+        "S-jitter-decay-sec": 0.3,
+        "S-jitter-decay-sub": 0.3,
+        "S-jitter-ground-sec": 0.3,
+        "S-jitter-ground-sub": 0.3
+      },
+      "d200": {
+        "S-raw-hold-sec": 0.175,
+        "S-raw-hold-sub": 0.175,
+        "S-raw-decay-sec": 0.125,
+        "S-raw-decay-sub": 0.125,
+        "S-raw-ground-sec": 0.15,
+        "S-raw-ground-sub": 0.15,
+        "S-smooth-hold-sec": 0.2,
+        "S-smooth-hold-sub": 0.2,
+        "S-smooth-decay-sec": 0.2,
+        "S-smooth-decay-sub": 0.2,
+        "S-smooth-ground-sec": 0.225,
+        "S-smooth-ground-sub": 0.225,
+        "S-rank-hold-sec": 0.25,
+        "S-rank-hold-sub": 0.25,
+        "S-rank-decay-sec": 0.225,
+        "S-rank-decay-sub": 0.225,
+        "S-rank-ground-sec": 0.25,
+        "S-rank-ground-sub": 0.25,
+        "S-jitter-hold-sec": 0.2,
+        "S-jitter-hold-sub": 0.2,
+        "S-jitter-decay-sec": 0.175,
+        "S-jitter-decay-sub": 0.175,
+        "S-jitter-ground-sec": 0.2,
+        "S-jitter-ground-sub": 0.2
+      },
+      "f200": {
+        "S-raw-hold-sec": 0.3,
+        "S-raw-hold-sub": 0.3,
+        "S-raw-decay-sec": 0.275,
+        "S-raw-decay-sub": 0.25,
+        "S-raw-ground-sec": 0.275,
+        "S-raw-ground-sub": 0.275,
+        "S-smooth-hold-sec": 0.3,
+        "S-smooth-hold-sub": 0.3,
+        "S-smooth-decay-sec": 0.3,
+        "S-smooth-decay-sub": 0.3,
+        "S-smooth-ground-sec": 0.3,
+        "S-smooth-ground-sub": 0.3,
+        "S-rank-hold-sec": 0.3,
+        "S-rank-hold-sub": 0.3,
+        "S-rank-decay-sec": 0.3,
+        "S-rank-decay-sub": 0.3,
+        "S-rank-ground-sec": 0.3,
+        "S-rank-ground-sub": 0.3,
+        "S-jitter-hold-sec": 0.3,
+        "S-jitter-hold-sub": 0.3,
+        "S-jitter-decay-sec": 0.3,
+        "S-jitter-decay-sub": 0.3,
+        "S-jitter-ground-sec": 0.3,
+        "S-jitter-ground-sub": 0.3
+      }
+    },
+    "aim": 0.055,
+    "lam_1800": {
+      "d100": {
+        "S-raw-hold-sec": 0.3,
+        "S-raw-hold-sub": 0.3,
+        "S-raw-decay-sec": 0.3,
+        "S-raw-decay-sub": 0.3,
+        "S-raw-ground-sec": 0.3,
+        "S-raw-ground-sub": 0.3,
+        "S-smooth-hold-sec": 0.3,
+        "S-smooth-hold-sub": 0.3,
+        "S-smooth-decay-sec": 0.3,
+        "S-smooth-decay-sub": 0.3,
+        "S-smooth-ground-sec": 0.3,
+        "S-smooth-ground-sub": 0.3,
+        "S-rank-hold-sec": 0.3,
+        "S-rank-hold-sub": 0.3,
+        "S-rank-decay-sec": 0.3,
+        "S-rank-decay-sub": 0.3,
+        "S-rank-ground-sec": 0.3,
+        "S-rank-ground-sub": 0.3,
+        "S-jitter-hold-sec": 0.3,
+        "S-jitter-hold-sub": 0.3,
+        "S-jitter-decay-sec": 0.3,
+        "S-jitter-decay-sub": 0.3,
+        "S-jitter-ground-sec": 0.3,
+        "S-jitter-ground-sub": 0.3
+      },
+      "d200": {
+        "S-raw-hold-sec": 0.25,
+        "S-raw-hold-sub": 0.25,
+        "S-raw-decay-sec": 0.225,
+        "S-raw-decay-sub": 0.25,
+        "S-raw-ground-sec": 0.25,
+        "S-raw-ground-sub": 0.25,
+        "S-smooth-hold-sec": 0.225,
+        "S-smooth-hold-sub": 0.225,
+        "S-smooth-decay-sec": 0.225,
+        "S-smooth-decay-sub": 0.225,
+        "S-smooth-ground-sec": 0.25,
+        "S-smooth-ground-sub": 0.25,
+        "S-rank-hold-sec": 0.3,
+        "S-rank-hold-sub": 0.3,
+        "S-rank-decay-sec": 0.3,
+        "S-rank-decay-sub": 0.3,
+        "S-rank-ground-sec": 0.3,
+        "S-rank-ground-sub": 0.3,
+        "S-jitter-hold-sec": 0.25,
+        "S-jitter-hold-sub": 0.25,
+        "S-jitter-decay-sec": 0.275,
+        "S-jitter-decay-sub": 0.25,
+        "S-jitter-ground-sec": 0.275,
+        "S-jitter-ground-sub": 0.275
+      },
+      "f200": {
+        "S-raw-hold-sec": 0.3,
+        "S-raw-hold-sub": 0.3,
+        "S-raw-decay-sec": 0.3,
+        "S-raw-decay-sub": 0.3,
+        "S-raw-ground-sec": 0.3,
+        "S-raw-ground-sub": 0.3,
+        "S-smooth-hold-sec": 0.3,
+        "S-smooth-hold-sub": 0.3,
+        "S-smooth-decay-sec": 0.3,
+        "S-smooth-decay-sub": 0.3,
+        "S-smooth-ground-sec": 0.3,
+        "S-smooth-ground-sub": 0.3,
+        "S-rank-hold-sec": 0.3,
+        "S-rank-hold-sub": 0.3,
+        "S-rank-decay-sec": 0.3,
+        "S-rank-decay-sub": 0.3,
+        "S-rank-ground-sec": 0.3,
+        "S-rank-ground-sub": 0.3,
+        "S-jitter-hold-sec": 0.3,
+        "S-jitter-hold-sub": 0.3,
+        "S-jitter-decay-sec": 0.3,
+        "S-jitter-decay-sub": 0.3,
+        "S-jitter-ground-sec": 0.3,
+        "S-jitter-ground-sub": 0.3
+      }
+    }
+  },
+  "_comment_describe": "design 3.4: stop events are gaps of event_s or longer; a change smaller than unchanged is 'unchanged'; the lag needs the crossing to hold for hold_s; Ridge alpha; GroupKFold folds; the time since the last press is capped at since_cap_s.",
+  "describe": {
+    "event_s": 10,
+    "unchanged": 0.05,
+    "hold_s": 1,
+    "ridge_alpha": 1.0,
+    "folds": 5,
+    "since_cap_s": 3600
+  },
+  "_comment_graded": "graded world design 1.3: --world graded --t T copies segments_v4 and sets STRUGGLE's flight_median_ms = m4^(1-t) * m2^t and flight_sigma = (1-t) * s4 + t * s2 (m, s of segments_v4 and segments_v2: 150 / 320 ms, 0.25 / 0.35). t = 0 is v4 and t = 1 is v2 exactly.",
+  "_comment_speed_confound": "confound world design 1.3: --world confound --c C uses the graded segments at base_t (the stall delta = ln(STRUGGLE's median / FLOW's median) = 0.5 ln(320 / 150) in log units) and draws every FLOW and STRUGGLE key interval inside a burst as lognormal(ln(median) + z(tau), sigma) with z(tau) = c * delta * (u + d(floor(tau / 1000 ms))): u ~ N(0, 1) per unit (a session or a pair), d a stationary unit Ornstein-Uhlenbeck series per second with time constant tau_s. The widths c of the steps are in ceiling.steps. Shape world design 1.2: --world factor keeps only u (z = c * delta * u) and --world drift only d (z = c * delta * d(k)); the draws of u and d do not depend on the world.",
+  "speed_confound": {
+    "base_t": 0.5,
+    "tau_s": 300
+  },
+  "_comment_pc_r": "shape world design 1.3: the r-side controls PCrl- (the PC-stall's block value as u_r, u_a = 0.5) and PCrv- (u_r = 0.5 + var_sd * value * e, e standard normal per point, u_a = 0.5), with PCrl0- / PCrv0- at lambda 0. pilot_grid (decisions 10): the PC-stall's grid and 0.4 / 0.5 / 0.6 / 0.8 / 1.0 (at lambda 0.3 the pre-freeze trial left most controls below the band). lam is a table per step, lam.<step>.<level|var>.<candidate> = a value of pc_r.pilot_grid or null (no finite point estimate: never a stop), written by checks.py --apply-pilot from the pilot's L300r part (pc_stall's rule).",
+  "pc_r": {
+    "var_sd": 0.2,
+    "pilot_grid": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.8,
+      1.0
+    ],
+    "lam": {
+      "d100": {
+        "level": {
+          "S-raw-hold-sec": 0.4,
+          "S-raw-hold-sub": 0.4,
+          "S-raw-decay-sec": 0.3,
+          "S-raw-decay-sub": 0.3,
+          "S-raw-ground-sec": 0.3,
+          "S-raw-ground-sub": 0.3,
+          "S-smooth-hold-sec": 0.4,
+          "S-smooth-hold-sub": 0.4,
+          "S-smooth-decay-sec": 0.4,
+          "S-smooth-decay-sub": 0.4,
+          "S-smooth-ground-sec": 0.5,
+          "S-smooth-ground-sub": 0.5,
+          "S-rank-hold-sec": 0.5,
+          "S-rank-hold-sub": 0.5,
+          "S-rank-decay-sec": 0.5,
+          "S-rank-decay-sub": 0.5,
+          "S-rank-ground-sec": 0.5,
+          "S-rank-ground-sub": 0.5,
+          "S-jitter-hold-sec": 0.4,
+          "S-jitter-hold-sub": 0.4,
+          "S-jitter-decay-sec": 0.4,
+          "S-jitter-decay-sub": 0.4,
+          "S-jitter-ground-sec": 0.4,
+          "S-jitter-ground-sub": 0.4
+        },
+        "var": {
+          "S-raw-hold-sec": 0.4,
+          "S-raw-hold-sub": 0.4,
+          "S-raw-decay-sec": 0.4,
+          "S-raw-decay-sub": 0.4,
+          "S-raw-ground-sec": 0.5,
+          "S-raw-ground-sub": 0.5,
+          "S-smooth-hold-sec": 0.5,
+          "S-smooth-hold-sub": 0.5,
+          "S-smooth-decay-sec": 0.4,
+          "S-smooth-decay-sub": 0.5,
+          "S-smooth-ground-sec": 0.6,
+          "S-smooth-ground-sub": 0.6,
+          "S-rank-hold-sec": 0.4,
+          "S-rank-hold-sub": 0.4,
+          "S-rank-decay-sec": 0.4,
+          "S-rank-decay-sub": 0.4,
+          "S-rank-ground-sec": 0.4,
+          "S-rank-ground-sub": 0.4,
+          "S-jitter-hold-sec": 0.5,
+          "S-jitter-hold-sub": 0.5,
+          "S-jitter-decay-sec": 0.5,
+          "S-jitter-decay-sub": 0.5,
+          "S-jitter-ground-sec": 0.5,
+          "S-jitter-ground-sub": 0.5
+        }
+      },
+      "d200": {
+        "level": {
+          "S-raw-hold-sec": 0.15,
+          "S-raw-hold-sub": 0.15,
+          "S-raw-decay-sec": 0.125,
+          "S-raw-decay-sub": 0.125,
+          "S-raw-ground-sec": 0.125,
+          "S-raw-ground-sub": 0.125,
+          "S-smooth-hold-sec": 0.2,
+          "S-smooth-hold-sub": 0.2,
+          "S-smooth-decay-sec": 0.2,
+          "S-smooth-decay-sub": 0.2,
+          "S-smooth-ground-sec": 0.225,
+          "S-smooth-ground-sub": 0.2,
+          "S-rank-hold-sec": 0.25,
+          "S-rank-hold-sub": 0.25,
+          "S-rank-decay-sec": 0.225,
+          "S-rank-decay-sub": 0.225,
+          "S-rank-ground-sec": 0.25,
+          "S-rank-ground-sub": 0.25,
+          "S-jitter-hold-sec": 0.175,
+          "S-jitter-hold-sub": 0.175,
+          "S-jitter-decay-sec": 0.175,
+          "S-jitter-decay-sub": 0.175,
+          "S-jitter-ground-sec": 0.175,
+          "S-jitter-ground-sub": 0.175
+        },
+        "var": {
+          "S-raw-hold-sec": 0.175,
+          "S-raw-hold-sub": 0.175,
+          "S-raw-decay-sec": 0.15,
+          "S-raw-decay-sub": 0.15,
+          "S-raw-ground-sec": 0.2,
+          "S-raw-ground-sub": 0.2,
+          "S-smooth-hold-sec": 0.225,
+          "S-smooth-hold-sub": 0.225,
+          "S-smooth-decay-sec": 0.2,
+          "S-smooth-decay-sub": 0.2,
+          "S-smooth-ground-sec": 0.25,
+          "S-smooth-ground-sub": 0.275,
+          "S-rank-hold-sec": 0.175,
+          "S-rank-hold-sub": 0.175,
+          "S-rank-decay-sec": 0.15,
+          "S-rank-decay-sub": 0.15,
+          "S-rank-ground-sec": 0.175,
+          "S-rank-ground-sub": 0.175,
+          "S-jitter-hold-sec": 0.25,
+          "S-jitter-hold-sub": 0.25,
+          "S-jitter-decay-sec": 0.25,
+          "S-jitter-decay-sub": 0.25,
+          "S-jitter-ground-sec": 0.25,
+          "S-jitter-ground-sub": 0.25
+        }
+      },
+      "f200": {
+        "level": {
+          "S-raw-hold-sec": 0.3,
+          "S-raw-hold-sub": 0.3,
+          "S-raw-decay-sec": 0.25,
+          "S-raw-decay-sub": 0.25,
+          "S-raw-ground-sec": 0.275,
+          "S-raw-ground-sub": 0.275,
+          "S-smooth-hold-sec": 0.4,
+          "S-smooth-hold-sub": 0.4,
+          "S-smooth-decay-sec": 0.4,
+          "S-smooth-decay-sub": 0.4,
+          "S-smooth-ground-sec": 0.4,
+          "S-smooth-ground-sub": 0.4,
+          "S-rank-hold-sec": 0.5,
+          "S-rank-hold-sub": 0.5,
+          "S-rank-decay-sec": 0.4,
+          "S-rank-decay-sub": 0.4,
+          "S-rank-ground-sec": 0.5,
+          "S-rank-ground-sub": 0.5,
+          "S-jitter-hold-sec": 0.3,
+          "S-jitter-hold-sub": 0.3,
+          "S-jitter-decay-sec": 0.3,
+          "S-jitter-decay-sub": 0.3,
+          "S-jitter-ground-sec": 0.4,
+          "S-jitter-ground-sub": 0.4
+        },
+        "var": {
+          "S-raw-hold-sec": 0.3,
+          "S-raw-hold-sub": 0.3,
+          "S-raw-decay-sec": 0.3,
+          "S-raw-decay-sub": 0.3,
+          "S-raw-ground-sec": 0.4,
+          "S-raw-ground-sub": 0.4,
+          "S-smooth-hold-sec": 0.4,
+          "S-smooth-hold-sub": 0.4,
+          "S-smooth-decay-sec": 0.4,
+          "S-smooth-decay-sub": 0.4,
+          "S-smooth-ground-sec": 0.5,
+          "S-smooth-ground-sub": 0.5,
+          "S-rank-hold-sec": 0.3,
+          "S-rank-hold-sub": 0.3,
+          "S-rank-decay-sec": 0.3,
+          "S-rank-decay-sub": 0.3,
+          "S-rank-ground-sec": 0.4,
+          "S-rank-ground-sub": 0.4,
+          "S-jitter-hold-sec": 0.5,
+          "S-jitter-hold-sub": 0.5,
+          "S-jitter-decay-sec": 0.4,
+          "S-jitter-decay-sub": 0.4,
+          "S-jitter-ground-sec": 0.4,
+          "S-jitter-ground-sub": 0.4
+        }
+      }
+    }
+  },
+  "_comment_split": "shape world design 1.4 (from experiments/20261015-rhythm-stage-speed-cause-split/config.json, 6599c5e4): after the main run, on the same rows, L300 only: the base models lr, hgb, lrbin (bins quantile bins of each A_speed column next to its value) with the stage groups in drops dropped; lrbin2 descriptive. The 72 names (candidates, PCs-, PC0-) take every drop; the 96 r-side controls take none / R2 with lr, hgb, lrbin (pcr_drops; with Rall a control's features are its lambda 0 baseline's, since its a does not depend on lambda: cross-review 1). The gate compares the no-drop lr and hgb values with this step's results/<step>/main/e13.json (gate_tol). read: as the cause split; pcr_upper is the upper end of the band of the r-side controls' reading (design 3.3 (j)).",
+  "split": {
+    "bootstrap": 2000,
+    "smoke_bootstrap": 200,
+    "bins": 10,
+    "drops": {
+      "R2": [
+        "r_absdiff",
+        "r_sd"
+      ],
+      "Rall": [
+        "r_mean",
+        "r_sd",
+        "r_p10",
+        "r_p50",
+        "r_p90",
+        "r_ground",
+        "r_absdiff",
+        "r_ac1",
+        "r_end",
+        "r_since_change"
+      ],
+      "A2": [
+        "a_absdiff",
+        "a_sd"
+      ]
+    },
+    "pcr_drops": [
+      "none",
+      "R2"
+    ],
+    "read": {
+      "margin": 0.03,
+      "pc_lower": 0.03,
+      "pc_upper": 0.08,
+      "pcr_upper": 0.08
+    },
+    "versions": {
+      "python": "3.11.9",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "sklearn": "1.9.1",
+      "threadpoolctl": "3.7.0"
+    },
+    "gate_tol": 1e-09
+  },
+  "_comment_compare": "shape world design 1.5: compare.py reads this task's results and the files below (paths from experiments/, checked against their SHA-256 before reading) and writes results/compare/compare.json; pairs maps c to the confound world's step and this task's factor and drift steps.",
+  "compare": {
+    "prev_sha256": {
+      "20261014-rhythm-stage-speed-confound-world/results/ceiling/ceiling.json": "570694dddec156745102466c8f56e7245afcda0d2d7bf624757f94041fdd12db",
+      "20261014-rhythm-stage-speed-confound-world/results/c100/main/summary.json": "42017dda08cc1e5081172f79790e209a0aef70bda5a40245064a2a6970afb433",
+      "20261014-rhythm-stage-speed-confound-world/results/c100/main/e13.json": "a5c1ec8d0e1c1767980ff13a0e7748153bb4619bc99a796edc7d1ea9aa906ba6",
+      "20261014-rhythm-stage-speed-confound-world/results/c200/main/summary.json": "162277c30047be1802088f7a18b895d78af5a69072cbebccbf69c04ecfca0ac3",
+      "20261014-rhythm-stage-speed-confound-world/results/c200/main/e13.json": "168da4faf72ad15a4a956f96242bbb892a290f1c8da84d45a87e0ef91f56766a",
+      "20261015-rhythm-stage-speed-cause-split/results/c100/main/split.json": "489b58a3a748d6544c43f03122465a419dc5589cdb0a46111d052672e4a18a9e",
+      "20261015-rhythm-stage-speed-cause-split/results/c200/main/split.json": "4f36343d17e4c3b43c0c9f6b152ef84eaf00378f8e01dab74ad07ecb6ab25382"
+    },
+    "pairs": {
+      "1": {
+        "confound": "c100",
+        "factor": "f100",
+        "drift": "d100"
+      },
+      "2": {
+        "confound": "c200",
+        "factor": "f200",
+        "drift": "d200"
+      }
+    }
+  }
+}

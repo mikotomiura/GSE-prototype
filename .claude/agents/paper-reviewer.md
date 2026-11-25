@@ -3,7 +3,7 @@ name: paper-reviewer
 description: >
   attack-me Skill（論文のプレ査読）の査読者役・編集者の役（E）・意図の監査役。メインが渡した依頼文と、そこに絶対パスで
   挙げたファイル（対象物・接地の論文の本文テキスト・引き継ぎ）だけを読み、指摘を最後の応答として返す。
-  attack-me の Step 2 から起動する。それ以外の用途では起動しない。
+  attack-me の Step 2 と、paper-write の Step 3b（想定読者の役が節を読み、主張を言い直す）から起動する。それ以外の用途では起動しない。
 tools: Read, Grep, Glob
 model: opus
 ---

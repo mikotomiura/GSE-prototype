@@ -35,6 +35,8 @@ export type S1CardState =
       probe_id: string;
       window_start_ms: number;
       window_end_ms: number;
+      /** いま尋ねている問い（ADR-057）。backend `s1_driver::ProbeStep`。 */
+      step: ProbeStep;
     }
   | {
       kind: "day";
@@ -44,6 +46,17 @@ export type S1CardState =
       /** トレイの終了の補助（ボタンが「答えて終了／答えずに終了」）。 */
       quit_flow: boolean;
     };
+
+/** 段 1 のカードで尋ねている問い（Q3 何をしていたか → 詰まり・熟考・作業なら Q1 摩擦 → Q2 前進・ADR-057）。 */
+export type ProbeStep = "q3" | "q1" | "q2";
+
+/** 答えのキーの状態（backend `S1AnswerKeysView`・`get_s1_answer_keys` / `s1_answer_keys`）。 */
+export interface S1AnswerKeys {
+  /** 登録できていて、キーで答えられる。`false` ならキーの表示を出さない（ボタンで答える）。 */
+  active: boolean;
+  /** 修飾キーの名前（macOS "⌥"・Windows "Ctrl＋Alt"・ADR-057 判断 8）。 */
+  modifier: string;
+}
 
 /** backend `get_s1_mode` と同期。 */
 export interface S1ModeDto {

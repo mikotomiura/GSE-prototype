@@ -1,0 +1,226 @@
+{
+ "verdicts": {
+  "A": {
+   "D-run-hold-sec": "red_detected",
+   "D-all-hold-sec": "red_detected",
+   "S-raw-hold-sec": "red_detected",
+   "S-raw-hold-sub": "red_detected",
+   "S-rank-hold-sec": "red_detected",
+   "S-rank-hold-sub": "red_detected"
+  },
+  "A_speed": {
+   "D-run-hold-sec": "undecidable",
+   "D-all-hold-sec": "undecidable",
+   "S-raw-hold-sec": "undecidable",
+   "S-raw-hold-sub": "undecidable",
+   "S-rank-hold-sec": "undecidable",
+   "S-rank-hold-sub": "undecidable"
+  }
+ },
+ "_controls": {
+  "A": {
+   "PC1": "works",
+   "PCs-D-run-hold-sec": "works",
+   "PCs-D-all-hold-sec": "works",
+   "PCs-S-raw-hold-sec": "works",
+   "PCs-S-raw-hold-sub": "works",
+   "PCs-S-rank-hold-sec": "works",
+   "PCs-S-rank-hold-sub": "works",
+   "PC0-D-run-hold-sec": "baseline_below",
+   "PC0-D-all-hold-sec": "baseline_below",
+   "PC0-S-raw-hold-sec": "baseline_below",
+   "PC0-S-raw-hold-sub": "baseline_below",
+   "PC0-S-rank-hold-sec": "baseline_below",
+   "PC0-S-rank-hold-sub": "baseline_below",
+   "PC-corr": "descriptive"
+  },
+  "A_speed": {
+   "PC1": "works",
+   "PCs-D-run-hold-sec": "fails",
+   "PCs-D-all-hold-sec": "fails",
+   "PCs-S-raw-hold-sec": "fails",
+   "PCs-S-raw-hold-sub": "fails",
+   "PCs-S-rank-hold-sec": "fails",
+   "PCs-S-rank-hold-sub": "fails",
+   "PC0-D-run-hold-sec": "baseline_below",
+   "PC0-D-all-hold-sec": "baseline_below",
+   "PC0-S-raw-hold-sec": "baseline_below",
+   "PC0-S-raw-hold-sub": "baseline_below",
+   "PC0-S-rank-hold-sec": "baseline_below",
+   "PC0-S-rank-hold-sub": "baseline_below",
+   "PC-corr": "descriptive"
+  }
+ },
+ "_detector": {
+  "A": {
+   "auc_base": {
+    "hgb": 0.7442052827566505,
+    "lr": 0.7336049920491369
+   },
+   "ceiling_kinds": [],
+   "pc1_ok": true,
+   "null_all_73_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "detector": {
+    "D-run-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "D-all-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sec": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sub": {
+     "detector_ok": true,
+     "reasons": [],
+     "pcs_ok": true,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    }
+   },
+   "pilot_stop_S": null
+  },
+  "A_speed": {
+   "auc_base": {
+    "hgb": 0.974778039893171,
+    "lr": 0.8880957873207296
+   },
+   "ceiling_kinds": [
+    "hgb"
+   ],
+   "pc1_ok": true,
+   "null_all_73_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "detector": {
+    "D-run-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "D-all-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-raw-hold-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sec": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    },
+    "S-rank-hold-sub": {
+     "detector_ok": false,
+     "reasons": [
+      "weak_stall_pc"
+     ],
+     "pcs_ok": false,
+     "pc0_below": true,
+     "null_ok": true,
+     "stop_path": false
+    }
+   },
+   "pilot_stop_S": null
+  }
+ },
+ "auc": {
+  "A": {
+   "hgb": 0.7442052827566505,
+   "lr": 0.7336049920491369
+  },
+  "A_speed": {
+   "hgb": 0.974778039893171,
+   "lr": 0.8880957873207296
+  }
+ },
+ "speed_minus_A": {
+  "hgb": {
+   "diff": 0.23057275713652048,
+   "ci95": [
+    0.21631699068478136,
+    0.24444049991712455
+   ]
+  },
+  "lr": {
+   "diff": 0.1544907952715927,
+   "ci95": [
+    0.14006678838712572,
+    0.16790072779696477
+   ]
+  }
+ },
+ "_step": {
+  "step": "f200",
+  "world": "factor",
+  "c": 2.0
+ },
+ "_wall_s": 3667.921466112137
+}

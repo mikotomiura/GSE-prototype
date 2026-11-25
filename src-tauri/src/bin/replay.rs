@@ -4469,6 +4469,7 @@ fn load_calibration_session(session_path: &PathBuf) -> Result<SessionData, Strin
     // producer は q を 1..=5 に clamp するが reader は信頼せず再検証する (security-checker MEDIUM)。
     // 手編集/破損 NDJSON で範囲外 q が集計値を静かに歪めるのを防ぐ。
     let mut out_of_range_lines: u64 = 0;
+    let mut answered_without_scales_lines: u64 = 0;
 
     for (lineno, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
@@ -4517,13 +4518,22 @@ fn load_calibration_session(session_path: &PathBuf) -> Result<SessionData, Strin
                     unknown_enum_lines += 1;
                     continue;
                 };
-                // 回答済みは q1/q2 が 1..=5 必須 (producer 不変条件)。範囲外/欠落は破損とみなし skip。
+                // 回答済みの q は 1..=5。範囲外・q1 なしの q2 は破損とみなし skip。
                 // skip 回答 (answered=false) は q=None が正常なので検証しない。
+                // ★ 段 1 の 3 名の版は answered でも q が null になりうる（Q3 の選択肢によって Q1・Q2 を
+                //   聞かない・答える前に閉じた・ADR-057 D3）。破損ではないが較正の点にならないので、
+                //   別に数えて較正には入れない（較正の回答率・GATE の意味を変えない）。
                 if answered {
-                    let q_valid = matches!(q1_friction, Some(q) if (1..=5).contains(&q))
-                        && matches!(q2_progress, Some(q) if (1..=5).contains(&q));
-                    if !q_valid {
+                    let in_range = |q: Option<u8>| q.is_none_or(|v| (1..=5).contains(&v));
+                    if !in_range(q1_friction)
+                        || !in_range(q2_progress)
+                        || (q1_friction.is_none() && q2_progress.is_some())
+                    {
                         out_of_range_lines += 1;
+                        continue;
+                    }
+                    if q1_friction.is_none() || q2_progress.is_none() {
+                        answered_without_scales_lines += 1;
                         continue;
                     }
                 }
@@ -4616,6 +4626,7 @@ fn load_calibration_session(session_path: &PathBuf) -> Result<SessionData, Strin
         skipped_parse: parse_failed_lines,
         skipped_unknown_enum: unknown_enum_lines,
         skipped_out_of_range: out_of_range_lines,
+        skipped_answered_without_scales: answered_without_scales_lines,
     })
 }
 
@@ -8367,6 +8378,34 @@ not json\n";
             load_calibration_session(&fixture_path("calib_subject_s1.ndjson")).expect("load s1");
         assert_eq!(s1.vignettes.len(), 8, "s1 carries the 8 vignettes");
         assert_eq!(s1.probes.len(), 1);
+    }
+
+    /// 段 1 の 3 名の版の answered で q が欠けた行（ADR-057 D3）は破損ではなく、較正の点にもしない。
+    /// ★ q のそろった answered と skip は今どおり、範囲外と q1 の無い q2 は今どおり破損。
+    #[test]
+    fn answered_without_scales_is_counted_apart_from_corruption() {
+        let row = |id: &str, q1: &str, q2: &str, answered: bool, skip: &str| {
+            format!(
+                r#"{{"type":"realtime_label","probe_id":"{id}","source":"random_probe","q1_friction":{q1},"q2_progress":{q2},"answered":{answered},"skip_reason":"{skip}","latency_ms":1,"analysis_window_start_ms":0,"analysis_window_end_ms":1,"ts":5}}"#
+            )
+        };
+        let lines = [
+            row("full", "4", "2", true, "none"),
+            row("none", "null", "null", true, "none"),
+            row("part", "3", "null", true, "none"),
+            row("skip", "null", "null", false, "dismissed"),
+            row("bad", "9", "2", true, "none"),
+            row("q2only", "null", "2", true, "none"),
+        ];
+        let dir = std::env::temp_dir().join(format!("gse-replay-noscales-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.ndjson");
+        std::fs::write(&path, lines.join("\n") + "\n").unwrap();
+        let s = load_calibration_session(&path).expect("load");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(s.probes.len(), 2, "full と skip だけが較正の点");
+        assert_eq!(s.skipped_answered_without_scales, 2);
+        assert_eq!(s.skipped_out_of_range, 2);
     }
 
     /// 3 セッション (s1/s2 = 較正・s3 = 評価) を `--calibration` 相当で通し、
