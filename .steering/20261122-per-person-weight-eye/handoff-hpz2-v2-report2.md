@@ -2,7 +2,7 @@
 
 > 作成: 2026-11-26（Mac のセッション）。v2 の実験は `experiments/20261126-per-person-weight-eye-v2/`。一次は v2 の `conditions.md`・`notes.md` と `decisions.md`（判断 47〜49）。この手順は回すだけで、コードは直さない。赤・例外・見積もり超過が出たらそこで止めて、出力をそのまま研究者に返す。
 >
-> 2 回に分けて頼む。**今回は「前半」だけ**を行う。後半は、Mac が自分の 95% 点を push した後に、研究者が後半の入口の文で頼む。
+> 前半と後半に分かれる。後半は Mac の合図のファイル（`signals/mac-quant-null1.ready`）を待ってから始めるので、前半と後半を続けて頼んでもよい。
 
 ## 入口の文（HP Z2 の Claude Code に）
 
@@ -58,9 +58,16 @@ GSE-prototype の枝 exp/gse-per-person-weight-eye の .steering/20261122-per-pe
 
 ## 後半（Mac の `results/report/d6_local_null1.json` が push されてから）
 
-1. 最新にして、Mac の 95% 点があるかを確かめる（無ければ止めて研究者に返す。待たない）:
+1. Mac の合図のファイル `signals/mac-quant-null1.ready` が origin に来るのを待ってから最新にする。合図は、Mac が 95% 点を push したのと同じ push で入る（中にデータのコミットと時刻が書いてある）。前半に続けて頼まれたときも、この待ちで止まる。2 分ごとに fetch し、3 時間で来なければ止めて研究者に返す（Claude Code の bash の時間切れを避けるため、バックグラウンドで回すか 10 分ずつ区切って回す）:
    ```bash
-   cd <worktree> && git pull --ff-only && cd experiments/20261126-per-person-weight-eye-v2
+   cd <worktree>
+   B=exp/gse-per-person-weight-eye; F=experiments/20261126-per-person-weight-eye-v2/signals/mac-quant-null1.ready
+   for i in $(seq 1 90); do
+     git fetch -q origin "$B" && git cat-file -e "origin/$B:$F" 2>/dev/null && { echo "合図あり"; break; }
+     sleep 120
+   done
+   git cat-file -e "origin/$B:$F" || { echo "3 時間で合図が来なかった（止める）"; exit 1; }
+   git pull --ff-only && cat "$F" && cd experiments/20261126-per-person-weight-eye-v2
    ls results/report/d6_local_null1.json
    ```
 2. 両機の 95% 点から閾値 c と率を出す:
