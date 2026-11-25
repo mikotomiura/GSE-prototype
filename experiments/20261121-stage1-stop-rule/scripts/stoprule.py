@@ -1,4 +1,4 @@
-"""段 1 の終了判定（conditions.md K1〜K4）。件数・率・分布の要約・区間の幅の見込み・判定だけを出す。
+"""段 1 の終了判定（conditions.md K1〜K4・第 2 版）。件数・率・分布の要約・区間の幅の見込み・判定だけを出す。
 
 usage:
   stoprule.py count  --records DIR --work DIR --replay PATH --utc-offset-secs N --out JSON [--values JSON]
@@ -22,7 +22,7 @@ CAND = os.path.join(EXP, "../20261103-stall-candidates-c1c2c6")
 BUILD = os.path.join(EXP, "../20261102-stall-decomposition/o1")
 DAYSIM = os.path.join(EXP, "../20261103-mhd-dryrun-v2/scripts")
 
-# 変異（check_mutations.py だけが設定する）: strat / unanswered / cutoff0 / nomax / gt
+# 変異（check_mutations.py だけが設定する）: strat / unanswered / cutoff0 / early / gt / nowindow
 MUTATE = os.environ.get("STOPRULE_MUTATE") or None
 
 DAY_CUTOFF_HOUR = 4          # eh3::DAY_CUTOFF_HOUR
@@ -30,8 +30,9 @@ DAY_SECS = 86_400
 STUCK = ("stuck",)           # S1-A3 が決めるまでの既定（引数で替える）
 EXCLUDED = ("cannot_answer",)
 STRATA = ("random", "low_operation_end", "resumption")
-VALUE_KEYS = ("min_days", "min_stuck", "min_nonstuck", "min_in_c1", "min_in_c2", "min_assigned_days",
-              "target_slope_width", "auc", "sd_day", "rho_day", "max_days")
+# 第 2 版（判断 8）: 区間の幅は判定に入れない（記述）。auc・sd_day・rho_day は幅の見込みを出すときだけ使う
+VALUE_KEYS = ("min_days", "min_stuck", "min_nonstuck", "min_in_c1", "min_in_c2", "min_assigned_days", "max_days")
+WIDTH_KEYS = ("auc", "sd_day", "rho_day")
 
 
 def local_day(t_ms, utc_offset_secs):
@@ -97,8 +98,12 @@ def quartiles(xs):
     return [q(0.25), q(0.5), q(0.75)]
 
 
-def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED):
-    """records: read_record の列。episodes: 同じ順の {"C1": [(a, b)], "C2": [(a, b)]}（ms・閉区間）。"""
+def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, max_days=None):
+    """records: read_record の列。episodes: 同じ順の {"C1": [(a, b)], "C2": [(a, b)]}（ms・閉区間）。
+
+    max_days があれば、最初の日から max_days 日（両端を含む）の窓の中の回答と割付だけを数える
+    （全員を同じ期間で比べる・判断 8）。経過日数は窓で切らずに数える（最長の期間に達したかを見るため）。
+    """
     by_stratum = {s: 0 for s in STRATA}
     ans_by_stratum = {s: 0 for s in STRATA}
     n_unanswered_random = 0
@@ -108,10 +113,17 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED):
     all_days = set()
     hm_last = {}
     n_eps = {"C1": 0, "C2": 0}
-    for rec, eps in zip(records, episodes):
+    for rec in records:
         for t in rec["times"]:
             all_days.add(local_day(t, utc_offset_secs))
+    first = min(all_days) if all_days else None
+
+    def in_window(d):
+        return max_days is None or MUTATE == "nowindow" or (first is not None and d - first < max_days)
+    for rec, eps in zip(records, episodes):
         for d, (t, a) in rec["hm"].items():
+            if not in_window(d):
+                continue
             if d not in hm_last or t >= hm_last[d][0]:
                 hm_last[d] = (t, a)
         for st in rec["probes"].values():
@@ -123,6 +135,8 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED):
             if pid in rec["debug_ids"] or pid not in rec["probes"]:
                 continue
             st = rec["probes"][pid]
+            if not in_window(local_day(t_end, utc_offset_secs)):
+                continue
             if not answered and MUTATE != "unanswered":
                 if st == "random":
                     n_unanswered_random += 1
@@ -152,6 +166,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED):
     elapsed = (max(all_days) - min(all_days) + 1) if all_days else 0
     return {
         "elapsed_days": elapsed,
+        "window_days": max_days,
         "observed_days": obs_days,
         "probes_by_stratum": by_stratum,
         "answered_by_stratum": ans_by_stratum,
@@ -179,9 +194,15 @@ def check_values(v):
         raise ValueError("値が足りない: " + ",".join(missing))
 
 
-def verdict(c, width, v):
-    """c: count の出力・width: 今の観測日での傾きの区間の幅の見込み（None は見込めない）・v: 値。"""
+def verdict(c, v):
+    """c: count の出力（max_days の窓で数えたもの）・v: 値。
+
+    第 2 版（判断 8）: 全員を最長の期間まで続け、早くは終わらない。最長の期間に達したら、
+    下限をすべて満たせば「判定できる」、そうでなければ「判定不能」。区間の幅は判定に入れない。
+    """
     check_values(v)
+    if c.get("window_days") != v["max_days"]:
+        raise ValueError("count を max_days の窓で数えていない")
 
     def ge(x, lo):
         return x > lo if MUTATE == "gt" else x >= lo
@@ -192,14 +213,13 @@ def verdict(c, width, v):
         "in_C1": ge(c["in_C1"]["answered"], v["min_in_c1"]),
         "in_C2": ge(c["in_C2"]["answered"], v["min_in_c2"]),
         "assigned_days": ge(c["assigned_days"], v["min_assigned_days"]),
-        "width": width is not None and width <= v["target_slope_width"],
     }
-    if all(need.values()):
-        out = "reached"        # 届いた
-    elif MUTATE != "nomax" and c["elapsed_days"] >= v["max_days"]:
-        out = "undecidable"    # 判定不能
+    if c["elapsed_days"] < v["max_days"] and not (MUTATE == "early" and all(need.values())):
+        out = "continue"       # 続ける（下限を満たしていても早くは終わらない）
+    elif all(need.values()):
+        out = "decidable"      # 判定できる
     else:
-        out = "continue"       # 続ける
+        out = "undecidable"    # 判定不能
     return out, need
 
 
@@ -265,19 +285,20 @@ def cmd_count(a):
         sys.exit("記録の写しが無い")
     recs = [read_record(p) for p in paths]
     eps, selfcheck = episodes_from_records(paths, a.work, a.replay)
-    c = count(recs, eps, a.utc_offset_secs, tuple(a.stuck.split(",")), tuple(a.excluded.split(",")))
-    c["files"] = len(paths)
-    c["c0_selfcheck"] = selfcheck
+    v = None
     if a.values:
         v = json.load(open(a.values))
         check_values(v)
-        w = None
-        if c["observed_days"] and c["pi_stuck"] is not None:
-            sw = slope_width(c["observed_days"], v["auc"], c["pi_stuck"], c["lambda_per_observed_day"],
-                             v["sd_day"], v["rho_day"], a.reps, a.seed, 0)
-            w = sw["percentile"][1] if sw and sw["percentile"] else None
-            c["width_now"] = sw
-        c["verdict"], c["verdict_parts"] = verdict(c, w, v)
+    c = count(recs, eps, a.utc_offset_secs, tuple(a.stuck.split(",")), tuple(a.excluded.split(",")),
+              max_days=v["max_days"] if v else None)
+    c["files"] = len(paths)
+    c["c0_selfcheck"] = selfcheck
+    if v:
+        # 幅は記述だけ（判定に入れない・判断 8）。値に AUC と日の揺れがあるときだけ見込む
+        if all(k in v for k in WIDTH_KEYS) and c["observed_days"] and c["pi_stuck"] is not None:
+            c["width_now"] = slope_width(c["observed_days"], v["auc"], c["pi_stuck"], c["lambda_per_observed_day"],
+                                         v["sd_day"], v["rho_day"], a.reps, a.seed, 0)
+        c["verdict"], c["verdict_parts"] = verdict(c, v)
         c["values"] = v
     json.dump(c, open(a.out, "w"), ensure_ascii=False, indent=1)
     print(json.dumps({k: c[k] for k in ("files", "elapsed_days", "observed_days", "random_answered", "verdict")

@@ -6,4 +6,4 @@
 - `RECORDS_DIR=... UTC_OFFSET_SECS=32400 [VALUES_JSON=...] bash run.sh records` —— 記録の件数（値があれば判定）
 - `COUNTS_JSON=... bash run.sh need` —— 件数の要約から要る日数の見込み
 
-判定は「届いた（reached）・続ける（continue）・判定不能（undecidable）」の 3 つ。管理シートに載せるのは件数と判定だけで、計算はシートでしない。
+判定は「続ける（continue）・判定できる（decidable）・判定不能（undecidable）」の 3 つ（第 2 版・conditions.md K4′。全員を最長の期間まで続け、達した時点で下限を見る。第 1 版の「届いた（reached）」は無くした）。管理シートに載せるのは件数と判定だけで、計算はシートでしない。

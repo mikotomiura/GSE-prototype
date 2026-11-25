@@ -61,18 +61,18 @@ def make(n_days, per_day, stuck_every, late_on_off=0, extra=None):
     return lines + (extra or [])
 
 
-def run_count(lines_list, episodes):
+def run_count(lines_list, episodes, max_days=None):
     tmp = tempfile.mkdtemp()
     recs = []
     for i, lines in enumerate(lines_list):
         p = os.path.join(tmp, "r%03d.ndjson" % i)
         write(p, lines)
         recs.append(sr.read_record(p))
-    return sr.count(recs, episodes, JST)
+    return sr.count(recs, episodes, JST, max_days=max_days)
 
 
 VALUES = {"min_days": 10, "min_stuck": 10, "min_nonstuck": 10, "min_in_c1": 3, "min_in_c2": 3,
-          "min_assigned_days": 4, "target_slope_width": 2.0, "auc": 0.7, "sd_day": 0.5, "rho_day": 0.3, "max_days": 40}
+          "min_assigned_days": 4, "max_days": 20}
 
 
 def main():
@@ -118,51 +118,60 @@ def main():
     c = run_count([lines], [{"C1": [], "C2": []}])
     check("割付の日数は日ごとの最後の行の on・off", c["assigned_days"] == 1)
 
-    # ---- 判定の陽性対照
+    # ---- 判定の陽性対照（第 2 版: 最長の期間まで続け、達したら判定できる／判定不能）
+    M = VALUES["max_days"]
     eps = {"C1": [], "C2": []}
-    full = make(20, 3, 3, late_on_off=6)
+    full = make(M + 5, 3, 3, late_on_off=6)        # 最長の期間より 5 日長い記録
     # 停滞の中の回答: 各日の最初の 2 件を C1・C2 に入れる
-    for d in range(20):
+    for d in range(M + 5):
         t0 = day_start_ms(d) + 6 * H
         eps["C1"].append((t0 - 2000, t0))
         eps["C2"].append((t0 + 30 * 60_000 - 2000, t0 + 30 * 60_000))
-    c = run_count([full], [eps])
-    check("足りる記録の数（観測日 20・回答 60）", c["observed_days"] == 20 and c["random_answered"] == 60)
-    v, parts = sr.verdict(c, 1.5, VALUES)
-    check("足りる記録で「届いた」", v == "reached")
-    v, _ = sr.verdict(c, 2.5, VALUES)
-    check("幅が目標より広ければ届かない（期間内なので続ける）", v == "continue")
+    c = run_count([full], [eps], max_days=M)
+    check("窓の中だけ数える（観測日 20・回答 60・割付は窓の中の 1 日）",
+          c["observed_days"] == M and c["random_answered"] == 3 * M and c["assigned_days"] == 1)
+    check("経過日数は窓で切らない", c["elapsed_days"] == M + 5)
+    v, parts = sr.verdict(c, dict(VALUES, min_assigned_days=1))
+    check("足りる記録が最長の期間に達して「判定できる」", v == "decidable")
+    v, _ = sr.verdict(c, VALUES)
+    check("割付の日数が足りなければ「判定不能」", v == "undecidable")
+
+    early = run_count([make(M - 1, 3, 3, late_on_off=6)], [eps], max_days=M)
+    check("下限は満たす（期間の手前）", early["observed_days"] == M - 1 and early["random_stuck"] >= 10)
+    v, _ = sr.verdict(early, VALUES)
+    check("下限を満たしても最長の期間の手前は「続ける」（早く終わらない）", v == "continue")
 
     short = make(5, 1, 2)
-    short_c = run_count([short], [{"C1": [], "C2": []}])
-    short_c["elapsed_days"] = 41   # 期間を過ぎた
-    v, _ = sr.verdict(short_c, None, VALUES)
-    check("足りないまま最長の期間を過ぎた記録で「判定不能」", v == "undecidable")
-    short_c["elapsed_days"] = 5
-    v, _ = sr.verdict(short_c, None, VALUES)
+    short_c = run_count([short], [{"C1": [], "C2": []}], max_days=M)
+    v, _ = sr.verdict(short_c, VALUES)
     check("足りず期間内の記録で「続ける」", v == "continue")
+    short_c["elapsed_days"] = M    # 最長の期間ちょうど
+    v, _ = sr.verdict(short_c, VALUES)
+    check("足りないまま最長の期間ちょうどで「判定不能」", v == "undecidable")
 
     # 下限ちょうど（≥ で届く）
     edge = dict(c)
     edge["observed_days"] = VALUES["min_days"]
-    v, _ = sr.verdict(edge, 1.5, VALUES)
-    check("下限ちょうどで届く", v == "reached")
-    # 最長の期間ちょうどで判定不能
-    short_c["elapsed_days"] = VALUES["max_days"]
-    v, _ = sr.verdict(short_c, None, VALUES)
-    check("最長の期間ちょうどで判定不能", v == "undecidable")
+    v, _ = sr.verdict(edge, dict(VALUES, min_assigned_days=1))
+    check("下限ちょうどで判定できる", v == "decidable")
 
-    # 値が欠けていれば止める
+    # 値が欠けていれば止める・窓で数えていなければ止める
     try:
-        sr.verdict(c, 1.5, {k: v for k, v in VALUES.items() if k != "max_days"})
+        sr.verdict(c, {k: x for k, x in VALUES.items() if k != "max_days"})
         check("値の欠けで止める", False)
     except ValueError:
         check("値の欠けで止める", True)
+    try:
+        sr.verdict(run_count([full], [eps]), VALUES)
+        check("窓なしの数えで止める", False)
+    except ValueError:
+        check("窓なしの数えで止める", True)
 
     # 出力に日付・時刻・日ごとの値を含まない（キーの集合で縛る）
     allowed = {"elapsed_days", "observed_days", "probes_by_stratum", "answered_by_stratum", "random_unanswered",
                "random_answered", "random_stuck", "random_nonstuck", "random_excluded", "in_C1", "in_C2",
-               "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day", "pi_stuck", "rules"}
+               "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day", "pi_stuck", "rules",
+               "window_days"}
     check("出力のキーは件数・率・要約だけ", set(c) == allowed)
 
     print("SELFTEST", "FAIL" if FAILS else "PASS", "mutate=%s" % sr.MUTATE)
