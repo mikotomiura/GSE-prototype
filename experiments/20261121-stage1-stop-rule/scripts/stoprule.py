@@ -22,7 +22,7 @@ CAND = os.path.join(EXP, "../20261103-stall-candidates-c1c2c6")
 BUILD = os.path.join(EXP, "../20261102-stall-decomposition/o1")
 DAYSIM = os.path.join(EXP, "../20261103-mhd-dryrun-v2/scripts")
 
-# 変異（check_mutations.py だけが設定する）: strat / unanswered / cutoff0 / early / gt / nowindow
+# 変異（check_mutations.py だけが設定する）: strat / unanswered / cutoff0 / early / gt / nowindow / crossday
 MUTATE = os.environ.get("STOPRULE_MUTATE") or None
 
 DAY_CUTOFF_HOUR = 4          # eh3::DAY_CUTOFF_HOUR
@@ -73,7 +73,8 @@ def read_record(path):
                 if o.get("debug") is True:
                     debug_ids.add(o.get("probe_id"))
                     continue
-                labels.append((o.get("probe_id"), o["category"], o["answered"] is True, o["recall_window_end_ms"]))
+                labels.append((o.get("probe_id"), o["category"], o["answered"] is True, o["recall_window_end_ms"],
+                               o["recall_window_start_ms"]))
             elif ty == "handmark_day":
                 d = o["day"]
                 if d not in hm or o["t"] >= hm[d][0]:
@@ -108,6 +109,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
     ans_by_stratum = {s: 0 for s in STRATA}
     n_unanswered_random = 0
     n_random_ans = n_stuck = n_nonstuck = n_excluded = 0
+    n_cross_day = 0
     in_c = {"C1": [0, 0, 0], "C2": [0, 0, 0]}   # [回答, 詰まり, 詰まりでない]
     per_day = {}
     all_days = set()
@@ -131,7 +133,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         spans = {k: sorted(v) for k, v in eps.items()}
         for k in n_eps:
             n_eps[k] += len(spans.get(k, []))
-        for pid, cat, answered, t_end in rec["labels"]:
+        for pid, cat, answered, t_end, t_start in rec["labels"]:
             if pid in rec["debug_ids"] or pid not in rec["probes"]:
                 continue
             st = rec["probes"][pid]
@@ -140,6 +142,12 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
             if not answered and MUTATE != "unanswered":
                 if st == "random":
                     n_unanswered_random += 1
+                continue
+            # 窓が日の切れ目をまたぐ回答は数えない（S1-D1・ADR-010 D4・判断 17）
+            if (local_day(t_start, utc_offset_secs) != local_day(t_end, utc_offset_secs)
+                    and MUTATE != "crossday"):
+                if st == "random":
+                    n_cross_day += 1
                 continue
             ans_by_stratum[st] += 1
             if st != "random" and MUTATE != "strat":
@@ -175,6 +183,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         "random_stuck": n_stuck,
         "random_nonstuck": n_nonstuck,
         "random_excluded": n_excluded,
+        "random_cross_day": n_cross_day,
         "in_C1": dict(zip(("answered", "stuck", "nonstuck"), in_c["C1"])),
         "in_C2": dict(zip(("answered", "stuck", "nonstuck"), in_c["C2"])),
         "episodes": n_eps,
@@ -183,7 +192,8 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         "lambda_per_observed_day": (n_random_ans / obs_days) if obs_days else None,
         "pi_stuck": (n_stuck / (n_stuck + n_nonstuck)) if (n_stuck + n_nonstuck) else None,
         "rules": {"stuck": list(stuck), "excluded": list(excluded), "day_cutoff_hour": DAY_CUTOFF_HOUR,
-                  "in_stall": "recall_window_end_ms in [onset, resume or interval end]"},
+                  "in_stall": "recall_window_end_ms in [onset, resume or interval end]",
+                  "cross_day": "window start and end on different local days are not counted"},
     }
 
 

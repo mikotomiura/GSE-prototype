@@ -98,6 +98,14 @@ def main():
     c = run_count([lines], [{"C1": [], "C2": []}])
     check("4:00 の区切りで 2 日に分かれる", c["observed_days"] == 2)
 
+    # ---- 窓が日の切れ目をまたぐ回答は数えない（S1-D1）
+    lines = [{"type": "meta", "session_start": t4, "s1_mode": "marker"}]
+    lines += probe("c", t4 + 10_000, "random", "stuck")       # 窓 [3:59:39, 4:00:09] → またぐ
+    lines += probe("d", t4 + 40_000, "random", "stuck")       # 窓 [4:00:09, 4:00:39] → またがない
+    c = run_count([lines], [{"C1": [], "C2": []}])
+    check("日をまたぐ窓は数えず、件数を別に出す",
+          c["random_answered"] == 1 and c["random_cross_day"] == 1 and c["random_stuck"] == 1)
+
     # ---- 停滞の中の対応（閉区間の境の内と外）
     tt = day_start_ms(0) + 6 * H
     lines = [{"type": "meta", "session_start": tt, "s1_mode": "marker"}]
@@ -171,7 +179,7 @@ def main():
     allowed = {"elapsed_days", "observed_days", "probes_by_stratum", "answered_by_stratum", "random_unanswered",
                "random_answered", "random_stuck", "random_nonstuck", "random_excluded", "in_C1", "in_C2",
                "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day", "pi_stuck", "rules",
-               "window_days"}
+               "window_days", "random_cross_day"}
     check("出力のキーは件数・率・要約だけ", set(c) == allowed)
 
     print("SELFTEST", "FAIL" if FAILS else "PASS", "mutate=%s" % sr.MUTATE)
