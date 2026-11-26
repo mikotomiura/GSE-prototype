@@ -1,0 +1,14 @@
+{
+ "head": "388411ca0cca1c0438379c2c5174b263fb725543",
+ "dirty": "",
+ "seed": 2026112601,
+ "python": "3.14.4",
+ "numpy": "2.5.2",
+ "sha256": {
+  "experiments/20261126-stage1-resampling-coverage/scripts/coverage.py": "f0dd5790077a65cc1ee7239d2d341c32fcf937073bc1414866bb216835d2a37f",
+  "experiments/20261126-stage1-resampling-coverage/conditions.md": "f2dc666130303e2d4ea3af7a2c5d826a1c06ac9d717af5859c3b2bda7441ce78",
+  "experiments/20261126-stage1-resampling-coverage/SEED": "c12f209670fbb8de02a3382d231f77dbd79e2e1ef044153c38bfed21926eaaf9",
+  "experiments/20261126-stage1-resampling-coverage/run.sh": "e5a62cc1f79bf9f5d208347f5c7c218cd86c7095dd3033c9754275e1970f6d24",
+  "experiments/20261103-mhd-dryrun-v2/scripts/daysim.py": "1c084992a2394340062e7bb6486b07f2594383382b968bd8076fdcca9b39a8e5"
+ }
+}
