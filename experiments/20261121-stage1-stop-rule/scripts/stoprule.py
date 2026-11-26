@@ -25,6 +25,7 @@ DAYSIM = os.path.join(EXP, "../20261103-mhd-dryrun-v2/scripts")
 
 # 変異（check_mutations.py だけが設定する）: strat / unanswered / cutoff0 / early / gt / nowindow / crossday / nolatcap
 #   / endpoint（停滞の中の対応を窓の終わりに戻す）/ noclock（時計の狂った記録を除かない）
+#   / noobs（窓が観測区間に収まらない回答を除かない）
 MUTATE = os.environ.get("STOPRULE_MUTATE") or None
 
 DAY_CUTOFF_HOUR = 4          # eh3::DAY_CUTOFF_HOUR
@@ -146,6 +147,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
     n_random_ans = n_stuck = n_nonstuck = n_excluded = 0
     n_cross_day = 0
     n_late = 0
+    n_unobserved = 0
     in_c = {"C1": [0, 0, 0], "C2": [0, 0, 0]}   # [回答, 詰まり, 詰まりでない]
     per_day = {}
     all_days = set()
@@ -166,7 +168,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
                 hm_last[d] = (t, a)
         for st in rec["probes"].values():
             by_stratum[st] += 1
-        spans = {k: sorted(v) for k, v in eps.items()}
+        spans = {k: sorted(v) for k, v in eps.items() if k != "obs"}
         for k in n_eps:
             n_eps[k] += len(spans.get(k, []))
         for pid, cat, answered, t_end, t_start, latency in rec["labels"]:
@@ -189,6 +191,13 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
                     and MUTATE != "crossday"):
                 if st == "random":
                     n_cross_day += 1
+                continue
+            # 窓が 1 つの観測区間に収まらない回答は時点不明として数えない（S1-B2・判断 23）
+            obs = eps.get("obs")
+            if (obs is not None and MUTATE != "noobs"
+                    and not any(x <= t_start and t_end <= y for x, y in obs)):
+                if st == "random":
+                    n_unobserved += 1
                 continue
             ans_by_stratum[st] += 1
             if st != "random" and MUTATE != "strat":
@@ -226,6 +235,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         "random_excluded": n_excluded,
         "random_cross_day": n_cross_day,
         "random_over_latency_cap": n_late,
+        "random_window_unobserved": n_unobserved,
         "in_C1": dict(zip(("answered", "stuck", "nonstuck"), in_c["C1"])),
         "in_C2": dict(zip(("answered", "stuck", "nonstuck"), in_c["C2"])),
         "episodes": n_eps,
@@ -238,7 +248,8 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
                                "end": "recall_window_end_ms in [onset, resume or interval end]",
                                "contain": "whole recall window inside one [onset, resume or interval end]"}[rule],
                   "cross_day": "window start and end on different local days are not counted",
-                  "latency_cap_ms": LATENCY_CAP_MS},
+                  "latency_cap_ms": LATENCY_CAP_MS,
+                  "unobserved": "window not inside one observed interval is not counted"},
     }
 
 
@@ -328,6 +339,7 @@ def episodes_from_records(paths, work, replay):
                 end = r["o"] + r["len"] if r["len"] is not None else iv[1]
                 sp.append((r["s"], end))
             eps[k] = sp
+        eps["obs"] = list(dy.intervals)
         out.append(eps)
     if selfcheck["mismatch_files"]:
         sys.exit("検出器の C0 が gse-replay の onsets と一致しない記録がある " + json.dumps(selfcheck))

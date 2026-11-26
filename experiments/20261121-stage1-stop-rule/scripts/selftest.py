@@ -137,6 +137,15 @@ def main():
     check("丸ごとの規則: 窓の始まりちょうどからなら中・1 ms 遅れれば外",
           cc["in_C1"]["answered"] == 1 and cc["in_C2"]["answered"] == 0)
 
+    # ---- 時点不明（S1-B2・判断 23）: 窓が 1 つの観測区間に丸ごと入らない回答は数えない
+    c = run_count([lines], [{"C1": [], "C2": [], "obs": [(tt - 31_000, tt + 10 * H)]}])
+    check("窓の始まりちょうどから観測されていれば数える", c["random_answered"] == 2 and c["random_window_unobserved"] == 0)
+    c = run_count([lines], [{"C1": [], "C2": [], "obs": [(tt - 30_999, tt + 10 * H)]}])
+    check("窓の始まりが観測区間の 1 ms 前なら時点不明で数えない",
+          c["random_answered"] == 1 and c["random_window_unobserved"] == 1)
+    c = run_count([lines], [{"C1": [], "C2": [], "obs": [(tt - 40_000, tt - 20_000), (tt - 19_000, tt + 10 * H)]}])
+    check("窓の中に観測の空きがあれば時点不明", c["random_window_unobserved"] == 1)
+
     # ---- 時計の狂った起動で始まった記録は名前で除く（PR #435 の判断 3）
     check("1976 年・1970 年の名前は除き、2026 年は残す",
           sr.clock_excluded("gse_o1_19760331_150024.ndjson") and sr.clock_excluded("gse_s1_19700101_090000.ndjson")
@@ -205,7 +214,7 @@ def main():
     allowed = {"elapsed_days", "observed_days", "probes_by_stratum", "answered_by_stratum", "random_unanswered",
                "random_answered", "random_stuck", "random_nonstuck", "random_excluded", "in_C1", "in_C2",
                "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day", "pi_stuck", "rules",
-               "window_days", "random_cross_day", "random_over_latency_cap"}
+               "window_days", "random_cross_day", "random_over_latency_cap", "random_window_unobserved"}
     check("出力のキーは件数・率・要約だけ", set(c) == allowed)
 
     print("SELFTEST", "FAIL" if FAILS else "PASS", "mutate=%s" % sr.MUTATE)
