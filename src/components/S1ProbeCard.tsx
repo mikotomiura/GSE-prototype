@@ -197,7 +197,7 @@ const S1ProbeCard: React.FC<S1ProbeCardProps> = ({
     step === "q3" ? (
       <>
         <div style={{ fontSize: "0.86rem", margin: "0 0 0.45rem" }}>
-          直前の30秒、何をしていましたか?
+          カードが出る前の30秒、何をしていましたか?
         </div>
         <div
           role="group"
@@ -289,7 +289,7 @@ const S1ProbeCard: React.FC<S1ProbeCardProps> = ({
           marginBottom: "0.45rem",
         }}
       >
-        直前の30秒について
+        カードが出る前の30秒について
         {step === "q1" ? "（あと 2 問）" : step === "q2" ? "（あと 1 問）" : ""}
       </div>
 

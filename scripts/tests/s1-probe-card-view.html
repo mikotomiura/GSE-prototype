@@ -35,13 +35,26 @@
       const { createRoot } = await import("react-dom/client");
       await import("/src/App.css").catch(() => {});
       const S1ProbeCard = (await import("/src/components/S1ProbeCard.tsx")).default;
-      createRoot(document.getElementById("root")).render(
-        React.createElement(S1ProbeCard, {
-          probeId: "p-view",
-          onResize: (s) => { window.__GSE_SIZE = s; },
-          onDone: () => { window.__GSE_DONE = true; },
-        }),
-      );
+      // ADR-057 から段（step）は backend が決める。3 つの段を縦に並べて描く（window.__GSE_SIZE は段ごとの実寸）。
+      window.__GSE_SIZE = {};
+      const root = document.getElementById("root");
+      root.style.height = "auto";
+      // カードは画面の決まった位置に出るので、重ねずに見るときは ?step=q3 のように 1 つだけ描く。
+      const only = new URLSearchParams(location.search).get("step");
+      for (const step of only ? [only] : ["q3", "q1", "q2"]) {
+        const box = document.createElement("div");
+        box.dataset.step = step;
+        box.style.cssText = "position:relative; width:400px; margin-bottom:16px;";
+        root.appendChild(box);
+        createRoot(box).render(
+          React.createElement(S1ProbeCard, {
+            probeId: `p-view-${step}`,
+            step,
+            onResize: (s) => { window.__GSE_SIZE[step] = s; },
+            onDone: () => { window.__GSE_DONE = true; },
+          }),
+        );
+      }
     </script>
   </body>
 </html>

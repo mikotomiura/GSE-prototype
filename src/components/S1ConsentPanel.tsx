@@ -73,7 +73,7 @@ const S1ConsentPanel: React.FC = () => {
       {mode.consent ? (
         <>
           <p style={{ fontSize: "0.9em", margin: "0.4rem 0" }}>
-            問いに同意しています。作業中にときどき「直前の30秒」について尋ね、夕方に 1 日 1 回、その日の作業について尋ねます。
+            問いに同意しています。作業中にときどき「カードが出る前の30秒」について尋ね、夕方に 1 日 1 回、その日の作業について尋ねます。
           </p>
           {modifier && <HowToAnswer modifier={modifier} />}
           <p style={{ fontSize: "0.9em", margin: "0.4rem 0" }}>
@@ -86,7 +86,7 @@ const S1ConsentPanel: React.FC = () => {
       ) : (
         <>
           <p style={{ fontSize: "0.9em", margin: "0.4rem 0" }}>
-            作業中にときどき「直前の30秒」に何をしていたかを尋ね（選んだものによっては、続けて詰まりと前進も尋ねます）、
+            作業中にときどき「カードが出る前の30秒」に何をしていたかを尋ね（選んだものによっては、続けて詰まりと前進も尋ねます）、
             夕方に 1 日 1 回、その日の作業について 1 つ尋ねます。答えたくないときは閉じられます。
           </p>
           {modifier && <HowToAnswer modifier={modifier} />}
