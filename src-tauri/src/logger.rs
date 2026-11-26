@@ -936,6 +936,8 @@ pub struct HandmarkDayRow {
     pub shown_ms: u64,
     /// 見えていた時間（1a・1b では常に `None`・PR 2 で計り方が決まる）。
     pub visible_ms: Option<u64>,
+    /// その日に「ほかの窓をどける」を選んだ回数（記録が無いときは `None`・押した時刻は持たない）。
+    pub reveal_count: Option<u64>,
     /// 切った／戻した（時刻・出す側か）。
     pub toggles: Vec<(u64, bool)>,
     /// 入力ごとに切った／戻した（時刻・`cursor` か `click`・入れた側か）。ポインタの値は持たない。
@@ -2073,7 +2075,7 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
     format!(
         concat!(
             r#"{{"type":"handmark_day","t":{},"day":{},"assigned":"{}","late_start_day":{},"#,
-            r#""first_shown_day":{},"shown_ms":{},"visible_ms":{},"toggles":[{}],"#,
+            r#""first_shown_day":{},"shown_ms":{},"visible_ms":{},"reveal_count":{},"toggles":[{}],"#,
             r#""input_toggles":[{}],"stage_starts":[{}],"overflow":{},"table_sha256":{},"draw_seed":{},"reason":{}}}"#
         ),
         r.timestamp,
@@ -2083,6 +2085,7 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
         opt_i(r.first_shown_day),
         r.shown_ms,
         opt_u(r.visible_ms),
+        opt_u(r.reveal_count),
         toggles,
         input_toggles,
         starts,
@@ -4504,6 +4507,7 @@ mod tests {
             first_shown_day: Some(20_410),
             shown_ms: 3_600_000,
             visible_ms: None,
+            reveal_count: Some(3),
             toggles: vec![(1_799_999_000_000, false), (1_799_999_500_000, true)],
             input_toggles: vec![(1_799_999_200_000, "cursor", false)],
             stage_starts: vec![1_799_990_000_000],
@@ -4524,7 +4528,7 @@ mod tests {
             format!(
                 concat!(
                     r#"{{"type":"handmark_day","t":1800000000000,"day":20411,"assigned":"on","late_start_day":20410,"#,
-                    r#""first_shown_day":20410,"shown_ms":3600000,"visible_ms":null,"#,
+                    r#""first_shown_day":20410,"shown_ms":3600000,"visible_ms":null,"reveal_count":3,"#,
                     r#""toggles":[{{"t":1799999000000,"on":false}},{{"t":1799999500000,"on":true}}],"#,
                     r#""input_toggles":[{{"t":1799999200000,"input":"cursor","on":false}}],"#,
                     r#""stage_starts":[1799990000000],"overflow":false,"table_sha256":"{}","#,
@@ -4541,6 +4545,7 @@ mod tests {
         r.late_start_day = None;
         r.first_shown_day = None;
         r.shown_ms = 0;
+        r.reveal_count = None;
         r.toggles.clear();
         r.input_toggles.clear();
         r.stage_starts.clear();
@@ -4550,6 +4555,7 @@ mod tests {
         let v: serde_json::Value =
             serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
         assert_eq!(v["reason"], "table_missing");
+        assert!(v["reveal_count"].is_null(), "記録の無い日は null");
         assert_eq!(v["toggles"], serde_json::json!([]));
         assert_eq!(v["input_toggles"], serde_json::json!([]));
         assert!(v["table_sha256"].is_null() && v["draw_seed"].is_null());

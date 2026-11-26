@@ -1,0 +1,239 @@
+{
+ "combined": {
+  "main": "meets",
+  "overall": "undetermined",
+  "provisional_meets": true,
+  "sensitivity": "not_run"
+ },
+ "day_gate_passed": true,
+ "days_with_min_windows": 11,
+ "desk": {
+  "desk_version": "hm-desk-3",
+  "inject_stuck": 0.0,
+  "labels": "recorded",
+  "samples": 10,
+  "table_sha256": "e19e51c94f979c4c129bb998cc39ad42ee1f85e681fb205f4d71a8a9639e20da"
+ },
+ "desk_summary": {
+  "excluded": {
+   "away": 17392,
+   "few_feats": 388,
+   "pause": 1
+  },
+  "label_check": {
+   "checked": 5197,
+   "rate": 0.9876852030017318,
+   "t1_agree": 5133,
+   "windows_by_hmm_version": {
+    "0.5.0": 5197
+   }
+  },
+  "overflow_days": 0,
+  "redactions_given": true,
+  "seed_mismatch_days": 0,
+  "segments": 37,
+  "segments_recorded_t0": 0,
+  "sensitivity": {
+   "days": 0,
+   "few_on_windows": 0,
+   "late_days": 0,
+   "not_visible": 0,
+   "overflow": 0,
+   "redacted": 0,
+   "windows": 0,
+   "windows_off": 0
+  },
+  "windows": 5197
+ },
+ "n_days": 11,
+ "n_windows": 5197,
+ "newton_nonconverged": 0,
+ "overall": "meets",
+ "seconds": 126.1,
+ "sensitivity": {
+  "n_windows": 0,
+  "overall": "not_run",
+  "reason": "回 1（early）では感度分析を回さない（S1-F5）"
+ },
+ "t1_all_windows": 740,
+ "targets": {
+  "T1": {
+   "auc": {
+    "A": 0.6447413277719847,
+    "A2": 0.6414698644421272,
+    "A_time": 0.63960514424748,
+    "pixel": 0.6451361835245047,
+    "state": 0.6605647549530761,
+    "state_perm": 0.6319741397288843
+   },
+   "ceiling": false,
+   "class_counts": [
+    {
+     "days": 11,
+     "neg_days": 11,
+     "neg_windows": 4375,
+     "windows": 822
+    }
+   ],
+   "const_folds": {
+    "A": 0,
+    "A2": 0,
+    "A_time": 0,
+    "pixel": 0,
+    "state": 0,
+    "state_perm": 0
+   },
+   "diagnostics": {
+    "A2": -0.0032714633298575047,
+    "A_time": -0.005136183524504623,
+    "state_perm": -0.012767188043100397
+   },
+   "lambda": {
+    "A": [
+     0.001
+    ],
+    "A2": [
+     0.01
+    ],
+    "A_time": [
+     0.001
+    ],
+    "pixel": [
+     0.001
+    ],
+    "state": [
+     0.001
+    ],
+    "state_perm": [
+     0.001
+    ]
+   },
+   "pixel": {
+    "auc_a_lo": 0.6228522268478708,
+    "ceiling": false,
+    "ci90": [
+     -0.014400589384901907,
+     0.0071797843073573946
+    ],
+    "diff": 0.00039485575252007354,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "state": {
+    "auc_a_lo": 0.6225935369769697,
+    "ceiling": false,
+    "ci90": [
+     0.0020454724500977243,
+     0.02478596463878784
+    ],
+    "diff": 0.01582342718109142,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "verdict": "meets"
+  },
+  "T2": {
+   "auc": {
+    "A": 0.6957285302792644,
+    "A2": 0.6976000900230009,
+    "A_time": 0.6909272796426064,
+    "pixel": 0.6964753755391936,
+    "state": 0.7069990828298401,
+    "state_perm": 0.6877919650961655
+   },
+   "ceiling": false,
+   "class_counts": [
+    {
+     "days": 11,
+     "neg_days": 11,
+     "neg_windows": 4508,
+     "windows": 689
+    },
+    {
+     "days": 11,
+     "neg_days": 11,
+     "neg_windows": 1551,
+     "windows": 3646
+    },
+    {
+     "days": 11,
+     "neg_days": 11,
+     "neg_windows": 4335,
+     "windows": 862
+    }
+   ],
+   "const_folds": {
+    "A": 0,
+    "A2": 0,
+    "A_time": 0,
+    "pixel": 0,
+    "state": 0,
+    "state_perm": 0
+   },
+   "diagnostics": {
+    "A2": 0.0018715597437365394,
+    "A_time": -0.004801250636658039,
+    "state_perm": -0.007936565183098931
+   },
+   "lambda": {
+    "A": [
+     0.001,
+     0.001,
+     0.001
+    ],
+    "A2": [
+     0.001,
+     0.001,
+     0.01
+    ],
+    "A_time": [
+     0.001,
+     0.001,
+     0.001
+    ],
+    "pixel": [
+     0.001,
+     0.001,
+     0.001
+    ],
+    "state": [
+     0.001,
+     0.001,
+     0.001
+    ],
+    "state_perm": [
+     0.01,
+     0.01,
+     0.001
+    ]
+   },
+   "pixel": {
+    "auc_a_lo": 0.6791316364270576,
+    "ceiling": false,
+    "ci90": [
+     -0.007801779300534162,
+     0.005343466555855108
+    ],
+    "diff": 0.0007468452599291853,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "state": {
+    "auc_a_lo": 0.6788814711959793,
+    "ceiling": false,
+    "ci90": [
+     0.005825345045081093,
+     0.016279031848732854
+    ],
+    "diff": 0.011270552550575741,
+    "dropped": 0,
+    "kept": 2000,
+    "verdict": "meets"
+   },
+   "verdict": "meets"
+  }
+ }
+}

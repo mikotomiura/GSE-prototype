@@ -11,11 +11,14 @@
 //! 閉じる要求は止めて隠す（NSWindow を壊さない）。
 
 use crate::analysis::handmark::state::StageState;
+use crate::analysis::handmark::stopped::StoppedFrame;
 
 /// 背景の窓の label。`capabilities/handmark-stage.json` と `src/main.tsx` の分岐と一致させる。
 pub const LABEL: &str = "handmark-stage";
 /// 状態を窓へ配るイベント名（`StageState` か、閉じたときの `null`）。
 pub const STATE_EVENT: &str = "handmark-state";
+/// 止まりの層（ADR-056）を窓へ配るイベント名（研究者用の設定が入っているときだけ送る・手跡の窓だけ）。
+pub const STOPPED_EVENT: &str = "handmark-stopped";
 /// 跡の場を窓へ配るイベント名（手跡の窓だけ・`emit_to`。ポインタ・ADR-050 D2〜D4）。
 pub const TRACE_EVENT: &str = "handmark-trace";
 /// 波紋の種（押下が始まった正準の位置）を窓へ配るイベント名（手跡の窓だけ）。
@@ -388,6 +391,11 @@ mod imp {
         let _ = app.emit_to(LABEL, STATE_EVENT, Some(*state));
     }
 
+    /// 止まりの層を手跡の窓だけへ配る（窓を閉じたときは `STATE_EVENT` の `None` で窓の側が消す）。
+    pub fn emit_stopped(app: &AppHandle<Wry>, frame: &StoppedFrame) {
+        let _ = app.emit_to(LABEL, STOPPED_EVENT, frame);
+    }
+
     /// 跡の場を手跡の窓だけへ配る（全窓へ流す `emit` は使わない）。`t_ms` はポインタのスレッドの単調な ms。
     pub(crate) fn emit_trace(app: &AppHandle<Wry>, state: &TraceState, t_ms: u64) {
         let _ = app.emit_to(LABEL, TRACE_EVENT, trace_payload(state, t_ms));
@@ -436,7 +444,7 @@ mod imp {
 }
 
 #[cfg(any(target_os = "macos", windows))]
-pub use imp::{close, emit_state, open, setup, status};
+pub use imp::{close, emit_state, emit_stopped, open, setup, status};
 // 窓へ送る口と画面の大きさは crate の中だけ（呼べるのは `lib.rs` のポインタのスレッドだけ・検査が縛る）。
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use imp::{emit_ripple, emit_trace, screen_size_pt};

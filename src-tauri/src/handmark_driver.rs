@@ -15,6 +15,7 @@ use crate::analysis::handmark::assignment::Assigned;
 use crate::analysis::handmark::day::PointerInput;
 use crate::analysis::handmark::gate::{CloseReason, Decision, RECHECK_MS};
 use crate::analysis::handmark::state::{Stage, StageState, LIVE_LAG_MS};
+use crate::analysis::handmark::stopped::{stopped_view, StopGate, StoppedCfg, StoppedFrame};
 use crate::handmark_store::{
     rewrite_or_remove, scrub_state_file, turn_input_off, turn_input_on, turn_off, turn_on,
     Evaluation, HandmarkFs,
@@ -52,6 +53,28 @@ impl TrayItem {
     }
 }
 
+/// トレイの「ほかの窓をどける」の項目（窓を出している間だけ出す・handmark-reveal-count 判断 4）。
+/// 文言は同意文書の語にそろえ、手跡の語と状態の名前を出さない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevealItem {
+    Hidden,
+    /// どけていないので「ほかの窓をどける」。
+    Reveal,
+    /// どけているので「窓を戻す」。
+    Return,
+}
+
+impl RevealItem {
+    /// メニューの文言（`Hidden` は出さない）。
+    pub fn label(self) -> Option<&'static str> {
+        match self {
+            RevealItem::Hidden => None,
+            RevealItem::Reveal => Some("ほかの窓をどける"),
+            RevealItem::Return => Some("窓を戻す"),
+        }
+    }
+}
+
 /// 窓の層が知らせる窓の様子(窓を作れない・出せないときは `Failed`)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowStatus {
@@ -71,8 +94,15 @@ pub enum Effect {
     },
     CloseWindow,
     State(StageState),
+    /// 止まりの層（ADR-056）。研究者用の設定が入っているときだけ、`State` の直後に出す。
+    Stopped(StoppedFrame),
     Row(HandmarkDayRow),
     TrayItem(TrayItem),
+    /// ほかのアプリの窓をどける（`true`）・戻す（`false`）。どける側は、押した時に見えていたものだけを覚え、
+    /// 戻す側はそれだけを戻す（覚えた一覧は OS の層のメモリにだけ置き、記録しない）。
+    Reveal(bool),
+    /// トレイの「ほかの窓をどける」／「窓を戻す」の項目。
+    RevealItem(RevealItem),
     /// ポインタのスレッドへの入れ切り（窓を出している・カーソルが入っている・クリックが入っている）。
     /// 窓を開く・閉じる・入れ切りが変わる・日が変わる・門が閉じるたびに、その時点の値で 1 回出す。
     /// `open` は窓を出していること（全体の「やめる」で閉じれば false。入力ごとの状態は保つ）。
@@ -100,8 +130,10 @@ impl Effect {
             Effect::OpenWindow { .. }
             | Effect::CloseWindow
             | Effect::State(_)
-            | Effect::PointerGate { .. } => Destination::Window,
-            Effect::TrayItem(_) => Destination::Tray,
+            | Effect::Stopped(_)
+            | Effect::PointerGate { .. }
+            | Effect::Reveal(_) => Destination::Window,
+            Effect::TrayItem(_) | Effect::RevealItem(_) => Destination::Tray,
         }
     }
 }
@@ -144,6 +176,14 @@ pub struct HandmarkDriver {
     /// 今の `Stage` の起点（これより前の打鍵は入れない・再生と同じ）。
     stage_t0: u64,
     pending: Vec<u64>,
+    /// 今の `Stage` の描画の種（止まりの層の自律の動きにも使う・日の種）。
+    stage_seed: u64,
+    /// 止まりの層の設定（研究者用・`None` なら切ったままで `Effect::Stopped` を出さない）。
+    stopped: Option<StoppedCfg>,
+    /// 止まりの層の門（打鍵と一時停止の時刻だけ・設定に依らず保つ）。
+    stop_gate: StopGate,
+    /// 一時停止の始まり・終わりの時刻（打鍵と同じく `now − 500 ms` まで進めるときに入れる）。
+    pending_pauses: Vec<(u64, bool)>,
     window_open: bool,
     /// 窓の層が「出た」と知らせた(それまでは出ていた時間を積まない)。
     window_confirmed: bool,
@@ -155,6 +195,9 @@ pub struct HandmarkDriver {
     last_tray: TrayItem,
     /// 最後に出した `(open, cursor, click)`（閉じた初期の値から始める。変わらなければ出さない）。
     last_gate: (bool, bool, bool),
+    /// いまほかの窓をどけている（`Effect::Reveal(true)` を出し、まだ戻していない）。
+    revealed: bool,
+    last_reveal_item: RevealItem,
     /// 記録の一時停止中（本タスクの判断 2）。量を足さず、時刻の要素を状態に残さない。
     paused: Option<PauseMark>,
 }
@@ -182,6 +225,10 @@ impl HandmarkDriver {
             stage: None,
             stage_t0: now,
             pending: Vec::new(),
+            stage_seed: 0,
+            stopped: None,
+            stop_gate: StopGate::new(now, false),
+            pending_pauses: Vec::new(),
             window_open: false,
             window_confirmed: false,
             strip_visible: false,
@@ -190,6 +237,8 @@ impl HandmarkDriver {
             last_tick_ms: now,
             last_tray: TrayItem::Hidden,
             last_gate: (false, true, true),
+            revealed: false,
+            last_reveal_item: RevealItem::Hidden,
             paused: None,
         };
         let mut fx = Vec::new();
@@ -218,6 +267,23 @@ impl HandmarkDriver {
         self.last_tray
     }
 
+    /// 止まりの層の設定（研究者用）。起動の直後に 1 回入れる。門は設定に依らず保っているので、入れた次の刻みから出る。
+    pub fn set_stopped(&mut self, cfg: Option<StoppedCfg>) {
+        self.stopped = cfg;
+    }
+
+    /// 止まりの層が入っているか（`lib.rs` が、一時停止の時刻をコマンドの経路の値に揃えるかを決める）。
+    pub fn stopped_on(&self) -> bool {
+        self.stopped.is_some()
+    }
+
+    /// 一時停止の出来事を、窓が出ているときだけ溜める（窓を開くときは `new_stage` が今の状態から門を作る）。
+    fn queue_pause(&mut self, now: u64, paused: bool) {
+        if self.window_open && self.pending_pauses.len() < MAX_PENDING {
+            self.pending_pauses.push((now, paused));
+        }
+    }
+
     /// 打鍵の時刻を溜めるだけ（窓が出ていないときは捨てる）。
     pub fn on_press(&mut self, t: u64) {
         if self.window_open && self.pending.len() < MAX_PENDING {
@@ -237,6 +303,72 @@ impl HandmarkDriver {
             self.last_tray = t;
             fx.push(Effect::TrayItem(t));
         }
+        self.sync_reveal_item(fx);
+    }
+
+    /// 「ほかの窓をどける」の項目の今の状態（窓を出している間だけ出す）。
+    pub fn reveal_item(&self) -> RevealItem {
+        match (self.window_open, self.revealed) {
+            (false, _) => RevealItem::Hidden,
+            (true, false) => RevealItem::Reveal,
+            (true, true) => RevealItem::Return,
+        }
+    }
+
+    fn sync_reveal_item(&mut self, fx: &mut Vec<Effect>) {
+        let item = self.reveal_item();
+        if item != self.last_reveal_item {
+            self.last_reveal_item = item;
+            fx.push(Effect::RevealItem(item));
+        }
+    }
+
+    /// どけていれば戻す（窓を閉じる・日が変わる・終了するとき・判断 4）。戻しは数えない。
+    fn return_revealed(&mut self, fx: &mut Vec<Effect>) {
+        if self.revealed {
+            self.revealed = false;
+            fx.push(Effect::Reveal(false));
+        }
+    }
+
+    /// トレイの「ほかの窓をどける」／「窓を戻す」。`shown` は押された項目の、メニューに出ていた側。
+    /// 駆動役の今の項目と違う（表示が古い）・窓を出していないときは何もしない。
+    ///
+    /// どけるときは、記録の一時停止中でなければ日の累計の回数を 1 足して状態ファイルへ保存する。行は書かない
+    /// （行の `t` に押した時刻が出るため・回数は次の 5 分ごとの行に載る・判断 2）。戻すときは数えない。
+    pub fn toggle_reveal(
+        &mut self,
+        fs: &dyn HandmarkFs,
+        shown: RevealItem,
+        now: u64,
+    ) -> Vec<Effect> {
+        let mut fx = Vec::new();
+        if shown == RevealItem::Hidden || shown != self.reveal_item() {
+            return fx;
+        }
+        match shown {
+            RevealItem::Reveal => {
+                // 先に数えて保存し、書けたときだけどける。書けなければ閉じる側に倒れ、どけない
+                // （どけた直後に戻すと、Windows の非同期の最小化が戻しの後に走り、窓が最小化されたまま
+                // 残るため・/cross-review の Codex の指摘）
+                if self.paused.is_none() {
+                    self.ev.add_reveal();
+                    self.save_or_clean_up(fs, now, &mut fx);
+                    if !self.window_open {
+                        return fx;
+                    }
+                }
+                self.revealed = true;
+                fx.push(Effect::Reveal(true));
+                self.sync_reveal_item(&mut fx);
+            }
+            RevealItem::Return => {
+                self.return_revealed(&mut fx);
+                self.sync_reveal_item(&mut fx);
+            }
+            RevealItem::Hidden => {}
+        }
+        fx
     }
 
     /// ポインタの入れ切りを出す。値が変わったとき（`force` なら変わらなくても）1 回。
@@ -307,9 +439,12 @@ impl HandmarkDriver {
                     click_off: r.is_some_and(|r| r.click_off),
                     stage_restarted: false,
                 });
+                self.queue_pause(now, true);
             }
             (false, Some(m)) => {
                 self.paused = None;
+                // 再開で起点を取り直すなら、`new_stage` がこの出来事ごと畳む（門は一時停止の外から始まる）。
+                self.queue_pause(now, false);
                 self.end_pause(fs, m, now, &mut fx);
             }
             _ => {}
@@ -389,7 +524,11 @@ impl HandmarkDriver {
         let seed = self.ev.draw_seed().unwrap_or(0);
         self.stage = Some(Stage::new(seed, now));
         self.stage_t0 = now;
+        self.stage_seed = seed;
         self.pending.clear();
+        // 止まりの層の門も起点から。起点までの一時停止の出来事は今の状態に畳む（再生の `paused_at` と同じ）。
+        self.stop_gate = StopGate::new(now, self.paused.is_some());
+        self.pending_pauses.clear();
         // 記録の一時停止中は起点の時刻を記録に入れない（判断 2・判断 7）。再開のときに取り直す。
         match self.paused.as_mut() {
             Some(m) => m.stage_restarted = true,
@@ -408,11 +547,14 @@ impl HandmarkDriver {
     }
 
     fn close_window(&mut self, fx: &mut Vec<Effect>) {
+        // 窓を閉じる前に、どけた窓を戻す（やめる・門が閉じる・窓の失敗・保存の失敗のどれでも）
+        self.return_revealed(fx);
         self.window_open = false;
         self.window_confirmed = false;
         self.strip_visible = false;
         self.stage = None;
         self.pending.clear();
+        self.pending_pauses.clear();
         fx.push(Effect::CloseWindow);
     }
 
@@ -443,6 +585,8 @@ impl HandmarkDriver {
         self.last_tick_ms = now;
 
         if day_changed {
+            // 日が変わったら、どけた窓を戻す（新しい日の回数は 0 から・判断 4）
+            self.return_revealed(&mut fx);
             // 前の日の最後の行 → 門を検め直す → 新しい日の最初の行
             self.push_row(now, &mut fx);
             let was_open = self.window_open;
@@ -481,10 +625,37 @@ impl HandmarkDriver {
                 for p in due {
                     if p >= self.stage_t0 {
                         stage.press(p);
+                        self.stop_gate.on_press(p);
+                    }
+                }
+                // 一時停止の出来事は時刻の順に（門は打鍵との順に依らない・`stopped.rs`）
+                let mut due_pauses: Vec<(u64, bool)> = Vec::new();
+                self.pending_pauses.retain(|&e| {
+                    if e.0 <= target {
+                        due_pauses.push(e);
+                        false
+                    } else {
+                        true
+                    }
+                });
+                due_pauses.sort_by_key(|e| e.0);
+                for (pt, paused) in due_pauses {
+                    // 起点と同じ時刻の出来事も入れる（門は同じ値に冪等・再生の `paused_at` は `<= t0` を畳む）
+                    if pt >= self.stage_t0 {
+                        self.stop_gate.on_pause(pt, paused);
                     }
                 }
                 stage.advance_to(target);
                 fx.push(Effect::State(stage.state()));
+                if let Some(cfg) = self.stopped.as_ref() {
+                    fx.push(Effect::Stopped(stopped_view(
+                        stage.idle_since(),
+                        stage.grid_t(),
+                        self.stop_gate.is_open(),
+                        self.stage_seed,
+                        cfg,
+                    )));
+                }
             }
             // 窓が出たと分かってから、かつ 1 刻みの間が 2 秒以内のときだけ(スリープの間は足さない)
             let gap = now.saturating_sub(prev_tick);
@@ -634,6 +805,8 @@ impl HandmarkDriver {
     /// 終了: 保存して最後の行。
     pub fn on_quit(&mut self, fs: &dyn HandmarkFs, now: u64) -> Vec<Effect> {
         let mut fx = Vec::new();
+        // どけた窓を戻してから終わる（判断 4）
+        self.return_revealed(&mut fx);
         // 一時停止のまま終わる: 再開と同じに時刻を片づけてから保存する(次の起動の行に一時停止中の時刻を残さない)
         if let Some(m) = self.paused.take() {
             self.end_pause(fs, m, now, &mut fx);
@@ -948,6 +1121,310 @@ mod tests {
             let times: Vec<u64> = presses.iter().map(|p| p.0).collect();
             let want = replay_live(&times, seed, T0, last_tick);
             assert_eq!(last_state.unwrap().bits(), want.bits(), "case {case}");
+        }
+    }
+
+    fn stopped_cfg() -> StoppedCfg {
+        StoppedCfg {
+            form: crate::analysis::handmark::stopped::StoppedForm::Motes,
+            rise_ms: 2_000,
+            window_s: 10,
+            strength: 0.5,
+        }
+    }
+
+    /// 止まりの層のライブの刻み（遅れて届く打鍵と、記録の一時停止を挟む）が、記録の打鍵と一時停止の行からの
+    /// 再生（`replay_stopped_live`）と to_bits で一致する。一時停止の間の打鍵は届かない（`lib.rs` の門）。
+    #[test]
+    fn live_stopped_frames_match_the_replay_with_pauses_in_200_cases() {
+        use crate::analysis::handmark::stopped::replay_stopped_live;
+        let cfg = stopped_cfg();
+        let mut saw_v = (false, false);
+        for case in 0..200u64 {
+            let fs = with_table();
+            let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+            d.set_stopped(Some(cfg));
+            let seed = d.evaluation().draw_seed().unwrap();
+            let mut r = SplitMix64::new(case + 4_001);
+            // 一時停止の区間（始まり・終わり）
+            let mut pauses: Vec<(u64, bool)> = Vec::new();
+            let mut t = T0;
+            for _ in 0..r.below(4) {
+                t += 1 + r.below(60_000);
+                pauses.push((t, true));
+                t += 1 + r.below(40_000);
+                pauses.push((t, false));
+            }
+            let paused_at = |x: u64| {
+                pauses
+                    .iter()
+                    .take_while(|(pt, _)| *pt <= x)
+                    .last()
+                    .is_some_and(|(_, p)| *p)
+            };
+            // 打鍵（時刻 p・届く時刻 a）。届いた時に一時停止中なら捨てる（記録にも残らない）。
+            let mut presses: Vec<(u64, u64)> = Vec::new();
+            let mut t = T0 + r.below(300);
+            for _ in 0..r.below(150) {
+                let span = match r.below(6) {
+                    0 => 40_000,
+                    1 => 4_000,
+                    _ => 250,
+                };
+                t += 1 + r.below(span);
+                let a = t + r.below(501);
+                if !paused_at(t) && !paused_at(a) {
+                    presses.push((t, a));
+                }
+            }
+            let end = presses
+                .last()
+                .map_or(T0, |p| p.0)
+                .max(pauses.last().map_or(T0, |p| p.0))
+                + 60_000;
+            let mut ticks = Vec::new();
+            let mut now = T0;
+            while now < end {
+                now += 250 + r.below(60);
+                ticks.push(now);
+            }
+            // 到着・一時停止・tick を時刻の順に（同時刻は 到着 → 一時停止 → tick）
+            let mut events: Vec<(u64, u8, usize)> = presses
+                .iter()
+                .enumerate()
+                .map(|(i, p)| (p.1, 0u8, i))
+                .chain(pauses.iter().enumerate().map(|(i, p)| (p.0, 1u8, i)))
+                .chain(ticks.iter().enumerate().map(|(i, t)| (*t, 2u8, i)))
+                .collect();
+            events.sort();
+            let times: Vec<u64> = presses.iter().map(|p| p.0).collect();
+            for (_, kind, i) in events {
+                match kind {
+                    0 => d.on_press(presses[i].0),
+                    1 => {
+                        let _ = d.on_paused(&fs, pauses[i].1, pauses[i].0);
+                    }
+                    _ => {
+                        let mut got = None;
+                        for e in d.tick(&fs, ticks[i], ON_DAY) {
+                            if let Effect::Stopped(f) = e {
+                                got = Some(f);
+                            }
+                        }
+                        let f = got.expect("設定が入っていれば毎刻み出る");
+                        let want = replay_stopped_live(&times, &pauses, seed, T0, ticks[i], &cfg);
+                        assert_eq!(f.bits(), want.bits(), "case {case} tick {}", ticks[i] - T0);
+                        if f.v == 1.0 {
+                            saw_v.0 = true;
+                        }
+                        if f.v > 0.0 && f.v < 1.0 {
+                            saw_v.1 = true;
+                        }
+                    }
+                }
+            }
+        }
+        // 陽性対照: 止まりが見えた刻みと、立ち上がりの途中の刻みが両方あった（比べが空回りしていない）
+        assert_eq!(saw_v, (true, true));
+    }
+
+    /// 日付の切り替え・時計の飛びでは、起点と日の種を取り直す。止まりの層も、新しい起点からの再生と一致する
+    /// （打鍵が来るまでは返さない）。
+    #[test]
+    fn stopped_frames_restart_on_a_new_day_and_after_a_clock_jump() {
+        use crate::analysis::handmark::stopped::replay_stopped_live;
+        let cfg = stopped_cfg();
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        d.set_stopped(Some(cfg));
+        let last = |fx: Vec<Effect>| {
+            fx.into_iter()
+                .filter_map(|e| match e {
+                    Effect::Stopped(f) => Some(f),
+                    _ => None,
+                })
+                .next_back()
+        };
+        // 打って止まる → 見える
+        for k in 0..40u64 {
+            d.on_press(T0 + 1_000 + k * 150);
+        }
+        let mut now = T0;
+        while now < T0 + 120_000 {
+            now += 250;
+            let _ = d.tick(&fs, now, ON_DAY);
+        }
+        assert_eq!(last(d.tick(&fs, now + 250, ON_DAY)).unwrap().v, 1.0);
+        // 時計の飛び（1 日を超えて前へ）: 起点を取り直し、打鍵が来るまで 0
+        let jump = now + 250 + 2 * 86_400_000;
+        let f = last(d.tick(&fs, jump, ON_DAY)).unwrap();
+        assert_eq!(f.v, 0.0);
+        let seed = d.evaluation().draw_seed().unwrap();
+        let want = replay_stopped_live(&[], &[], seed, jump, jump, &cfg);
+        assert_eq!(f.bits(), want.bits());
+        // 次の出す日に変わる: 新しい日の種で、新しい起点から
+        let day_t = jump + 1_000;
+        let f = last(d.tick(&fs, day_t, NEXT_ON_DAY)).unwrap();
+        assert_eq!(f.v, 0.0);
+        let seed2 = d.evaluation().draw_seed().unwrap();
+        assert_ne!(seed, seed2);
+        let want = replay_stopped_live(&[], &[], seed2, day_t, day_t, &cfg);
+        assert_eq!(f.bits(), want.bits());
+    }
+
+    /// 1 刻み進め、出た止まりの層を、駆動役のいまの起点と種からの再生と to_bits で比べる。
+    fn tick_and_check(
+        d: &mut HandmarkDriver,
+        fs: &MemFs,
+        now: u64,
+        today: i64,
+        presses: &[u64],
+        pauses: &[(u64, bool)],
+        cfg: &StoppedCfg,
+    ) -> StoppedFrame {
+        let fx = d.tick(fs, now, today);
+        let f = fx
+            .iter()
+            .filter_map(|e| match e {
+                Effect::Stopped(f) => Some(*f),
+                _ => None,
+            })
+            .next_back()
+            .expect("窓が出ていて設定が入っていれば毎刻み出る");
+        let want = crate::analysis::handmark::stopped::replay_stopped_live(
+            presses,
+            pauses,
+            d.stage_seed,
+            d.stage_t0,
+            now,
+            cfg,
+        );
+        assert_eq!(f.bits(), want.bits(), "t {} t0 {}", now - T0, d.stage_t0);
+        f
+    }
+
+    /// 起点の取り直しが一時停止と重なる経路（一時停止中の時計の飛び・一時停止中の日の変わり目・窓を閉じている
+    /// 間に始まった一時停止・起点と同じ ms の一時停止）でも、刻みごとに再生と一致し、取り直しの後は最初の打鍵まで
+    /// 返さない。取り直しの後に打って止まれば v が 1 に戻る（陽性対照）。
+    #[test]
+    fn stopped_frames_match_the_replay_across_restarts_while_paused() {
+        let cfg = stopped_cfg();
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        d.set_stopped(Some(cfg));
+        let mut presses: Vec<u64> = Vec::new();
+        let mut pauses: Vec<(u64, bool)> = Vec::new();
+        let mut now = T0;
+        let mut today = ON_DAY;
+        // 打って止まり、`secs` 秒ぶん刻む。（見えた最大の v, 最後の刻みの v）を返す。出来事は 500 ms 遅れて
+        // 入る（ライブの規則）ので、止めた直後の数刻みは前の v のまま。「0 のまま」は最後の刻みで見る。
+        macro_rules! run {
+            ($type_first:expr, $secs:expr) => {{
+                if $type_first {
+                    for k in 0..40u64 {
+                        let p = now + 100 + k * 150;
+                        if d.is_window_open() && d.paused.is_none() {
+                            d.on_press(p);
+                            presses.push(p);
+                        }
+                    }
+                }
+                let (mut max_v, mut last_v) = (0.0f64, 0.0f64);
+                let end = now + $secs * 1_000;
+                while now < end {
+                    now += 250;
+                    let f = tick_and_check(&mut d, &fs, now, today, &presses, &pauses, &cfg);
+                    max_v = max_v.max(f.v);
+                    last_v = f.v;
+                }
+                (max_v, last_v)
+            }};
+        }
+        macro_rules! pause {
+            ($p:expr) => {{
+                let _ = d.on_paused(&fs, $p, now);
+                pauses.push((now, $p));
+            }};
+        }
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 1) 一時停止中の時計の飛び → 再開 → 打つまで 0 → 打てば 1
+        pause!(true);
+        assert_eq!(run!(false, 10).1, 0.0);
+        now += 2 * 86_400_000;
+        assert_eq!(run!(false, 10).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 2) 一時停止中の日の変わり目
+        pause!(true);
+        assert_eq!(run!(false, 5).1, 0.0);
+        today = NEXT_ON_DAY;
+        assert_eq!(run!(false, 10).1, 0.0);
+        assert!(d.is_window_open());
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 3) 窓を閉じている間に始まった一時停止（戻したときは一時停止中から始まる）
+        let _ = d.turn_off(&fs, now);
+        assert!(!d.is_window_open());
+        pause!(true);
+        now += 1_000;
+        let _ = d.turn_on(&fs, now);
+        assert!(d.is_window_open());
+        assert_eq!(run!(true, 30).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 4) 起点と同じ ms の一時停止（戻した直後に同じ時刻で止める）
+        let _ = d.turn_off(&fs, now);
+        let _ = d.turn_on(&fs, now);
+        assert_eq!(d.stage_t0, now);
+        pause!(true);
+        // 一時停止の判定をすり抜けた打鍵が 1 つ届いても（時刻は一時停止の後）、門は閉じたまま。
+        // 起点と同じ時刻の一時停止を落とすと、ライブだけが開く（変異で赤になることを確かめた）。
+        d.on_press(now + 50);
+        presses.push(now + 50);
+        assert_eq!(run!(false, 30).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(true, 60).0, 1.0);
+    }
+
+    /// 設定が無ければ（参加者の配布物の既定）止まりの層を出さず、今の状態の列も変わらない。
+    #[test]
+    fn without_the_config_no_stopped_frames_are_emitted() {
+        let fs = with_table();
+        let (mut a, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let fs_b = with_table();
+        let (mut b, _) = HandmarkDriver::new(&fs_b, true, T0, ON_DAY);
+        b.set_stopped(Some(stopped_cfg()));
+        for i in 1..800u64 {
+            if i % 7 != 0 && i < 300 {
+                a.on_press(T0 + i * 130);
+                b.on_press(T0 + i * 130);
+            }
+            if i == 500 {
+                let _ = a.on_paused(&fs, true, T0 + i * 250);
+                let _ = b.on_paused(&fs_b, true, T0 + i * 250);
+            }
+            let fa = a.tick(&fs, T0 + i * 250, ON_DAY);
+            let fb = b.tick(&fs_b, T0 + i * 250, ON_DAY);
+            assert!(!fa.iter().any(|e| matches!(e, Effect::Stopped(_))));
+            let states = |fx: &[Effect]| -> Vec<[u64; 5]> {
+                fx.iter()
+                    .filter_map(|e| match e {
+                        Effect::State(s) => Some(s.bits()),
+                        _ => None,
+                    })
+                    .collect()
+            };
+            assert_eq!(states(&fa), states(&fb), "tick {i}");
+            assert_eq!(
+                fb.iter()
+                    .filter(|e| matches!(e, Effect::Stopped(_)))
+                    .count(),
+                1,
+                "tick {i}"
+            );
         }
     }
 
@@ -1559,6 +2036,7 @@ mod tests {
                 t: T0 + 10_000,
                 shown_ms: 10_000,
                 visible_ms: 9_000,
+                reveals: 0,
                 skipped: false,
             },
             HandmarkSnap {
@@ -1566,6 +2044,7 @@ mod tests {
                 t: T0 + 20_000,
                 shown_ms: 20_000,
                 visible_ms: 19_000,
+                reveals: 0,
                 skipped: false,
             },
         ];
@@ -1657,11 +2136,205 @@ mod tests {
             t,
             shown_ms: s,
             visible_ms: s,
+            reveals: 0,
             skipped: false,
         };
         let snaps = [snap(T0 - 50_000, 100), snap(T0 - 10_000, 300)];
         let (_, _, subs) = d.on_redact(&fs, T0 - 40_000, T0 - 20_000, &snaps, false, T0 + 1_000);
         assert_eq!(subs.get(&(ON_DAY - 1)).map(|s| s.shown_ms), Some(200));
         assert!(!subs.contains_key(&ON_DAY));
+    }
+
+    fn reveals(d: &HandmarkDriver) -> u64 {
+        d.evaluation().record.as_ref().map_or(0, |r| r.reveal_count)
+    }
+    fn reveal_fx(fx: &[Effect]) -> Vec<bool> {
+        fx.iter()
+            .filter_map(|e| match e {
+                Effect::Reveal(b) => Some(*b),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// 「ほかの窓をどける」: 窓を出している間だけ項目が出て、どけると 1 回数え、戻すのは数えない。
+    /// どけたときに行は書かない（押した時刻を行の t に出さない）。回数は次の 5 分の行に載る。
+    #[test]
+    fn reveal_counts_only_the_reveal_and_writes_no_row_at_the_press() {
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Reveal)));
+        assert_eq!(d.reveal_item(), RevealItem::Reveal);
+        let fx = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        assert_eq!(reveal_fx(&fx), vec![true]);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Return)));
+        assert!(
+            !has(&fx, |e| matches!(e, Effect::Row(_))),
+            "押した時刻を行に出さない: {fx:?}"
+        );
+        assert_eq!(reveals(&d), 1);
+        // 状態ファイルにも保存した
+        let DayLoadCheck(n) = saved_reveals(&fs);
+        assert_eq!(n, 1);
+        // 古い文言の押下は捨てる(どけている間の「ほかの窓をどける」)
+        assert!(d
+            .toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_500)
+            .is_empty());
+        assert!(d
+            .toggle_reveal(&fs, RevealItem::Hidden, T0 + 1_500)
+            .is_empty());
+        // 戻すのは数えない
+        let fx = d.toggle_reveal(&fs, RevealItem::Return, T0 + 2_000);
+        assert_eq!(reveal_fx(&fx), vec![false]);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Reveal)));
+        assert_eq!(reveals(&d), 1);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 3_000);
+        let _ = d.toggle_reveal(&fs, RevealItem::Return, T0 + 4_000);
+        assert_eq!(reveals(&d), 2);
+        // 次の 5 分の行に回数が載る
+        let mut rows = Vec::new();
+        let mut now = T0 + 4_000;
+        while now < T0 + ROW_MS + 5_000 {
+            now += 250;
+            rows.extend(d.tick(&fs, now, ON_DAY));
+        }
+        let counts: Vec<Option<u64>> = rows
+            .iter()
+            .filter_map(|e| match e {
+                Effect::Row(r) => Some(r.reveal_count),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(counts, vec![Some(2)]);
+        // 記録に向かうのは Row だけ
+        assert_eq!(
+            Effect::Reveal(true).destination(),
+            Destination::Window,
+            "どける操作は記録に向かわない"
+        );
+        assert_eq!(
+            Effect::RevealItem(RevealItem::Reveal).destination(),
+            Destination::Tray
+        );
+    }
+
+    struct DayLoadCheck(u64);
+    fn saved_reveals(fs: &MemFs) -> DayLoadCheck {
+        use crate::handmark_store::{parse_state, DayLoad};
+        match parse_state(&fs.read_state()) {
+            DayLoad::Loaded(r) => DayLoadCheck(r.reveal_count),
+            _ => DayLoadCheck(u64::MAX),
+        }
+    }
+
+    /// 窓を出していない日（出さない日・切った日）は項目が出ず、押しても何もしない。
+    #[test]
+    fn reveal_is_hidden_and_inert_when_the_window_is_not_shown() {
+        let fs = with_table();
+        let (mut d, fx) = HandmarkDriver::new(&fs, true, T0, OFF_DAY);
+        assert!(!has(&fx, |e| matches!(e, Effect::RevealItem(_))));
+        assert_eq!(d.reveal_item(), RevealItem::Hidden);
+        assert!(d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1).is_empty());
+        assert_eq!(reveals(&d), 0);
+        // 出す日でも「やめる」の後は出さない
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let fx = d.turn_off(&fs, T0 + 1_000);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Hidden)));
+        assert!(d
+            .toggle_reveal(&fs, RevealItem::Reveal, T0 + 2_000)
+            .is_empty());
+        assert_eq!(reveals(&d), 0);
+    }
+
+    /// 記録の一時停止中はどけても数えない（量を足さない・判断 2 の作法）。どける・戻す自体は効く。
+    #[test]
+    fn reveal_during_a_pause_is_not_counted() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.on_paused(&fs, true, T0 + 500);
+        let fx = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        assert_eq!(reveal_fx(&fx), vec![true]);
+        assert_eq!(reveals(&d), 0);
+        let _ = d.toggle_reveal(&fs, RevealItem::Return, T0 + 1_500);
+        let _ = d.on_paused(&fs, false, T0 + 2_000);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 3_000);
+        assert_eq!(reveals(&d), 1, "再開の後は数える");
+    }
+
+    /// どけている間に「やめる」・日の変わり目・門が閉じる・窓の失敗・終了があれば、窓を戻す（判断 4）。
+    /// 戻す出来事は窓を閉じる出来事より前に出る。
+    #[test]
+    fn revealed_windows_are_returned_on_stop_day_change_failure_and_quit() {
+        let returned_before_close = |fx: &[Effect]| {
+            let r = fx.iter().position(|e| *e == Effect::Reveal(false));
+            let c = fx.iter().position(|e| matches!(e, Effect::CloseWindow));
+            matches!((r, c), (Some(r), Some(c)) if r < c)
+        };
+        // やめる
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.turn_off(&fs, T0 + 2_000);
+        assert!(returned_before_close(&fx), "{fx:?}");
+        assert_eq!(d.reveal_item(), RevealItem::Hidden);
+        // 日の変わり目（出す日が続いても戻し、新しい日は 0 から）
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let day = 86_400_000;
+        let fx = d.tick(&fs, T0 + day, OFF_DAY);
+        assert_eq!(reveal_fx(&fx), vec![false], "{fx:?}");
+        assert!(returned_before_close(&fx), "{fx:?}");
+        assert_eq!(reveals(&d), 0);
+        // 日の変わり目で出す日が続く（窓は閉じない）ときも戻し、項目は「ほかの窓をどける」に戻る
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.tick(&fs, T0 + day * 3, NEXT_ON_DAY);
+        assert!(d.is_window_open(), "出す日が続く");
+        assert!(!closed(&fx), "{fx:?}");
+        assert_eq!(reveal_fx(&fx), vec![false], "{fx:?}");
+        assert_eq!(d.reveal_item(), RevealItem::Reveal);
+        assert!(has(&fx, |e| *e == Effect::RevealItem(RevealItem::Reveal)));
+        assert_eq!(reveals(&d), 0, "新しい日は 0 から");
+        // 窓の失敗で門が閉じる
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.on_window_status(WindowStatus::Failed, T0 + 2_000);
+        assert!(returned_before_close(&fx), "{fx:?}");
+        // 終了
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let _ = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        let fx = d.on_quit(&fs, T0 + 2_000);
+        assert_eq!(reveal_fx(&fx), vec![false]);
+        // どけていなければ戻す出来事は出ない（対照）
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert!(reveal_fx(&d.turn_off(&fs, T0 + 1_000)).is_empty());
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert!(reveal_fx(&d.on_quit(&fs, T0 + 1_000)).is_empty());
+    }
+
+    /// 保存に失敗したら閉じる側に倒れ、どけない（どけてすぐ戻す組を出さない。Windows では非同期の最小化が
+    /// 戻しの後に走って窓が残るため）。
+    #[test]
+    fn a_failed_save_at_reveal_closes_without_revealing() {
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        fs.fail_state_write.set(true);
+        let fx = d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000);
+        assert!(reveal_fx(&fx).is_empty(), "{fx:?}");
+        assert!(closed(&fx));
+        assert_eq!(d.reveal_item(), RevealItem::Hidden);
+        // 対照: 書ければどける
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        assert_eq!(
+            reveal_fx(&d.toggle_reveal(&fs, RevealItem::Reveal, T0 + 1_000)),
+            vec![true]
+        );
     }
 }
