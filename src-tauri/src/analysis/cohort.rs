@@ -1086,6 +1086,7 @@ mod tests {
             skipped_parse: 0,
             skipped_unknown_enum: 0,
             skipped_out_of_range: 0,
+            skipped_answered_without_scales: 0,
         };
         let report = compute_calibration_metrics(&[session], AggSpec::default());
         let json = serde_json::to_string(&report).expect("serialize real D report");

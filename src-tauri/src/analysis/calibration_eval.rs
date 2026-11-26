@@ -244,6 +244,9 @@ pub struct SessionData {
     pub skipped_parse: u64,
     pub skipped_unknown_enum: u64,
     pub skipped_out_of_range: u64,
+    /// answered だが q1/q2 がそろっていない `realtime_label`（段 1 の 3 名の版・ADR-057 D3）。
+    /// ★ 破損ではない。較正の点にならないので `probes` に入れず、数だけ残す。
+    pub skipped_answered_without_scales: u64,
 }
 
 // =============================================================================
@@ -824,6 +827,17 @@ pub fn compute_calibration_metrics(sessions: &[SessionData], spec: AggSpec) -> C
         notes.push(format!(
             "extraction skipped lines: parse={} unknown_enum={} out_of_range={} (data quality)",
             skipped_parse, skipped_unknown, skipped_range
+        ));
+    }
+    // ★ 破損とは別に出す（段 1 の 3 名の版の、Q1・Q2 を聞かなかった・答えなかった回答・ADR-057 D3）
+    let skipped_no_scales: u64 = sessions
+        .iter()
+        .map(|s| s.skipped_answered_without_scales)
+        .sum();
+    if skipped_no_scales > 0 {
+        notes.push(format!(
+            "answered probes without q1/q2 (stage 1 conditional scales, not calibration points): {}",
+            skipped_no_scales
         ));
     }
 
@@ -1664,6 +1678,7 @@ mod tests {
                 skipped_parse: 0,
                 skipped_unknown_enum: 0,
                 skipped_out_of_range: 0,
+                skipped_answered_without_scales: 0,
             }
         };
         vec![
@@ -1791,6 +1806,7 @@ mod tests {
             session_start_ms: None,
             skipped_parse: 0,
             skipped_out_of_range: 0,
+            skipped_answered_without_scales: 0,
             skipped_unknown_enum: 0,
         }
     }
@@ -2083,6 +2099,7 @@ mod tests {
             skipped_parse: 0,
             skipped_unknown_enum: 0,
             skipped_out_of_range: 0,
+            skipped_answered_without_scales: 0,
         }
     }
 

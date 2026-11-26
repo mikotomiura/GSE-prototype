@@ -97,6 +97,9 @@ pub struct Stage {
     grid_start: u64,
     drift_offset: f64,
     layout_seed: u32,
+    /// `is_idle` が初めて真になった格子の刻み（ADR-056 D1）。止まっていなければ `None`。
+    /// 止まりの層（`stopped.rs`）の立ち上がりにだけ使う。風・位相・漂いの計算には効かない。
+    idle_since: Option<u64>,
     #[cfg(test)]
     ticks_run: u64,
 }
@@ -118,6 +121,8 @@ impl Stage {
             grid_start: g0,
             drift_offset: (a >> 11) as f64 / (1u64 << 53) as f64 * DRIFT_SPAN_S,
             layout_seed: (b >> 32) as u32,
+            // 打鍵の列が空で風も無いので、作った時点で止まっている（返すかは止まりの層の門が決める）。
+            idle_since: Some(g0),
             #[cfg(test)]
             ticks_run: 0,
         }
@@ -134,6 +139,16 @@ impl Stage {
         self.ring[self.next] = t_ms;
         self.next = (self.next + 1) % CAP;
         self.len = (self.len + 1).min(CAP);
+        self.note_idle();
+    }
+
+    /// 格子の時刻か打鍵の列が変わった後に呼ぶ。止まりが始まった刻みを 1 つだけ覚え、止まっていなければ忘れる。
+    fn note_idle(&mut self) {
+        if !self.is_idle() {
+            self.idle_since = None;
+        } else if self.idle_since.is_none() {
+            self.idle_since = Some(self.grid_t);
+        }
     }
 
     fn times(&self) -> impl Iterator<Item = u64> + '_ {
@@ -202,12 +217,24 @@ impl Stage {
     pub fn advance_to(&mut self, t: u64) {
         while let Some(g) = self.grid_t.checked_add(TICK_MS).filter(|g| *g <= t) {
             if self.is_idle() {
+                // 止まっている間は状態が変わらず、`idle_since` も既に決まっている（`note_idle` を刻みごとに呼ぶ）。
                 self.grid_t += (t - self.grid_t) / TICK_MS * TICK_MS;
                 return;
             }
             self.grid_t = g;
             self.tick(g);
+            self.note_idle();
         }
+    }
+
+    /// `is_idle` が初めて真になった格子の刻み（止まっていなければ `None`・ADR-056 D1）。
+    pub fn idle_since(&self) -> Option<u64> {
+        self.idle_since
+    }
+
+    /// 最後に処理した格子の点。
+    pub fn grid_t(&self) -> u64 {
+        self.grid_t
     }
 
     /// 以後の刻みが状態を変えない（打鍵が無いまま）。
@@ -405,6 +432,71 @@ mod tests {
             naive_advance(&mut slow, end);
             assert_eq!(fast.state().bits(), slow.state().bits(), "case {i} end");
         }
+    }
+
+    /// 素朴な進め方で、刻みごとに止まりの始まりを数え直す参照（`note_idle` を毎刻み呼ぶ）。
+    fn naive_advance_with_idle(s: &mut Stage, t: u64) {
+        while let Some(g) = s.grid_t.checked_add(TICK_MS).filter(|g| *g <= t) {
+            s.grid_t = g;
+            s.tick(g);
+            s.note_idle();
+        }
+    }
+
+    /// 早送りでも、止まりの始まりの刻みは素朴な 1 刻みずつと同じ（ADR-056・設計案 §4.4 の論理の時刻）。
+    #[test]
+    fn idle_since_matches_the_naive_step_loop_including_long_gaps() {
+        for i in 0..200u64 {
+            let mut r = SplitMix64::new(i + 991);
+            let mut fast = Stage::new(3, 500_000);
+            let mut slow = Stage::new(3, 500_000);
+            let mut t = 500_000u64;
+            for _ in 0..r.below(40) {
+                let prev = t;
+                t += 1 + match r.below(4) {
+                    0 => 600_000 + r.below(3_600_000),
+                    1 => 9_000 + r.below(60_000),
+                    _ => r.below(400),
+                };
+                // 打鍵の前に、描画のつもりの途中の時刻（前の打鍵と次の打鍵の間）でも比べる
+                let mid = prev + r.below(t - prev);
+                fast.advance_to(mid);
+                naive_advance_with_idle(&mut slow, mid);
+                assert_eq!(fast.idle_since(), slow.idle_since(), "case {i} mid {mid}");
+                fast.advance_to(t);
+                naive_advance_with_idle(&mut slow, t);
+                assert_eq!(fast.idle_since(), slow.idle_since(), "case {i} t {t}");
+                fast.push(t);
+                slow.push(t);
+                assert_eq!(fast.idle_since(), None, "case {i}");
+            }
+            let end = t + 7_200_000;
+            fast.advance_to(end);
+            naive_advance_with_idle(&mut slow, end);
+            assert_eq!(fast.idle_since(), slow.idle_since(), "case {i} end");
+            assert!(fast.idle_since().is_some(), "case {i}");
+        }
+    }
+
+    /// 止まりの始まりは、止まった区間の中で動かない（長さが伸びても同じ刻み）。
+    #[test]
+    fn idle_since_stays_put_while_stopped() {
+        let mut s = Stage::new(1, 1_000_000);
+        for k in 0..30u64 {
+            s.press(1_000_000 + 1_000 + k * 120);
+        }
+        s.advance_to(1_000_000 + 120_000);
+        let start = s.idle_since().expect("stopped after two minutes");
+        // 最後の打鍵は 1_004_480。止まりの始まりは、そこから `IRREG_MS` を過ぎた後の格子の点
+        assert!(start > 1_000_000 + 4_480 + IRREG_MS, "{start}");
+        assert_eq!(start % TICK_MS, 0);
+        for later in [3_600_000u64, 86_400_000, 30 * 86_400_000] {
+            s.advance_to(1_000_000 + later);
+            assert_eq!(s.idle_since(), Some(start));
+        }
+        // 打鍵で忘れ、次の止まりは新しい刻みから
+        s.press(1_000_000 + 30 * 86_400_000 + 7);
+        assert_eq!(s.idle_since(), None);
     }
 
     #[test]

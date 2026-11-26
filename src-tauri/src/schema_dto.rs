@@ -431,11 +431,14 @@ pub enum LogEntryDto {
     ///
     /// **不変条件 (schema では緩く、producer 側で強制)**:
     /// - skip (`answered=false`) ⇒ `q1_friction`/`q2_progress` は null
-    /// - `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5
+    /// - `q1_friction`/`q2_progress` があれば 1..=5。`q2_progress` は `q1_friction` が無ければ null
+    /// - 較正と自己マーカーの `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5
+    /// - 段 1（3 名の版・ADR-057）の `answered=true` は、答えた分だけ q が入り残りは null
+    ///   （Q3 の選択肢によって Q1・Q2 を聞かない、または答える前に閉じた。対の `activity_label` で分かる）
     /// - `source=self_marker` ⇒ `probe_id` は null
     ///
-    /// `logger.rs` の `LogEntry::realtime_label_answered` / `..._skipped` コンストラクタが
-    /// これらを保証する。schemars は Option を緩く出すため validator 側で補検証する。
+    /// `logger.rs` の `LogEntry::realtime_label_answered` / `..._s1_answered` / `..._skipped`
+    /// コンストラクタがこれらを保証する。schemars は Option を緩く出すため validator 側で補検証する。
     RealtimeLabel {
         probe_id: Option<String>,
         source: ProbeSourceDto,

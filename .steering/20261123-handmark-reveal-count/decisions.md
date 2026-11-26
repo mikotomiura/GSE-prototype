@@ -74,3 +74,18 @@
 | Codex（Codex は HIGH・cross-reviewer は LOW〜MEDIUM）: Windows の `ShowWindowAsync` は非同期なので、どけた直後に戻すと、戻す側が「まだ最小化されていない」と見て飛ばし一覧を捨て、その後で最小化が走って窓が最小化されたまま残る。確実に起きるのは、どけた直後の保存の失敗で駆動役がどける・戻すを続けて出す経路 | 駆動役で「先に数えて保存し、書けたときだけどける」順にした。保存に失敗したらどけない。テスト `a_failed_save_at_reveal_closes_without_revealing`（対照つき）。人が続けて押す経路はトレイの表示の更新（1 秒ごと）を挟むので起きにくい。G-GEAR の確かめの項目に「どけた直後に戻す」「応答の遅いアプリ」を足した |
 | Codex LOW: 同じプロセスの中でのハンドルの使い回しは pid の照合では見分けられないのに、コメントが「別の窓へ使い回されたものには触らない」と言い過ぎている | コメントを「別のプロセスの窓への使い回し」に直した |
 | Codex LOW: macOS で、アプリを数えてから一括で隠すまでの間に起動したアプリは、覚えていないので戻らない | 採らない（残る穴）。どけたすぐ後に新しく開いたアプリは本人が開いたもので、Dock から戻せる。個別に `hide()` する形は、前面のアプリを外から隠せない（試作 run9・run10）ので採れない |
+
+## 判断 8: Windows の CI で落ちた本文読みのテストを CRLF に強くし、main（#434）を取り込む（2026-11-26・Mac）
+
+- 発見: repo を一時 public にして CI を回し直した run 45137837991 で、Windows の check だけが赤
+  （1444 passed・1 failed）。`handmark_wiring_tests::the_driver_thread_guard_returns_revealed_windows` が
+  `lib.rs:8530:67` の `expect("end of impl")` で panic。G-GEAR の checkout は改行が CRLF で、テストが探す
+  `"\n}\n"` が `"\n}\r\n"` になって当たらない。Mac は LF なので緑だった。
+- 決定: `production_code()` と同じく `include_str!("lib.rs").replace("\r\n", "\n")` にしてから探す。
+  同じファイルのほかの本文読み 2 か所は `"\n}"` を探すので CRLF でも当たり、直さない。
+- 確かめ（Mac で CRLF を再現）: lib.rs を CRLF にして、直す前は CI と同じ `lib.rs:8530:67` で panic（陽性対照）、
+  直した後は緑。LF に戻しても緑。
+- main の取り込み: #434（止まりの層）の `Effect::Stopped` と、この枝の `Effect::Reveal`・`RevealItem` が
+  `handmark_driver.rs` の `destination` と `lib.rs` の効果の振り分け・テストの並びで競合した。両方を残す足し算で解いた
+  （非対象 OS の空の腕は main の 4 つ、Reveal と RevealItem の腕はこの枝のまま）。
+  解いた後に fmt・clippy（-D warnings）・`cargo test --workspace`・emit_schema の一致・replay（15 snapshots）が緑。

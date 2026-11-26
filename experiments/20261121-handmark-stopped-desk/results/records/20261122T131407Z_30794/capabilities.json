@@ -1,0 +1,204 @@
+{
+  "files": [
+    {
+      "file_id": "523ba57c",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0528d650",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "641708cf",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "599537ad",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "247e6748",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "d88f4625",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f51f325d",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "63cae0d7",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9be41a82",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "11cf96f3",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "6592dddc",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3551c606",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "a2388e36",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "38f4e241",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "0335c8f9",
+      "app_version": "0.1.41",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "9993e895",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "f38d5905",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "a6ec663c",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "30e0245d",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "3bbf1eae",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "4080aa4e",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "fc4b914f",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "2554bfd8",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "6a3507a3",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "ddbaf15e",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "5b6f6101",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "906e61d5",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "2de641e8",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "e0fede29",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    },
+    {
+      "file_id": "39f20266",
+      "app_version": "0.1.42",
+      "declares_capabilities": true,
+      "malformed_lines": 0
+    }
+  ],
+  "verdicts": [
+    {
+      "line_type": "key",
+      "verdict": "PRESENT",
+      "rows": 81018,
+      "declared_as": [
+        "unconditional"
+      ],
+      "note": "宣言: unconditional"
+    },
+    {
+      "line_type": "feat",
+      "verdict": "PRESENT",
+      "rows": 680507,
+      "declared_as": [
+        "unconditional"
+      ],
+      "note": "宣言: unconditional"
+    }
+  ]
+}
