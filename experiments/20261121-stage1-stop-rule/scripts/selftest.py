@@ -98,7 +98,7 @@ def main():
 
     # ---- 4:00 の区切り（現地 3:59 と 4:01 は別の日）
     t4 = day_start_ms(1)
-    lines = [{"type": "meta", "session_start": t4, "s1_mode": "marker"}]
+    lines = [{"type": "meta", "session_start": t4 - H, "s1_mode": "marker"}]   # 前の日の 3:00 から（窓の 1 日目）
     lines += probe("a", t4 - 59_000 + 1000, "random", "stuck")    # 窓の終わり 3:59:01 → 前の日
     lines += probe("b", t4 + 61_000 + 1000, "random", "stuck")    # 窓の終わり 4:01:01 → この日
     c = run_count([lines], [{"C1": [], "C2": []}])
@@ -287,11 +287,27 @@ def main():
                                                                   early_days=2))["early"]
     check("表だけでも前期を数える（late_start_day は表から）", e2 is not None and e2["observed_days"] == 2)
     check("late_start_day が分からなければ前期は None", run_count([make(6, 3, 3)], [eps])["early"] is None)
+    ca = run_count([ex], [eps], table=dict(tb, s1_start_day=dS, late_start_day=dS + 5, early_days=5))
+    check("late_start_day が記録と表で食い違えば判定は止めず前期は None（理由つき）",
+          ca["early"] is None and ca["early_unavailable"] == "late_start_day_ambiguous")
+    cb = run_count([make(6, 3, 3)], [eps], table=dict(tb, s1_start_day=dS - 5, late_start_day=dS, early_days=5))
+    check("前期の終わりが窓の 1 日目より後でなければ前期は None（理由つき）",
+          cb["early"] is None and cb["early_unavailable"] == "late_start_not_after_window_start")
+    check("前期の cannot_answer を数える",
+          run_count([make(4, 3, 3, extra=probe("ce", day_start_ms(1) + 9 * H, "random", "cannot_answer"))], [eps],
+                    table=dict(tb, s1_start_day=dS, late_start_day=dS + 3, early_days=3))["early"]["random_excluded"] == 1)
+    check("前期の出力のキーは件数だけ", set(e1) == {"early_days", "observed_days", "random_stuck", "random_nonstuck",
+                                          "random_excluded", "in_C1", "in_C2"})
+    cl = run_count([stray_ans], [eps])
+    check("max_days が無くても窓の 1 日目より前の回答は数えない", cl["random_answered"] == 9)
+    fut = make(3, 3, 3)
+    fut.insert(1, {"type": "key", "t": 4_102_444_800_000 + 86_400_000, "category": "alphabetic", "press": True})  # 2100 年
+    check("年の範囲の外へ跳んだ時刻は経過に数えない", run_count([fut], [eps], max_days=M)["elapsed_days"] == 3)
     try:
-        run_count([ex], [eps], table=dict(tb, s1_start_day=dS, late_start_day=dS + 5, early_days=5))
-        check("late_start_day が記録と表で食い違えば止める", False)
+        run_count([make(1, 1, 1)], [eps], table=dict(tb, early_days=0, late_start_day=tb["s1_start_day"]))
+        check("表の early_days が 1 未満なら止める", False)
     except ValueError:
-        check("late_start_day が記録と表で食い違えば止める", True)
+        check("表の early_days が 1 未満なら止める", True)
     try:
         run_count([make(1, 1, 1)], [eps], table=dict(tb, early_days=3))
         check("表の late_start_day が s1_start_day + early_days でなければ止める", False)
@@ -306,7 +322,7 @@ def main():
                "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day",
                "lambda_valid_per_observed_day", "pi_stuck", "rules",
                "window_days", "random_cross_day", "random_over_latency_cap", "random_window_unobserved",
-               "early", "table_start_offset_days"}
+               "early", "early_unavailable", "table_start_offset_days"}
     check("出力のキーは件数・率・要約だけ", set(c) == allowed)
 
     print("SELFTEST", "FAIL" if FAILS else "PASS", "mutate=%s" % sr.MUTATE)

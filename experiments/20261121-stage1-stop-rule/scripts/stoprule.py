@@ -27,7 +27,8 @@ DAYSIM = os.path.join(EXP, "../20261103-mhd-dryrun-v2/scripts")
 #   / endpoint（停滞の中の対応を窓の終わりに戻す）/ noclock（時計の狂った記録を除かない）
 #   / noobs（窓が観測区間に収まらない回答を除かない）
 #   / anytime（窓の 1 日目を段 1 の行ではなく全行の最小の時刻から取る）/ tablestart（表の s1_start_day を窓の 1 日目にする）
-#   / earlyle（前期を late_start_day の日まで含めて数える）
+#   / earlyle（前期を late_start_day の日まで含めて数える）/ nolower（窓の 1 日目より前も数える）
+#   / nocapyear（年の範囲の外の時刻も日に数える）
 MUTATE = os.environ.get("STOPRULE_MUTATE") or None
 
 DAY_CUTOFF_HOUR = 4          # eh3::DAY_CUTOFF_HOUR
@@ -47,6 +48,14 @@ VALUE_KEYS = ("min_days", "min_stuck", "min_nonstuck", "min_in_c1", "min_in_c2",
 WIDTH_KEYS = ("auc", "sd_day", "rho_day")
 # 回答の類（S1-A3・S1-B6・ADR-055）。知らない類は止める（黙って「詰まりでない」に数えない）
 CATEGORIES = ("stuck", "deliberating", "external_material", "conversation", "away", "working", "cannot_answer")
+
+
+def _year_bounds_ms():
+    """CLOCK_YEAR_RANGE の UTC の ms の範囲 [lo, hi)。"""
+    import datetime as _dt
+    lo = _dt.datetime(CLOCK_YEAR_RANGE[0], 1, 1, tzinfo=_dt.timezone.utc)
+    hi = _dt.datetime(CLOCK_YEAR_RANGE[1] + 1, 1, 1, tzinfo=_dt.timezone.utc)
+    return int(lo.timestamp() * 1000), int(hi.timestamp() * 1000)
 
 
 def local_day(t_ms, utc_offset_secs):
@@ -128,6 +137,8 @@ def read_table(path):
     for k in ("s1_start_day", "early_days", "late_start_day"):
         if not isinstance(t.get(k), int) or isinstance(t.get(k), bool):
             raise ValueError("表の " + k + " が整数でない")
+    if t["early_days"] < 1:
+        raise ValueError("表の early_days が 1 以上でない")
     if t["late_start_day"] != t["s1_start_day"] + t["early_days"]:
         raise ValueError("表の late_start_day が s1_start_day + early_days でない")
     return {"s1_start_day": t["s1_start_day"], "late_start_day": t["late_start_day"]}
@@ -198,8 +209,11 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
     all_days = set()
     hm_last = {}
     n_eps = {"C1": 0, "C2": 0}
+    lo_ms, hi_ms = _year_bounds_ms()
     for rec in records:
         for t in rec["times"]:
+            if MUTATE != "nocapyear" and not (lo_ms <= t < hi_ms):
+                continue    # 年の範囲（CLOCK_YEAR_RANGE）の外の時刻は経過に数えない
             all_days.add(local_day(t, utc_offset_secs))
         all_days.add(local_day(rec["session_start"], utc_offset_secs))
     first = min(local_day(r["session_start"], utc_offset_secs) for r in records) if records else None
@@ -211,9 +225,16 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
     lates = set().union(*(r["late_starts"] for r in records)) if records else set()
     if table is not None:
         lates.add(table["late_start_day"])
+    # 前期は記述なので、決まらないときは判定を止めずに early を null にして理由を出す
+    early_unavailable = None
+    late_start = None
     if len(lates) > 1:
-        raise ValueError("late_start_day が記録と表で 1 つに決まらない")
-    late_start = next(iter(lates)) if lates else None
+        early_unavailable = "late_start_day_ambiguous"
+    elif lates:
+        late_start = next(iter(lates))
+        if first is None or late_start <= first:
+            early_unavailable = "late_start_not_after_window_start"
+            late_start = None
     early_c = {"stuck": 0, "nonstuck": 0, "excluded": 0, "C1": [0, 0, 0], "C2": [0, 0, 0]}
     early_days_obs = set()
 
@@ -223,8 +244,10 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         return d <= late_start if MUTATE == "earlyle" else d < late_start
 
     def in_window(d):
-        # 窓は [窓の 1 日目, 窓の 1 日目 + max_days)。1 日目より前（時計の狂った行）も数えない
-        return max_days is None or MUTATE == "nowindow" or (first is not None and 0 <= d - first < max_days)
+        # 窓は [窓の 1 日目, 窓の 1 日目 + max_days)。1 日目より前（時計の狂った行）は max_days が無くても数えない
+        if first is None or (d < first and MUTATE != "nolower"):
+            return False
+        return max_days is None or MUTATE == "nowindow" or d - first < max_days
     for rec, eps in zip(records, episodes):
         for d, (t, a) in rec["hm"].items():
             if not in_window(d):
@@ -322,6 +345,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         "assigned_days": assigned,
         # 前期の件数（記述・H1〜H3 は前期だけで判定する・判断 47）。late_start_day が分からなければ None
         "early": early_out,
+        "early_unavailable": early_unavailable,
         # 表の s1_start_day − 窓の 1 日目（日数の差だけ・窓の 1 日目を正とする・S1-F2）。表が無ければ None
         "table_start_offset_days": (table["s1_start_day"] - first) if (table is not None and first is not None) else None,
         "answers_per_observed_day_q": quartiles(list(per_day.values())),

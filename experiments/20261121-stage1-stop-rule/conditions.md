@@ -114,7 +114,9 @@
 - 窓の 1 日目 ＝ 段 1 の記録の最初の `meta`（`session_start` を持つ行）の `session_start` の日（4:00 区切り）のうち最も早い日。第 3 版までは全行の時刻の最小で、時計の狂った行が 1 つあると窓が前にずれた。
 - 窓は [1 日目, 1 日目 + `max_days`) で、1 日目より前の回答と割付も数えない。経過日数は 1 日目から最後の日まで。
 - `--table`（割付の表 `handmark_assignment.json`）を渡すと、表の `s1_start_day` − 窓の 1 日目を `table_start_offset_days` として出す（日数の差だけ）。窓は記録の 1 日目を正とし、表の値で動かさない（S1-F2）。ずれは台帳に書く。
-- 止める: 最初の `meta` に `session_start` が無い・表の `late_start_day` が `s1_start_day + early_days` でない・`late_start_day` が記録（`handmark_day` の行）と表で 1 つに決まらない。
+- 止める: 最初の `meta` に `session_start` が無い・表の `early_days` が 1 未満・表の `late_start_day` が `s1_start_day + early_days` でない。
+- 窓の下端は `max_days` が無くても切る。年が `CLOCK_YEAR_RANGE`（2020〜2040）の外の時刻は経過の日に数えない（時計が先へ跳んだ行で経過が伸びない）。
+- 前期は記述なので、判定を止めない: `late_start_day` が記録と表で 1 つに決まらない・窓の 1 日目より後でないときは `early` を `null` にし、理由を `early_unavailable` に出す。
 
 ### K2⁗″ 前期の件数（記述・判断 47）
 
@@ -123,4 +125,4 @@
 ### K5‴ 陽性対照と変異
 
 - 合成の記録で: 30 日前の時刻の行があっても窓・経過・観測日は `session_start` の日から／1 日目より前の回答は数えない／表の `s1_start_day` が 2 日ずれても窓は動かずずれを +2 と出す／前期は `late_start_day` の前日まで（日数・観測日・詰まり・詰まりでない・C1 と C2 の中）／表だけでも前期を数える／`late_start_day` が分からなければ `null`／上の 4 つの止める場合。
-- 変異: 第 3 版の 11 個に、窓の 1 日目を全行の最小にする（`anytime`）・表の `s1_start_day` を窓の 1 日目にする（`tablestart`）・前期に `late_start_day` の日を含める（`earlyle`）を足す。どれも自己検査を赤にすること。窓の下端を外した写しでも赤になることを確かめた。
+- 変異: 第 3 版の 11 個に、窓の 1 日目を全行の最小にする（`anytime`）・表の `s1_start_day` を窓の 1 日目にする（`tablestart`）・前期に `late_start_day` の日を含める（`earlyle`）・窓の下端を外す（`nolower`）・年の範囲の外の時刻を数える（`nocapyear`）を足す。どれも自己検査を赤にすること（/cross-review の指摘で `nolower`・`nocapyear` と、前期の `cannot_answer`・前期のキー・null の理由の対照を足した）。
