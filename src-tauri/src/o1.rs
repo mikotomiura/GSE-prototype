@@ -454,6 +454,91 @@ pub const MAX_PLAUSIBLE_EPOCH_MS: u64 = 2_208_988_800_000;
 /// ⚠️ 中身は epoch ms が 1 行だけ。★ 被験者を特定できるものは 1 バイトも書かない。
 pub const CLOCK_HWM_FILE_NAME: &str = ".o1_clock_hwm";
 
+/// 今の時計が O1 の記録に使える範囲（[`MIN_PLAUSIBLE_EPOCH_MS`]〜[`MAX_PLAUSIBLE_EPOCH_MS`]）にあるか（純関数）。
+pub fn clock_is_plausible(now_ms: u64) -> bool {
+    (MIN_PLAUSIBLE_EPOCH_MS..=MAX_PLAUSIBLE_EPOCH_MS).contains(&now_ms)
+}
+
+/// 高水位（[`CLOCK_HWM_FILE_NAME`]）より古い時計を待つ回数の上限（1 秒に 1 回で 10 分）。
+///
+/// 高水位は前にしか動かないので、一度でも未来へずれた時計で書かれると、上限なしでは
+/// その時刻まで起動しなくなる（判断 4）。範囲の外の待ちには上限を置かない（判断 2）。
+pub const HWM_WAIT_MAX_SLEEPS: u64 = 600;
+
+/// [`wait_for_plausible_clock`] の結果。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClockWait {
+    /// 眠った回数（範囲の外の待ちと高水位の待ちの合計）。
+    pub slept: u64,
+    /// 高水位の待ちを上限で打ち切り、高水位より古い時計のまま始めた。
+    pub gave_up_below_hwm: bool,
+}
+
+/// 時計が範囲に入り、前回の高水位にも追いつくまで待つ（高水位の待ちは [`HWM_WAIT_MAX_SLEEPS`] まで）。
+///
+/// 2026-11-22、この Mac の起動直後の数分、時計が 1976 年になっていた。O1 はその時刻で記録を開き、
+/// 段 1 の無作為の枠の起点も 1976 年になった。時計が合った最初の 1 秒で、調停器が 50 年分の候補を
+/// 1 つずつ離席として抑え、1,907,310 行の `probe_suppressed` を書いた（208 MB）。
+/// → 記録のファイル名・起点・`meta` を決める前に、ここで待つ（`.steering/20261123-clock-jump-gate/`）。
+///
+/// 範囲の内でも、前回の起動の高水位より古い時計（ファームウェアの既定日など）は同じ追いかけを起こすので待つ。
+/// `on_wait` は眠り終えるたびに、眠った回数と眠る前に読んだ時刻を受ける（警告の間引きは呼び出し側）。
+pub fn wait_for_plausible_clock(
+    hwm: Option<u64>,
+    mut now_ms: impl FnMut() -> u64,
+    mut sleep: impl FnMut(),
+    mut on_wait: impl FnMut(u64, u64),
+) -> ClockWait {
+    let mut slept = 0u64;
+    let mut hwm_sleeps = 0u64;
+    loop {
+        let now = now_ms();
+        let below_hwm = hwm.is_some_and(|h| now < h);
+        if clock_is_plausible(now) {
+            if !below_hwm || hwm_sleeps >= HWM_WAIT_MAX_SLEEPS {
+                return ClockWait {
+                    slept,
+                    gave_up_below_hwm: below_hwm,
+                };
+            }
+            hwm_sleeps += 1;
+        }
+        sleep();
+        slept += 1;
+        on_wait(slept, now);
+    }
+}
+
+/// セッション置き場 `dir` の時計の高水位を読む（無い・壊れていれば `None`）。
+pub fn clock_hwm_in(dir: &Path) -> Option<u64> {
+    read_clock_hwm(&dir.join(CLOCK_HWM_FILE_NAME))
+}
+
+/// 高水位の待ちを打ち切ったときの、その高水位の値を置くファイル名（セッション置き場に置く）。
+///
+/// 高水位は孤児の回収が書き、時計がそれより古いと書き直さない。一度未来の値が書かれると下がらず、
+/// 起動のたびに 10 分待つことになる。→ 打ち切った値を覚え、高水位が同じ値の間は待たない（判断 5）。
+/// `gse_` で始まらないので、提出・削除の走査には掛からない。中身は epoch ms が 1 行だけ。
+pub const CLOCK_HWM_GAVE_UP_FILE_NAME: &str = ".o1_clock_hwm_gave_up";
+
+/// 打ち切りを覚えた高水位の値を読む（無い・壊れていれば `None`）。
+pub fn clock_hwm_gave_up_in(dir: &Path) -> Option<u64> {
+    read_clock_hwm(&dir.join(CLOCK_HWM_GAVE_UP_FILE_NAME))
+}
+
+/// 高水位の待ちを打ち切ったことを覚える。
+pub fn record_clock_hwm_gave_up(dir: &Path, hwm: u64) -> std::io::Result<()> {
+    std::fs::write(dir.join(CLOCK_HWM_GAVE_UP_FILE_NAME), format!("{hwm}\n"))
+}
+
+/// 待つべき高水位（純関数）。前に打ち切った値と同じなら待たない（`None`）。
+pub fn hwm_to_wait_for(hwm: Option<u64>, gave_up: Option<u64>) -> Option<u64> {
+    match (hwm, gave_up) {
+        (Some(h), Some(g)) if h == g => None,
+        _ => hwm,
+    }
+}
+
 /// ⚠️★★★ 行の分類規則は **`crate::ndjson_scan` が単一真実源**である。
 ///
 /// ★ 2026-09-03 の cross-review で、同じ規則が `packaging` / `reconcile` / ここの
@@ -1768,5 +1853,221 @@ mod tests {
         let id = install_id_from_bytes([0, 1, 0xab, 0xcd, 0xef, 0x10, 0x20, 0xff]);
         assert_eq!(id, "0001abcdef1020ff");
         assert!(is_valid_install_id(&id));
+    }
+
+    #[test]
+    fn plausible_clock_bounds() {
+        assert!(!clock_is_plausible(0));
+        assert!(!clock_is_plausible(197_132_474_227), "1976 年は範囲の外");
+        assert!(!clock_is_plausible(MIN_PLAUSIBLE_EPOCH_MS - 1));
+        assert!(clock_is_plausible(MIN_PLAUSIBLE_EPOCH_MS));
+        assert!(
+            clock_is_plausible(1_795_335_817_091),
+            "2026-11-22 は範囲の内"
+        );
+        assert!(clock_is_plausible(MAX_PLAUSIBLE_EPOCH_MS));
+        assert!(!clock_is_plausible(MAX_PLAUSIBLE_EPOCH_MS + 1));
+    }
+
+    #[test]
+    fn wait_returns_at_once_when_the_clock_is_plausible() {
+        let mut slept = 0u64;
+        let mut waits = Vec::new();
+        let w = wait_for_plausible_clock(
+            None,
+            || 1_795_335_817_091,
+            || slept += 1,
+            |k, t| waits.push((k, t)),
+        );
+        assert_eq!((w.slept, slept, w.gave_up_below_hwm), (0, 0, false));
+        assert!(waits.is_empty());
+    }
+
+    /// 2026-11-22 の形: 1976 年で起動し、数回後に 2026 年へ合う。合うまで眠り、合ったら抜ける。
+    #[test]
+    fn wait_sleeps_until_the_clock_becomes_plausible() {
+        let clock = std::cell::Cell::new(0usize);
+        let seq = [
+            197_132_424_000u64,
+            197_132_425_000,
+            197_132_426_000,
+            1_795_335_817_091,
+        ];
+        let mut slept = 0u64;
+        let mut waits = Vec::new();
+        let w = wait_for_plausible_clock(
+            None,
+            || seq[clock.get().min(seq.len() - 1)],
+            || {
+                slept += 1;
+                clock.set(clock.get() + 1);
+            },
+            |k, t| waits.push((k, t)),
+        );
+        assert_eq!((w.slept, slept), (3, 3));
+        assert_eq!(waits.len(), 3);
+        assert_eq!(waits[0], (1, 197_132_424_000));
+    }
+
+    /// `on_wait` は眠り終えてから呼ぶ（「n 秒待った」の n が実際に眠った回数と合う）。
+    #[test]
+    fn on_wait_is_called_after_each_sleep() {
+        let clock = std::cell::Cell::new(0usize);
+        let seq = [0u64, 0, 1_795_335_817_091];
+        let log = std::cell::RefCell::new(Vec::new());
+        wait_for_plausible_clock(
+            None,
+            || seq[clock.get().min(seq.len() - 1)],
+            || {
+                log.borrow_mut().push("sleep");
+                clock.set(clock.get() + 1);
+            },
+            |_, _| log.borrow_mut().push("on_wait"),
+        );
+        assert_eq!(*log.borrow(), ["sleep", "on_wait", "sleep", "on_wait"]);
+    }
+
+    /// 未来側にずれた時計（2040 年より後）も待つ。
+    #[test]
+    fn wait_also_waits_for_a_clock_in_the_far_future() {
+        let clock = std::cell::Cell::new(0usize);
+        let seq = [MAX_PLAUSIBLE_EPOCH_MS + 1, 1_795_335_817_091];
+        let mut slept = 0u64;
+        let w = wait_for_plausible_clock(
+            None,
+            || seq[clock.get().min(seq.len() - 1)],
+            || {
+                slept += 1;
+                clock.set(clock.get() + 1);
+            },
+            |_, _| {},
+        );
+        assert_eq!((w.slept, slept), (1, 1));
+    }
+
+    /// 偽の時計: 呼ぶたびに `seq` を 1 つ進める（最後の値に留まる）。
+    /// 眠りが 10,000 回を超えたら落とす（待ちが終わらない誤りを、止まりではなく赤にする）。
+    fn run_wait(hwm: Option<u64>, seq: &[u64]) -> ClockWait {
+        let i = std::cell::Cell::new(0usize);
+        wait_for_plausible_clock(
+            hwm,
+            || seq[i.get().min(seq.len() - 1)],
+            || {
+                i.set(i.get() + 1);
+                assert!(i.get() <= 10_000, "待ちが終わらない");
+            },
+            |_, _| {},
+        )
+    }
+
+    const NOW_2026: u64 = 1_795_335_817_091;
+    const BIOS_2024: u64 = 1_704_067_200_000;
+
+    /// ファームウェアの既定日（範囲の内・前回の高水位より古い）で起動し、数秒後に合う形。
+    #[test]
+    fn wait_for_the_clock_to_pass_the_high_water_mark() {
+        let w = run_wait(Some(NOW_2026 - 60_000), &[BIOS_2024, BIOS_2024, NOW_2026]);
+        assert_eq!(
+            w,
+            ClockWait {
+                slept: 2,
+                gave_up_below_hwm: false
+            }
+        );
+    }
+
+    /// 高水位ちょうどは待たない（前にしか動かない印と同じ時刻は「古い」ではない）。
+    #[test]
+    fn a_clock_equal_to_the_high_water_mark_does_not_wait() {
+        let w = run_wait(Some(NOW_2026), &[NOW_2026]);
+        assert_eq!(
+            w,
+            ClockWait {
+                slept: 0,
+                gave_up_below_hwm: false
+            }
+        );
+    }
+
+    /// 未来の高水位（一度ずれた時計で書かれた）には追いつけない。上限で打ち切って始める。
+    #[test]
+    fn a_future_high_water_mark_is_given_up_after_the_limit() {
+        let w = run_wait(Some(2_051_222_400_000), &[NOW_2026]);
+        assert_eq!(
+            w,
+            ClockWait {
+                slept: HWM_WAIT_MAX_SLEEPS,
+                gave_up_below_hwm: true
+            }
+        );
+    }
+
+    /// 範囲の外の待ちは上限に数えない（1976 年の間に高水位の 10 分を使い切らない）。
+    #[test]
+    fn out_of_range_sleeps_do_not_use_the_high_water_budget() {
+        let mut seq = vec![197_132_424_000u64; HWM_WAIT_MAX_SLEEPS as usize + 5];
+        seq.push(BIOS_2024);
+        seq.push(NOW_2026);
+        let w = run_wait(Some(NOW_2026 - 60_000), &seq);
+        assert_eq!(
+            w,
+            ClockWait {
+                slept: HWM_WAIT_MAX_SLEEPS + 6, // 範囲の外 605 回＋既定日 1 回
+                gave_up_below_hwm: false
+            }
+        );
+    }
+
+    /// 600 回目の眠りの後の読みで高水位に届けば、打ち切りではない（上限の境界の内側）。
+    #[test]
+    fn reaching_the_high_water_mark_on_the_last_allowed_read_is_not_a_give_up() {
+        let mut seq = vec![BIOS_2024; HWM_WAIT_MAX_SLEEPS as usize];
+        seq.push(NOW_2026);
+        let w = run_wait(Some(NOW_2026 - 60_000), &seq);
+        assert_eq!(
+            w,
+            ClockWait {
+                slept: HWM_WAIT_MAX_SLEEPS,
+                gave_up_below_hwm: false
+            }
+        );
+    }
+
+    /// 前に打ち切った高水位と同じなら待たない。高水位が動いたら（別の値なら）また待つ。
+    #[test]
+    fn a_high_water_mark_given_up_once_is_not_waited_for_again() {
+        assert_eq!(hwm_to_wait_for(None, None), None);
+        assert_eq!(hwm_to_wait_for(Some(NOW_2026), None), Some(NOW_2026));
+        assert_eq!(hwm_to_wait_for(Some(NOW_2026), Some(NOW_2026)), None);
+        assert_eq!(
+            hwm_to_wait_for(Some(NOW_2026 + 1), Some(NOW_2026)),
+            Some(NOW_2026 + 1)
+        );
+        assert_eq!(hwm_to_wait_for(None, Some(NOW_2026)), None);
+    }
+
+    #[test]
+    fn gave_up_mark_round_trips_and_stays_out_of_session_scans() {
+        assert!(!CLOCK_HWM_GAVE_UP_FILE_NAME.starts_with("gse_"));
+        assert!(!is_o1_session_file_name(CLOCK_HWM_GAVE_UP_FILE_NAME));
+        assert!(!is_o1_age_file_name(CLOCK_HWM_GAVE_UP_FILE_NAME));
+        let dir = sweep_dir("clock_hwm_gave_up");
+        assert_eq!(clock_hwm_gave_up_in(&dir), None);
+        record_clock_hwm_gave_up(&dir, NOW_2026).unwrap();
+        assert_eq!(clock_hwm_gave_up_in(&dir), Some(NOW_2026));
+        // 高水位そのものには触れない
+        assert_eq!(clock_hwm_in(&dir), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clock_hwm_in_reads_the_mark_and_tolerates_absence() {
+        let dir = sweep_dir("clock_hwm_in");
+        assert_eq!(clock_hwm_in(&dir), None);
+        std::fs::write(dir.join(CLOCK_HWM_FILE_NAME), "1795335817091\n").unwrap();
+        assert_eq!(clock_hwm_in(&dir), Some(NOW_2026));
+        std::fs::write(dir.join(CLOCK_HWM_FILE_NAME), "garbage").unwrap();
+        assert_eq!(clock_hwm_in(&dir), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
