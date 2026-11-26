@@ -1,5 +1,7 @@
 # 次のセッション: Mh-D（推定器）を入力から強くする —— S1-E8 の入力の候補づくりと、3 名の端末で記録されるかの確かめ
 
+> まとめの引き継ぎ `.steering/_handoff/next-session-gse-integrated-before-freeze-then-slides.md` の段 A の 1 本。段 1 の事前登録の凍結（worktree `/Users/johnd/GSE-prototype-prereg-values`）の前に結論を出し、その decisions.md に写す。凍結の門はまとめの引き継ぎにある。
+
 作成: 2026-11-26（`.steering/20261126-gse-concept-field-companion/` 判断 13）。
 
 ## なぜ
