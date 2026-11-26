@@ -14,6 +14,7 @@ import bisect
 import json
 import math
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -23,6 +24,7 @@ BUILD = os.path.join(EXP, "../20261102-stall-decomposition/o1")
 DAYSIM = os.path.join(EXP, "../20261103-mhd-dryrun-v2/scripts")
 
 # 変異（check_mutations.py だけが設定する）: strat / unanswered / cutoff0 / early / gt / nowindow / crossday / nolatcap
+#   / endpoint（停滞の中の対応を窓の終わりに戻す）/ noclock（時計の狂った記録を除かない）
 MUTATE = os.environ.get("STOPRULE_MUTATE") or None
 
 DAY_CUTOFF_HOUR = 4          # eh3::DAY_CUTOFF_HOUR
@@ -31,6 +33,12 @@ STUCK = ("stuck",)           # S1-A3 が決めるまでの既定（引数で替�
 EXCLUDED = ("cannot_answer",)
 LATENCY_CAP_MS = 600_000     # S1-A4（判断 19）: これを超えて答えた回答は未回答と同じに扱う（2 分は感度の記述）
 STRATA = ("random", "low_operation_end", "resumption")
+# 停滞の中の対応（S1-B1・判断 22）: 回答の窓 [recall_window_start_ms, recall_window_end_ms] の半分以上が
+# 停滞の区間に入るとき中と数える。end（第 2 版までの仮・窓の終わり）と contain（丸ごと・S1-B2 の感度）は引数で選ぶ
+IN_STALL_RULES = ("majority", "end", "contain")
+IN_STALL = "majority"
+# 時計の狂った起動で始まった記録（名前の年が 2020〜2040 の外・PR #435 の判断 3）は名前で除く
+CLOCK_YEAR_RANGE = (2020, 2040)
 # 第 2 版（判断 8）: 区間の幅は判定に入れない（記述）。auc・sd_day・rho_day は幅の見込みを出すときだけ使う
 VALUE_KEYS = ("min_days", "min_stuck", "min_nonstuck", "min_in_c1", "min_in_c2", "min_assigned_days", "max_days")
 WIDTH_KEYS = ("auc", "sd_day", "rho_day")
@@ -89,6 +97,32 @@ def in_spans(spans, t):
     return i >= 0 and spans[i][1] >= t
 
 
+def in_stall(spans, a, b, rule=IN_STALL):
+    """回答の窓 [a, b] が停滞の区間（spans・閉区間・互いに交わらない）に入るか。
+
+    majority: 窓と区間の重なりの長さの和が窓の長さの半分以上（ちょうど半分は中）。
+    end: 窓の終わり b が区間のどれかに入る。contain: 窓が 1 つの区間に丸ごと入る。
+    """
+    if MUTATE == "endpoint":
+        rule = "end"
+    if rule == "end":
+        return in_spans(spans, b)
+    if rule == "contain":
+        return any(s <= a and b <= e for s, e in spans)
+    if rule != "majority":
+        raise ValueError(rule)
+    ov = sum(max(0, min(b, e) - max(a, s)) for s, e in spans if e >= a and s <= b)
+    return 2 * ov >= (b - a)
+
+
+def clock_excluded(name):
+    """記録の名前（gse_<mode>_YYYYMMDD_HHMMSS.ndjson）の年が範囲の外なら True。"""
+    if MUTATE == "noclock":
+        return False
+    m = re.search(r"_(\d{4})\d{4}_\d{6}", name)
+    return bool(m) and not (CLOCK_YEAR_RANGE[0] <= int(m.group(1)) <= CLOCK_YEAR_RANGE[1])
+
+
 def quartiles(xs):
     if not xs:
         return None
@@ -100,7 +134,7 @@ def quartiles(xs):
     return [q(0.25), q(0.5), q(0.75)]
 
 
-def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, max_days=None):
+def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, max_days=None, rule=IN_STALL):
     """records: read_record の列。episodes: 同じ順の {"C1": [(a, b)], "C2": [(a, b)]}（ms・閉区間）。
 
     max_days があれば、最初の日から max_days 日（両端を含む）の窓の中の回答と割付だけを数える
@@ -172,7 +206,7 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
                 cls = 2
                 n_nonstuck += 1
             for k in in_c:
-                if in_spans(spans.get(k, []), t_end):
+                if in_stall(spans.get(k, []), t_start, t_end, rule):
                     in_c[k][0] += 1
                     if cls is not None:
                         in_c[k][cls] += 1
@@ -200,7 +234,9 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         "lambda_per_observed_day": (n_random_ans / obs_days) if obs_days else None,
         "pi_stuck": (n_stuck / (n_stuck + n_nonstuck)) if (n_stuck + n_nonstuck) else None,
         "rules": {"stuck": list(stuck), "excluded": list(excluded), "day_cutoff_hour": DAY_CUTOFF_HOUR,
-                  "in_stall": "recall_window_end_ms in [onset, resume or interval end]",
+                  "in_stall": {"majority": "at least half of [recall_window_start_ms, recall_window_end_ms] inside [onset, resume or interval end]",
+                               "end": "recall_window_end_ms in [onset, resume or interval end]",
+                               "contain": "whole recall window inside one [onset, resume or interval end]"}[rule],
                   "cross_day": "window start and end on different local days are not counted",
                   "latency_cap_ms": LATENCY_CAP_MS},
     }
@@ -300,6 +336,13 @@ def episodes_from_records(paths, work, replay):
 
 def cmd_count(a):
     paths = sorted(os.path.join(a.records, n) for n in os.listdir(a.records) if n.endswith(".ndjson"))
+    n_clock = 0
+    if a.manifest:
+        # 写しの名前（r001 など）から元の名前を引き、時計の狂った起動で始まった記録を除く（件数だけ出す）
+        names = {os.path.basename(r["copy"]): r["name"] for r in json.load(open(a.manifest))["records"]}
+        keep = [p for p in paths if not clock_excluded(names.get(os.path.basename(p), ""))]
+        n_clock = len(paths) - len(keep)
+        paths = keep
     if not paths:
         sys.exit("記録の写しが無い")
     recs = [read_record(p) for p in paths]
@@ -309,8 +352,9 @@ def cmd_count(a):
         v = json.load(open(a.values))
         check_values(v)
     c = count(recs, eps, a.utc_offset_secs, tuple(a.stuck.split(",")), tuple(a.excluded.split(",")),
-              max_days=v["max_days"] if v else None)
+              max_days=v["max_days"] if v else None, rule=a.in_stall)
     c["files"] = len(paths)
+    c["excluded_clock_files"] = n_clock
     c["c0_selfcheck"] = selfcheck
     if v:
         # 幅は記述だけ（判定に入れない・判断 8）。値に AUC と日の揺れがあるときだけ見込む
@@ -359,6 +403,8 @@ def main(argv):
     p.add_argument("--utc-offset-secs", type=int, required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--values")
+    p.add_argument("--manifest", help="prepare_records.py の対応表。あれば時計の狂った記録を名前で除く")
+    p.add_argument("--in-stall", choices=IN_STALL_RULES, default=IN_STALL, help="停滞の中の対応（S1-B1）")
     p.add_argument("--stuck", default=",".join(STUCK))
     p.add_argument("--excluded", default=",".join(EXCLUDED))
     p.add_argument("--reps", type=int, default=200)

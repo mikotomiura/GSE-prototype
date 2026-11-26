@@ -40,7 +40,7 @@ case "$MODE" in
     trap 'rm -rf "$WORK"' EXIT
     "$PY" -I "$PREP" --records-dir "$RECORDS_DIR" --out "$WORK/rec" --manifest "$WORK/manifest.json" >&2
     OUT="${COUNTS_OUT:-$EXP_DIR/results/records/counts.json}"; mkdir -p "$(dirname "$OUT")"
-    ARGS=(count --records "$WORK/rec" --work "$WORK/mid" --replay "$REPLAY" --utc-offset-secs "$UTC_OFFSET_SECS" --out "$OUT" --seed "$SEED")
+    ARGS=(count --records "$WORK/rec" --manifest "$WORK/manifest.json" --work "$WORK/mid" --replay "$REPLAY" --utc-offset-secs "$UTC_OFFSET_SECS" --out "$OUT" --seed "$SEED")
     [ -n "${VALUES_JSON:-}" ] && ARGS+=(--values "$VALUES_JSON")
     "$PY" -I "$SC/stoprule.py" "${ARGS[@]}"
     ;;

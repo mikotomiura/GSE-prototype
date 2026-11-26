@@ -120,10 +120,27 @@ def main():
     lines = [{"type": "meta", "session_start": tt, "s1_mode": "marker"}]
     lines += probe("x", tt, "random", "stuck")             # 窓の終わり tt − 1000
     lines += probe("y", tt + H, "random", "deliberating")  # 窓の終わり tt + H − 1000
-    e = tt - 1000
-    c = run_count([lines], [{"C1": [(e, e + 10)], "C2": [(e + 1, tt + H - 1000)]}])
-    check("C1 の始まりちょうどは中", c["in_C1"]["answered"] == 1 and c["in_C1"]["stuck"] == 1)
-    check("C2 の始まりの手前は外・終わりちょうどは中", c["in_C2"]["answered"] == 1 and c["in_C2"]["nonstuck"] == 1)
+    # 窓は [t − 31 000, t − 1000]（30 秒）。過半の規則（S1-B1・判断 22）: 重なりが 15 秒ちょうどなら中、1 ms 足りなければ外
+    c = run_count([lines], [{"C1": [(tt - 16_000, tt + 5000)], "C2": [(tt + H - 15_999, tt + H + 5000)]}])
+    check("窓の半分ちょうどが停滞に入れば中", c["in_C1"]["answered"] == 1 and c["in_C1"]["stuck"] == 1)
+    check("半分に 1 ms 足りなければ外（窓の終わりは停滞の中でも）", c["in_C2"]["answered"] == 0)
+    # 窓の後半が停滞・前半が別の停滞（同じ種類）なら、重なりの和で数える
+    c = run_count([lines], [{"C1": [(tt - 31_000, tt - 24_000), (tt - 8000, tt)], "C2": []}])
+    check("同じ種類の停滞 2 つの重なりの和（7 + 7 秒）は半分に足りず外", c["in_C1"]["answered"] == 0)
+    c = run_count([lines], [{"C1": [(tt - 31_000, tt - 23_000), (tt - 8000, tt)], "C2": []}])
+    check("重なりの和が 8 + 7 秒で半分ちょうどなら中", c["in_C1"]["answered"] == 1)
+    # 丸ごとの規則（感度）は引数で選べる
+    tmp = tempfile.mkdtemp()
+    pth = os.path.join(tmp, "r.ndjson")
+    write(pth, lines)
+    cc = sr.count([sr.read_record(pth)], [{"C1": [(tt - 31_000, tt)], "C2": [(tt - 30_999, tt)]}], JST, rule="contain")
+    check("丸ごとの規則: 窓の始まりちょうどからなら中・1 ms 遅れれば外",
+          cc["in_C1"]["answered"] == 1 and cc["in_C2"]["answered"] == 0)
+
+    # ---- 時計の狂った起動で始まった記録は名前で除く（PR #435 の判断 3）
+    check("1976 年・1970 年の名前は除き、2026 年は残す",
+          sr.clock_excluded("gse_o1_19760331_150024.ndjson") and sr.clock_excluded("gse_s1_19700101_090000.ndjson")
+          and not sr.clock_excluded("gse_s1_20261126_100000.ndjson"))
 
     # ---- 割付の日数（日ごとの最後の行）
     d0 = sr.local_day(tt, JST)
@@ -142,8 +159,8 @@ def main():
     # 停滞の中の回答: 各日の最初の 2 件を C1・C2 に入れる
     for d in range(M + 5):
         t0 = day_start_ms(d) + 6 * H
-        eps["C1"].append((t0 - 2000, t0))
-        eps["C2"].append((t0 + 30 * 60_000 - 2000, t0 + 30 * 60_000))
+        eps["C1"].append((t0 - 31_000, t0))
+        eps["C2"].append((t0 + 30 * 60_000 - 31_000, t0 + 30 * 60_000))
     c = run_count([full], [eps], max_days=M)
     check("窓の中だけ数える（観測日 20・回答 60・割付は窓の中の 1 日）",
           c["observed_days"] == M and c["random_answered"] == 3 * M and c["assigned_days"] == 1)
