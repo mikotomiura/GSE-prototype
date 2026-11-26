@@ -175,6 +175,53 @@ fn handmark_tray_after(
     }
 }
 
+/// 手跡の「ほかの窓をどける」／「窓を戻す」の項目の ID(窓を出している間だけ「やめる」の上に出す)。
+const MENU_HANDMARK_REVEAL: &str = "gse-tray-handmark-reveal";
+
+/// どける項目の状態(駆動役が書き、更新スレッドが読む)。0 = 出さない・1 = どける・2 = 戻す。
+static HANDMARK_REVEAL: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+/// メニューに実際に出しているどける項目の状態(更新スレッドが書き、押下の処理が読む)。
+static HANDMARK_REVEAL_SHOWN: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn reveal_item_code(t: crate::handmark_driver::RevealItem) -> u8 {
+    use crate::handmark_driver::RevealItem;
+    match t {
+        RevealItem::Hidden => 0,
+        RevealItem::Reveal => 1,
+        RevealItem::Return => 2,
+    }
+}
+
+fn reveal_item_from_code(c: u8) -> crate::handmark_driver::RevealItem {
+    use crate::handmark_driver::RevealItem;
+    match c {
+        1 => RevealItem::Reveal,
+        2 => RevealItem::Return,
+        _ => RevealItem::Hidden,
+    }
+}
+
+/// どける項目の出し入れの計画(「やめる」の項目と同じ規則・文言だけが違う)。
+fn reveal_tray_plan(
+    want: crate::handmark_driver::RevealItem,
+    shown: crate::handmark_driver::RevealItem,
+) -> HandmarkTrayPlan {
+    use crate::handmark_driver::RevealItem;
+    if want == shown {
+        return HandmarkTrayPlan::Nothing;
+    }
+    match (want.label(), shown) {
+        (None, _) => HandmarkTrayPlan::Remove,
+        (Some(label), RevealItem::Hidden) => HandmarkTrayPlan::Insert(label),
+        (Some(label), _) => HandmarkTrayPlan::Relabel(label),
+    }
+}
+
+/// 駆動役がどける項目の状態を知らせる(出し入れは更新スレッドが 1 秒ごとに行う)。
+pub fn set_handmark_reveal_item(t: crate::handmark_driver::RevealItem) {
+    HANDMARK_REVEAL.store(reveal_item_code(t), Ordering::Release);
+}
+
 /// 手跡の「カーソル」「クリック」のチェックの項目の ID(窓を出している日だけ出す)。
 const MENU_HANDMARK_CURSOR: &str = "gse-tray-handmark-cursor";
 const MENU_HANDMARK_CLICK: &str = "gse-tray-handmark-click";
@@ -357,10 +404,11 @@ fn handmark_input_reconcile(
     force: bool,
 ) -> Option<bool> {
     let want = input_from_code(HANDMARK_INPUT_WANT[which].load(Ordering::Acquire));
+    // 並び: カーソル・クリック・ほかの窓をどける・やめる・終了
     let before: &[&str] = if which == INPUT_CURSOR {
-        &[MENU_HANDMARK_CLICK, MENU_HANDMARK]
+        &[MENU_HANDMARK_CLICK, MENU_HANDMARK_REVEAL, MENU_HANDMARK]
     } else {
-        &[MENU_HANDMARK]
+        &[MENU_HANDMARK_REVEAL, MENU_HANDMARK]
     };
     let mut retry = false;
     let after = handmark_input_step(want, shown, force, |plan| {
@@ -490,6 +538,12 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                     app,
                     handmark_item_from_code(HANDMARK_TRAY_SHOWN.load(Ordering::Acquire)),
                 );
+            } else if event.id.as_ref() == MENU_HANDMARK_REVEAL {
+                // ⚠️ 選んだことは applog にも出さない(どけた回数が日の累計に足されるだけ)。
+                crate::handmark_reveal_from_tray(
+                    app,
+                    reveal_item_from_code(HANDMARK_REVEAL_SHOWN.load(Ordering::Acquire)),
+                );
             } else if event.id.as_ref() == MENU_HANDMARK_CURSOR {
                 // ⚠️ 選んだことは applog にも出さない(日の行に入れ切りの時刻が残るだけ)。
                 handmark_input_pressed(app, INPUT_CURSOR);
@@ -506,6 +560,14 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
     let tray = builder.build(app)?;
     // 手跡の項目(今日の割付が出す日のときだけ駆動役が `Hidden` 以外にする)
     let handmark_menu_item = MenuItem::with_id(app, MENU_HANDMARK, "やめる", true, None::<&str>)?;
+    // ほかの窓をどける(窓を出している間だけ「やめる」の上に出す)
+    let handmark_reveal_item = MenuItem::with_id(
+        app,
+        MENU_HANDMARK_REVEAL,
+        "ほかの窓をどける",
+        true,
+        None::<&str>,
+    )?;
     // 入力ごとの入れ切り(窓を出している日だけ「やめる」の上に出す。文言は入力の名前だけ)
     let handmark_cursor_item = CheckMenuItem::with_id(
         app,
@@ -534,6 +596,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             let mut insert_failure_warned = false;
             // 手跡の項目をいま差し込んでいる文言
             let mut handmark_shown = crate::handmark_driver::TrayItem::Hidden;
+            // どける項目をいま差し込んでいる文言
+            let mut reveal_shown = crate::handmark_driver::RevealItem::Hidden;
             // 入力の項目(カーソル・クリック)をいま出している状態
             let mut input_shown: [Option<bool>; 2] = [None, None];
             loop {
@@ -578,6 +642,30 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                     // 押下の照合に使う値は、出し入れ・文言の変更のどれでも成功したときに更新する
                     HANDMARK_TRAY_SHOWN
                         .store(handmark_item_code(handmark_shown), Ordering::Release);
+                }
+                // どける項目: 「やめる」の直前(無ければ終了の直前)に差し込む
+                let want = reveal_item_from_code(HANDMARK_REVEAL.load(Ordering::Acquire));
+                let plan = reveal_tray_plan(want, reveal_shown);
+                let ok = match plan {
+                    HandmarkTrayPlan::Nothing => true,
+                    HandmarkTrayPlan::Remove => menu.remove(&handmark_reveal_item).is_ok(),
+                    HandmarkTrayPlan::Relabel(label) => {
+                        handmark_reveal_item.set_text(label).is_ok()
+                    }
+                    HandmarkTrayPlan::Insert(label) => {
+                        let ids: Vec<String> = menu
+                            .items()
+                            .map(|v| v.iter().map(|k| k.id().as_ref().to_string()).collect())
+                            .unwrap_or_default();
+                        let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+                        let position = handmark_input_index(&refs, &[MENU_HANDMARK]);
+                        handmark_reveal_item.set_text(label).is_ok()
+                            && menu.insert(&handmark_reveal_item, position).is_ok()
+                    }
+                };
+                if plan != HandmarkTrayPlan::Nothing {
+                    reveal_shown = if ok { want } else { reveal_shown };
+                    HANDMARK_REVEAL_SHOWN.store(reveal_item_code(reveal_shown), Ordering::Release);
                 }
                 // 入力の項目: クリックが先(カーソルの項目の位置がクリックの前に決まるように)
                 let force = HANDMARK_INPUT_RESYNC.swap(false, Ordering::AcqRel);
@@ -734,6 +822,67 @@ mod tests {
         for t in [TrayItem::Hidden, TrayItem::Stop, TrayItem::Restore] {
             assert_eq!(handmark_item_from_code(handmark_item_code(t)), t);
         }
+        // 「ほかの窓をどける」／「窓を戻す」も同じ語の検査（同意文書の語にそろえる・判断 4）
+        use crate::handmark_driver::RevealItem;
+        for t in [RevealItem::Reveal, RevealItem::Return] {
+            let label = t.label().expect("label");
+            for w in banned {
+                assert!(!label.contains(w), "{label:?} has {w:?}");
+            }
+        }
+        assert_eq!(RevealItem::Reveal.label(), Some("ほかの窓をどける"));
+        assert_eq!(RevealItem::Return.label(), Some("窓を戻す"));
+        assert_eq!(RevealItem::Hidden.label(), None);
+        for t in [RevealItem::Hidden, RevealItem::Reveal, RevealItem::Return] {
+            assert_eq!(reveal_item_from_code(reveal_item_code(t)), t);
+        }
+    }
+
+    /// どける項目の出し入れの計画と、並び（カーソル・クリック・ほかの窓をどける・やめる・終了）。
+    #[test]
+    fn reveal_item_plan_and_position() {
+        use crate::handmark_driver::RevealItem;
+        assert_eq!(
+            reveal_tray_plan(RevealItem::Reveal, RevealItem::Reveal),
+            HandmarkTrayPlan::Nothing
+        );
+        assert_eq!(
+            reveal_tray_plan(RevealItem::Reveal, RevealItem::Hidden),
+            HandmarkTrayPlan::Insert("ほかの窓をどける")
+        );
+        assert_eq!(
+            reveal_tray_plan(RevealItem::Return, RevealItem::Reveal),
+            HandmarkTrayPlan::Relabel("窓を戻す")
+        );
+        assert_eq!(
+            reveal_tray_plan(RevealItem::Hidden, RevealItem::Return),
+            HandmarkTrayPlan::Remove
+        );
+        let quit = "gse-tray-quit";
+        // やめるの直前
+        let ids = ["status", "sep", MENU_HANDMARK, quit];
+        assert_eq!(handmark_input_index(&ids, &[MENU_HANDMARK]), 2);
+        // クリックはどける項目の前、カーソルはクリックの前
+        let ids = ["status", "sep", MENU_HANDMARK_REVEAL, MENU_HANDMARK, quit];
+        assert_eq!(
+            handmark_input_index(&ids, &[MENU_HANDMARK_REVEAL, MENU_HANDMARK]),
+            2
+        );
+        let ids = [
+            "status",
+            "sep",
+            MENU_HANDMARK_CLICK,
+            MENU_HANDMARK_REVEAL,
+            MENU_HANDMARK,
+            quit,
+        ];
+        assert_eq!(
+            handmark_input_index(
+                &ids,
+                &[MENU_HANDMARK_CLICK, MENU_HANDMARK_REVEAL, MENU_HANDMARK]
+            ),
+            2
+        );
     }
 
     /// 手跡の項目: 出す・文言を替える・隠すのどれでも、成功したときに照合の値が実際の表示になる。

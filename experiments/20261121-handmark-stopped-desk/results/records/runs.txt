@@ -1,0 +1,4 @@
+{"event":"started","run":"20261122T131407Z_30794","commit":"582f1d10600bb0ff5e5c83da825a3c886ccd07f6","dirty_files":0}
+{"event":"aborted","run":"20261122T131407Z_30794","reason":"meta.session_start out of range in 2 records (clock at 1976 right after boot); rerun without them (decision 15)"}
+{"event":"started","run":"20261122T133821Z_33994","commit":"582f1d10600bb0ff5e5c83da825a3c886ccd07f6","dirty_files":0}
+{"event":"finished","run":"20261122T133821Z_33994"}

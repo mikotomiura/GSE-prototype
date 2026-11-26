@@ -35,6 +35,8 @@ export type S1CardState =
       probe_id: string;
       window_start_ms: number;
       window_end_ms: number;
+      /** いま尋ねている問い（ADR-057）。backend `s1_driver::ProbeStep`。 */
+      step: ProbeStep;
     }
   | {
       kind: "day";
@@ -45,24 +47,37 @@ export type S1CardState =
       quit_flow: boolean;
     };
 
+/** 段 1 のカードで尋ねている問い（Q3 何をしていたか → 詰まり・熟考・作業なら Q1 摩擦 → Q2 前進・ADR-057）。 */
+export type ProbeStep = "q3" | "q1" | "q2";
+
+/** 答えのキーの状態（backend `S1AnswerKeysView`・`get_s1_answer_keys` / `s1_answer_keys`）。 */
+export interface S1AnswerKeys {
+  /** 登録できていて、キーで答えられる。`false` ならキーの表示を出さない（ボタンで答える）。 */
+  active: boolean;
+  /** 修飾キーの名前（macOS "⌥"・Windows "Ctrl＋Alt"・ADR-057 判断 8）。 */
+  modifier: string;
+}
+
 /** backend `get_s1_mode` と同期。 */
 export interface S1ModeDto {
   s1: boolean;
   consent: boolean;
 }
 
-/** 6 択の値（backend `logger::ActivityCategory` と同じ・ADR-031 D3 の固定 6 択）。 */
+/** 7 択の値（backend `logger::ActivityCategory` と同じ・ADR-031 D3 と ADR-055 の固定 7 択）。 */
 export type ActivityCategory =
   | "deliberating"
   | "stuck"
   | "external_material"
   | "conversation"
   | "away"
+  | "working"
   | "cannot_answer";
 
 /**
- * 6 択の表示の文（ADR-031 の「熟考・詰まり・外部資料・会話・離席・回答不能」と
- * `logger::ActivityCategory` の doc）。⚠️ 選択肢を足さない・自由記述を置かない（data-privacy ルール 7）。
+ * 7 択の表示の文（ADR-031 の「熟考・詰まり・外部資料・会話・離席・回答不能」に ADR-055 が「作業」を
+ * 足した。`logger::ActivityCategory` の doc）。並びは ADR-055 D3（既存 5 つの位置と、回答不能が最後を保つ）。
+ * ⚠️ 選択肢を足すには別 ADR が要る・自由記述を置かない（data-privacy ルール 7）。
  */
 export const ACTIVITY_CHOICES: ReadonlyArray<{
   value: ActivityCategory;
@@ -74,5 +89,7 @@ export const ACTIVITY_CHOICES: ReadonlyArray<{
   { value: "external_material", label: "外部資料", note: "本・書類・画面などを読んでいた" },
   { value: "conversation", label: "会話", note: "会話・通話・打ち合わせをしていた" },
   { value: "away", label: "離席", note: "その場を離れていた" },
+  { value: "working", label: "作業", note: "手を動かして作業を進めていた。入力・編集・単純作業を含む" },
+  // ↑ カードは説明を（）で包むので、括弧を二重にしない（同意文書とフォームは「〜（入力・編集・単純作業を含む）」）。
   { value: "cannot_answer", label: "回答不能", note: "思い出せない・当てはまらない" },
 ];

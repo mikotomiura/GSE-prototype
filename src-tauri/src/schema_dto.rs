@@ -431,11 +431,14 @@ pub enum LogEntryDto {
     ///
     /// **不変条件 (schema では緩く、producer 側で強制)**:
     /// - skip (`answered=false`) ⇒ `q1_friction`/`q2_progress` は null
-    /// - `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5
+    /// - `q1_friction`/`q2_progress` があれば 1..=5。`q2_progress` は `q1_friction` が無ければ null
+    /// - 較正と自己マーカーの `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5
+    /// - 段 1（3 名の版・ADR-057）の `answered=true` は、答えた分だけ q が入り残りは null
+    ///   （Q3 の選択肢によって Q1・Q2 を聞かない、または答える前に閉じた。対の `activity_label` で分かる）
     /// - `source=self_marker` ⇒ `probe_id` は null
     ///
-    /// `logger.rs` の `LogEntry::realtime_label_answered` / `..._skipped` コンストラクタが
-    /// これらを保証する。schemars は Option を緩く出すため validator 側で補検証する。
+    /// `logger.rs` の `LogEntry::realtime_label_answered` / `..._s1_answered` / `..._skipped`
+    /// コンストラクタがこれらを保証する。schemars は Option を緩く出すため validator 側で補検証する。
     RealtimeLabel {
         probe_id: Option<String>,
         source: ProbeSourceDto,
@@ -645,6 +648,11 @@ pub enum LogEntryDto {
         shown_ms: u64,
         /// 帯（下の縁）が出ていて、覆われておらず、画面のロック・ユーザーの切り替え・主画面のスリープの最中でなかった時間（ms）。ロックしないスクリーンセーバーと Dock に隠れた分は差し引けない。背景の層は数えない（透明な部分が多く、覆われていても見えている扱いになりうるため）。記録が無いときは null。
         visible_ms: Option<u64>,
+        /// その日にトレイの「ほかの窓をどける」を選んだ回数（どけただけ数え、戻したのは数えない）。押した時刻は持たない
+        /// （回数は次の 5 分ごとの行に載る）。記録の一時停止中は数えない。区間指定削除では `shown_ms` と同じく、区間の
+        /// 直前と直後の行の差を区間より後の同じ日の行と走行中の累計から引く。記録が無いときは null。古い行には無い。
+        #[serde(default)]
+        reveal_count: Option<u64>,
         /// 切った（`on: false`）／戻した（`on: true`）時刻。
         toggles: Vec<HandmarkToggleDto>,
         /// 入力ごとに切った／戻した（カーソル・クリック）。ポインタの値は持たない。区間指定削除では `toggles` と同じく区間に入る要素を消す。古い行には無い。
@@ -885,10 +893,11 @@ pub enum ProbeStratumDto {
     Resumption,
 }
 
-/// `activity_label` の行動カテゴリ (ADR-031 D3)。固定 6 択で、増やすには別 ADR が要る。
+/// `activity_label` の行動カテゴリ (ADR-031 D3・ADR-055)。固定 7 択で、増やすには別 ADR が要る。
 ///
 /// 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
-/// 「熟考・詰まり・外部資料・会話・離席・回答不能」に対応する。
+/// 「熟考・詰まり・外部資料・会話・離席・回答不能」に、ADR-055 が「作業」を足した。
+/// 本人の段 1 の配布物（タグ v0.1.42）の記録は `working` を持たない。`working` の不在から版を推さない (ADR-055 D5)。
 ///
 /// ⚠️ 同メモ `:236` は「外部参照 / 観測不能」という別語で同じ並びを書いているが、
 /// そちらは**解析側の混同率のカテゴリ**であって被験者に出す選択肢ではない (ADR-031 Context-1)。
@@ -909,6 +918,8 @@ pub enum ActivityCategoryDto {
     Conversation,
     /// 離席: その場を離れていた。
     Away,
+    /// 作業: 手を動かして作業を進めていた（入力・編集・単純作業を含む）。ADR-055。
+    Working,
     /// 回答不能: 思い出せない・当てはまらない。
     CannotAnswer,
 }

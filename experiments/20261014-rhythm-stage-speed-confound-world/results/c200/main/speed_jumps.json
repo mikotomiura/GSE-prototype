@@ -1,0 +1,30 @@
+{
+ "quantity": "z jump at the segment boundaries: c * (w(first second of the next segment) - w(last second of the one before)), log units of the key interval (design 3.3 (h))",
+ "c": 2.0,
+ "pairs": {
+  "00": {
+   "a": {
+    "n": 16,
+    "median_abs_z_jump": 0.0,
+    "max_abs_z_jump": 0.056969429309877695
+   },
+   "b": {
+    "n": 16,
+    "median_abs_z_jump": 0.4168440812198657,
+    "max_abs_z_jump": 0.9750593711060065
+   }
+  },
+  "01": {
+   "a": {
+    "n": 8,
+    "median_abs_z_jump": 0.0,
+    "max_abs_z_jump": 0.0670133860017249
+   },
+   "b": {
+    "n": 8,
+    "median_abs_z_jump": 1.5821925647235426,
+    "max_abs_z_jump": 2.2289591628872047
+   }
+  }
+ }
+}

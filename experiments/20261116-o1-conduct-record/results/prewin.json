@@ -1,0 +1,520 @@
+{
+ "people": {
+  "A": {
+   "days_used": 10,
+   "same_length": {
+    "stalls_typed": 300,
+    "boot_failures": 0,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": 200,
+       "den": 300,
+       "ratio": 0.61
+      },
+      "random": {
+       "ratio": 0.51
+      },
+      "diff": 0.093,
+      "diff_ci95": [
+       0.043,
+       0.153
+      ]
+     },
+     "move_or_click": {
+      "stall": {
+       "num": 5,
+       "den": 300,
+       "ratio": 0.01
+      },
+      "random": {
+       "ratio": 0.08
+      },
+      "diff": -0.07,
+      "diff_ci95": [
+       -0.129,
+       -0.024
+      ]
+     },
+     "delete2": {
+      "stall": {
+       "num": 5,
+       "den": 300,
+       "ratio": 0.01
+      },
+      "random": {
+       "ratio": 0.03
+      },
+      "diff": -0.017,
+      "diff_ci95": [
+       -0.026,
+       -0.007
+      ]
+     },
+     "silence": {
+      "stall": {
+       "num": 100,
+       "den": 300,
+       "ratio": 0.37
+      },
+      "random": {
+       "ratio": 0.38
+      },
+      "diff": -0.007,
+      "diff_ci95": [
+       -0.063,
+       0.047
+      ]
+     }
+    }
+   },
+   "fixed_30s": {
+    "stalls_typed": 300,
+    "boot_failures": 0,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": 100,
+       "den": 300,
+       "ratio": 0.34
+      },
+      "random": {
+       "ratio": 0.3
+      },
+      "diff": 0.04,
+      "diff_ci95": [
+       -0.006,
+       0.109
+      ]
+     },
+     "move_or_click": {
+      "stall": {
+       "num": 0,
+       "den": 300,
+       "ratio": 0.0
+      },
+      "random": {
+       "ratio": 0.08
+      },
+      "diff": -0.077,
+      "diff_ci95": [
+       -0.121,
+       -0.054
+      ]
+     },
+     "delete2": {
+      "stall": {
+       "num": 5,
+       "den": 300,
+       "ratio": 0.01
+      },
+      "random": {
+       "ratio": 0.03
+      },
+      "diff": -0.017,
+      "diff_ci95": [
+       -0.029,
+       -0.006
+      ]
+     },
+     "silence": {
+      "stall": {
+       "num": 200,
+       "den": 300,
+       "ratio": 0.65
+      },
+      "random": {
+       "ratio": 0.59
+      },
+      "diff": 0.055,
+      "diff_ci95": [
+       -0.007,
+       0.096
+      ]
+     }
+    }
+   }
+  },
+  "B": {
+   "days_used": 0,
+   "same_length": {
+    "stalls_typed": 5,
+    "boot_failures": 500,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.56
+      },
+      "diff": null,
+      "diff_ci95": null
+     },
+     "move_or_click": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.3
+      },
+      "diff": null,
+      "diff_ci95": null
+     },
+     "delete2": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.0
+      },
+      "diff": null,
+      "diff_ci95": null
+     },
+     "silence": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.14
+      },
+      "diff": null,
+      "diff_ci95": null
+     }
+    }
+   },
+   "fixed_30s": {
+    "stalls_typed": 5,
+    "boot_failures": 500,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.4
+      },
+      "diff": null,
+      "diff_ci95": null
+     },
+     "move_or_click": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.22
+      },
+      "diff": null,
+      "diff_ci95": null
+     },
+     "delete2": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.06
+      },
+      "diff": null,
+      "diff_ci95": null
+     },
+     "silence": {
+      "stall": {
+       "num": null,
+       "den": 5,
+       "ratio": null
+      },
+      "random": {
+       "ratio": 0.32
+      },
+      "diff": null,
+      "diff_ci95": null
+     }
+    }
+   }
+  },
+  "C": {
+   "days_used": 20,
+   "same_length": {
+    "stalls_typed": 200,
+    "boot_failures": 0,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": 100,
+       "den": 200,
+       "ratio": 0.28
+      },
+      "random": {
+       "ratio": 0.19
+      },
+      "diff": 0.087,
+      "diff_ci95": [
+       0.008,
+       0.136
+      ]
+     },
+     "move_or_click": {
+      "stall": {
+       "num": 10,
+       "den": 200,
+       "ratio": 0.05
+      },
+      "random": {
+       "ratio": 0.09
+      },
+      "diff": -0.04,
+      "diff_ci95": [
+       -0.123,
+       0.006
+      ]
+     },
+     "delete2": {
+      "stall": {
+       "num": 0,
+       "den": 200,
+       "ratio": 0.01
+      },
+      "random": {
+       "ratio": 0.02
+      },
+      "diff": -0.013,
+      "diff_ci95": [
+       -0.029,
+       0.008
+      ]
+     },
+     "silence": {
+      "stall": {
+       "num": 200,
+       "den": 200,
+       "ratio": 0.66
+      },
+      "random": {
+       "ratio": 0.7
+      },
+      "diff": -0.034,
+      "diff_ci95": [
+       -0.11,
+       0.112
+      ]
+     }
+    }
+   },
+   "fixed_30s": {
+    "stalls_typed": 200,
+    "boot_failures": 0,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": 30,
+       "den": 200,
+       "ratio": 0.13
+      },
+      "random": {
+       "ratio": 0.12
+      },
+      "diff": 0.007,
+      "diff_ci95": [
+       -0.089,
+       0.058
+      ]
+     },
+     "move_or_click": {
+      "stall": {
+       "num": 5,
+       "den": 200,
+       "ratio": 0.02
+      },
+      "random": {
+       "ratio": 0.06
+      },
+      "diff": -0.044,
+      "diff_ci95": [
+       -0.071,
+       -0.029
+      ]
+     },
+     "delete2": {
+      "stall": {
+       "num": 0,
+       "den": 200,
+       "ratio": 0.0
+      },
+      "random": {
+       "ratio": 0.02
+      },
+      "diff": -0.014,
+      "diff_ci95": [
+       -0.034,
+       -0.008
+      ]
+     },
+     "silence": {
+      "stall": {
+       "num": 200,
+       "den": 200,
+       "ratio": 0.85
+      },
+      "random": {
+       "ratio": 0.8
+      },
+      "diff": 0.051,
+      "diff_ci95": [
+       0.003,
+       0.179
+      ]
+     }
+    }
+   }
+  },
+  "D": {
+   "days_used": 20,
+   "same_length": {
+    "stalls_typed": 2000,
+    "boot_failures": 0,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": 1100,
+       "den": 2000,
+       "ratio": 0.58
+      },
+      "random": {
+       "ratio": 0.43
+      },
+      "diff": 0.151,
+      "diff_ci95": [
+       0.115,
+       0.186
+      ]
+     },
+     "move_or_click": {
+      "stall": {
+       "num": 400,
+       "den": 2000,
+       "ratio": 0.19
+      },
+      "random": {
+       "ratio": 0.2
+      },
+      "diff": -0.009,
+      "diff_ci95": [
+       -0.032,
+       0.017
+      ]
+     },
+     "delete2": {
+      "stall": {
+       "num": 5,
+       "den": 2000,
+       "ratio": 0.0
+      },
+      "random": {
+       "ratio": 0.02
+      },
+      "diff": -0.015,
+      "diff_ci95": [
+       -0.02,
+       -0.01
+      ]
+     },
+     "silence": {
+      "stall": {
+       "num": 500,
+       "den": 2000,
+       "ratio": 0.23
+      },
+      "random": {
+       "ratio": 0.36
+      },
+      "diff": -0.127,
+      "diff_ci95": [
+       -0.169,
+       -0.086
+      ]
+     }
+    }
+   },
+   "fixed_30s": {
+    "stalls_typed": 2000,
+    "boot_failures": 0,
+    "by_class": {
+     "focus": {
+      "stall": {
+       "num": 500,
+       "den": 2000,
+       "ratio": 0.23
+      },
+      "random": {
+       "ratio": 0.24
+      },
+      "diff": -0.014,
+      "diff_ci95": [
+       -0.04,
+       0.008
+      ]
+     },
+     "move_or_click": {
+      "stall": {
+       "num": 600,
+       "den": 2000,
+       "ratio": 0.28
+      },
+      "random": {
+       "ratio": 0.23
+      },
+      "diff": 0.049,
+      "diff_ci95": [
+       0.027,
+       0.071
+      ]
+     },
+     "delete2": {
+      "stall": {
+       "num": 0,
+       "den": 2000,
+       "ratio": 0.0
+      },
+      "random": {
+       "ratio": 0.03
+      },
+      "diff": -0.026,
+      "diff_ci95": [
+       -0.03,
+       -0.022
+      ]
+     },
+     "silence": {
+      "stall": {
+       "num": 1000,
+       "den": 2000,
+       "ratio": 0.49
+      },
+      "random": {
+       "ratio": 0.5
+      },
+      "diff": -0.009,
+      "diff_ci95": [
+       -0.045,
+       0.03
+      ]
+     }
+    }
+   }
+  }
+ }
+}

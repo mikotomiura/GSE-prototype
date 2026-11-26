@@ -1,0 +1,7 @@
+.venv/
+work-*/
+results/*/smoke/
+results/.partial-*/
+__pycache__/
+results/.failed-*/
+results/*/*.old/

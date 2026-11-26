@@ -841,7 +841,7 @@
       }
     },
     {
-      "description": "v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。\n\n**不変条件 (schema では緩く、producer 側で強制)**: - skip (`answered=false`) ⇒ `q1_friction`/`q2_progress` は null - `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5 - `source=self_marker` ⇒ `probe_id` は null\n\n`logger.rs` の `LogEntry::realtime_label_answered` / `..._skipped` コンストラクタが これらを保証する。schemars は Option を緩く出すため validator 側で補検証する。",
+      "description": "v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。\n\n**不変条件 (schema では緩く、producer 側で強制)**: - skip (`answered=false`) ⇒ `q1_friction`/`q2_progress` は null - `q1_friction`/`q2_progress` があれば 1..=5。`q2_progress` は `q1_friction` が無ければ null - 較正と自己マーカーの `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5 - 段 1（3 名の版・ADR-057）の `answered=true` は、答えた分だけ q が入り残りは null （Q3 の選択肢によって Q1・Q2 を聞かない、または答える前に閉じた。対の `activity_label` で分かる） - `source=self_marker` ⇒ `probe_id` は null\n\n`logger.rs` の `LogEntry::realtime_label_answered` / `..._s1_answered` / `..._skipped` コンストラクタがこれらを保証する。schemars は Option を緩く出すため validator 側で補検証する。",
       "type": "object",
       "required": [
         "analysis_window_end_ms",
@@ -1517,6 +1517,16 @@
             }
           ]
         },
+        "reveal_count": {
+          "description": "その日にトレイの「ほかの窓をどける」を選んだ回数（どけただけ数え、戻したのは数えない）。押した時刻は持たない （回数は次の 5 分ごとの行に載る）。記録の一時停止中は数えない。区間指定削除では `shown_ms` と同じく、区間の 直前と直後の行の差を区間より後の同じ日の行と走行中の累計から引く。記録が無いときは null。古い行には無い。",
+          "default": null,
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "shown_ms": {
           "description": "その日に出ていた時間（ms）。",
           "type": "integer",
@@ -1571,7 +1581,7 @@
   ],
   "definitions": {
     "ActivityCategoryDto": {
-      "description": "`activity_label` の行動カテゴリ (ADR-031 D3)。固定 6 択で、増やすには別 ADR が要る。\n\n語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の 「熟考・詰まり・外部資料・会話・離席・回答不能」に対応する。\n\n⚠️ 同メモ `:236` は「外部参照 / 観測不能」という別語で同じ並びを書いているが、 そちらは**解析側の混同率のカテゴリ**であって被験者に出す選択肢ではない (ADR-031 Context-1)。\n\n⚠️★★★ `external_material` と `conversation` は、計器由来なら ADR-014 D4 が禁じている 役割カテゴリ (`editor` / `terminal` / `browser`) と**意味的に等価**である。 自己申告経由に限って許可されており、条件は `data-privacy` ルール 7 にある。",
+      "description": "`activity_label` の行動カテゴリ (ADR-031 D3・ADR-055)。固定 7 択で、増やすには別 ADR が要る。\n\n語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の 「熟考・詰まり・外部資料・会話・離席・回答不能」に、ADR-055 が「作業」を足した。 本人の段 1 の配布物（タグ v0.1.42）の記録は `working` を持たない。`working` の不在から版を推さない (ADR-055 D5)。\n\n⚠️ 同メモ `:236` は「外部参照 / 観測不能」という別語で同じ並びを書いているが、 そちらは**解析側の混同率のカテゴリ**であって被験者に出す選択肢ではない (ADR-031 Context-1)。\n\n⚠️★★★ `external_material` と `conversation` は、計器由来なら ADR-014 D4 が禁じている 役割カテゴリ (`editor` / `terminal` / `browser`) と**意味的に等価**である。 自己申告経由に限って許可されており、条件は `data-privacy` ルール 7 にある。",
       "oneOf": [
         {
           "description": "熟考: 手は止まっていたが考えていた。",
@@ -1606,6 +1616,13 @@
           "type": "string",
           "enum": [
             "away"
+          ]
+        },
+        {
+          "description": "作業: 手を動かして作業を進めていた（入力・編集・単純作業を含む）。ADR-055。",
+          "type": "string",
+          "enum": [
+            "working"
           ]
         },
         {

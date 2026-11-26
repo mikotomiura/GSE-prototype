@@ -1,5 +1,5 @@
-> **履歴の文書（2026-11-16 に凍結）。** `docs/research-positioning.md` の、加工と照合の論文（`papers/keystroke-log-release-matching/`）の結果を漏れの材料に足す前の版を逐語で写したもの。現行の主張は `docs/research-positioning.md` と ADR が一次で、この文書を現行の根拠に使わない（ADR-053）。前の全文は `docs/history/research-positioning-2026-11-15b.md`。
-> 写しの元: main `8591d4f8` の `docs/research-positioning.md`。本文中の「§n」の参照は、この写しの中の節を指す。
+> **履歴の文書（2026-11-16 に凍結）。** `docs/research-positioning.md` の、R1 の定義の検査の結果を足す前の版を逐語で写したもの。現行の主張は `docs/research-positioning.md` と ADR が一次で、この文書を現行の根拠に使わない（ADR-053）。それより前の版は `docs/history/research-positioning-2026-11-15b.md` と `-2026-11-15.md`。
+> 写しの元: main `7b5fae2a` の `docs/research-positioning.md`。本文中の「§n」の参照は、この写しの中の節を指す。
 
 # 研究ポジショニング
 

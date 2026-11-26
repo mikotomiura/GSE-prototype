@@ -177,7 +177,7 @@ main へのマージ前チェック:
 3. **PR**: `gh pr create --base main --head <作業ブランチ>`。本文は `.steering/<task>/` から要約（背景・変更点・検証方法・レビュー結果・残課題）し、末尾に attribution を付ける。
    ★ 同じブランチに open の PR が既にあれば新規作成せず、それに push したものとして扱う。
 4. **CI 待ち**: `gh pr checks <番号> --watch`（★ self-hosted が offline なら 30 秒で hosted へ fallback する設計 —— memory `project_ci_exhausted`）。
-   ★ チェックが 1 件も作られないまま数分経つなら、`gh run list --branch <作業ブランチ>` で確かめてから判断する。
+   ★ チェックが 1 件も作られないまま数分経つなら、`gh run list --branch <作業ブランチ>` で確かめてから判断する（2026-11-19 から `feature/*` の push では CI が走らないので、出てくるのは PR の run だけ）。
 5. **merge**: 全チェックが緑なら `gh pr merge <番号> --merge`（★ 既存の PR と同じマージコミット方式。⚠️ `--admin` / `--squash` / `--rebase` は使わない）。
 6. **main の CI 発火確認**: `/finish-task` Step 5 を必ず実行する（★ run = 0 のまま「CI は緑」と書かない）。
 7. **後片づけ**: `git switch main && git pull --ff-only`（★ 作業ブランチは消さない —— 研究者が消すまで残す）。完了報告に PR 番号・merge コミット・main の run を書く。

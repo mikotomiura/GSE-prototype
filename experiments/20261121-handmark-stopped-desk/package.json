@@ -1,0 +1,9 @@
+{
+  "name": "handmark-stopped-desk",
+  "private": true,
+  "type": "module",
+  "description": "手跡の机上の道具の画素の特徴（overlay.mjs）。依存はこのディレクトリに閉じる（アプリの package.json に入れない）。",
+  "dependencies": {
+    "@napi-rs/canvas": "1.0.13"
+  }
+}

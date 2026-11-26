@@ -13,7 +13,7 @@ use crate::handmark_store::Evaluation;
 use crate::logger::LogEntry;
 
 /// 新しく足したファイルの本文（このファイル自身は含めない）。
-const FILES: [(&str, &str); 13] = [
+const FILES: [(&str, &str); 14] = [
     (
         "analysis/handmark/mod.rs",
         include_str!("analysis/handmark/mod.rs"),
@@ -60,9 +60,14 @@ const FILES: [(&str, &str); 13] = [
         "input/handmark_pointer_macos.rs",
         include_str!("input/handmark_pointer_macos.rs"),
     ),
+    // Windows の読み（手跡の Windows 版・ADR-050 D3）。添字 13。
+    (
+        "input/handmark_pointer_windows.rs",
+        include_str!("input/handmark_pointer_windows.rs"),
+    ),
 ];
 
-/// `FILES` のうちポインタの本文のファイル（末尾の 5 つ）。
+/// `FILES` のうちポインタの本文のファイル（末尾の 6 つ）。
 fn pointer_files() -> &'static [(&'static str, &'static str)] {
     &FILES[8..]
 }
@@ -181,6 +186,7 @@ fn the_handmark_day_schema_has_exactly_the_designed_fields() {
         "first_shown_day",
         "shown_ms",
         "visible_ms",
+        "reveal_count",
         "toggles",
         "input_toggles",
         "stage_starts",
@@ -528,7 +534,7 @@ const _: () =
 #[test]
 fn pointer_files_do_not_touch_the_recorders_files_network_or_the_estimator() {
     let files = pointer_files();
-    assert_eq!(files.len(), 5);
+    assert_eq!(files.len(), 6);
     // 記録・ログ・ファイル・ネットワーク・推定のどれも呼ばない。
     assert_clean(
         "ポインタの本文",
@@ -642,6 +648,7 @@ fn only_lib_and_the_pointer_thread_read_the_pointer() {
     let files = rs_sources();
     let names = [
         "handmark_pointer_macos::",
+        "handmark_pointer_windows::",
         "handmark_pointer::to_point",
         "to_point(",
     ];
@@ -650,6 +657,7 @@ fn only_lib_and_the_pointer_thread_read_the_pointer() {
         "handmark_pointer_thread.rs",
         "input/handmark_pointer.rs",
         "input/handmark_pointer_macos.rs",
+        "input/handmark_pointer_windows.rs",
     ];
     assert_eq!(
         rs_files_naming(&names, &allowed, &files),
@@ -675,7 +683,8 @@ fn only_lib_and_the_pointer_thread_read_the_pointer() {
 
 // ---- 窓の TS（PR 3・ADR-050 D3・D4） ----
 
-/// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。
+/// 窓の側の本文（手跡の窓だけがポインタのイベントを受ける）。この一覧は、場と波紋のイベント名を知ってよい
+/// ファイルの許可も兼ねる（`others_naming`）。
 const WINDOW: [(&str, &str); 2] = [
     (
         "HandmarkStage.tsx",
@@ -684,6 +693,20 @@ const WINDOW: [(&str, &str); 2] = [
     (
         "handmarkStageTrace.ts",
         include_str!("../../src/components/handmarkStageTrace.ts"),
+    ),
+];
+
+/// 描画の純関数（手跡の PR 4・判断 8）。画面と机上の道具が同じに呼ぶ。窓の側と同じく保存・送信の語と名前の外の
+/// 列の検査を受けるが、イベント名を知ってよい一覧（`WINDOW`）には入れない（イベントを聞かない）。
+const DRAW: [(&str, &str); 2] = [
+    (
+        "handmarkStageDraw.ts",
+        include_str!("../../src/components/handmarkStageDraw.ts"),
+    ),
+    // 止まりの層の重ね描き（ADR-056）。画面が `drawFrame` の後に呼ぶ（机上の道具 `overlay.mjs` も同じ順に呼ぶ）。
+    (
+        "handmarkStoppedDraw.ts",
+        include_str!("../../src/components/handmarkStoppedDraw.ts"),
     ),
 ];
 
@@ -722,6 +745,29 @@ const WINDOW_BANNED: [&str; 14] = [
 #[test]
 fn the_window_does_not_store_send_back_or_talk_to_the_network() {
     assert_clean("窓", &WINDOW, &WINDOW_BANNED);
+    assert_clean("描画", &DRAW, &WINDOW_BANNED);
+}
+
+/// 描画の純関数はイベントを聞かず、どのイベント名も持たない（受け取りは画面の部品だけ）。
+#[test]
+fn the_draw_module_listens_to_nothing() {
+    let names = [
+        stage_event("STATE_EVENT"),
+        stage_event("TRACE_EVENT"),
+        stage_event("RIPPLE_EVENT"),
+        stage_event("STOPPED_EVENT"),
+    ];
+    let mut needles: Vec<&str> = names.iter().map(String::as_str).collect();
+    needles.extend(["listen", "@tauri-apps", "emit"]);
+    assert_clean("描画のイベント", &DRAW, &needles);
+    // 陽性対照: イベント名か listen を書けば赤になる（実行時に連結して作る）
+    for n in &needles {
+        let planted = format!("{}\n{n}", DRAW[0].1);
+        assert!(
+            !hits(&planted, &[n]).is_empty(),
+            "描画のイベント: 対照が赤にならない（{n}）"
+        );
+    }
 }
 
 /// 帯の窓も同じ（保存・返送・外への送りが無い。推定の語も受け取らない）。
@@ -813,7 +859,11 @@ fn only_the_stage_window_knows_the_trace_and_ripple_events() {
     for ext in ["js", "jsx", "mjs"] {
         assert!(TS_EXTS.contains(&ext), "{ext} を走査しない");
     }
-    for name in [stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT")] {
+    for name in [
+        stage_event("TRACE_EVENT"),
+        stage_event("RIPPLE_EVENT"),
+        stage_event("STOPPED_EVENT"),
+    ] {
         let name = name.as_str();
         assert!(
             others_naming(name, &files).is_empty(),
@@ -912,11 +962,14 @@ fn only_the_stage_rs_names_the_events_and_nobody_uses_listen_any() {
     );
     assert!(files.iter().any(|(n, _)| n == "handmark_stage.rs"));
     let (trace, ripple) = (stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT"));
+    let stopped = stage_event("STOPPED_EVENT");
     let events = [
         "TRACE_EVENT",
         "RIPPLE_EVENT",
+        "STOPPED_EVENT",
         trace.as_str(),
         ripple.as_str(),
+        stopped.as_str(),
     ];
     assert_eq!(
         rs_files_naming(&events, &["handmark_stage.rs"], &files),
@@ -946,6 +999,7 @@ fn only_the_stage_rs_names_the_events_and_nobody_uses_listen_any() {
         .find(|(n, _)| n == "handmark_stage.rs")
         .expect("stage");
     assert!(body(&stage.1).contains("TRACE_EVENT") && body(&stage.1).contains("RIPPLE_EVENT"));
+    assert!(body(&stage.1).contains("STOPPED_EVENT"));
 }
 
 /// 窓へ送る口（`emit_trace`・`emit_ripple`）と画面の大きさ（`screen_size_pt`）を呼べるのは `lib.rs`
@@ -1052,7 +1106,7 @@ fn unnamed_lists(src: &str) -> Vec<String> {
 /// 窓の側の列は、名前を許した枠だけ（位置・押下の列を作らない）。
 #[test]
 fn the_window_lists_only_named_slots() {
-    for (name, src) in WINDOW.into_iter().chain(STRIP_WINDOW) {
+    for (name, src) in WINDOW.into_iter().chain(DRAW).chain(STRIP_WINDOW) {
         let bad = unnamed_lists(src);
         assert!(
             bad.is_empty(),
@@ -1580,8 +1634,12 @@ fn only_the_strip_window_knows_the_strip_events() {
             );
         }
     }
-    // 帯の窓の TS は、場・波紋のイベントを知らない（`others_naming` は帯のファイルを除かない）。
-    for name in [stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT")] {
+    // 帯の窓の TS は、場・波紋・止まりのイベントを知らない（`others_naming` は帯のファイルを除かない）。
+    for name in [
+        stage_event("TRACE_EVENT"),
+        stage_event("RIPPLE_EVENT"),
+        stage_event("STOPPED_EVENT"),
+    ] {
         assert!(
             STRIP_WINDOW.iter().all(|(_, t)| !body(t).contains(&name)),
             "帯の窓が {name} を知っている"
@@ -2016,4 +2074,362 @@ fn the_strip_event_prefix_appears_only_in_the_strip_window() {
             "対照が赤にならない（{planted_name}）"
         );
     }
+}
+
+// ---- Windows（手跡の Windows 版・判断 9・10・ADR-050 D3） ----
+
+/// `VK_` で始まる識別子の一覧（本文から）。
+fn vk_names(src: &str) -> Vec<String> {
+    let b = body(src);
+    let bytes = b.as_bytes();
+    b.match_indices("VK_")
+        .filter(|(i, _)| *i == 0 || !ident(bytes.get(i - 1)))
+        .map(|(i, _)| {
+            b[i..]
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect()
+        })
+        .collect()
+}
+
+/// `GetAsyncKeyState(` の引数（閉じ括弧まで）の一覧。
+fn async_key_args(src: &str) -> Vec<String> {
+    let b = body(src);
+    let needle = ["GetAsyncKeyState", "("].concat();
+    b.match_indices(&needle)
+        .map(|(i, _)| {
+            let rest = &b[i + needle.len()..];
+            let mut depth = 1usize;
+            let mut end = rest.len();
+            for (j, c) in rest.char_indices() {
+                match c {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = j;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            rest[..end].to_string()
+        })
+        .collect()
+}
+
+/// `GetAsyncKeyState` の引数がすべて `i32::from(VK_LBUTTON.0)` と一致するか（他の値を混ぜる・数値の直書き・
+/// 別の仮想キーを許さない）。
+fn async_key_args_ok(src: &str) -> bool {
+    let args = async_key_args(src);
+    !args.is_empty()
+        && args
+            .iter()
+            .all(|a| a.split_whitespace().collect::<String>() == "i32::from(VK_LBUTTON.0)")
+}
+
+/// Windows の読みは、いまの位置と左のボタンだけを読む。キーボードの仮想キー・キーボードの状態・フック・
+/// Raw Input を持たない（ADR-050 D3: `GetAsyncKeyState` に渡すのはマウスの仮想キーだけ）。
+#[test]
+fn the_windows_read_touches_only_the_left_button() {
+    let win = FILES[13];
+    assert_eq!(win.0, "input/handmark_pointer_windows.rs");
+    assert_clean(
+        "Windows の読み",
+        &[win],
+        &[
+            "GetKeyState",
+            "GetKeyboardState",
+            "SetWindowsHookEx",
+            "RegisterRawInputDevices",
+            "GetRawInput",
+            "MapVirtualKey",
+            "ToUnicode",
+            "keybd_event",
+            "SendInput",
+            // 別名にしてから別の引数で呼ぶ書き方を禁じる（引数の検査をすり抜ける）。
+            "GetAsyncKeyState as",
+        ],
+    );
+    let vks = vk_names(win.1);
+    assert!(!vks.is_empty(), "仮想キーが無い（検査が空回り）");
+    for v in &vks {
+        assert_eq!(v, "VK_LBUTTON", "左のボタン以外の仮想キー: {v}");
+    }
+    assert!(
+        async_key_args_ok(win.1),
+        "GetAsyncKeyState の引数が VK_LBUTTON だけでない"
+    );
+    assert!(body(win.1).contains("GetCursorPos"), "位置の読みが無い");
+    // 陽性対照 1: キーボードの仮想キーを足すと見つかる。
+    let planted = format!("{}\nfn x() {{ let _ = {}{}; }}", win.1, "VK_", "SHIFT");
+    assert!(vk_names(&planted).iter().any(|v| v == "VK_SHIFT"));
+    // 陽性対照 2: 数値の直書きの読み（0x10 = Shift）は引数の検査で赤になる。
+    let planted = format!(
+        "{}\nfn y() {{ let _ = unsafe {{ {}(0x10) }}; }}",
+        win.1, "GetAsyncKeyState"
+    );
+    assert!(!async_key_args_ok(&planted));
+    // 陽性対照 3: 正しい引数に別の値を混ぜても赤になる。
+    let planted = format!(
+        "{}
+fn w() {{ let _ = unsafe {{ {}(i32::from({}.0) | K) }}; }}",
+        win.1, "GetAsyncKeyState", "VK_LBUTTON"
+    );
+    assert!(!async_key_args_ok(&planted));
+    // 陽性対照 4: 引数に別の仮想キーを並べても赤になる。
+    let planted = format!(
+        "{}\nfn z() {{ let _ = unsafe {{ {}(i32::from({}{}.0)) }}; }}",
+        win.1, "GetAsyncKeyState", "VK_", "RBUTTON"
+    );
+    assert!(!async_key_args_ok(&planted));
+}
+
+/// アイコンの層の TS（Windows だけ届く・判断 10）。
+const ICONS_WINDOW: [(&str, &str); 1] = [(
+    "handmarkStageIcons.ts",
+    include_str!("../../src/components/handmarkStageIcons.ts"),
+)];
+
+const DESKTOP_RS: &str = include_str!("handmark_desktop.rs");
+const DESKTOP_WIN_RS: &str = include_str!("handmark_desktop_windows.rs");
+
+/// アイコンの写しを受ける TS は、保存・返送・外への送りを持たない（窓と同じ禁止の語）。
+#[test]
+fn the_icon_layer_does_not_store_send_back_or_talk_to_the_network() {
+    assert_clean("アイコンの層", &ICONS_WINDOW, &WINDOW_BANNED);
+    // 陽性対照
+    let planted = format!("{}\nlocalStorage.setItem('x', 'y');", ICONS_WINDOW[0].1);
+    assert!(!hits(&planted, &["localStorage"]).is_empty());
+}
+
+/// アイコンの受け口の名前を知ってよい TS は、アイコンの層だけ（背景の窓の部品は `installIconsHook` で置く）。
+#[test]
+fn only_the_icon_layer_knows_the_icons_hook() {
+    let files = ts_sources();
+    let name = rs_str_const(FILES[7].1, "ICONS_HOOK");
+    assert_eq!(name, "__gseHandmarkIcons");
+    let allowed = [ICONS_WINDOW[0]];
+    assert_eq!(
+        ts_files_naming_except(&name, &files, &allowed),
+        Vec::<String>::new()
+    );
+    assert!(
+        body(ICONS_WINDOW[0].1).contains(name.as_str()),
+        "層が受け口の名前を持っていない"
+    );
+    assert!(
+        body(WINDOW[0].1).contains("installIconsHook"),
+        "背景の窓が受け口を置いていない"
+    );
+    for planted_name in ["Planted.tsx", "planted.js", "planted.html"] {
+        let mut planted = files.clone();
+        planted.push((planted_name.to_string(), format!("window.{name}(x)")));
+        assert_eq!(
+            ts_files_naming_except(&name, &planted, &allowed),
+            vec![planted_name.to_string()],
+            "対照が赤にならない（{planted_name}）"
+        );
+    }
+}
+
+/// アイコンの受け口の名前を Rust で参照してよいのは `handmark_stage.rs` だけ。`PrintWindow`（アイコンの画素の読み）を
+/// 呼んでよいのは `handmark_desktop_windows.rs` だけ。窓の中で走らせる `eval` は `handmark_stage.rs` の 1 か所だけ
+/// （宛先は手跡の窓）。
+#[test]
+fn only_the_desktop_keeper_reads_icon_pixels_and_only_the_stage_sends_them() {
+    let files = rs_sources();
+    let hooks = ["ICONS_HOOK", "__gseHandmarkIcons"];
+    assert_eq!(
+        rs_files_naming(&hooks, &["handmark_stage.rs"], &files),
+        Vec::<String>::new()
+    );
+    let print = ["PrintWindow"];
+    assert_eq!(
+        rs_files_naming(&print, &["handmark_desktop_windows.rs"], &files),
+        Vec::<String>::new()
+    );
+    assert!(
+        body(DESKTOP_WIN_RS).contains("PrintWindow"),
+        "読みが無い（空回り）"
+    );
+    // WinEvent のフックを張ってよいのは、既存の打鍵・フォーカスの観測と、手跡のデスクトップの番だけ。
+    let hook = ["SetWinEventHook"];
+    let hook_allowed = [
+        "input/hook_windows.rs",
+        "input/observe_windows.rs",
+        "handmark_desktop_windows.rs",
+    ];
+    assert_eq!(
+        rs_files_naming(&hook, &hook_allowed, &files),
+        Vec::<String>::new()
+    );
+    assert!(
+        body(DESKTOP_WIN_RS).contains("SetWinEventHook"),
+        "フックが無い（空回り）"
+    );
+    let mut planted = files.clone();
+    planted.push((
+        "planted.rs".to_string(),
+        "fn f() { SetWinEventHook(); }".to_string(),
+    ));
+    assert_eq!(
+        rs_files_naming(&hook, &hook_allowed, &planted),
+        vec!["planted.rs".to_string()]
+    );
+    let eval = [".", "eval", "("].concat();
+    assert_eq!(
+        rs_files_naming(&[eval.as_str()], &["handmark_stage.rs"], &files),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        body(FILES[7].1).matches(eval.as_str()).count(),
+        1,
+        "eval は 1 か所だけ"
+    );
+    for (needles, allowed) in [
+        (&hooks[..], "handmark_stage.rs"),
+        (&print[..], "handmark_desktop_windows.rs"),
+        (&[eval.as_str()][..], "handmark_stage.rs"),
+    ] {
+        let mut planted = files.clone();
+        planted.push((
+            "planted.rs".to_string(),
+            format!("fn f() {{ x{}(); }}", needles[0]),
+        ));
+        assert_eq!(
+            rs_files_naming(needles, &[allowed], &planted),
+            vec!["planted.rs".to_string()]
+        );
+    }
+}
+
+/// 背景の窓の層（アイコンの画素を base64 にして窓へ渡す・ポインタの場を送る）は、記録・ファイル・ネットワークに触れず、
+/// 送りの宛先はすべて手跡の窓の `LABEL`。全窓へ送る口（関数の形・`emit_filter` を含む）を使わない。
+#[test]
+fn the_stage_rs_touches_no_recorder_file_or_network_and_sends_only_to_its_window() {
+    let stage = FILES[7];
+    assert_eq!(stage.0, "handmark_stage.rs");
+    assert_clean(
+        "背景の窓の層",
+        &[stage],
+        &[
+            "LogEntry",
+            "log_tx",
+            "crate::logger",
+            "std::fs",
+            "OpenOptions",
+            "applog",
+            "std::net",
+            "reqwest",
+            "TcpStream",
+            "::emit(",
+            "emit_filter",
+            "EventTarget",
+            "listen_any",
+        ],
+    );
+    let targets = emit_to_targets(stage.1);
+    assert!(
+        targets.len() >= 4,
+        "送りの数が想定より少ない（空回り）: {targets:?}"
+    );
+    assert!(
+        targets.iter().all(|t| t == "LABEL"),
+        "emit_to の第 1 引数が LABEL でない: {targets:?}"
+    );
+    let planted = format!(
+        "fn f() {{ app.emit_to(\"main\", X, 1); }}
+{}",
+        stage.1
+    );
+    assert!(emit_to_targets(&planted).iter().any(|t| t != "LABEL"));
+}
+
+/// デスクトップの番は、記録・ファイル・ネットワーク・推定に触れず、窓へ直接送らず（送りは背景の窓の層の口だけ）、
+/// 名前の文字列（窓の題名・一覧の項目の名前・UI Automation）を読まない。tracing は値を持たない固定の文だけ。
+#[test]
+fn the_desktop_keeper_reads_no_names_and_records_nothing() {
+    let files = [
+        ("handmark_desktop.rs", DESKTOP_RS),
+        ("handmark_desktop_windows.rs", DESKTOP_WIN_RS),
+    ];
+    let banned = [
+        "LogEntry",
+        "log_tx",
+        "crate::logger",
+        "std::fs",
+        "fs::",
+        "OpenOptions",
+        "applog",
+        "std::net",
+        "reqwest",
+        "TcpStream",
+        "crate::analysis::engine",
+        "intervention",
+        "invitation",
+        "p_stuck",
+        "Emitter",
+        "emit",
+        "GetWindowText",
+        "LVM_GETITEM",
+        "SendMessage",
+        "UIAutomation",
+        "IUIAutomation",
+        "CurrentName",
+        "Serialize",
+        "Debug",
+        // 名前を読む別の口（MSAA・シェルの名前空間・他のプロセスのメモリ）。
+        "AccessibleObjectFrom",
+        "IAccessible",
+        "get_accName",
+        "SHGetDesktopFolder",
+        "IShellFolder",
+        "GetDisplayNameOf",
+        "FOLDERID_Desktop",
+        "ReadProcessMemory",
+        "VirtualAllocEx",
+        // tracing の別の書き方（`use` してから短い名前で呼ぶ）。
+        "use tracing",
+    ];
+    assert_clean("デスクトップの番", &files, &banned);
+    // tracing は固定の文だけ（`{` を含まない・値を渡さない）。
+    let needle = ["tracing", "::"].concat();
+    let b = body(DESKTOP_WIN_RS);
+    let calls: Vec<&str> = b
+        .match_indices(needle.as_str())
+        // 呼び出しの頭から、最初の文字列の閉じる引用符まで（rustfmt が閉じ括弧を次の行へ送っても切れる）。
+        .map(|(i, _)| {
+            let rest = &b[i..];
+            let open = rest.find('"').map_or(rest.len(), |o| o + 1);
+            let close = rest[open.min(rest.len())..]
+                .find('"')
+                .map_or(rest.len(), |c| open + c);
+            &rest[..close]
+        })
+        .collect();
+    assert!(!calls.is_empty(), "tracing が無い（空回り）");
+    // `warn!(` の直後（空白を除く）が文字列で始まる（構造化した値を前に置かない）。
+    let starts_with_text = |c: &str| {
+        c.split_once("warn!(")
+            .is_some_and(|(_, rest)| rest.trim_start().starts_with('"'))
+    };
+    // `tracing::` を付けない呼び出しが無い（`warn!(` の数 = `tracing::warn!(` の数）。
+    let tw = ["tracing", "::", "warn!("].concat();
+    assert_eq!(b.matches("warn!(").count(), b.matches(tw.as_str()).count());
+    assert!(!starts_with_text(
+        "tracing::warn!(n = v, \"handmark desktop: x\")"
+    ));
+    for c in &calls {
+        assert!(
+            starts_with_text(c) && c.contains("\"handmark desktop:") && !c.contains('{'),
+            "値を持つかもしれない tracing: {c}"
+        );
+    }
+    assert!(body(DESKTOP_RS).matches(needle.as_str()).count() == 0);
+    // 陽性対照
+    let planted = format!("{DESKTOP_WIN_RS}\nfn x() {{ GetWindowTextW(); }}");
+    assert!(!hits(&planted, &["GetWindowText"]).is_empty());
 }

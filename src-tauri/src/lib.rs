@@ -55,13 +55,24 @@ pub mod s1_driver;
 pub mod handmark_driver;
 // ポインタのスレッドの純粋な部分（OS API を呼ばない・cfg なし）。
 pub mod handmark_pointer_thread;
-// 手跡の背景の窓(macOS だけ・ADR-051)。駆動役の出来事だけが開け閉めする。
-#[cfg(target_os = "macos")]
+// 手跡の背景の窓(macOS と Windows・ADR-051)。駆動役の出来事だけが開け閉めする。
+#[cfg(any(target_os = "macos", windows))]
 pub mod handmark_stage;
-// 手跡の下の縁の帯の窓(macOS だけ・ADR-051)。背景の窓と一緒に開け閉めする(帯は従)。
-#[cfg(target_os = "macos")]
+// 背景の窓をデスクトップのすぐ上に保ち、アイコンを写すための純関数(OS 非依存・cfg なし・判断 9・10)。
+pub mod handmark_desktop;
+// その Windows の部分(並びの番・アイコンの写し)。
+#[cfg(windows)]
+pub mod handmark_desktop_windows;
+// 手跡の下の縁の帯の窓(macOS と Windows・ADR-051)。背景の窓と一緒に開け閉めする(帯は従)。
+#[cfg(any(target_os = "macos", windows))]
 pub mod handmark_edge_strip;
 pub mod handmark_store;
+// 手跡の「ほかの窓をどける」の OS に依らない判定(cfg なし・handmark-reveal-count)と、その OS の部分。
+pub mod handmark_reveal;
+#[cfg(target_os = "macos")]
+pub mod handmark_reveal_macos;
+#[cfg(windows)]
+pub mod handmark_reveal_windows;
 // 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
 pub mod s1_day_state;
 // 段 1 の再生（`gse-replay --probes`・`--day-questions`・記録から調停器を回し直して照合する・純粋）。
@@ -96,7 +107,7 @@ use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
 #[allow(unused_imports)]
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -2037,7 +2048,7 @@ fn acknowledge_o1_enrollment(participant_id: String) -> Result<(), String> {
 //
 // ★ 判断と状態は純粋な `s1_driver.rs`。ここは `Effect` を行（`LogEntry`）・画面（emit）・状態ファイルに
 //   変えるだけ。6 択（`activity_label`）の行を組むのは、ここの `emit_s1_superseded` と
-//   `record_probe_response`・`record_probe_skip` の 3 か所だけで、どれも同意の門
+//   `s1_probe_answer_rows`・`s1_skip_probe` の 3 か所だけで、どれも同意の門
 //   `o1::activity_label_allowed(s1::is_s1(), s1_probe_consent_acknowledged())` を通す
 //   （`o1::is_o1()` を渡さない・`s1_esm_gate_passes_stage1_not_o1` が本文で縛る）。
 // ===========================================================================
@@ -2184,6 +2195,7 @@ fn run_s1_effects(
             | Effect::Suppressed { .. }
             | Effect::Assigned { .. }
             | Effect::DayRow(_)
+            | Effect::ProbeAnswered { .. }
                 if !consent =>
             {
                 None
@@ -2199,6 +2211,15 @@ fn run_s1_effects(
             }
             Effect::Superseded { t, card } => {
                 emit_s1_superseded(log_tx, t, &card);
+                None
+            }
+            // ⚠️ 止まった後に気づいた（tick の予備の）一時停止では書けない（ロガーの停止ゲートが落とす）。
+            Effect::ProbeAnswered { .. } if paused => {
+                tracing::info!("stage 1: partly answered card closed while paused; no row written");
+                None
+            }
+            Effect::ProbeAnswered { t, card } => {
+                emit_s1_probe_answered(log_tx, t, &card);
                 None
             }
             e @ Effect::DayRow(_) => s1_effect_row(e),
@@ -2246,8 +2267,312 @@ fn run_s1_effects(
         if let Err(e) = app.emit("s1_card_state", view) {
             tracing::warn!("s1_card_state emit failed: {}", e);
         }
+        // ★ カードの開閉の全経路がここを通る。答えのキーをカードに合わせる（ADR-057 D5）
+        s1_request_answer_keys(app, view);
     }
     outcome
+}
+
+// ---------------------------------------------------------------------------
+// 段 1 の答えのキー（ADR-057 D5）。カードが出ているあいだだけ、修飾キー＋数字を登録する。
+//
+// ★ 登録の真実はカードの真実と同じ側（`run_s1_effects` が出す view）から決める。
+// ⚠️ プラグインの `register` は呼んだスレッドからメインスレッドへ投げて終わるまで待つ
+//   （`run_main_thread!`）。`S1_DRIVER` のロックを持つ tick のスレッドから呼ぶと、ロックを待つ同期の
+//   コマンド（メインスレッドで走る）と待ち合って止まりうる。→ メインスレッドへ非同期に投げ、その中で呼ぶ。
+// ⚠️ O1 の形で研究者用の 6 本を登録しない理由（`lib.rs` の setup の注釈）とは別物: 登録はカードを出してから
+//   長くて 2 分（`S1_ANSWER_KEYS_FOR_MS`・判断 8）で、ハンドラが書くのは同意文書にある 2 行
+//   （`realtime_label`・`activity_label`）だけ。
+// ---------------------------------------------------------------------------
+
+/// 答えの修飾キー（macOS ⌥・Windows Ctrl＋Alt・本タスクの判断 2 と 8）。
+/// ⚠️ Windows の Ctrl＋数字はブラウザのタブや VSCode のエディタの移動でふだん使われ、表示中に
+/// そのつもりで押すと本人が選んでいない答えになるので、Ctrl＋Alt にした（/finish-task の security-checker M2）。
+#[cfg(target_os = "macos")]
+const S1_ANSWER_MODS: tauri_plugin_global_shortcut::Modifiers =
+    tauri_plugin_global_shortcut::Modifiers::ALT;
+#[cfg(not(target_os = "macos"))]
+const S1_ANSWER_MODS: tauri_plugin_global_shortcut::Modifiers =
+    tauri_plugin_global_shortcut::Modifiers::CONTROL
+        .union(tauri_plugin_global_shortcut::Modifiers::ALT);
+
+/// 画面に出す修飾キーの名前。
+#[cfg(target_os = "macos")]
+const S1_ANSWER_MOD_LABEL: &str = "⌥";
+#[cfg(not(target_os = "macos"))]
+const S1_ANSWER_MOD_LABEL: &str = "Ctrl＋Alt";
+
+/// 答えのキーを登録しておく長さ（カードを出してから）。過ぎたらキーだけ外し、カードとボタンは残す
+/// （カードには期限が無く、答えるか閉じるまで出たままなので、キーを何時間も奪わないように・判断 8）。
+const S1_ANSWER_KEYS_FOR_MS: u64 = 120_000;
+
+/// キーの期限を数えているカード（probe_id と、キーを付けた時刻）。
+static S1_ANSWER_CARD: Mutex<Option<(String, u64)>> = Mutex::new(None);
+
+/// view と期限から、いま登録しておく数字（★ 純関数。`card` は期限を数えているカードで、ここで更新する）。
+fn s1_answer_digits_at(
+    view: &crate::s1_driver::S1CardView,
+    card: &mut Option<(String, u64)>,
+    now: u64,
+) -> Vec<u8> {
+    let crate::s1_driver::S1CardView::Probe { probe_id, .. } = view else {
+        *card = None;
+        return Vec::new();
+    };
+    if card.as_ref().map(|(id, _)| id.as_str()) != Some(probe_id.as_str()) {
+        *card = Some((probe_id.clone(), now));
+    }
+    let opened = card.as_ref().map_or(now, |(_, t)| *t);
+    if s1_answer_keys_expired(opened, now) {
+        return Vec::new();
+    }
+    s1_answer_digits(view)
+}
+
+/// キーの期限が過ぎたか。★ 壁時計が戻った（今 < 付けた時刻）ときも過ぎた扱いにする
+/// （戻した分だけキーを長く持たないように・/cross-review の Codex）。
+fn s1_answer_keys_expired(opened: u64, now: u64) -> bool {
+    now < opened || now - opened >= S1_ANSWER_KEYS_FOR_MS
+}
+
+/// 答えの数字のキー（添字が数字。0 は閉じる）。
+const S1_ANSWER_CODES: [tauri_plugin_global_shortcut::Code; 8] = {
+    use tauri_plugin_global_shortcut::Code;
+    [
+        Code::Digit0,
+        Code::Digit1,
+        Code::Digit2,
+        Code::Digit3,
+        Code::Digit4,
+        Code::Digit5,
+        Code::Digit6,
+        Code::Digit7,
+    ]
+};
+
+/// view から、いま登録しておく答えの数字（★ 純関数）。プローブのカードなら 0（閉じる）と 1〜選択肢の数。
+/// それ以外（カードなし・日の問い）は空（＝全部外す）。
+fn s1_answer_digits(view: &crate::s1_driver::S1CardView) -> Vec<u8> {
+    match view {
+        crate::s1_driver::S1CardView::Probe { step, .. } => (0..=step.choice_count()).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// 押されたショートカットが答えのキーなら、その数字。
+fn s1_answer_digit_of(shortcut: &tauri_plugin_global_shortcut::Shortcut) -> Option<u8> {
+    S1_ANSWER_CODES
+        .iter()
+        .position(|c| shortcut.matches(S1_ANSWER_MODS, *c))
+        .map(|i| i as u8)
+}
+
+/// 登録した答えの数字と、画面に知らせた状態。
+#[derive(Debug, Default)]
+struct S1AnswerKeys {
+    registered: Vec<u8>,
+    active: bool,
+}
+
+static S1_ANSWER_KEYS: Mutex<S1AnswerKeys> = Mutex::new(S1AnswerKeys {
+    registered: Vec::new(),
+    active: false,
+});
+
+/// 押したまま離していない答えの数字（ビット）。★ 押しっぱなしの繰り返しで次の問いに同じ答えが入らないように。
+static S1_ANSWER_HELD: AtomicU16 = AtomicU16::new(0);
+
+/// 画面に送る答えのキーの状態（`s1_answer_keys`・`get_s1_answer_keys`）。
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+struct S1AnswerKeysView {
+    /// 登録できていて、キーで答えられる（★ `false` ならキーの表示を消し、ボタンで答える・判断 1）。
+    active: bool,
+    modifier: &'static str,
+}
+
+fn s1_answer_keys_view() -> S1AnswerKeysView {
+    S1AnswerKeysView {
+        active: S1_ANSWER_KEYS
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .active,
+        modifier: S1_ANSWER_MOD_LABEL,
+    }
+}
+
+/// いま登録しておきたい答えの数字（最新の view から）。`S1_ANSWER_KEYS` とは別のロックにする
+/// （答えのキーのハンドラはプラグインのロックを持ったまま、これを書きに来る）。
+static S1_ANSWER_WANT: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+
+/// 答えのキーの押下を答えとして受けるか（登録できていて期限の内）。★ ハンドラはこれだけを見る
+/// （Mutex を取らない。外すのに失敗して OS 側に残ったキーの押下を、期限の後に答えにしない）。
+static S1_ANSWER_ACCEPT: AtomicBool = AtomicBool::new(false);
+
+/// view に合わせて答えのキーを登録・解除するよう、メインスレッドに頼む（★ 待たない）。
+///
+/// ⚠️ メインスレッドから `run_on_main_thread` を呼ぶとその場で走る。答えのキーのハンドラは
+/// global-shortcut のプラグインが登録表のロックを持ったまま呼ぶので、その場で `unregister` すると
+/// 同じロックを待って止まる（2026-11-25 の実機で固まった）。そこで短いスレッドから投げ、
+/// ハンドラが返った後に走らせる。投げた順が入れ替わっても、走るときに最新の `want` にそろえる。
+fn s1_request_answer_keys(app: &tauri::AppHandle, view: &crate::s1_driver::S1CardView) {
+    let want = {
+        let mut card = S1_ANSWER_CARD.lock().unwrap_or_else(|p| p.into_inner());
+        s1_answer_digits_at(view, &mut card, epoch_ms())
+    };
+    if want.is_empty() {
+        S1_ANSWER_ACCEPT.store(false, Ordering::Relaxed);
+    }
+    *S1_ANSWER_WANT.lock().unwrap_or_else(|p| p.into_inner()) = want;
+    s1_post_answer_keys_sync(app);
+}
+
+/// 答えのキーの期限が過ぎていれば、キーだけ外す（tick から・駆動役のロックの外で）。
+fn s1_expire_answer_keys(app: &tauri::AppHandle, now: u64) {
+    let expired = S1_ANSWER_CARD
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .as_ref()
+        .is_some_and(|(_, opened)| s1_answer_keys_expired(*opened, now));
+    if !expired {
+        return;
+    }
+    // ★ 期限の後は、ハンドラが答えを受けないようにすぐ印を下ろす（外すのはメインスレッドで後から）
+    S1_ANSWER_ACCEPT.store(false, Ordering::Relaxed);
+    let mut want = S1_ANSWER_WANT.lock().unwrap_or_else(|p| p.into_inner());
+    if want.is_empty() {
+        drop(want);
+        // ★ 外すのに失敗したキーが残っていれば、外し直す（次にカードが替わるまで待たない・/cross-review の Codex）
+        let leftover = !S1_ANSWER_KEYS
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .registered
+            .is_empty();
+        if leftover {
+            s1_post_answer_keys_sync(app);
+        }
+        return;
+    }
+    want.clear();
+    drop(want);
+    tracing::info!("stage 1: answer keys released after the time limit (answer by clicking)");
+    s1_post_answer_keys_sync(app);
+}
+
+/// 最新の `want` にそろえるよう、別のスレッドからメインスレッドへ投げる（理由は `s1_request_answer_keys`）。
+fn s1_post_answer_keys_sync(app: &tauri::AppHandle) {
+    let handle = app.clone();
+    let spawned = std::thread::Builder::new()
+        .name("s1-answer-keys".into())
+        .spawn(move || {
+            let inner = handle.clone();
+            if let Err(e) = handle.run_on_main_thread(move || s1_sync_answer_keys(&inner)) {
+                tracing::warn!("stage 1: answer keys not synced: {e}");
+            }
+        });
+    if let Err(e) = spawned {
+        tracing::warn!("stage 1: answer keys not synced (thread): {e}");
+    }
+}
+
+/// メインスレッドで、登録している数字を最新の `want` にそろえる。1 つでも登録できなければ全部外し、
+/// キーの表示を消す（ボタンで答える）。
+fn s1_sync_answer_keys(app: &tauri::AppHandle) {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+    let want_owned = S1_ANSWER_WANT
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone();
+    let want: &[u8] = &want_owned;
+    let sc = |d: u8| Shortcut::new(Some(S1_ANSWER_MODS), S1_ANSWER_CODES[usize::from(d)]);
+    let gs = app.global_shortcut();
+    let mut st = S1_ANSWER_KEYS.lock().unwrap_or_else(|p| p.into_inner());
+    let unregister = |st: &mut S1AnswerKeys, d: u8| {
+        match gs.unregister(sc(d)) {
+            Ok(()) => st.registered.retain(|&x| x != d),
+            // ★ 一覧に残し、次にそろえるときに外し直す（消すと OS 側に残ったまま忘れる）
+            Err(e) => tracing::warn!("stage 1: answer key {d} not unregistered (will retry): {e}"),
+        }
+        // ★ 外したキーの離しは届かないので、押したままの印も消す
+        S1_ANSWER_HELD.fetch_and(!(1u16 << d), Ordering::Relaxed);
+    };
+    for d in st.registered.clone() {
+        if !want.contains(&d) {
+            unregister(&mut st, d);
+        }
+    }
+    let mut failed = false;
+    for &d in want {
+        if st.registered.contains(&d) {
+            continue;
+        }
+        match gs.register(sc(d)) {
+            Ok(()) => st.registered.push(d),
+            Err(e) => {
+                tracing::warn!("stage 1: answer key {d} not registered (answer by clicking): {e}");
+                failed = true;
+                break;
+            }
+        }
+    }
+    if failed {
+        for d in st.registered.clone() {
+            unregister(&mut st, d);
+        }
+    }
+    let active = !want.is_empty() && !failed;
+    let changed = st.active != active;
+    st.active = active;
+    S1_ANSWER_ACCEPT.store(active, Ordering::Relaxed);
+    drop(st);
+    if changed || active {
+        if let Err(e) = app.emit("s1_answer_keys", s1_answer_keys_view()) {
+            tracing::warn!("s1_answer_keys emit failed: {}", e);
+        }
+    }
+}
+
+/// 答えのキーが押された・離された（共通のハンドラから。メインスレッド）。
+fn s1_on_answer_key(
+    app: &tauri::AppHandle,
+    log: &Arc<Mutex<LogState>>,
+    digit: u8,
+    state: tauri_plugin_global_shortcut::ShortcutState,
+) {
+    use crate::s1_driver::{AnswerInput, ProbeStep};
+    let bit = 1u16 << digit;
+    if state == tauri_plugin_global_shortcut::ShortcutState::Released {
+        S1_ANSWER_HELD.fetch_and(!bit, Ordering::Relaxed);
+        return;
+    }
+    if S1_ANSWER_HELD.fetch_or(bit, Ordering::Relaxed) & bit != 0 {
+        return;
+    }
+    if !S1_ANSWER_ACCEPT.load(Ordering::Relaxed) {
+        tracing::info!("stage 1: an answer key outside its time was ignored");
+        return;
+    }
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    let res = if digit == 0 {
+        s1_skip_probe(app, &log_tx, None, SkipReason::Dismissed)
+    } else {
+        s1_answer_probe(app, &log_tx, S1AnswerTarget::Current, |step| match step {
+            ProbeStep::Q3 => crate::logger::ActivityCategory::ALL
+                .get(usize::from(digit) - 1)
+                .map(|c| AnswerInput::Activity(*c))
+                .ok_or_else(|| format!("no choice for key {digit}")),
+            ProbeStep::Q1 | ProbeStep::Q2 => Ok(AnswerInput::Scale(digit)),
+        })
+    };
+    if let Err(e) = res {
+        // ⚠️ 数字は書かない（Q3 では数字がそのまま選択肢になり、取り消しの後にも答えが applog に残る）
+        tracing::info!("stage 1: an answer key was ignored: {e}");
+    }
+}
+
+/// 段 1 の答えのキーの状態（カードが描かれたときに 1 度読む）。
+#[tauri::command]
+fn get_s1_answer_keys() -> S1AnswerKeysView {
+    s1_answer_keys_view()
 }
 
 /// 段 1: 状態ファイルの保存の失敗を警告したか（続けて失敗している間は 1 回だけ出す）。
@@ -2312,7 +2637,7 @@ fn show_s1_overlay(app: &tauri::AppHandle) {
 }
 
 // ===========================================================================
-// 手跡（段 1 の後期・ADR-051・1b）の配線。★ 段 1 のモードかつ macOS のときだけ駆動スレッドを起こす。
+// 手跡（段 1 の後期・ADR-051・1b）の配線。★ 段 1 のモードかつ macOS か Windows のときだけ駆動スレッドを起こす。
 //   純粋な部分は `handmark_driver`（出来事 `Effect` を返す）。ここは出来事を行・窓・トレイに変えるだけ。
 //   ロックの順: `LogState` のロックは `log_tx` を複製する間だけ取り、放してから `HANDMARK_DRIVER` を取る
 //   （`handmark_log_tx`）。ふだんは `HANDMARK_DRIVER` を持っている間は `LogState` を取らない（出来事の実行は
@@ -2331,8 +2656,21 @@ static HANDMARK_PRESS_TX: std::sync::OnceLock<crossbeam_channel::Sender<u64>> =
 
 /// ポインタのスレッドへの門(駆動役が `Effect::PointerGate` で書く)。ビット 0 = 窓が開いている・
 /// 1 = カーソルが入っている・2 = クリックが入っている。0 = 閉じている。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 static HANDMARK_POINTER_GATE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// 記録の一時停止の最後の遷移の時刻(`set_recording_paused` の `now`・`recording_pause` の行と同じ値)。0 は未設定。
+static HANDMARK_PAUSE_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// 駆動スレッドの刻みが一時停止の遷移を入れるときの時刻。止まりの層が入っていて、コマンドの経路が置いた時刻
+/// `recorded`(0 は未設定)があればそれ、無ければ `wall`。切っているときは常に `wall`(今までどおり・判断 10・17)。
+fn handmark_tick_pause_at(stopped_on: bool, recorded: u64, wall: u64) -> u64 {
+    if stopped_on && recorded != 0 {
+        recorded
+    } else {
+        wall
+    }
+}
 
 /// 手跡の駆動役へ打鍵の時刻を送る(口が無ければ何もしない・満杯なら捨てる)。
 fn handmark_send_press(t_ms: u64) {
@@ -2353,7 +2691,7 @@ fn run_handmark_effects(
     fx: Vec<crate::handmark_driver::Effect>,
 ) {
     use crate::handmark_driver::Effect;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = app;
     for e in fx {
         match e {
@@ -2362,24 +2700,39 @@ fn run_handmark_effects(
                     tracing::warn!("handmark: day row not sent: {}", log_send_error(err));
                 }
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             Effect::OpenWindow { .. } => {
                 crate::handmark_stage::open(app);
                 // 帯は従: 出せなくても背景は閉じない(帯の側が理由を 1 行残す)。
                 crate::handmark_edge_strip::open(app);
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             Effect::CloseWindow => {
                 crate::handmark_stage::close(app);
                 crate::handmark_edge_strip::close(app);
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             Effect::State(s) => {
                 crate::handmark_stage::emit_state(app, &s);
                 crate::handmark_edge_strip::emit_state(app, &s);
             }
-            #[cfg(not(target_os = "macos"))]
-            Effect::OpenWindow { .. } | Effect::CloseWindow | Effect::State(_) => {}
+            #[cfg(any(target_os = "macos", windows))]
+            Effect::Stopped(f) => crate::handmark_stage::emit_stopped(app, &f),
+            #[cfg(not(any(target_os = "macos", windows)))]
+            Effect::OpenWindow { .. }
+            | Effect::CloseWindow
+            | Effect::State(_)
+            | Effect::Stopped(_) => {}
+            // ほかの窓をどける・戻す(覚えた一覧は OS の層のメモリだけ・記録しない)
+            Effect::Reveal(reveal) => {
+                #[cfg(target_os = "macos")]
+                crate::handmark_reveal_macos::apply(app, reveal);
+                #[cfg(windows)]
+                crate::handmark_reveal_windows::apply(reveal);
+                #[cfg(not(any(target_os = "macos", windows)))]
+                let _ = reveal;
+            }
+            Effect::RevealItem(i) => crate::tray::set_handmark_reveal_item(i),
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
             // ポインタのスレッドへの入れ切り(Atomic に書くだけ)と、トレイの「カーソル」「クリック」の項目の状態。
             Effect::PointerGate {
@@ -2387,13 +2740,39 @@ fn run_handmark_effects(
                 cursor,
                 click,
             } => {
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 HANDMARK_POINTER_GATE.store(
                     u8::from(open) | (u8::from(cursor) << 1) | (u8::from(click) << 2),
                     std::sync::atomic::Ordering::Release,
                 );
                 crate::tray::set_handmark_inputs_from_gate(open, cursor, click);
             }
+        }
+    }
+}
+
+/// 止まりの層（ADR-056）の研究者用の設定。`GSE_DEBUG=1` のときだけ `GSE_HANDMARK_STOPPED` を読む。
+/// 読めない値は警告を出して切ったままにする（参加者の配布物の既定は切ったまま）。
+fn handmark_stopped_cfg_from_env() -> Option<crate::analysis::handmark::stopped::StoppedCfg> {
+    // 門は `ensure_debug_enabled` と同じ（`GSE_DEBUG=1` のときだけ）。
+    let debug = ensure_debug_enabled().is_ok();
+    let raw = std::env::var("GSE_HANDMARK_STOPPED").ok();
+    if raw.is_some() && !debug {
+        // 研究者が入ったと思い込まないよう 1 行残す（値は出さない・参加者の既定の挙動は変わらない）
+        tracing::info!(
+            "handmark: GSE_HANDMARK_STOPPED is set but GSE_DEBUG is not 1; stopped layer stays off"
+        );
+    }
+    match crate::analysis::handmark::stopped::parse_stopped_cfg(raw.as_deref(), debug) {
+        Ok(cfg) => {
+            if let Some(c) = cfg.as_ref() {
+                tracing::info!("handmark: stopped layer on ({:?})", c.form);
+            }
+            cfg
+        }
+        Err(e) => {
+            tracing::warn!("handmark: GSE_HANDMARK_STOPPED ignored: {e}");
+            None
         }
     }
 }
@@ -2431,6 +2810,24 @@ pub(crate) fn handmark_toggle_from_tray(
         TrayItem::Restore => d.turn_on(fs, now),
         TrayItem::Hidden => return,
     };
+    run_handmark_effects(app, &log_tx, fx);
+}
+
+/// トレイの「ほかの窓をどける」／「窓を戻す」。`shown` は押された項目の文言の側(メニューに出ていた状態)。
+/// 駆動役の今の状態と違う(表示が古い)・窓を出していない・終了中は何もしない。選んだことは applog にも出さない
+/// (どけた回数が日の累計に足されるだけ)。ロックの順は `handmark_toggle_from_tray` と同じ。
+pub(crate) fn handmark_reveal_from_tray(
+    app: &tauri::AppHandle,
+    shown: crate::handmark_driver::RevealItem,
+) {
+    if is_shutting_down() {
+        return;
+    }
+    let Some(fs) = HANDMARK_FS.get() else { return };
+    let log_tx = handmark_log_tx(app);
+    let mut g = handmark_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.toggle_reveal(fs, shown, epoch_ms());
     run_handmark_effects(app, &log_tx, fx);
 }
 
@@ -2538,9 +2935,9 @@ fn handmark_finish_before_end(app: &tauri::AppHandle, log_tx: &Sender<LogEntry>)
     run_handmark_effects(app, log_tx, fx);
 }
 
-/// 窓の層の様子。★ 呼ぶのは macOS の駆動スレッドだけ（macOS 以外は窓も駆動役も無い。
+/// 窓の層の様子。★ 呼ぶのは macOS と Windows の駆動スレッドだけ（他の OS は窓も駆動役も無い。
 /// `cfg` を付けないと Windows の clippy が未使用で赤になる・2026-11-08 の CI で実測）。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
     crate::handmark_stage::status()
 }
@@ -2548,7 +2945,7 @@ fn handmark_window_status() -> crate::handmark_driver::WindowStatus {
 /// 駆動役を捨てる(駆動スレッドがパニックで抜けたときに、その後のトレイの押下が古い駆動役で門を
 /// 開け直さないように)。ロックが毒を受けていても取れる。★ 終了の処理中は残す(`handmark_finish_before_end`
 /// が最後の行を書くのに駆動役が要る)。
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_os = "macos", windows, test))]
 fn handmark_clear_driver() {
     if is_shutting_down() {
         return;
@@ -2557,12 +2954,12 @@ fn handmark_clear_driver() {
 }
 
 /// 駆動スレッドが抜けるとき(パニックを含む)に窓を閉じ、トレイの項目を隠し、駆動役を捨てる。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 struct HandmarkWindowGuard {
     app: tauri::AppHandle,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl Drop for HandmarkWindowGuard {
     fn drop(&mut self) {
         // ★ 駆動役を捨てるのが最初(以後のトレイの押下は `handmark_lock()` が `None` を返して何もしない)。
@@ -2573,15 +2970,22 @@ impl Drop for HandmarkWindowGuard {
         crate::handmark_edge_strip::close(&self.app);
         crate::tray::set_handmark_item(crate::handmark_driver::TrayItem::Hidden);
         crate::tray::set_handmark_inputs(None);
+        // どけた窓を戻し、「窓を戻す」の項目も隠す(駆動役が居ないので押しても戻せなくなるため・
+        // handmark-reveal-count のレビュー HIGH)。覚えた一覧が空なら何もしない。
+        crate::tray::set_handmark_reveal_item(crate::handmark_driver::RevealItem::Hidden);
+        #[cfg(target_os = "macos")]
+        crate::handmark_reveal_macos::apply(&self.app, false);
+        #[cfg(windows)]
+        crate::handmark_reveal_windows::apply(false);
         // ポインタのスレッドも読むのをやめる(閉じた門)
         HANDMARK_POINTER_GATE.store(0, std::sync::atomic::Ordering::Release);
     }
 }
 
-/// 手跡のポインタのスレッド。★ 段 1 かつ macOS のときだけ起こす。`HANDMARK_DRIVER` のロックを取らず、
+/// 手跡のポインタのスレッド。★ 段 1 かつ macOS か Windows のときだけ起こす。`HANDMARK_DRIVER` のロックを取らず、
 /// 門の Atomic・一時停止・主画面の大きさだけを読む。読んだ値・座標・場は窓以外へ出さない
 /// (ログ・エラー文にも入れない・ADR-050 D2)。時計は起動からの単調な ms（駆動役の壁時計とは別）。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn spawn_handmark_pointer(app: tauri::AppHandle) {
     let spawned = thread::Builder::new()
         .name("gse-handmark-pointer".to_string())
@@ -2596,11 +3000,12 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
                 || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
                 || {
                     let (w, h) = crate::handmark_stage::screen_size_pt();
-                    crate::input::handmark_pointer::to_point(
-                        crate::input::handmark_pointer_macos::read(),
-                        w,
-                        h,
-                    )
+                    #[cfg(target_os = "macos")]
+                    let sample = Some(crate::input::handmark_pointer_macos::read());
+                    // Windows: 主画面の高さ（物理ピクセル）で y の向きを直す。読めなければ None。
+                    #[cfg(windows)]
+                    let sample = crate::input::handmark_pointer_windows::read(h);
+                    sample.and_then(|s| crate::input::handmark_pointer::to_point(s, w, h))
                 },
                 |s, now| crate::handmark_stage::emit_trace(&app, s, now),
                 |r, now| crate::handmark_stage::emit_ripple(&app, r, now),
@@ -2616,8 +3021,8 @@ fn spawn_handmark_pointer(app: tauri::AppHandle) {
     }
 }
 
-/// 手跡の駆動スレッド(250 ms ごと)。★ 段 1 かつ macOS のときだけ起こす。
-#[cfg(target_os = "macos")]
+/// 手跡の駆動スレッド(250 ms ごと)。★ 段 1 かつ macOS か Windows のときだけ起こす。
+#[cfg(any(target_os = "macos", windows))]
 fn spawn_handmark_driver(
     app: tauri::AppHandle,
     log_tx: Sender<LogEntry>,
@@ -2653,7 +3058,8 @@ fn spawn_handmark_driver(
             let wall = epoch_ms();
             let today = today_of(&mut offset, wall);
             let mut g = handmark_lock();
-            let (d, fx) = crate::handmark_driver::HandmarkDriver::new(fs, true, wall, today);
+            let (mut d, fx) = crate::handmark_driver::HandmarkDriver::new(fs, true, wall, today);
+            d.set_stopped(handmark_stopped_cfg_from_env());
             run_handmark_effects(&app, &log_tx, fx);
             *g = Some(d);
         }
@@ -2677,7 +3083,16 @@ fn spawn_handmark_driver(
                 d.on_press(t);
             }
             // 記録の一時停止(コマンドの経路で既に合わせてあれば何もしない)
-            let mut fx = d.on_paused(fs, crate::recording::is_paused(), wall);
+            // 時刻はコマンドの経路が決めた遷移の時刻(`recording_pause` の行と同じ値)。コマンドの経路が先に
+            // ロックを取れなかったときも、記録と同じ時刻で入れる(止まりの層の再生の一致・ADR-051 D5)。
+            // 止まりの層を切っているときは今までどおり `wall`(切っていれば 1 ビットも変えない・判断 10)。
+            let paused_now = crate::recording::is_paused();
+            let at = handmark_tick_pause_at(
+                d.stopped_on(),
+                HANDMARK_PAUSE_AT_MS.load(std::sync::atomic::Ordering::SeqCst),
+                wall,
+            );
+            let mut fx = d.on_paused(fs, paused_now, at);
             // 窓の層の様子(作れなかった・出せなかった)を、この刻みの前に駆動役へ渡す
             fx.extend(d.on_window_status(handmark_window_status(), wall));
             // 帯が出ていて見えているか(見えていた時間 `visible_ms` の足し込み用)
@@ -2792,6 +3207,8 @@ fn spawn_s1_driver(
                 }));
                 s1_apply_locked(&app, &log_tx, d, fx, None);
             }
+            // ★ 駆動役のロックの外で、答えのキーの期限を見る（ADR-057 D5・判断 8）
+            s1_expire_answer_keys(&app, epoch_ms());
             let dropped = S1_INPUT_DROPPED.load(Ordering::Relaxed);
             if dropped != last_dropped {
                 tracing::warn!("stage 1: {} input events dropped (channel full)", dropped);
@@ -2969,128 +3386,268 @@ fn s1_answer_gate() -> Result<(), String> {
     Ok(())
 }
 
-/// 段 1 のプローブへの回答（3 問を 1 枚: 摩擦・前進・6 択）。★ `realtime_label` と `activity_label` を同じ `probe_id` で 2 行。
-#[tauri::command]
-fn record_probe_response(
-    app: tauri::AppHandle,
-    log: State<'_, Arc<Mutex<LogState>>>,
-    probe_id: String,
-    q1_friction: u8,
-    q2_progress: u8,
-    category: String,
-    latency_ms: u64,
+/// 段 1: 答えたカード（最後まで・途中まで）の 2 行（`realtime_label` と `activity_label`・ADR-057 D3）。
+///
+/// ★ 2 行とも同じ時刻 `t`・同じ `probe_id`。`realtime_label` の q1・q2 は答えた分だけ入り、
+///   聞かなかった・答えなかった分は null（どちらかは `activity_label.category` の `asks_scales` で分かる）。
+/// ★ 回答の遅れはカードを出した時刻から: `activity_label` は Q3 を押すまで、`realtime_label` は最後の押下まで。
+/// `card.answer` が無ければ `None`（答えていないカードは `s1_skip_probe` か `emit_s1_superseded`）。
+fn s1_probe_answer_rows(
+    consent: &crate::o1::EsmConsent,
+    t: u64,
+    card: &crate::s1_driver::ProbeCard,
+) -> Option<[LogEntry; 2]> {
+    let a = card.answer?;
+    let probe = ProbeRef::RandomProbe {
+        probe_id: card.probe_id.clone(),
+    };
+    let realtime = LogEntry::realtime_label_s1_answered(
+        t,
+        &probe,
+        a.q1,
+        a.q2,
+        a.last_ts.saturating_sub(card.shown_ts),
+        card.window_start_ms,
+        card.window_end_ms,
+    );
+    let activity = LogEntry::activity_label_answered(
+        consent,
+        t,
+        Some(card.probe_id.as_str()),
+        a.category,
+        a.q3_ts.saturating_sub(card.shown_ts),
+        card.window_start_ms,
+        card.window_end_ms,
+    );
+    Some([
+        realtime.with_s1_debug(card.debug),
+        activity.with_s1_debug(card.debug),
+    ])
+}
+
+/// 段 1: 途中まで答えたカードが閉じた（差し替え・一時停止・終了）ときの 2 行。
+fn emit_s1_probe_answered(log_tx: &Sender<LogEntry>, t: u64, card: &crate::s1_driver::ProbeCard) {
+    let Some(consent) = crate::o1::activity_label_allowed(
+        crate::s1::is_s1(),
+        crate::submission::s1_probe_consent_acknowledged(),
+    ) else {
+        tracing::warn!("stage 1: partly answered card not recorded (no consent to the questions)");
+        return;
+    };
+    for entry in s1_probe_answer_rows(&consent, t, card)
+        .into_iter()
+        .flatten()
+    {
+        if let Err(e) = log_tx.try_send(entry) {
+            tracing::warn!(
+                "stage 1: partly answered row not sent: {}",
+                log_send_error(e)
+            );
+        }
+    }
+}
+
+/// 段 1: どのカードのどの問いに当てるか。
+#[derive(Debug, Clone, Copy)]
+enum S1AnswerTarget<'a> {
+    /// 画面のボタン（押した側が見ていたカードと問い）。
+    Shown {
+        probe_id: &'a str,
+        step: crate::s1_driver::ProbeStep,
+    },
+    /// キー（いま開いているカードの、いまの問い）。
+    Current,
+}
+
+/// 段 1 のカードに答えを 1 つ当てる（★ ボタンのコマンドとキーのハンドラの共通の道・ADR-057）。
+///
+/// ★ 答え終わったら 2 行を書いて閉じる。1 行目が送れなければカードを前の状態のまま残す（押し直せる）。
+///   答え終わっていなければ、行を書かずに次の問いへ進める。
+fn s1_answer_probe(
+    app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    target: S1AnswerTarget<'_>,
+    input_for: impl FnOnce(crate::s1_driver::ProbeStep) -> Result<crate::s1_driver::AnswerInput, String>,
 ) -> Result<(), String> {
     s1_answer_gate()?;
-    // ★ 目盛りの外は丸めずに拒む（日の問いの `motivation` と扱いをそろえる）
-    if !(1..=5).contains(&q1_friction) || !(1..=5).contains(&q2_progress) {
-        return Err(format!("invalid scale: q1={q1_friction} q2={q2_progress}"));
-    }
-    let category = crate::logger::ActivityCategory::parse(&category)
-        .ok_or_else(|| format!("invalid category: {:?}", category))?;
     let consent = crate::o1::activity_label_allowed(
         crate::s1::is_s1(),
         crate::submission::s1_probe_consent_acknowledged(),
     )
     .ok_or_else(|| "問いへの同意がありません。".to_string())?;
-    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
     let now = epoch_ms();
-    with_s1_driver(&app, &log_tx, |d| {
-        let Some(card) = d.probe_card(&probe_id).cloned() else {
+    with_s1_driver(app, log_tx, |d| {
+        let closed = || {
+            (
+                Err("このカードはもう閉じています。".to_string()),
+                Vec::new(),
+            )
+        };
+        let Some(card) = d.open_probe().cloned() else {
+            return closed();
+        };
+        let expected = match target {
+            S1AnswerTarget::Shown { probe_id, step } => {
+                if card.probe_id != probe_id {
+                    return closed();
+                }
+                // ★ 押した側が見ていた問いが既に進んでいる（キーが先に入った）。答えは入っているので、
+                //   この押下は捨てて Ok を返す（画面は取り直すだけ・エラーの文を出さない）。
+                if card.step() != Some(step) {
+                    tracing::info!("stage 1: a press on an earlier question was ignored");
+                    return (Ok(()), Vec::new());
+                }
+                step
+            }
+            S1AnswerTarget::Current => match card.step() {
+                Some(s) => s,
+                None => return closed(),
+            },
+        };
+        let next = match input_for(expected).and_then(|i| card.with_answer(expected, i, now)) {
+            Ok(n) => n,
+            Err(e) => return (Err(e), Vec::new()),
+        };
+        if next.step().is_some() {
+            return (Ok(()), d.commit_probe_answer(next));
+        }
+        let Some([realtime, activity]) = s1_probe_answer_rows(&consent, now, &next) else {
+            return (Err("答えがありません。".to_string()), Vec::new());
+        };
+        // ★ 1 行目が送れなければカードを残す（再押下でやり直せる）
+        if let Err(e) = log_tx.try_send(realtime) {
+            return (Err(log_send_error(e)), Vec::new());
+        }
+        // ⚠️ 2 行目が送れなくてもカードは閉じる（やり直すと 1 行目が二重になる）
+        let res = log_tx.try_send(activity).map_err(log_send_error);
+        (res, d.close_probe(&next.probe_id))
+    })
+    .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
+}
+
+/// 段 1 のプローブのボタン（ADR-057）。`step` は押した側が見ていた問い（`q3`・`q1`・`q2`）。
+/// Q3 は `category`（7 択の値）、Q1・Q2 は `scale`（1〜5）で答える。
+#[tauri::command]
+fn answer_s1_probe(
+    app: tauri::AppHandle,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    probe_id: String,
+    step: String,
+    category: Option<String>,
+    scale: Option<u8>,
+) -> Result<(), String> {
+    use crate::s1_driver::{AnswerInput, ProbeStep};
+    let step = match step.as_str() {
+        "q3" => ProbeStep::Q3,
+        "q1" => ProbeStep::Q1,
+        "q2" => ProbeStep::Q2,
+        _ => return Err(format!("invalid step: {step:?}")),
+    };
+    let input = match (step, category, scale) {
+        (ProbeStep::Q3, Some(c), None) => AnswerInput::Activity(
+            crate::logger::ActivityCategory::parse(&c)
+                .ok_or_else(|| format!("invalid category: {c:?}"))?,
+        ),
+        // ★ 目盛りの外は丸めずに拒む（日の問いの `motivation` と扱いをそろえる）
+        (ProbeStep::Q1 | ProbeStep::Q2, None, Some(v)) if (1..=5).contains(&v) => {
+            AnswerInput::Scale(v)
+        }
+        _ => return Err("答えの形が問いと合いません。".to_string()),
+    };
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    s1_answer_probe(
+        &app,
+        &log_tx,
+        S1AnswerTarget::Shown {
+            probe_id: &probe_id,
+            step,
+        },
+        |_| Ok(input),
+    )
+}
+
+/// 段 1 のプローブを閉じる（★ ボタンのコマンドとキーのハンドラの共通の道）。
+///
+/// ★ Q3 まで答えていれば、理由に関わらず押した分を answered の 2 行で書く（ADR-057 D3）。
+///   答えていなければ `reason`（`dont_remember`・`dismissed`）の skipped の 2 行。
+/// ★ `latency_ms` はカードを出した時刻から（ボタンもキーも backend の時計で測る・ADR-057 D4）。
+fn s1_skip_probe(
+    app: &tauri::AppHandle,
+    log_tx: &Sender<LogEntry>,
+    probe_id: Option<&str>,
+    reason: SkipReason,
+) -> Result<(), String> {
+    s1_answer_gate()?;
+    let consent = crate::o1::activity_label_allowed(
+        crate::s1::is_s1(),
+        crate::submission::s1_probe_consent_acknowledged(),
+    )
+    .ok_or_else(|| "問いへの同意がありません。".to_string())?;
+    let now = epoch_ms();
+    with_s1_driver(app, log_tx, |d| {
+        let card = match probe_id {
+            Some(id) => d.probe_card(id).cloned(),
+            None => d.open_probe().cloned(),
+        };
+        let Some(card) = card else {
             return (
                 Err("このカードはもう閉じています。".to_string()),
                 Vec::new(),
             );
         };
-        let probe = ProbeRef::RandomProbe {
-            probe_id: card.probe_id.clone(),
+        let rows = match s1_probe_answer_rows(&consent, now, &card) {
+            Some(rows) => rows,
+            None => {
+                let latency_ms = now.saturating_sub(card.shown_ts);
+                let probe = ProbeRef::RandomProbe {
+                    probe_id: card.probe_id.clone(),
+                };
+                [
+                    LogEntry::realtime_label_skipped(
+                        now,
+                        &probe,
+                        reason,
+                        latency_ms,
+                        card.window_start_ms,
+                        card.window_end_ms,
+                    )
+                    .with_s1_debug(card.debug),
+                    LogEntry::activity_label_skipped(
+                        &consent,
+                        now,
+                        Some(card.probe_id.as_str()),
+                        latency_ms,
+                        card.window_start_ms,
+                        card.window_end_ms,
+                    )
+                    .with_s1_debug(card.debug),
+                ]
+            }
         };
-        let realtime = LogEntry::realtime_label_answered(
-            now,
-            &probe,
-            q1_friction,
-            q2_progress,
-            latency_ms,
-            card.window_start_ms,
-            card.window_end_ms,
-        );
-        // ★ 1 行目が送れなければカードを残す（再押下でやり直せる）
-        if let Err(e) = log_tx.try_send(realtime.with_s1_debug(card.debug)) {
+        let [realtime, activity] = rows;
+        if let Err(e) = log_tx.try_send(realtime) {
             return (Err(log_send_error(e)), Vec::new());
         }
-        let activity = LogEntry::activity_label_answered(
-            &consent,
-            now,
-            Some(card.probe_id.as_str()),
-            category,
-            latency_ms,
-            card.window_start_ms,
-            card.window_end_ms,
-        );
-        // ⚠️ 2 行目が送れなくてもカードは閉じる（やり直すと 1 行目が二重になる）
-        let res = log_tx
-            .try_send(activity.with_s1_debug(card.debug))
-            .map_err(log_send_error);
+        let res = log_tx.try_send(activity).map_err(log_send_error);
         (res, d.close_probe(&card.probe_id))
     })
     .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
 }
 
-/// 段 1 のプローブを答えずに閉じる（`dont_remember`・`dismissed` だけ。`superseded` は調停器だけが書く）。
+/// 段 1 のプローブを閉じるボタン（`dont_remember`・`dismissed` だけ。`superseded` は調停器だけが書く）。
 #[tauri::command]
 fn record_probe_skip(
     app: tauri::AppHandle,
     log: State<'_, Arc<Mutex<LogState>>>,
     probe_id: String,
     skip_reason: String,
-    latency_ms: u64,
 ) -> Result<(), String> {
-    s1_answer_gate()?;
     let reason = match SkipReason::parse(&skip_reason) {
         Some(r @ (SkipReason::DontRemember | SkipReason::Dismissed)) => r,
         _ => return Err(format!("invalid skip_reason: {:?}", skip_reason)),
     };
-    let consent = crate::o1::activity_label_allowed(
-        crate::s1::is_s1(),
-        crate::submission::s1_probe_consent_acknowledged(),
-    )
-    .ok_or_else(|| "問いへの同意がありません。".to_string())?;
     let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
-    let now = epoch_ms();
-    with_s1_driver(&app, &log_tx, |d| {
-        let Some(card) = d.probe_card(&probe_id).cloned() else {
-            return (
-                Err("このカードはもう閉じています。".to_string()),
-                Vec::new(),
-            );
-        };
-        let probe = ProbeRef::RandomProbe {
-            probe_id: card.probe_id.clone(),
-        };
-        let realtime = LogEntry::realtime_label_skipped(
-            now,
-            &probe,
-            reason,
-            latency_ms,
-            card.window_start_ms,
-            card.window_end_ms,
-        );
-        if let Err(e) = log_tx.try_send(realtime.with_s1_debug(card.debug)) {
-            return (Err(log_send_error(e)), Vec::new());
-        }
-        let activity = LogEntry::activity_label_skipped(
-            &consent,
-            now,
-            Some(card.probe_id.as_str()),
-            latency_ms,
-            card.window_start_ms,
-            card.window_end_ms,
-        );
-        let res = log_tx
-            .try_send(activity.with_s1_debug(card.debug))
-            .map_err(log_send_error);
-        (res, d.close_probe(&card.probe_id))
-    })
-    .unwrap_or_else(|| Err("段 1 の駆動役が動いていません。".to_string()))
+    s1_skip_probe(&app, &log_tx, Some(&probe_id), reason)
 }
 
 /// 段 1 の日の終わりの問い（答える・閉じる）。`motivation` が 1..5 なら答えた、`None` なら閉じた
@@ -3387,6 +3944,10 @@ fn set_recording_paused(
     if paused && !crate::recording::is_paused() {
         let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
         s1_on_pause_requested(&app, &log_tx);
+    }
+    // 手跡: 遷移の時刻を先に置く(駆動スレッドの刻みが先に遷移を見たときも、記録の行と同じ時刻を使う)。
+    if paused != crate::recording::is_paused() {
+        HANDMARK_PAUSE_AT_MS.store(now, std::sync::atomic::Ordering::SeqCst);
     }
     let previous = crate::recording::set_paused(paused);
     if previous != paused {
@@ -5513,6 +6074,55 @@ pub fn run() {
         );
     }
 
+    // O1: 起動直後に時計が範囲の外か、前回の起動の高水位より古ければ、合うまで待ってから記録の名前・起点を決める。
+    //   2026-11-22、この Mac の起動直後に時計が 1976 年になっており、その時刻で記録と段 1 の枠を始めた結果、
+    //   時計が合った最初の 1 秒で 50 年分の候補が 1 行ずつ書かれた（`.steering/20261123-clock-jump-gate/`）。
+    //   Builder を組む前なので、待っている間は画面もトレイも無い（起動が遅れるだけ）。
+    //   ⚠️ 時刻を使う処理（ファイル名・起点・`meta`・孤児の回収）をこれより前に置かない。
+    if o1_source.is_some() {
+        let dir = logger::session_log_dir().0;
+        let seen_hwm = crate::o1::clock_hwm_in(&dir);
+        let gave_up_hwm = crate::o1::clock_hwm_gave_up_in(&dir);
+        // 前に打ち切った高水位と同じ値なら待たない（未来の高水位で毎回 10 分待たない・判断 5）
+        let hwm = crate::o1::hwm_to_wait_for(seen_hwm, gave_up_hwm);
+        if seen_hwm.is_some() && hwm.is_none() {
+            tracing::warn!(
+                "O1: not waiting for the last seen time ({seen_hwm:?}); it was given up before"
+            );
+        }
+        let wait = crate::o1::wait_for_plausible_clock(
+            hwm,
+            epoch_ms,
+            || thread::sleep(Duration::from_secs(1)),
+            |n, now| {
+                if n == 1 || n.is_multiple_of(60) {
+                    tracing::warn!(
+                        "O1: system clock looks wrong (now_ms={now}, last seen {hwm:?}); \
+                         waiting before opening the session log (waited {n} s)"
+                    );
+                }
+            },
+        );
+        if wait.gave_up_below_hwm {
+            tracing::error!(
+                "O1: system clock is still behind the last seen time ({hwm:?}) after {} s; \
+                 starting anyway (the orphan sweep may skip this run); \
+                 the next launch will not wait for this value",
+                wait.slept
+            );
+            if let Some(h) = hwm {
+                if let Err(e) = crate::o1::record_clock_hwm_gave_up(&dir, h) {
+                    tracing::warn!("O1: cannot record the given-up clock mark: {e}");
+                }
+            }
+        } else if wait.slept > 0 {
+            tracing::info!(
+                "O1: system clock looks right after {} s; starting",
+                wait.slept
+            );
+        }
+    }
+
     // セッションロガー — ★ **ここではまだ NDJSON を作らない** (follow-up F-3)。
     //
     // ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、止められる前に
@@ -6045,6 +6655,11 @@ pub fn run() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
                     use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+                    // 段 1 の答えのキー（★ 押す・離すの両方を見る・ADR-057 D5）
+                    if let Some(digit) = s1_answer_digit_of(shortcut) {
+                        s1_on_answer_key(app, &log_state_for_shortcut, digit, event.state());
+                        return;
+                    }
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
@@ -7201,15 +7816,15 @@ pub fn run() {
                 let _ = S1_PRESS_TX.set(press_tx);
                 let _ = S1_FOCUS_TX.set(focus_tx);
                 spawn_s1_driver(app.handle().clone(), log_tx_s1, press_rx, focus_rx);
-                // 手跡(ADR-051): 段 1 の後期の背景。macOS だけ(窓が無い OS では行も書かない)。
-                #[cfg(target_os = "macos")]
+                // 手跡(ADR-051): 段 1 の後期の背景。macOS と Windows(窓が無い OS では行も書かない)。
+                #[cfg(any(target_os = "macos", windows))]
                 {
                     let (hm_tx, hm_rx) = crossbeam_channel::bounded::<u64>(4096);
                     let _ = HANDMARK_PRESS_TX.set(hm_tx);
                     spawn_handmark_driver(app.handle().clone(), log_tx_handmark, hm_rx);
                     spawn_handmark_pointer(app.handle().clone());
                 }
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(not(any(target_os = "macos", windows)))]
                 let _ = log_tx_handmark;
             }
 
@@ -7339,8 +7954,8 @@ pub fn run() {
             //   ★ O1 は `start_session` を押さないので、今は overlay が一度も `show()` されない。
             show_s1_overlay(app.handle());
 
-            // 手跡: 背景の窓を隠したまま先に作る(setup のメインスレッド・段 1 かつ macOS のときだけ)。
-            #[cfg(target_os = "macos")]
+            // 手跡: 背景の窓を隠したまま先に作る(setup のメインスレッド・段 1 かつ macOS か Windows のときだけ)。
+            #[cfg(any(target_os = "macos", windows))]
             if crate::s1::is_s1() {
                 crate::handmark_stage::setup(app);
                 crate::handmark_edge_strip::setup(app);
@@ -7431,7 +8046,8 @@ pub fn run() {
             get_s1_card,
             acknowledge_s1_probe_consent,
             revoke_s1_probe_consent,
-            record_probe_response,
+            answer_s1_probe,
+            get_s1_answer_keys,
             record_probe_skip,
             record_day_question,
             debug_force_s1_probe,
@@ -8346,6 +8962,11 @@ mod invitation_reset_tests {
 /// コメントでない行）だけを見る（検査の文字列そのものに当たって空回りしないように）。
 #[cfg(test)]
 mod s1_driver_wiring_tests {
+    use super::{
+        s1_answer_digit_of, s1_answer_digits, s1_answer_digits_at, S1_ANSWER_CODES,
+        S1_ANSWER_KEYS_FOR_MS, S1_ANSWER_MODS,
+    };
+
     fn production_code() -> String {
         // ★ Windows の checkout は改行が CRLF になりうる（autocrlf）ので、LF にそろえてから切る
         let lib = include_str!("lib.rs").replace("\r\n", "\n");
@@ -8373,8 +8994,9 @@ mod s1_driver_wiring_tests {
             .match_indices(needle)
             .map(|(i, _)| &code[i..])
             .collect();
-        // ★ 対照: 送出元の 3 か所（差し替え・回答・未回答）が見つかる（0 件なら探し方が壊れている）
-        assert_eq!(calls.len(), 3, "6 択の門の呼び出しの数が想定と違う");
+        // ★ 対照: 送出元の 4 か所（差し替え・途中まで答えて閉じた・回答・閉じる）が見つかる
+        //   （0 件なら探し方が壊れている・ADR-057 で途中まで答えて閉じたカードの 1 か所が加わった）
+        assert_eq!(calls.len(), 4, "6 択の門の呼び出しの数が想定と違う");
         for call in calls {
             assert!(
                 call.starts_with(
@@ -8399,8 +9021,8 @@ mod s1_driver_wiring_tests {
         let code = production_code();
         let allowed = [
             "fn emit_s1_superseded(",
-            "fn record_probe_response(",
-            "fn record_probe_skip(",
+            "fn s1_probe_answer_rows(",
+            "fn s1_skip_probe(",
         ];
         let mut found = 0;
         for ctor in ["activity_label_answered(", "activity_label_skipped("] {
@@ -8457,6 +9079,152 @@ mod s1_driver_wiring_tests {
         );
     }
 
+    /// 答えのキーはプローブのカードの間だけ（0 = 閉じる と 1〜選択肢の数）。カードが無い・日の問いなら全部外す。
+    #[test]
+    fn answer_keys_follow_the_probe_card_and_its_step() {
+        use crate::s1_driver::{ProbeStep, S1CardView};
+        let probe = |step| S1CardView::Probe {
+            probe_id: "p".to_string(),
+            window_start_ms: 0,
+            window_end_ms: 1,
+            step,
+        };
+        assert_eq!(
+            s1_answer_digits(&probe(ProbeStep::Q3)),
+            (0..=7).collect::<Vec<u8>>()
+        );
+        assert_eq!(
+            s1_answer_digits(&probe(ProbeStep::Q1)),
+            (0..=5).collect::<Vec<u8>>()
+        );
+        assert_eq!(
+            s1_answer_digits(&probe(ProbeStep::Q2)),
+            (0..=5).collect::<Vec<u8>>()
+        );
+        assert!(s1_answer_digits(&S1CardView::None).is_empty());
+        assert!(s1_answer_digits(&S1CardView::Day {
+            card_id: 1,
+            delayed: false,
+            quit_flow: false,
+        })
+        .is_empty());
+    }
+
+    /// 答えのキーは修飾キー 1 つ＋数字だけ。研究者用の 6 本（3 つの修飾キー＋文字）とは重ならない。
+    #[test]
+    fn answer_key_digit_matches_only_the_answer_modifier() {
+        use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+        for (d, c) in S1_ANSWER_CODES.iter().enumerate() {
+            assert_eq!(
+                s1_answer_digit_of(&Shortcut::new(Some(S1_ANSWER_MODS), *c)),
+                Some(d as u8)
+            );
+            assert_eq!(s1_answer_digit_of(&Shortcut::new(None, *c)), None);
+            assert_eq!(
+                s1_answer_digit_of(&Shortcut::new(Some(S1_ANSWER_MODS | Modifiers::SHIFT), *c)),
+                None
+            );
+        }
+        assert_eq!(
+            s1_answer_digit_of(&Shortcut::new(Some(S1_ANSWER_MODS), Code::Digit8)),
+            None
+        );
+        let research = Modifiers::SUPER | Modifiers::SHIFT | Modifiers::ALT;
+        assert_eq!(
+            s1_answer_digit_of(&Shortcut::new(Some(research), Code::KeyM)),
+            None
+        );
+        // ★ Windows は Ctrl＋Alt。ふだんの Ctrl＋数字（タブの移動など）は答えにならない（判断 8）
+        #[cfg(not(target_os = "macos"))]
+        {
+            assert_eq!(S1_ANSWER_MODS, Modifiers::CONTROL | Modifiers::ALT);
+            assert_eq!(
+                s1_answer_digit_of(&Shortcut::new(Some(Modifiers::CONTROL), Code::Digit2)),
+                None
+            );
+        }
+    }
+
+    /// キーはカードを出してから 2 分だけ。過ぎたら問いが進んでも付け直さず、次のカードで数え直す（判断 8）。
+    #[test]
+    fn answer_keys_expire_two_minutes_after_the_card_opens() {
+        use crate::s1_driver::{ProbeStep, S1CardView};
+        let probe = |id: &str, step| S1CardView::Probe {
+            probe_id: id.to_string(),
+            window_start_ms: 0,
+            window_end_ms: 1,
+            step,
+        };
+        let mut card = None;
+        let t0 = 1_000_000;
+        assert_eq!(
+            s1_answer_digits_at(&probe("a", ProbeStep::Q3), &mut card, t0).len(),
+            8
+        );
+        // 問いが進んでも数え始めは変えない
+        let before = t0 + S1_ANSWER_KEYS_FOR_MS - 1;
+        assert_eq!(
+            s1_answer_digits_at(&probe("a", ProbeStep::Q1), &mut card, before).len(),
+            6
+        );
+        let after = t0 + S1_ANSWER_KEYS_FOR_MS;
+        assert!(s1_answer_digits_at(&probe("a", ProbeStep::Q2), &mut card, after).is_empty());
+        // 次のカードは数え直す
+        assert_eq!(
+            s1_answer_digits_at(&probe("b", ProbeStep::Q3), &mut card, after).len(),
+            8
+        );
+        // カードが消えれば忘れる
+        assert!(s1_answer_digits_at(&S1CardView::None, &mut card, after).is_empty());
+        assert!(card.is_none());
+        // ★ 壁時計が戻ったら過ぎた扱い（戻した分だけ長く持たない）
+        assert_eq!(
+            s1_answer_digits_at(&probe("c", ProbeStep::Q3), &mut card, t0).len(),
+            8
+        );
+        assert!(s1_answer_digits_at(&probe("c", ProbeStep::Q1), &mut card, t0 - 1).is_empty());
+    }
+
+    /// 画面（webview）に global-shortcut の権限を与えない（ADR-057 D5・判断 6）。
+    /// ⚠️ 戻すと、webview の `register` が登録表のロックを持ったままメインスレッドを待ち、
+    /// メインスレッドの `s1_sync_answer_keys` と待ち合いうる（/finish-task の code-reviewer MEDIUM）。
+    #[test]
+    fn no_capability_grants_global_shortcut_to_the_webview() {
+        for (name, text) in [
+            ("default.json", include_str!("../capabilities/default.json")),
+            (
+                "handmark-stage.json",
+                include_str!("../capabilities/handmark-stage.json"),
+            ),
+            (
+                "invitation-settings.json",
+                include_str!("../capabilities/invitation-settings.json"),
+            ),
+        ] {
+            assert!(!text.contains("global-shortcut"), "{name}");
+        }
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("capabilities");
+        let n = std::fs::read_dir(dir).unwrap().count();
+        assert_eq!(n, 3, "capabilities のファイルが増えた: この検査にも足す");
+    }
+
+    /// カードの開閉の全経路が通る emit の直後で、答えのキーをそろえる（★ 経路を数え上げない）。
+    #[test]
+    fn answer_keys_are_synced_where_the_card_state_is_emitted() {
+        let code = squash(&production_code());
+        assert!(code.contains(
+            "app.emit(\"s1_card_state\",view){tracing::warn!(\"s1_card_stateemitfailed:{}\",e);}s1_request_answer_keys(app,view);"
+        ));
+        assert_eq!(code.matches("app.emit(\"s1_card_state\"").count(), 1);
+        // ★ 登録はメインスレッドへ非同期に投げる（ロックを持つ tick のスレッドで待たない）。
+        // ⚠️ 投げるのは別のスレッドから（メインスレッドのハンドラから直に投げるとその場で走り、
+        // プラグインのロックを待って固まる・2026-11-25 の実機）
+        assert!(code.contains(
+            ".spawn(move||{letinner=handle.clone();ifletErr(e)=handle.run_on_main_thread(move||s1_sync_answer_keys(&inner))"
+        ));
+        assert_eq!(code.matches("s1_sync_answer_keys(&").count(), 1);
+    }
+
     /// `superseded` は調停器だけが書く値で、段 1 の未回答のコマンドは受けない。
     #[test]
     fn record_probe_skip_accepts_only_person_reasons() {
@@ -8470,6 +9238,41 @@ mod s1_driver_wiring_tests {
 mod handmark_wiring_tests {
     use super::*;
     use crate::handmark_store::testfs::with_table;
+
+    /// 駆動スレッドが抜けたとき（パニックを含む）の後始末は、どけた窓を両 OS で戻し、「窓を戻す」の項目も隠す
+    /// （駆動役が居なくなると押しても戻せないため・handmark-reveal-count のレビュー HIGH）。Drop は AppHandle が
+    /// 要るので、本文で縛る。
+    #[test]
+    fn the_driver_thread_guard_returns_revealed_windows() {
+        // Windows の checkout は改行が CRLF になりうる（autocrlf）ので、LF にそろえてから "\n}\n" を探す
+        let src = include_str!("lib.rs").replace("\r\n", "\n");
+        let start = src
+            .find(concat!("impl Drop for ", "HandmarkWindowGuard"))
+            .expect("guard");
+        let body = &src[start..start + src[start..].find("\n}\n").expect("end of impl")];
+        for needle in [
+            concat!(
+                "set_handmark_reveal_item(",
+                "crate::handmark_driver::RevealItem::Hidden)"
+            ),
+            concat!("handmark_reveal_macos::apply(", "&self.app, false)"),
+            concat!("handmark_reveal_windows::apply(", "false)"),
+        ] {
+            assert!(body.contains(needle), "{needle}");
+        }
+    }
+
+    /// 刻みの一時停止の時刻: 切っているときは記録の時刻があっても `wall`(PR 前と同じ)、入っているときは
+    /// 記録の時刻(未設定の 0 なら `wall`)。
+    #[test]
+    fn the_tick_uses_the_recorded_pause_time_only_with_the_stopped_layer() {
+        let wall = 1_800_000_000_500;
+        let rec = 1_800_000_000_123;
+        assert_eq!(handmark_tick_pause_at(false, rec, wall), wall);
+        assert_eq!(handmark_tick_pause_at(false, 0, wall), wall);
+        assert_eq!(handmark_tick_pause_at(true, rec, wall), rec);
+        assert_eq!(handmark_tick_pause_at(true, 0, wall), wall);
+    }
 
     /// 駆動スレッドがロックを持ったままパニックしても（ロックが毒を受けても）、駆動役を捨てられ、
     /// 以後のトレイの押下の入口（`handmark_lock()` の `as_mut()`）は `None` で何もしない。

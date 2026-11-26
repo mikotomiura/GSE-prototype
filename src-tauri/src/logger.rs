@@ -172,12 +172,14 @@ impl ProbeStratum {
     }
 }
 
-/// `activity_label` の行動カテゴリ (ADR-031 **D3**)。★ **固定 6 択**。
+/// `activity_label` の行動カテゴリ (ADR-031 **D3**・ADR-055)。固定 7 択。
 ///
-/// ★ 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
-/// 「**熟考・詰まり・外部資料・会話・離席・回答不能**」に対応する。
+/// 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
+/// 「熟考・詰まり・外部資料・会話・離席・回答不能」に、ADR-055 が「作業」を足した。
+/// 本人の段 1 の配布物（タグ v0.1.42）は 6 択で、`working` を持たない（並べ方は ADR-055 D4）。
+/// `working` の不在から版を推さない（7 択でも選ばれなければ現れない・ADR-055 D5）。
 ///
-/// ⚠️★★★ **1 つも足さない。** ★ 足すには**別 ADR** が要る（`data-privacy` ルール 7 条件 i）。
+/// 足すには別 ADR が要る（`data-privacy` ルール 7 条件 i）。
 /// ⚠️★★★ `ExternalMaterial` / `Conversation` は、**計器由来なら** ADR-014 D4 が禁じている
 /// 役割カテゴリ（`editor` / `terminal` / `browser`）と**意味的に等価**である。
 /// ★ **自己申告経由に限って**許可されており、条件（自由記述を置かない / 相手・アプリ・URL を
@@ -194,6 +196,8 @@ pub enum ActivityCategory {
     Conversation,
     /// 離席: その場を離れていた。
     Away,
+    /// 作業: 手を動かして作業を進めていた（入力・編集・単純作業を含む）。ADR-055。
+    Working,
     /// 回答不能: 思い出せない・当てはまらない。
     CannotAnswer,
 }
@@ -206,6 +210,7 @@ impl ActivityCategory {
             Self::ExternalMaterial => "external_material",
             Self::Conversation => "conversation",
             Self::Away => "away",
+            Self::Working => "working",
             Self::CannotAnswer => "cannot_answer",
         }
     }
@@ -217,24 +222,38 @@ impl ActivityCategory {
             "external_material" => Some(Self::ExternalMaterial),
             "conversation" => Some(Self::Conversation),
             "away" => Some(Self::Away),
+            "working" => Some(Self::Working),
             "cannot_answer" => Some(Self::CannotAnswer),
             _ => None,
         }
     }
 
-    /// ★ 6 択の全列挙（⚠️ **テストと UI がここを単一の出所にする**）。
+    /// 7 択の全列挙（テストがここを単一の出所にする。UI の並びは `src/probeTypes.ts` が同じ順で持つ）。
     ///
     /// ⚠️★★★ **variant を足したら `exhaustive_marker` が非網羅で *コンパイルエラー* になる**
     /// （2026-09-14・security-checker LOW）。★ 旧版は `[Self; 6]` の長さしか言わず、
     /// **7 個目を足して `ALL` に入れ忘れると検査を素通り**した。
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Deliberating,
         Self::Stuck,
         Self::ExternalMaterial,
         Self::Conversation,
         Self::Away,
+        Self::Working,
         Self::CannotAnswer,
     ];
+
+    /// 段 1 のカードで、Q3 にこれを選んだ後に Q1 摩擦・Q2 前進を続けて聞くか（ADR-057 D2）。
+    ///
+    /// ★ 詰まり・熟考・作業の 3 つだけ。外部資料・会話・離席・回答不能では聞かない。
+    /// ★ 記録の読み手は、この関数で「聞かなかった」（q が null で正常）と「答えなかった」を分ける。
+    /// ⚠️ 網羅の `match` にして、選択肢を足したら決め直しを迫る。
+    pub fn asks_scales(self) -> bool {
+        match self {
+            Self::Stuck | Self::Deliberating | Self::Working => true,
+            Self::ExternalMaterial | Self::Conversation | Self::Away | Self::CannotAnswer => false,
+        }
+    }
 
     /// ⚠️★★★ **`ALL` の網羅性をコンパイラに守らせるためだけの関数**。
     ///
@@ -248,7 +267,8 @@ impl ActivityCategory {
             Self::ExternalMaterial => 2,
             Self::Conversation => 3,
             Self::Away => 4,
-            Self::CannotAnswer => 5,
+            Self::Working => 5,
+            Self::CannotAnswer => 6,
         }
     }
 }
@@ -790,9 +810,12 @@ fn format_activity_label_line(
 }
 
 /// `LogEntry::RealtimeLabel` の NDJSON 1 行を生成する純粋関数。
-/// 不変条件 (skip⇒q1/q2=null, answered⇒1..=5, self_marker⇒probe_id=null) は
+/// 不変条件 (skip⇒q1/q2=null, q があれば 1..=5, self_marker⇒probe_id=null) は
 /// `LogEntry::realtime_label_*` コンストラクタ側で保証する。本関数は安全網として
 /// `debug_assert!` で検証してから整形する。
+///
+/// ⚠️ answered でも q が null の行がある（段 1 の 3 名の版・ADR-057 D3）。
+/// 較正（v0.3）と本人の段 1 の書き手（`realtime_label_answered`）は今どおり q を必ず持つ。
 #[allow(clippy::too_many_arguments)]
 fn format_realtime_label_line(
     timestamp: u64,
@@ -806,15 +829,13 @@ fn format_realtime_label_line(
     analysis_window_start_ms: u64,
     analysis_window_end_ms: u64,
 ) -> String {
-    debug_assert_eq!(
-        answered,
-        q1_friction.is_some(),
-        "realtime_label: answered と q1_friction の有無が不一致"
+    debug_assert!(
+        answered || (q1_friction.is_none() && q2_progress.is_none()),
+        "realtime_label: skip なのに q がある"
     );
-    debug_assert_eq!(
-        q1_friction.is_some(),
-        q2_progress.is_some(),
-        "realtime_label: q1/q2 の有無が不一致"
+    debug_assert!(
+        q2_progress.is_none() || q1_friction.is_some(),
+        "realtime_label: q1 が無いのに q2 がある（段 1 は Q1 → Q2 の順に聞く）"
     );
     debug_assert!(
         q1_friction.is_none_or(|v| (1..=5).contains(&v)),
@@ -915,6 +936,8 @@ pub struct HandmarkDayRow {
     pub shown_ms: u64,
     /// 見えていた時間（1a・1b では常に `None`・PR 2 で計り方が決まる）。
     pub visible_ms: Option<u64>,
+    /// その日に「ほかの窓をどける」を選んだ回数（記録が無いときは `None`・押した時刻は持たない）。
+    pub reveal_count: Option<u64>,
     /// 切った／戻した（時刻・出す側か）。
     pub toggles: Vec<(u64, bool)>,
     /// 入力ごとに切った／戻した（時刻・`cursor` か `click`・入れた側か）。ポインタの値は持たない。
@@ -1423,6 +1446,40 @@ impl LogEntry {
             source: probe.source(),
             q1_friction: Some(q1_friction.clamp(1, 5)),
             q2_progress: Some(q2_progress.clamp(1, 5)),
+            answered: true,
+            skip_reason: SkipReason::None,
+            latency_ms,
+            analysis_window_start_ms,
+            analysis_window_end_ms,
+            debug: false,
+        }
+    }
+
+    /// 段 1 のカード（3 名の版）の `RealtimeLabel` (回答あり)。ADR-057 D3。
+    ///
+    /// ★ Q3 に答えたカードは answered。q1/q2 は答えた分だけ入り、聞かなかった・答えなかった分は null。
+    /// 「聞かなかった」か「答えなかった」かは、対の `activity_label.category` の
+    /// [`ActivityCategory::asks_scales`] で分かる。
+    /// ⚠️ 範囲外の値は `clamp` せず落とす（呼び出し側が先に拒む。ここは安全網）。
+    /// ⚠️ q2 は q1 が無ければ落とす（Q1 → Q2 の順に聞くので、q2 だけの行は作らない）。
+    #[allow(clippy::too_many_arguments)]
+    pub fn realtime_label_s1_answered(
+        timestamp: u64,
+        probe: &ProbeRef,
+        q1_friction: Option<u8>,
+        q2_progress: Option<u8>,
+        latency_ms: u64,
+        analysis_window_start_ms: u64,
+        analysis_window_end_ms: u64,
+    ) -> Self {
+        let q1 = q1_friction.filter(|v| (1..=5).contains(v));
+        let q2 = q2_progress.filter(|v| (1..=5).contains(v) && q1.is_some());
+        LogEntry::RealtimeLabel {
+            timestamp,
+            probe_id: probe.probe_id().map(str::to_string),
+            source: probe.source(),
+            q1_friction: q1,
+            q2_progress: q2,
             answered: true,
             skip_reason: SkipReason::None,
             latency_ms,
@@ -2018,7 +2075,7 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
     format!(
         concat!(
             r#"{{"type":"handmark_day","t":{},"day":{},"assigned":"{}","late_start_day":{},"#,
-            r#""first_shown_day":{},"shown_ms":{},"visible_ms":{},"toggles":[{}],"#,
+            r#""first_shown_day":{},"shown_ms":{},"visible_ms":{},"reveal_count":{},"toggles":[{}],"#,
             r#""input_toggles":[{}],"stage_starts":[{}],"overflow":{},"table_sha256":{},"draw_seed":{},"reason":{}}}"#
         ),
         r.timestamp,
@@ -2028,6 +2085,7 @@ fn format_handmark_day_line(r: &HandmarkDayRow) -> String {
         opt_i(r.first_shown_day),
         r.shown_ms,
         opt_u(r.visible_ms),
+        opt_u(r.reveal_count),
         toggles,
         input_toggles,
         starts,
@@ -4241,11 +4299,23 @@ mod tests {
         }
         assert_eq!(ActivityCategory::parse("bogus"), None);
         assert_eq!(ActivityCategory::parse(""), None);
-        // ⚠️ 6 択であることそのものを固定する (★ 増やすには ADR-031 D3 条件 i の改訂が要る)。
-        assert_eq!(ActivityCategory::ALL.len(), 6);
+        // 7 択であることそのものを固定する（増やすには ADR-031 D3 条件 i を改める別 ADR が要る・ADR-055）。
+        assert_eq!(ActivityCategory::ALL.len(), 7);
+        // 本人の段 1 の 6 択の記録と並べるため、既存の 6 つの綴りは変えない（ADR-055 D4）。
+        for (c, s) in [
+            (ActivityCategory::Deliberating, "deliberating"),
+            (ActivityCategory::Stuck, "stuck"),
+            (ActivityCategory::ExternalMaterial, "external_material"),
+            (ActivityCategory::Conversation, "conversation"),
+            (ActivityCategory::Away, "away"),
+            (ActivityCategory::Working, "working"),
+            (ActivityCategory::CannotAnswer, "cannot_answer"),
+        ] {
+            assert_eq!(c.as_str(), s);
+        }
         // ⚠️★★★ **`ALL` が全 variant を覆っていること** (2026-09-14・security-checker LOW)。
         //   ★ `exhaustive_marker` は網羅 `match` なので、variant を足すと**コンパイルが落ちる**。
-        //   ★ ここで印が 0..6 を過不足なく埋めることを見て、`ALL` 側の抜けも捕まえる。
+        //   ★ ここで印が 0..7 を過不足なく埋めることを見て、`ALL` 側の抜けも捕まえる。
         let mut marks: Vec<usize> = ActivityCategory::ALL
             .iter()
             .map(|c| c.exhaustive_marker())
@@ -4253,7 +4323,7 @@ mod tests {
         marks.sort_unstable();
         assert_eq!(
             marks,
-            (0..6).collect::<Vec<_>>(),
+            (0..7).collect::<Vec<_>>(),
             "ALL が全 variant を覆っていない"
         );
 
@@ -4266,6 +4336,31 @@ mod tests {
         }
         assert_eq!(ProbeStratum::parse("p_stuck"), None);
         assert_eq!(ProbeStratum::parse(""), None);
+    }
+
+    /// 画面の選択肢（`src/probeTypes.ts` の `ACTIVITY_CHOICES`）が `ActivityCategory::ALL` と
+    /// 値と並びで一致すること（ADR-055 D3・/cross-review C2）。
+    ///
+    /// ずれると画面から送った値が `answer_s1_probe` の `parse` で拒まれ、回答が落ちる（キーで答えると別の選択肢になる）。
+    /// 並び（既存 5 つの位置と、回答不能が最後）は研究者が決めた計器の一部なので並びも見る。
+    #[test]
+    fn frontend_activity_choices_match_all_in_order() {
+        let ts = include_str!("../../src/probeTypes.ts");
+        let start = ts
+            .find("export const ACTIVITY_CHOICES")
+            .expect("probeTypes.ts に ACTIVITY_CHOICES が無い");
+        let body = &ts[start..];
+        let end = body.find("];").expect("ACTIVITY_CHOICES の終わりが無い");
+        let values: Vec<&str> = body[..end]
+            .split("value: \"")
+            .skip(1)
+            .filter_map(|rest| rest.split('"').next())
+            .collect();
+        let expected: Vec<&str> = ActivityCategory::ALL.iter().map(|c| c.as_str()).collect();
+        assert_eq!(
+            values, expected,
+            "画面の選択肢と ActivityCategory::ALL が食い違う"
+        );
     }
 
     /// ⚠️★★★ **未回答は行を書かないのではなく `cannot_answer` で残す** (ADR-031 D7)。
@@ -4412,6 +4507,7 @@ mod tests {
             first_shown_day: Some(20_410),
             shown_ms: 3_600_000,
             visible_ms: None,
+            reveal_count: Some(3),
             toggles: vec![(1_799_999_000_000, false), (1_799_999_500_000, true)],
             input_toggles: vec![(1_799_999_200_000, "cursor", false)],
             stage_starts: vec![1_799_990_000_000],
@@ -4432,7 +4528,7 @@ mod tests {
             format!(
                 concat!(
                     r#"{{"type":"handmark_day","t":1800000000000,"day":20411,"assigned":"on","late_start_day":20410,"#,
-                    r#""first_shown_day":20410,"shown_ms":3600000,"visible_ms":null,"#,
+                    r#""first_shown_day":20410,"shown_ms":3600000,"visible_ms":null,"reveal_count":3,"#,
                     r#""toggles":[{{"t":1799999000000,"on":false}},{{"t":1799999500000,"on":true}}],"#,
                     r#""input_toggles":[{{"t":1799999200000,"input":"cursor","on":false}}],"#,
                     r#""stage_starts":[1799990000000],"overflow":false,"table_sha256":"{}","#,
@@ -4449,6 +4545,7 @@ mod tests {
         r.late_start_day = None;
         r.first_shown_day = None;
         r.shown_ms = 0;
+        r.reveal_count = None;
         r.toggles.clear();
         r.input_toggles.clear();
         r.stage_starts.clear();
@@ -4458,6 +4555,7 @@ mod tests {
         let v: serde_json::Value =
             serde_json::from_str(&format_handmark_day_line(&r)).expect("valid json");
         assert_eq!(v["reason"], "table_missing");
+        assert!(v["reveal_count"].is_null(), "記録の無い日は null");
         assert_eq!(v["toggles"], serde_json::json!([]));
         assert_eq!(v["input_toggles"], serde_json::json!([]));
         assert!(v["table_sha256"].is_null() && v["draw_seed"].is_null());
@@ -4522,6 +4620,73 @@ mod tests {
     }
 
     /// `with_s1_debug` は印を持つ 4 行種だけに立て、偽なら何も変えない。
+    /// 段 1 の 3 名の版: answered でも q は答えた分だけ（ADR-057 D3）。較正の書き手は今どおり。
+    #[test]
+    fn s1_answered_realtime_label_keeps_only_what_was_answered() {
+        let probe = ProbeRef::RandomProbe {
+            probe_id: "p-1".to_string(),
+        };
+        let line = |q1: Option<u8>, q2: Option<u8>| {
+            let e = LogEntry::realtime_label_s1_answered(10, &probe, q1, q2, 7, 0, 1);
+            let LogEntry::RealtimeLabel {
+                timestamp,
+                probe_id,
+                source,
+                q1_friction,
+                q2_progress,
+                answered,
+                skip_reason,
+                latency_ms,
+                analysis_window_start_ms,
+                analysis_window_end_ms,
+                ..
+            } = e
+            else {
+                panic!("not a realtime_label");
+            };
+            let v: serde_json::Value = serde_json::from_str(&format_realtime_label_line(
+                timestamp,
+                probe_id.as_deref(),
+                source,
+                q1_friction,
+                q2_progress,
+                answered,
+                skip_reason,
+                latency_ms,
+                analysis_window_start_ms,
+                analysis_window_end_ms,
+            ))
+            .unwrap();
+            v
+        };
+        let none = line(None, None);
+        assert_eq!(none["answered"], true);
+        assert!(none["q1_friction"].is_null() && none["q2_progress"].is_null());
+        assert_eq!(none["skip_reason"], "none");
+        let part = line(Some(4), None);
+        assert_eq!(part["q1_friction"], 4);
+        assert!(part["q2_progress"].is_null());
+        let full = line(Some(4), Some(2));
+        assert_eq!(
+            (full["q1_friction"].clone(), full["q2_progress"].clone()),
+            (4.into(), 2.into())
+        );
+        // 安全網: 範囲外は落とし、q1 の無い q2 は作らない
+        assert!(line(Some(9), Some(2))["q1_friction"].is_null());
+        assert!(line(Some(9), Some(2))["q2_progress"].is_null());
+        assert!(line(None, Some(3))["q2_progress"].is_null());
+    }
+
+    #[test]
+    fn only_stuck_deliberating_and_working_ask_scales() {
+        let asked: Vec<_> = ActivityCategory::ALL
+            .into_iter()
+            .filter(|c| c.asks_scales())
+            .map(ActivityCategory::as_str)
+            .collect();
+        assert_eq!(asked, ["deliberating", "stuck", "working"]);
+    }
+
     #[test]
     fn with_s1_debug_marks_only_the_four_row_types() {
         let probe = ProbeRef::RandomProbe {

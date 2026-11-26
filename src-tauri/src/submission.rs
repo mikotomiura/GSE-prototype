@@ -101,9 +101,12 @@ pub const O1_INSTALL_ID_FILE_NAME: &str = "o1_install_id";
 /// ⚠️ 無い間は、段 1 でも問いを出さない（駆動役が調停器を作らない・M5 の 2 本目）。
 pub const S1_PROBE_CONSENT_FILE_NAME: &str = "s1_probe_consent";
 
-/// 段 1 の問いへの同意の版。★ 問いの中身（頻度の上限・6 択・日の問い）が変わったら上げる。
-/// 本人の試し（R5）用の版。他の参加者向けは段 1 の同意文書（R4）の版に合わせて上げる。
-pub const S1_PROBE_CONSENT_VERSION: &str = "s1-self-trial-1";
+/// 段 1 の問いへの同意の版。★ 問いの中身（頻度の上限・選択肢・日の問い）が変わったら上げる。
+/// 履歴: `s1-self-trial-1` = 本人の試し（R5）の 6 択（本人の段 1 の配布物・タグ v0.1.42）。
+/// `s1-n3-1` = 採択前の 3 名の版。Q3 が 7 択（ADR-055）で、2026-11-17 に Q3 を直した段 1 の同意文書
+/// （`.steering/20261114-gse-stage1-n3-consent/consent-draft-s1.md`）に対応する。
+/// 旧い版の印では問いを出さない（本人に新しい選択肢を説明してから同意し直してもらう）。
+pub const S1_PROBE_CONSENT_VERSION: &str = "s1-n3-1";
 
 /// home ディレクトリ。`USERPROFILE` → `HOME` の順で引く (logger.rs `fallback_log_dir` と一致。
 /// Windows git-bash で両方設定された場合に解決先が割れないよう順序を揃える)。
@@ -1144,6 +1147,16 @@ mod tests {
         assert_eq!(v["consent_version"], S1_PROBE_CONSENT_VERSION);
         std::fs::write(&path, r#"{"acknowledged_at":1,"consent_version":"old"}"#).unwrap();
         assert!(!s1_probe_consent_acknowledged_at(&path), "版が違えば無効");
+        // 本人の試しの 6 択の版（タグ v0.1.42）の印では、7 択の版の問いを出さない（ADR-055）。
+        std::fs::write(
+            &path,
+            r#"{"acknowledged_at":1,"consent_version":"s1-self-trial-1"}"#,
+        )
+        .unwrap();
+        assert!(
+            !s1_probe_consent_acknowledged_at(&path),
+            "6 択の版の同意で 7 択の問いが出る"
+        );
         std::fs::write(&path, "not json").unwrap();
         assert!(!s1_probe_consent_acknowledged_at(&path), "壊れていれば無効");
         let _ = std::fs::remove_dir_all(&dir);

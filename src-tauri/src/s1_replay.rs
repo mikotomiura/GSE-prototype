@@ -467,6 +467,8 @@ struct CardSpan {
     probe: Option<(Stratum, u64)>,
     /// 確かめ用のカード（調停器の外で出す。再生は差し替えを出さない）。
     debug: bool,
+    /// 記録が answered のラベルで閉じた（★ 途中まで答えた層化のカードは差し替えでも answered で閉じる・ADR-057 D3）。
+    closed_answered: bool,
 }
 
 /// 枠の動き出し。
@@ -599,7 +601,9 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                 Row::Label(l) => {
                     if let Some(k) = open_probes.iter().position(|p| p.0 == l.probe_id) {
                         let (_, from, st, sched, dbg) = open_probes.remove(k);
-                        tl.spans.push(probe_span(from, l.t, st, sched, dbg));
+                        let mut span = probe_span(from, l.t, st, sched, dbg);
+                        span.closed_answered = l.answered;
+                        tl.spans.push(span);
                     }
                     tl.labels.push(l.clone());
                 }
@@ -612,6 +616,7 @@ fn build_timeline(files: &[InputFile]) -> Timeline {
                         },
                         probe: None,
                         debug: d.debug,
+                        closed_answered: false,
                     });
                     if d.trigger == DayTrigger::Quit {
                         tl.quits.push(d.shown_ts);
@@ -678,6 +683,7 @@ fn probe_span(from: u64, to: u64, stratum: Stratum, scheduled_ts: u64, debug: bo
             },
             probe: Some((stratum, scheduled_ts)),
             debug,
+            closed_answered: false,
         };
     }
     CardSpan {
@@ -693,6 +699,7 @@ fn probe_span(from: u64, to: u64, stratum: Stratum, scheduled_ts: u64, debug: bo
         },
         probe: Some((stratum, scheduled_ts)),
         debug,
+        closed_answered: false,
     }
 }
 
@@ -947,13 +954,21 @@ fn run_phase(tl: &Timeline, opts: &ReplayOptions, phase_ms: u64) -> Vec<Replayed
                     }),
                     Action::SupersedeOpenStrat => {
                         // ★ 確かめ用のカードの差し替えは記録の側でも照合の外（`debug` の行）
-                        if let Some(key) = open_probe_at(tl, &active, &fired_at, wall)
-                            .filter(|(s, _)| *s != Stratum::Random)
+                        if let Some(span) = open_probe_span_at(tl, &active, &fired_at, wall)
+                            .filter(|s| s.probe.is_some_and(|(st, _)| st != Stratum::Random))
                         {
-                            out.push(Replayed::Supersede {
-                                probe_id_key: key,
-                                wall,
-                            });
+                            // ★ 途中まで答えた層化のカードは、差し替えでも記録は answered のラベルで閉じる
+                            //   （superseded の行は無い・ADR-057 D3）。記録がこの tick（tick の遅れの内）で
+                            //   answered で閉じていれば、差し替えは記録と合っているので数えない
+                            //   （/finish-task の code-reviewer HIGH）。
+                            let closed_by_partial_answer = span.closed_answered
+                                && span.to <= wall.saturating_add(S1_TICK_LAG_MS);
+                            if let (false, Some(key)) = (closed_by_partial_answer, span.probe) {
+                                out.push(Replayed::Supersede {
+                                    probe_id_key: key,
+                                    wall,
+                                });
+                            }
                         }
                     }
                     Action::ShowDayQuestion {
@@ -1038,19 +1053,16 @@ fn open_card_at(
     day
 }
 
-/// いま開いている本物のプローブのカード（確かめ用は除く）。
-fn open_probe_at(
-    tl: &Timeline,
+/// いま開いている本物のプローブのカードの区間（確かめ用は除く）。
+fn open_probe_span_at<'a>(
+    tl: &'a Timeline,
     active: &[usize],
     fired_at: &HashMap<(u8, u64), u64>,
     wall: u64,
-) -> Option<(Stratum, u64)> {
-    active.iter().find_map(|&k| {
-        let s = &tl.spans[k];
+) -> Option<&'a CardSpan> {
+    active.iter().map(|&k| &tl.spans[k]).find(|s| {
         let from = span_from(s, fired_at);
-        (!s.debug && wall > from && wall <= s.to)
-            .then_some(s.probe)
-            .flatten()
+        s.probe.is_some() && !s.debug && wall > from && wall <= s.to
     })
 }
 
@@ -1909,6 +1921,8 @@ mod tests {
         day_answer_after_ms: u64,
         /// 駆動役の tick の位相。
         sim_phase_ms: u64,
+        /// 層化のカードは Q3（作業）だけ答えて放っておく（差し替えで answered のまま閉じる・ADR-057 D3）。
+        partial_strat: bool,
     }
 
     /// 打鍵の塊（`from` から `to` まで `every` ごと）。
@@ -1945,6 +1959,7 @@ mod tests {
             debug_probe_at: None,
             day_answer_after_ms: 9_000,
             sim_phase_ms: 0,
+            partial_strat: false,
         }
     }
 
@@ -1981,6 +1996,13 @@ mod tests {
                         )
                         .with_s1_debug(card.debug),
                     );
+                }
+                // ★ 本物は `run_s1_effects` が同意の印を持って `s1_probe_answer_rows` で書く
+                Effect::ProbeAnswered { t, card } => {
+                    let consent = crate::o1::activity_label_allowed(true, true).unwrap();
+                    if let Some(rows) = crate::s1_probe_answer_rows(&consent, t, &card) {
+                        out.extend(rows);
+                    }
                 }
                 e => {
                     if let Some(row) = crate::s1_effect_row(e) {
@@ -2092,7 +2114,25 @@ mod tests {
             // 本人の回答（tick の間に届くコマンド）
             if let (Some(after), Some((id, at))) = (sc.answer_after_ms, opened_at.clone()) {
                 let t = at + after;
-                if t <= wall && !paused {
+                let partial = sc.partial_strat
+                    && d.probe_card(&id)
+                        .is_some_and(|c| c.stratum != Stratum::Random);
+                if t <= wall && !paused && partial {
+                    // Q3 だけ答えて据える（カードは開いたまま）
+                    if let Some(next) = d.probe_card(&id).and_then(|c| {
+                        c.with_answer(
+                            crate::s1_driver::ProbeStep::Q3,
+                            crate::s1_driver::AnswerInput::Activity(
+                                crate::logger::ActivityCategory::Working,
+                            ),
+                            t,
+                        )
+                        .ok()
+                    }) {
+                        rows_of(d.commit_probe_answer(next), out);
+                    }
+                    opened_at = None;
+                } else if t <= wall && !paused {
                     if let Some(card) = d.probe_card(&id).cloned() {
                         let probe = ProbeRef::RandomProbe {
                             probe_id: card.probe_id.clone(),
@@ -2233,6 +2273,39 @@ mod tests {
                 + r.cards.open_at_input_end
                 + r.cards.dropped_at_quit
         );
+    }
+
+    /// 途中まで答えた層化のカードが無作為のプローブに差し替わっても、往復は合う
+    /// （記録は superseded ではなく answered で閉じる・ADR-057 D3・/finish-task の code-reviewer HIGH）。
+    #[test]
+    fn round_trip_holds_when_a_partly_answered_strat_card_is_superseded() {
+        let mut sc = base();
+        sc.partial_strat = true;
+        let (r, files) = run(&sc, &jst());
+        assert_eq!(bad(&r), 0, "{:#?}", r.items);
+        // ★ 場面が本当に起きたこと（層化のカードが q の無い answered で閉じた行がある）
+        let strat_ids: HashSet<String> = files
+            .iter()
+            .flat_map(|f| f.rows.iter())
+            .filter_map(|row| match row {
+                Row::Assigned(a) if a.stratum != Stratum::Random => Some(a.probe_id.clone()),
+                _ => None,
+            })
+            .collect();
+        let partial_closed = files
+            .iter()
+            .flat_map(|f| f.rows.iter())
+            .filter(
+                |row| matches!(row, Row::Label(l) if l.answered && strat_ids.contains(&l.probe_id)),
+            )
+            .count();
+        assert!(
+            partial_closed >= 1,
+            "層化のカードの途中の回答が起きていない"
+        );
+        assert_eq!(r.cards.superseded, 0, "{:?}", r.cards);
+        // ★ 直す前は、この差し替えが記録と結べず「tick の境目」に 3 件落ちていた（赤にはならないが誤った分類）
+        assert_eq!(r.counts.boundary_tick, 0, "{:?}", r.counts);
     }
 
     #[test]
