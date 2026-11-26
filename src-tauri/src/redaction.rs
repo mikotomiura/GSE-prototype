@@ -338,6 +338,8 @@ pub struct HandmarkSnap {
     pub t: u64,
     pub shown_ms: u64,
     pub visible_ms: u64,
+    /// どけた回数の累計（`reveal_count` の無い古い行・null の行は 0）。
+    pub reveals: u64,
     /// いま書いているファイル（削除で書き換えないファイル）の行。
     pub skipped: bool,
 }
@@ -347,6 +349,8 @@ pub struct HandmarkSnap {
 pub struct HandmarkSub {
     pub shown_ms: u64,
     pub visible_ms: u64,
+    /// どけた回数。
+    pub reveals: u64,
     /// 当てる範囲の終わり（この時刻以降の行には当てない・走行中の累計にも当てない）。累計が日の途中で 0 から
     /// 始め直したとき、次の区切りの行を削らないため。`None` は終わりが無い（走行中の累計にも当てる）。
     pub until: Option<u64>,
@@ -375,6 +379,10 @@ pub fn handmark_snap(line: &str) -> Option<HandmarkSnap> {
         t: obj.get("t")?.as_u64()?,
         shown_ms: obj.get("shown_ms")?.as_u64()?,
         visible_ms: obj.get("visible_ms")?.as_u64()?,
+        reveals: obj
+            .get("reveal_count")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0),
         skipped: false,
     })
 }
@@ -408,7 +416,7 @@ pub fn collect_handmark_snaps(dir: &Path, skip: Option<&Path>) -> Vec<HandmarkSn
 
 /// 区間 `[from_ms, to_ms]` の手跡の量を、日ごとに求める（段 1 の同意の判断 13・本タスクの判断 1）。
 ///
-/// 行はその日の累計（`shown_ms`・`visible_ms`）を持つので、区間の中の行を落としても、後の行の累計と
+/// 行はその日の累計（`shown_ms`・`visible_ms`・どけた回数 `reveal_count`）を持つので、区間の中の行を落としても、後の行の累計と
 /// 前の行の差から区間の中の量が読める。日 d ごとに:
 ///
 /// - next = d の写しで `t > to_ms` の最初のもの。無く、走行中の累計 `live` が d なら `live`。どちらも無ければ引かない。
@@ -450,14 +458,14 @@ pub fn handmark_subtractions(
         let mut seg = Vec::with_capacity(of_day.len());
         let mut cur = 0usize;
         for (i, s) in of_day.iter().enumerate() {
-            if i > 0 && s.shown_ms < of_day[i - 1].shown_ms {
+            if i > 0 && restarted(&of_day[i - 1], s) {
                 cur += 1;
             }
             seg.push(cur);
         }
         // 走行中の累計の区切り(最後の行より小さければ 0 から始め直した後)
         let live_seg = live.filter(|l| l.day == day).map(|l| match of_day.last() {
-            Some(p) if l.shown_ms < p.shown_ms => cur + 1,
+            Some(p) if restarted(p, &l) => cur + 1,
             _ => cur,
         });
         let next = match of_day.iter().position(|s| s.t > to_ms) {
@@ -467,11 +475,11 @@ pub fn handmark_subtractions(
         let Some((next, next_seg)) = next else {
             continue;
         };
-        let (ps, pv) = of_day
+        let (ps, pv, pr) = of_day
             .iter()
             .zip(&seg)
             .rfind(|(s, g)| s.t < from_ms && **g == next_seg)
-            .map_or((0, 0), |(p, _)| (p.shown_ms, p.visible_ms));
+            .map_or((0, 0, 0), |(p, _)| (p.shown_ms, p.visible_ms, p.reveals));
         // 当てる範囲: next の区切りの終わりまで(次の区切りの最初の行の時刻)。走行中の累計が別の区切りなら当てない
         let until = match of_day.iter().zip(&seg).find(|(_, g)| **g > next_seg) {
             Some((s, _)) => Some(s.t),
@@ -481,13 +489,20 @@ pub fn handmark_subtractions(
         let sub = HandmarkSub {
             shown_ms: next.shown_ms.saturating_sub(ps),
             visible_ms: next.visible_ms.saturating_sub(pv),
+            reveals: next.reveals.saturating_sub(pr),
             until,
         };
-        if (sub.shown_ms, sub.visible_ms) != (0, 0) {
+        if (sub.shown_ms, sub.visible_ms, sub.reveals) != (0, 0, 0) {
             subs.insert(day, sub);
         }
     }
     subs
+}
+
+/// 累計が 0 から始め直したか（状態ファイルが消えた後の起動など）: 3 つの量のどれかが前の写しより減った。
+/// 窓が出たと分かる前（`shown_ms` が 0 のまま）にどけた回数だけが減る始め直しも見分ける（レビュー MEDIUM）。
+fn restarted(prev: &HandmarkSnap, cur: &HandmarkSnap) -> bool {
+    cur.shown_ms < prev.shown_ms || cur.visible_ms < prev.visible_ms || cur.reveals < prev.reveals
 }
 
 /// 累計から引く（visible ≤ shown を保つ）。
@@ -511,13 +526,23 @@ pub fn subtract_handmark_day(line: &str, to_ms: u64, subs: &HandmarkSubs) -> Opt
         return None;
     }
     let (shown, visible) = subtract_handmark(snap.shown_ms, snap.visible_ms, *sub);
-    if (shown, visible) == (snap.shown_ms, snap.visible_ms) {
+    // 回数は行に数があるときだけ書き換える（`reveal_count` の無い古い行・null の行の形を変えない）
+    let mut v: serde_json::Value = serde_json::from_str(line).ok()?;
+    let has_reveals = v
+        .get("reveal_count")
+        .and_then(serde_json::Value::as_u64)
+        .is_some();
+    let reveals = crate::analysis::handmark::day::subtract_count(snap.reveals, sub.reveals);
+    let reveals_changed = has_reveals && reveals != snap.reveals;
+    if (shown, visible) == (snap.shown_ms, snap.visible_ms) && !reveals_changed {
         return None;
     }
-    let mut v: serde_json::Value = serde_json::from_str(line).ok()?;
     let obj = v.as_object_mut()?;
     obj.insert("shown_ms".into(), shown.into());
     obj.insert("visible_ms".into(), visible.into());
+    if has_reveals {
+        obj.insert("reveal_count".into(), reveals.into());
+    }
     serde_json::to_string(&v).ok()
 }
 
@@ -1869,6 +1894,7 @@ mod tests {
             t,
             shown_ms: s,
             visible_ms: v,
+            reveals: 0,
             skipped: false,
         }
     }
@@ -1877,6 +1903,7 @@ mod tests {
         HandmarkSub {
             shown_ms: s,
             visible_ms: v,
+            reveals: 0,
             until: None,
         }
     }
@@ -2218,5 +2245,99 @@ mod tests {
         assert!(
             !handmark_subtractions(&snaps, Some(snap(D, 9_000, 125, 125)), 1_500, 3_000).is_empty()
         );
+    }
+
+    /// どけた回数（`reveal_count`）も前後の行の差で引く。shown の差が 0 でも回数の差があれば引き、行と走行中の
+    /// 累計の両方に当てる（段 1 の 3 名の版・handmark-reveal-count 判断 2）。
+    #[test]
+    fn reveal_counts_inside_the_range_are_subtracted_like_the_other_amounts() {
+        let with_reveals = |t: u64, s: u64, r: u64| HandmarkSnap {
+            reveals: r,
+            ..snap(D, t, s, s)
+        };
+        // 区間 [1_500, 2_500]: prev = 1_000(回数 1)、next = 3_000(回数 4) → 3 回を引く
+        let snaps = vec![
+            with_reveals(1_000, 100, 1),
+            with_reveals(2_000, 200, 3),
+            with_reveals(3_000, 300, 4),
+        ];
+        let subs = handmark_subtractions(&snaps, None, 1_500, 2_500);
+        assert_eq!(
+            subs.get(&D),
+            Some(&HandmarkSub {
+                reveals: 3,
+                ..sub(200, 200)
+            })
+        );
+        // 出ていた量が増えていなくても、回数だけの差なら引く
+        let snaps = vec![with_reveals(1_000, 100, 0), with_reveals(3_000, 100, 2)];
+        let subs = handmark_subtractions(&snaps, None, 1_500, 2_500);
+        assert_eq!(subs.get(&D).map(|x| x.reveals), Some(2));
+        // 行の書き換え: 数の reveal_count を持つ行は回数を引く
+        let line = format!(
+            r#"{{"type":"handmark_day","t":3000,"day":{D},"assigned":"on","late_start_day":20410,"first_shown_day":20410,"shown_ms":100,"visible_ms":100,"reveal_count":2,"toggles":[],"input_toggles":[],"stage_starts":[],"overflow":false,"table_sha256":null,"draw_seed":null,"reason":null}}"#
+        );
+        let out = subtract_handmark_day(&line, 2_500, &subs).expect("rewritten");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["reveal_count"], 0);
+        assert_eq!(v["shown_ms"], 100);
+        // 古い行(reveal_count が無い)は回数の差だけでは書き換えず、欄も足さない
+        let old = hm_line(D, 3_000, 100, Some(100));
+        assert_eq!(subtract_handmark_day(&old, 2_500, &subs), None);
+        let both = HandmarkSubs::from([(
+            D,
+            HandmarkSub {
+                reveals: 5,
+                ..sub(10, 10)
+            },
+        )]);
+        let out = subtract_handmark_day(&old, 2_500, &both).expect("shown changes");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert!(v.get("reveal_count").is_none(), "古い行に欄を足さない");
+        // null の行(記録が無かった日)は回数 0 と読み、欄は null のまま
+        let null_row = line.replace(r#""reveal_count":2"#, r#""reveal_count":null"#);
+        assert_eq!(handmark_snap(&null_row).map(|s| s.reveals), Some(0));
+        assert_eq!(handmark_snap(&old).map(|s| s.reveals), Some(0));
+        // 走行中の累計にも同じ式で当たる
+        let mut r = crate::analysis::handmark::day::DayRecord::new(D);
+        r.add_shown(300);
+        for _ in 0..4 {
+            r.add_reveal();
+        }
+        crate::handmark_store::scrub_record(
+            &mut r,
+            1_500,
+            2_500,
+            &HandmarkSubs::from([(
+                D,
+                HandmarkSub {
+                    reveals: 3,
+                    ..sub(0, 0)
+                },
+            )]),
+        );
+        assert_eq!(r.reveal_count, 1);
+    }
+
+    /// shown_ms が 0 のままどけた回数だけが減った（窓が出たと分かる前に数え、状態ファイルが消えて始め直した）
+    /// ところも区切りとして扱い、前の区切りの回数を後の区切りから引かない・区間の回数を潰さない（レビュー MEDIUM）。
+    #[test]
+    fn a_restart_seen_only_in_the_reveal_count_splits_the_day() {
+        let r = |t: u64, n: u64| HandmarkSnap {
+            reveals: n,
+            ..snap(D, t, 0, 0)
+        };
+        // 1_000: 3 回 → 2_000: 0 から始め直し → 3_000: 2 回
+        let snaps = vec![r(1_000, 3), r(2_000, 0), r(3_000, 2)];
+        // 区間 [2_500, 2_800]: next = 3_000(2)、prev は同じ区切りの 2_000(0) → 2 回を引く
+        let subs = handmark_subtractions(&snaps, None, 2_500, 2_800);
+        assert_eq!(subs.get(&D).map(|x| x.reveals), Some(2), "{subs:?}");
+        // 区間 [1_200, 1_500]: next = 2_000 は始め直した区切りの最初の行。前の区切りの 1_000(3) を prev にしない
+        let subs = handmark_subtractions(&snaps, None, 1_200, 1_500);
+        assert!(subs.is_empty(), "{subs:?}");
+        // 走行中の累計が減っていれば、それも別の区切り。始め直した後の 1 回は区間の中のものを含みうるので、
+        // shown_ms と同じく消す側に倒して引く（前の区切りの 3 を引く元にすると 1 − 3 で 0 になり、引き残す）
+        let subs = handmark_subtractions(&snaps[..1], Some(r(9_000, 1)), 1_200, 1_500);
+        assert_eq!(subs.get(&D).map(|x| x.reveals), Some(1), "{subs:?}");
     }
 }

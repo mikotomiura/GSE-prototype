@@ -402,6 +402,14 @@ impl Evaluation {
         }
     }
 
+    /// 「ほかの窓をどける」を 1 回数える（開いていて一時停止中でないときだけ呼ぶ・`add_shown` と同じく今日の記録だけ）。
+    pub fn add_reveal(&mut self) {
+        let today = self.today;
+        if let Some(r) = self.record.as_mut().filter(|r| r.day == today) {
+            r.add_reveal();
+        }
+    }
+
     /// 手跡を出し始めた時刻を足す。
     pub fn note_stage_start(&mut self, t: u64) {
         let today = self.today;
@@ -442,6 +450,7 @@ impl Evaluation {
             first_shown_day: rec.and_then(|r| r.first_shown_day),
             shown_ms: rec.map_or(0, |r| r.shown_ms),
             visible_ms: rec.map(|r| r.visible_ms),
+            reveal_count: rec.map(|r| r.reveal_count),
             toggles: rec.map_or_else(Vec::new, |r| {
                 r.toggles.iter().map(|t| (t.t, t.on)).collect()
             }),
@@ -511,7 +520,7 @@ pub fn scrub_state_file(
 pub(crate) fn scrub_record(r: &mut DayRecord, from_ms: u64, to_ms: u64, subs: &HandmarkSubs) {
     r.scrub_range(from_ms, to_ms);
     if let Some(sub) = subs.get(&r.day).filter(|s| s.applies_to_live()) {
-        r.subtract(sub.shown_ms, sub.visible_ms);
+        r.subtract(sub.shown_ms, sub.visible_ms, sub.reveals);
     }
 }
 
@@ -521,6 +530,7 @@ fn snap_of(r: &DayRecord, now: u64) -> HandmarkSnap {
         t: now,
         shown_ms: r.shown_ms,
         visible_ms: r.visible_ms,
+        reveals: r.reveal_count,
         skipped: false,
     }
 }
@@ -568,6 +578,7 @@ pub fn unavailable_row(t_ms: u64, day: i64, reason: CloseReason) -> HandmarkDayR
         first_shown_day: None,
         shown_ms: 0,
         visible_ms: None,
+        reveal_count: None,
         toggles: Vec::new(),
         input_toggles: Vec::new(),
         stage_starts: Vec::new(),
@@ -1645,6 +1656,7 @@ mod tests {
             t: 1_000,
             shown_ms: 100,
             visible_ms: 90,
+            reveals: 0,
             skipped: false,
         }];
         let (r, subs) = scrub_state_file(&fs, 1_500, 2_500, &snaps, true, 9_000);
@@ -1654,7 +1666,8 @@ mod tests {
             Some(&HandmarkSub {
                 until: None,
                 shown_ms: 400,
-                visible_ms: 310
+                visible_ms: 310,
+                reveals: 0,
             })
         );
         let DayLoad::Loaded(disk) = parse_state(&fs.read_state()) else {
@@ -1680,6 +1693,7 @@ mod tests {
             t,
             shown_ms: s,
             visible_ms: s,
+            reveals: 0,
             skipped: false,
         };
         let snaps = [snap(1_000, 500), snap(2_000, 600)];

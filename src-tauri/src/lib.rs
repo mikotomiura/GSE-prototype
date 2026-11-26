@@ -67,6 +67,12 @@ pub mod handmark_desktop_windows;
 #[cfg(any(target_os = "macos", windows))]
 pub mod handmark_edge_strip;
 pub mod handmark_store;
+// 手跡の「ほかの窓をどける」の OS に依らない判定(cfg なし・handmark-reveal-count)と、その OS の部分。
+pub mod handmark_reveal;
+#[cfg(target_os = "macos")]
+pub mod handmark_reveal_macos;
+#[cfg(windows)]
+pub mod handmark_reveal_windows;
 // 段 1 の日の終わりの問いの状態ファイル（`~/.gse/s1_day_state.json`）。
 pub mod s1_day_state;
 // 段 1 の再生（`gse-replay --probes`・`--day-questions`・記録から調停器を回し直して照合する・純粋）。
@@ -2717,6 +2723,16 @@ fn run_handmark_effects(
             | Effect::CloseWindow
             | Effect::State(_)
             | Effect::Stopped(_) => {}
+            // ほかの窓をどける・戻す(覚えた一覧は OS の層のメモリだけ・記録しない)
+            Effect::Reveal(reveal) => {
+                #[cfg(target_os = "macos")]
+                crate::handmark_reveal_macos::apply(app, reveal);
+                #[cfg(windows)]
+                crate::handmark_reveal_windows::apply(reveal);
+                #[cfg(not(any(target_os = "macos", windows)))]
+                let _ = reveal;
+            }
+            Effect::RevealItem(i) => crate::tray::set_handmark_reveal_item(i),
             Effect::TrayItem(t) => crate::tray::set_handmark_item(t),
             // ポインタのスレッドへの入れ切り(Atomic に書くだけ)と、トレイの「カーソル」「クリック」の項目の状態。
             Effect::PointerGate {
@@ -2794,6 +2810,24 @@ pub(crate) fn handmark_toggle_from_tray(
         TrayItem::Restore => d.turn_on(fs, now),
         TrayItem::Hidden => return,
     };
+    run_handmark_effects(app, &log_tx, fx);
+}
+
+/// トレイの「ほかの窓をどける」／「窓を戻す」。`shown` は押された項目の文言の側(メニューに出ていた状態)。
+/// 駆動役の今の状態と違う(表示が古い)・窓を出していない・終了中は何もしない。選んだことは applog にも出さない
+/// (どけた回数が日の累計に足されるだけ)。ロックの順は `handmark_toggle_from_tray` と同じ。
+pub(crate) fn handmark_reveal_from_tray(
+    app: &tauri::AppHandle,
+    shown: crate::handmark_driver::RevealItem,
+) {
+    if is_shutting_down() {
+        return;
+    }
+    let Some(fs) = HANDMARK_FS.get() else { return };
+    let log_tx = handmark_log_tx(app);
+    let mut g = handmark_lock();
+    let Some(d) = g.as_mut() else { return };
+    let fx = d.toggle_reveal(fs, shown, epoch_ms());
     run_handmark_effects(app, &log_tx, fx);
 }
 
@@ -2936,6 +2970,13 @@ impl Drop for HandmarkWindowGuard {
         crate::handmark_edge_strip::close(&self.app);
         crate::tray::set_handmark_item(crate::handmark_driver::TrayItem::Hidden);
         crate::tray::set_handmark_inputs(None);
+        // どけた窓を戻し、「窓を戻す」の項目も隠す(駆動役が居ないので押しても戻せなくなるため・
+        // handmark-reveal-count のレビュー HIGH)。覚えた一覧が空なら何もしない。
+        crate::tray::set_handmark_reveal_item(crate::handmark_driver::RevealItem::Hidden);
+        #[cfg(target_os = "macos")]
+        crate::handmark_reveal_macos::apply(&self.app, false);
+        #[cfg(windows)]
+        crate::handmark_reveal_windows::apply(false);
         // ポインタのスレッドも読むのをやめる(閉じた門)
         HANDMARK_POINTER_GATE.store(0, std::sync::atomic::Ordering::Release);
     }
@@ -9197,6 +9238,29 @@ mod s1_driver_wiring_tests {
 mod handmark_wiring_tests {
     use super::*;
     use crate::handmark_store::testfs::with_table;
+
+    /// 駆動スレッドが抜けたとき（パニックを含む）の後始末は、どけた窓を両 OS で戻し、「窓を戻す」の項目も隠す
+    /// （駆動役が居なくなると押しても戻せないため・handmark-reveal-count のレビュー HIGH）。Drop は AppHandle が
+    /// 要るので、本文で縛る。
+    #[test]
+    fn the_driver_thread_guard_returns_revealed_windows() {
+        // Windows の checkout は改行が CRLF になりうる（autocrlf）ので、LF にそろえてから "\n}\n" を探す
+        let src = include_str!("lib.rs").replace("\r\n", "\n");
+        let start = src
+            .find(concat!("impl Drop for ", "HandmarkWindowGuard"))
+            .expect("guard");
+        let body = &src[start..start + src[start..].find("\n}\n").expect("end of impl")];
+        for needle in [
+            concat!(
+                "set_handmark_reveal_item(",
+                "crate::handmark_driver::RevealItem::Hidden)"
+            ),
+            concat!("handmark_reveal_macos::apply(", "&self.app, false)"),
+            concat!("handmark_reveal_windows::apply(", "false)"),
+        ] {
+            assert!(body.contains(needle), "{needle}");
+        }
+    }
 
     /// 刻みの一時停止の時刻: 切っているときは記録の時刻があっても `wall`(PR 前と同じ)、入っているときは
     /// 記録の時刻(未設定の 0 なら `wall`)。
