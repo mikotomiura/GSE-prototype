@@ -43,6 +43,8 @@ CLOCK_YEAR_RANGE = (2020, 2040)
 # 第 2 版（判断 8）: 区間の幅は判定に入れない（記述）。auc・sd_day・rho_day は幅の見込みを出すときだけ使う
 VALUE_KEYS = ("min_days", "min_stuck", "min_nonstuck", "min_in_c1", "min_in_c2", "min_assigned_days", "max_days")
 WIDTH_KEYS = ("auc", "sd_day", "rho_day")
+# 回答の類（S1-A3・S1-B6・ADR-055）。知らない類は止める（黙って「詰まりでない」に数えない）
+CATEGORIES = ("stuck", "deliberating", "external_material", "conversation", "away", "working", "cannot_answer")
 
 
 def local_day(t_ms, utc_offset_secs):
@@ -56,6 +58,7 @@ def local_day(t_ms, utc_offset_secs):
 def read_record(path):
     """1 本の記録から、数えるのに要る行だけを取る（key 行の中身は読まない）。"""
     probes, debug_ids, labels, hm, times = {}, set(), [], {}, []
+    seen_labels = set()
     with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -83,6 +86,16 @@ def read_record(path):
                 if o.get("debug") is True:
                     debug_ids.add(o.get("probe_id"))
                     continue
+                a, b, lat, cat = o["recall_window_start_ms"], o["recall_window_end_ms"], o.get("latency_ms"), o["category"]
+                if not all(isinstance(x, int) and not isinstance(x, bool) for x in (a, b)) or a >= b:
+                    raise ValueError("回答の窓の始まりが終わりより前でない")
+                if isinstance(lat, int) and not isinstance(lat, bool) and lat < 0:
+                    raise ValueError("回答の遅れが負")
+                if o["answered"] is True and cat not in CATEGORIES:
+                    raise ValueError("知らない回答の類")
+                if o.get("probe_id") in seen_labels:
+                    raise ValueError("同じ問いの回答の行が 2 つある")
+                seen_labels.add(o.get("probe_id"))
                 labels.append((o.get("probe_id"), o["category"], o["answered"] is True, o["recall_window_end_ms"],
                                o["recall_window_start_ms"], o.get("latency_ms")))
             elif ty == "handmark_day":
@@ -242,6 +255,8 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         "assigned_days": assigned,
         "answers_per_observed_day_q": quartiles(list(per_day.values())),
         "lambda_per_observed_day": (n_random_ans / obs_days) if obs_days else None,
+        # 判定に使える回答（詰まり・詰まりでない。cannot_answer を除く）の観測日あたりの数。日数の見込みはこちらを使う
+        "lambda_valid_per_observed_day": ((n_stuck + n_nonstuck) / obs_days) if obs_days else None,
         "pi_stuck": (n_stuck / (n_stuck + n_nonstuck)) if (n_stuck + n_nonstuck) else None,
         "rules": {"stuck": list(stuck), "excluded": list(excluded), "day_cutoff_hour": DAY_CUTOFF_HOUR,
                   "in_stall": {"majority": "at least half of [recall_window_start_ms, recall_window_end_ms] inside [onset, resume or interval end]",
@@ -258,6 +273,11 @@ def check_values(v):
     missing = [k for k in VALUE_KEYS if k not in v]
     if missing:
         raise ValueError("値が足りない: " + ",".join(missing))
+    bad = [k for k in VALUE_KEYS if not isinstance(v[k], int) or isinstance(v[k], bool) or v[k] < 1]
+    if bad:
+        raise ValueError("値が 1 以上の整数でない: " + ",".join(bad))
+    if v["min_days"] > v["max_days"]:
+        raise ValueError("min_days が max_days を越える")
 
 
 def verdict(c, v):
@@ -371,7 +391,7 @@ def cmd_count(a):
     if v:
         # 幅は記述だけ（判定に入れない・判断 8）。値に AUC と日の揺れがあるときだけ見込む
         if all(k in v for k in WIDTH_KEYS) and c["observed_days"] and c["pi_stuck"] is not None:
-            c["width_now"] = slope_width(c["observed_days"], v["auc"], c["pi_stuck"], c["lambda_per_observed_day"],
+            c["width_now"] = slope_width(c["observed_days"], v["auc"], c["pi_stuck"], c["lambda_valid_per_observed_day"],
                                          v["sd_day"], v["rho_day"], a.reps, a.seed, 0)
         c["verdict"], c["verdict_parts"] = verdict(c, v)
         c["values"] = v
@@ -382,7 +402,7 @@ def cmd_count(a):
 
 def cmd_need(a):
     c = json.load(open(a.counts))
-    lam, pi_obs = c["lambda_per_observed_day"], c["pi_stuck"]
+    lam, pi_obs = c.get("lambda_valid_per_observed_day"), c["pi_stuck"]   # cannot_answer を除いた数（Codex の指摘）
     if lam is None:
         sys.exit("λ が無い（回答が無い）")
     # π は記録の値か、--pis で仮の幅を入れる（記録の π が 0 か 1 だと模擬にならない）

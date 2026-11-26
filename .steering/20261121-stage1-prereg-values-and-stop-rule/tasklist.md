@@ -29,6 +29,6 @@
 - [ ] 4 後期の後: F3・F4・F9〜F11（このタスクの外でもよい）
 
 ## 完了処理
-- [ ] `scripts/check_citations.py` に違反が無い
-- [ ] /cross-review（Codex には記録の本文と集計を送らない）: 1 巡目の code-reviewer は直した（判断 51）。Codex は利用の上限で止まり、直した後に script だけで回す
+- [x] `scripts/check_citations.py` に違反が無い
+- [x] /cross-review（Codex には記録の本文と集計を送らない）: code-reviewer（判断 51）・Codex（script だけ・判断 52）の指摘を直した。事前登録と作業記録は記録の集計を含むので Codex に送っていない
 - [ ] push・PR は研究者に確かめる（docs と experiments だけなら [skip ci]）

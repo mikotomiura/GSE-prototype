@@ -32,7 +32,8 @@ def run_cell(seed, idx, p, lname, R):
     rng = np.random.default_rng(np.random.SeedSequence([seed, idx]))
     a, s, prev, av = ds.solve_params(p["pi"], p["AUC"], SD, seed)
     if abs(prev - p["pi"]) > 0.002 or abs(av - p["AUC"]) > 0.002:
-        sys.exit("点 %d で a・s が狙いから ±0.002 を超えた" % idx)
+        # Pool のワーカーの中で sys.exit すると親が結果を待ち続けうるので、例外で親へ返す（Codex の指摘）
+        raise ValueError("点 %d で a・s が狙いから ±0.002 を超えた" % idx)
     ti, tsl, tconv = ds.population_values(rng, LAM, a, s, SD, p["rho"])
     cov = {(q, m): 0 for q in "is" for m in METHODS}
     wid = {(q, m): [] for q in "is" for m in METHODS}

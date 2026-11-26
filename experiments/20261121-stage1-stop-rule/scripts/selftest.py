@@ -210,10 +210,48 @@ def main():
     except ValueError:
         check("窓なしの数えで止める", True)
 
+    # 入力と値の検査（Codex の指摘・止める側に倒す）
+    def bad_record(name, lines):
+        try:
+            run_count([lines], [eps])
+            check(name, False)
+        except (ValueError, KeyError):
+            check(name, True)
+    base = make(1, 1, 1)
+    rev = json.loads(json.dumps(base))
+    for x in rev:
+        if x.get("type") == "activity_label":
+            x["recall_window_start_ms"], x["recall_window_end_ms"] = x["recall_window_end_ms"], x["recall_window_end_ms"]
+    bad_record("長さ 0 の回答の窓で止める", rev)
+    unk = json.loads(json.dumps(base))
+    for x in unk:
+        if x.get("type") == "activity_label":
+            x["category"] = "napping"
+    bad_record("知らない回答の類で止める", unk)
+    dup = base + [x for x in base if x.get("type") == "activity_label"]
+    bad_record("同じ問いの回答の行が 2 つで止める", dup)
+    neg = json.loads(json.dumps(base))
+    for x in neg:
+        if x.get("type") == "activity_label":
+            x["latency_ms"] = -1
+    bad_record("負の遅れで止める", neg)
+    for name, vv in (("値が 0 で止める", dict(VALUES, min_stuck=0)), ("min_days が max_days を越えると止める",
+                     dict(VALUES, min_days=VALUES["max_days"] + 1))):
+        try:
+            sr.check_values(vv)
+            check(name, False)
+        except ValueError:
+            check(name, True)
+    cx = run_count([make(2, 3, 3, extra=probe("px", day_start_ms(0) + 9 * H, "random", "cannot_answer"))], [eps])
+    check("日数の見込みの λ は cannot_answer を除く",
+          cx["lambda_valid_per_observed_day"] == (cx["random_stuck"] + cx["random_nonstuck"]) / cx["observed_days"]
+          and cx["lambda_valid_per_observed_day"] < cx["lambda_per_observed_day"])
+
     # 出力に日付・時刻・日ごとの値を含まない（キーの集合で縛る）
     allowed = {"elapsed_days", "observed_days", "probes_by_stratum", "answered_by_stratum", "random_unanswered",
                "random_answered", "random_stuck", "random_nonstuck", "random_excluded", "in_C1", "in_C2",
-               "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day", "pi_stuck", "rules",
+               "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day",
+               "lambda_valid_per_observed_day", "pi_stuck", "rules",
                "window_days", "random_cross_day", "random_over_latency_cap", "random_window_unobserved"}
     check("出力のキーは件数・率・要約だけ", set(c) == allowed)
 
