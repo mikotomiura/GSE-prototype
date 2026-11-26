@@ -2,7 +2,11 @@
  "A": {
   "status": "ok",
   "stalls_used": 300,
+  "controls_used": 600,
   "days_with_stalls": 10,
+  "interval_overlaps": 0,
+  "boot_failures": 0,
+  "ci_status": "ok",
   "K": 0.59,
   "K_ci95": [
    0.51,
@@ -33,21 +37,28 @@
    -0.05,
    0.02
   ],
-  "dT_shuffled": -0.01,
-  "dT_shuffled_ci95": [
-   -0.05,
-   0.01
-  ]
+  "null_dT": {
+   "n": 20,
+   "q025": -0.04,
+   "q975": 0.01,
+   "share_ge_observed": 0.75
+  }
  },
  "B": {
   "status": "数が足りない",
   "stalls_used": 5,
-  "days_with_stalls": 0
+  "controls_used": 15,
+  "days_with_stalls": 0,
+  "interval_overlaps": 0
  },
  "C": {
   "status": "ok",
   "stalls_used": 200,
+  "controls_used": 300,
   "days_with_stalls": 10,
+  "interval_overlaps": 0,
+  "boot_failures": 0,
+  "ci_status": "ok",
   "K": 0.47,
   "K_ci95": [
    0.35,
@@ -78,16 +89,21 @@
    -0.09,
    0.05
   ],
-  "dT_shuffled": 0.03,
-  "dT_shuffled_ci95": [
-   -0.05,
-   0.11
-  ]
+  "null_dT": {
+   "n": 20,
+   "q025": -0.07,
+   "q975": 0.06,
+   "share_ge_observed": 0.45
+  }
  },
  "D": {
   "status": "ok",
   "stalls_used": 1700,
+  "controls_used": 3600,
   "days_with_stalls": 20,
+  "interval_overlaps": 0,
+  "boot_failures": 0,
+  "ci_status": "ok",
   "K": 0.59,
   "K_ci95": [
    0.56,
@@ -113,15 +129,16 @@
    -0.02,
    0.01
   ],
-  "dT_given_N": -0.0,
+  "dT_given_N": -0.01,
   "dT_given_N_ci95": [
    -0.02,
    0.01
   ],
-  "dT_shuffled": -0.01,
-  "dT_shuffled_ci95": [
-   -0.02,
-   0.01
-  ]
+  "null_dT": {
+   "n": 20,
+   "q025": -0.01,
+   "q975": 0.0,
+   "share_ge_observed": 0.8
+  }
  }
 }

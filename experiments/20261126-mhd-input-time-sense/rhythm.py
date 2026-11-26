@@ -1,20 +1,18 @@
 """語・文の境界のリズムの量 B を O1 の学習器に足す比べ（conditions.md C8・ADR-019 D6）。
 
 usage: rhythm.py <work_dir> <out_json>   |   --selftest
+評価の手順は time_sense.evaluate_group と同じ（並べ替えの種だけ違う）。
 """
 import json
 import math
 import os
-import random
 import statistics
 import sys
-
-import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import time_sense as ts  # noqa: E402
-from time_sense import auc, cm  # noqa: E402
+from time_sense import auc  # noqa: E402
 
 BOUND = {"space", "enter", "sentence_punctuation"}
 SENT = {"sentence_punctuation", "enter"}
@@ -22,7 +20,7 @@ MIN_GAP = 50
 
 
 def b_window(press, a, b):
-    """(a, b] の押下の並び [(t, c)] から B の 6 量。"""
+    """(a, b] の押下の並び [(t, c)] から B の 6 量。間隔は 50 ms を超えるものだけ。"""
     w = [(t, c) for t, c in press if a < t <= b]
     nan = float("nan")
     n_b = float(sum(1 for _, c in w if c in BOUND))
@@ -52,87 +50,13 @@ def feat_b(f, u):
     return w1 + [x - y for x, y in zip(w1, w0)]
 
 
-def evaluate(p, seed, label):
-    files = p.files
-    srows, crows, pairs, _ = auc.match(files, auc.CTRL_LO, f"{seed}-{label}-main")
-    nd = len({files[fi].date for fi, _ in srows})
-    res = {"stalls_used": len(srows), "controls_used": len(crows), "days_with_stalls": nd}
-    if len(srows) < auc.MIN_STALLS or nd < auc.MIN_DAYS:
-        res["status"] = "数が足りない"
-        return res
-    XK = (np.array([auc.feat_k(files[fi], u) for fi, u in srows]), np.array([auc.feat_k(files[fi], u) for fi, u in crows]))
-    XN = (np.array([auc.feat_n(files[fi], u, False) for fi, u in srows]), np.array([auc.feat_n(files[fi], u, False) for fi, u in crows]))
-    XB = (np.array([feat_b(files[fi], u) for fi, u in srows]), np.array([feat_b(files[fi], u) for fi, u in crows]))
-    rng0 = random.Random(seed + 7)
-    allB = np.vstack(XB)
-    perm = list(range(len(allB)))
-    rng0.shuffle(perm)
-    allB = allB[perm]
-    XBs = (allB[:len(srows)], allB[len(srows):])
-    models = {
-        "K": XK,
-        "KB": (np.hstack([XK[0], XB[0]]), np.hstack([XK[1], XB[1]])),
-        "KN": (np.hstack([XK[0], XN[0]]), np.hstack([XK[1], XN[1]])),
-        "KNB": (np.hstack([XK[0], XN[0], XB[0]]), np.hstack([XK[1], XN[1], XB[1]])),
-        "KBshuf": (np.hstack([XK[0], XBs[0]]), np.hstack([XK[1], XBs[1]])),
-    }
-    s_unit = [files[fi].date for fi, _ in srows]
-    c_unit = [files[fi].date for fi, _ in crows]
-    units = sorted({*s_unit, *c_unit})
-
-    def one(sunit, cunit, srcs, crcs, prs, rs):
-        o = {}
-        for nm, (A, B) in models.items():
-            r = auc.cv_scores(A[srcs], B[crcs], sunit, cunit, random.Random(rs))
-            if r is None:
-                return None
-            o[nm] = auc.matched_auc(r[0], r[1], prs)
-        o["dB"] = o["KB"] - o["K"]
-        o["dB_given_N"] = o["KNB"] - o["KN"]
-        o["dB_shuffled"] = o["KBshuf"] - o["K"]
-        return o
-
-    main = one(s_unit, c_unit, list(range(len(srows))), list(range(len(crows))), pairs, seed)
-    if main is None:
-        res["status"] = "学習に失敗"
-        return res
-    rng = random.Random(seed + 1)
-    by_s = {u: [i for i, x in enumerate(s_unit) if x == u] for u in units}
-    by_c = {u: [i for i, x in enumerate(c_unit) if x == u] for u in units}
-    boots, fails = {k: [] for k in main}, 0
-    for _ in range(auc.NBOOT):
-        draw = [units[rng.randrange(len(units))] for _ in units]
-        srcs, crcs, su, cu, prs = auc.resample(draw, by_s, by_c, pairs)
-        r = one(su, cu, srcs, crcs, prs, rng.randrange(1 << 30)) if prs else None
-        if r is None:
-            fails += 1
-            continue
-        for k in boots:
-            boots[k].append(r[k])
-    res.update({k: round(v, 4) for k, v in main.items()})
-    res["ci95"] = {k: cm.ci95(v) for k, v in boots.items()}
-    res["boot_failures"] = fails
-    return res
-
-
 def run(work, out):
     people = ts.build(work)
-    full = {sym: evaluate(p, ts.SEED, sym) for sym, p in people.items()}
+    full = {sym: ts.evaluate_group(p, ts.SEED, sym, (lambda fi, u, p=p: feat_b(p.files[fi], u)), "B", 11)
+            for sym, p in people.items()}
     with open(os.path.join(work, "rhythm.full.json"), "w") as fh:
         json.dump(full, fh, indent=1, ensure_ascii=False)
-    pub = {}
-    for sym, r in full.items():
-        q = {"status": r.get("status", "ok"), "stalls_used": ts.cm_round_count(r["stalls_used"]),
-             "days_with_stalls": ts.cm_round_count(r["days_with_stalls"])}
-        for k in ("K", "KB", "KN", "KNB", "dB", "dB_given_N", "dB_shuffled"):
-            if k in r:
-                q[k] = round(r[k], 2)
-                ci = r["ci95"].get(k)
-                q[k + "_ci95"] = [round(ci[0], 2), round(ci[1], 2)] if ci else None
-        pub[sym] = q
-    with open(out, "w") as fh:
-        json.dump(pub, fh, indent=1, ensure_ascii=False)
-    print(json.dumps(pub, indent=1, ensure_ascii=False))
+    ts.publish(full, ("K", "KB", "KN", "KNB", "dB", "dB_given_N"), out)
 
 
 def selftest():
@@ -148,6 +72,22 @@ def selftest():
     assert v[5] == 2000
     e = b_window([], 0, 1)
     assert e[0] == 0.0 and all(math.isnan(x) for x in e[1:])
+    # 窓の端: (a, b] なので a ちょうどの押下は入らず、b ちょうどは入る
+    edge = [(0, "space"), (100, "alphabetic"), (200, "space")]
+    ve = b_window(edge, 0, 200)
+    assert ve[0] == 1.0 and ve[1] == 100 and math.isnan(ve[2])
+    # ちょうど 50 ms の間隔は数えない
+    v50 = b_window([(0, "alphabetic"), (50, "alphabetic"), (151, "alphabetic")], -1, 1000)
+    assert v50[3] == 101
+    # W1 − W0 の差（欠けの差は欠け）
+    class F:
+        pass
+    f = F()
+    f.press = [(31_000, "alphabetic"), (31_400, "alphabetic"), (61_000, "space"), (61_500, "alphabetic"), (62_000, "alphabetic")]
+    fb = feat_b(f, 62_000)                   # W1 = (32 s, 62 s]・W0 = (2 s, 32 s]
+    assert fb[0] == 1.0 and fb[6] == 1.0 - 0.0
+    assert fb[3] == 500 and fb[9] == 500 - 400
+    assert math.isnan(fb[7])                 # W1 の直前の間は欠けではない（61_000 の前の押下は W1 の外）→ 欠け − 欠け
     print("selftest ok")
 
 
