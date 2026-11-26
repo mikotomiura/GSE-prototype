@@ -61,14 +61,20 @@ def make(n_days, per_day, stuck_every, late_on_off=0, extra=None):
     return lines + (extra or [])
 
 
-def run_count(lines_list, episodes, max_days=None):
+def run_count(lines_list, episodes, max_days=None, table=None):
     tmp = tempfile.mkdtemp()
     recs = []
     for i, lines in enumerate(lines_list):
         p = os.path.join(tmp, "r%03d.ndjson" % i)
         write(p, lines)
         recs.append(sr.read_record(p))
-    return sr.count(recs, episodes, JST, max_days=max_days)
+    tb = None
+    if table is not None:
+        tp = os.path.join(tmp, "handmark_assignment.json")
+        with open(tp, "w", encoding="utf-8") as f:
+            json.dump(table, f)
+        tb = sr.read_table(tp)
+    return sr.count(recs, episodes, JST, max_days=max_days, table=tb)
 
 
 VALUES = {"min_days": 10, "min_stuck": 10, "min_nonstuck": 10, "min_in_c1": 3, "min_in_c2": 3,
@@ -247,12 +253,60 @@ def main():
           cx["lambda_valid_per_observed_day"] == (cx["random_stuck"] + cx["random_nonstuck"]) / cx["observed_days"]
           and cx["lambda_valid_per_observed_day"] < cx["lambda_per_observed_day"])
 
+    # ---- 窓の 1 日目は段 1 の行（最初の meta の session_start）から（判断 51）
+    dS = sr.local_day(day_start_ms(0) + 6 * H, JST)
+    stray = make(M + 5, 3, 3)
+    stray.insert(1, {"type": "key", "t": day_start_ms(-30) + 6 * H, "category": "alphabetic", "press": True})
+    cs = run_count([stray], [eps], max_days=M)
+    check("時計の狂った早い行があっても窓の 1 日目は session_start の日（経過・観測日・回答）",
+          cs["elapsed_days"] == M + 5 and cs["observed_days"] == M and cs["random_answered"] == 3 * M)
+    stray_ans = make(3, 3, 3, extra=probe("old", day_start_ms(-30) + 6 * H, "random", "stuck"))
+    cs = run_count([stray_ans], [eps], max_days=M)
+    check("窓の 1 日目より前の回答は数えない", cs["random_answered"] == 9)
+    # 表の s1_start_day はずれの日数を出すだけで、窓は記録の 1 日目のまま（S1-F2）
+    tb = {"version": 1, "s1_start_day": dS + 2, "early_days": 10, "late_start_day": dS + 12, "days": [True, False]}
+    ct = run_count([full], [eps], max_days=M, table=tb)
+    check("表の s1_start_day が 2 日ずれても窓は記録の 1 日目から（ずれは +2 と出す）",
+          ct["table_start_offset_days"] == 2 and ct["observed_days"] == M and ct["random_answered"] == 3 * M)
+    check("表が無ければずれは None", c["table_start_offset_days"] is None)
+
+    # ---- 前期の件数（記述・判断 47・51）: 窓の 1 日目から late_start_day の前日まで
+    ex = make(6, 3, 3)    # 1 日 3 件・各日の 1 件目が詰まり
+    ex.append({"type": "handmark_day", "t": day_start_ms(3) + 6 * H, "day": dS + 3, "assigned": "late_first",
+               "late_start_day": dS + 3})
+    ex.append({"type": "handmark_day", "t": day_start_ms(4) + 6 * H, "day": dS + 4, "assigned": "on",
+               "late_start_day": None})
+    e1 = run_count([ex], [eps], max_days=M)["early"]
+    check("前期は late_start_day の前日まで（観測日 3・詰まり 3・詰まりでない 6・日数 3）",
+          e1 is not None and e1["early_days"] == 3 and e1["observed_days"] == 3
+          and e1["random_stuck"] == 3 and e1["random_nonstuck"] == 6)
+    check("前期の C1・C2 の中（各日の 1 件目・2 件目）",
+          e1["in_C1"] == {"answered": 3, "stuck": 3, "nonstuck": 0}
+          and e1["in_C2"] == {"answered": 3, "stuck": 0, "nonstuck": 3})
+    e2 = run_count([make(6, 3, 3)], [eps], max_days=M, table=dict(tb, s1_start_day=dS, late_start_day=dS + 2,
+                                                                  early_days=2))["early"]
+    check("表だけでも前期を数える（late_start_day は表から）", e2 is not None and e2["observed_days"] == 2)
+    check("late_start_day が分からなければ前期は None", run_count([make(6, 3, 3)], [eps])["early"] is None)
+    try:
+        run_count([ex], [eps], table=dict(tb, s1_start_day=dS, late_start_day=dS + 5, early_days=5))
+        check("late_start_day が記録と表で食い違えば止める", False)
+    except ValueError:
+        check("late_start_day が記録と表で食い違えば止める", True)
+    try:
+        run_count([make(1, 1, 1)], [eps], table=dict(tb, early_days=3))
+        check("表の late_start_day が s1_start_day + early_days でなければ止める", False)
+    except ValueError:
+        check("表の late_start_day が s1_start_day + early_days でなければ止める", True)
+    nometa = [x for x in make(1, 1, 1) if x.get("type") != "meta"]
+    bad_record("最初の meta に session_start が無ければ止める", nometa)
+
     # 出力に日付・時刻・日ごとの値を含まない（キーの集合で縛る）
     allowed = {"elapsed_days", "observed_days", "probes_by_stratum", "answered_by_stratum", "random_unanswered",
                "random_answered", "random_stuck", "random_nonstuck", "random_excluded", "in_C1", "in_C2",
                "episodes", "assigned_days", "answers_per_observed_day_q", "lambda_per_observed_day",
                "lambda_valid_per_observed_day", "pi_stuck", "rules",
-               "window_days", "random_cross_day", "random_over_latency_cap", "random_window_unobserved"}
+               "window_days", "random_cross_day", "random_over_latency_cap", "random_window_unobserved",
+               "early", "table_start_offset_days"}
     check("出力のキーは件数・率・要約だけ", set(c) == allowed)
 
     print("SELFTEST", "FAIL" if FAILS else "PASS", "mutate=%s" % sr.MUTATE)

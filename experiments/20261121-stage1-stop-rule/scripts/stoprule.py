@@ -26,6 +26,8 @@ DAYSIM = os.path.join(EXP, "../20261103-mhd-dryrun-v2/scripts")
 # 変異（check_mutations.py だけが設定する）: strat / unanswered / cutoff0 / early / gt / nowindow / crossday / nolatcap
 #   / endpoint（停滞の中の対応を窓の終わりに戻す）/ noclock（時計の狂った記録を除かない）
 #   / noobs（窓が観測区間に収まらない回答を除かない）
+#   / anytime（窓の 1 日目を段 1 の行ではなく全行の最小の時刻から取る）/ tablestart（表の s1_start_day を窓の 1 日目にする）
+#   / earlyle（前期を late_start_day の日まで含めて数える）
 MUTATE = os.environ.get("STOPRULE_MUTATE") or None
 
 DAY_CUTOFF_HOUR = 4          # eh3::DAY_CUTOFF_HOUR
@@ -59,6 +61,8 @@ def read_record(path):
     """1 本の記録から、数えるのに要る行だけを取る（key 行の中身は読まない）。"""
     probes, debug_ids, labels, hm, times = {}, set(), [], {}, []
     seen_labels = set()
+    session_start = None    # 最初の meta（段 1 の行）の session_start。窓の 1 日目に使う（判断 51）
+    late_starts = set()     # handmark_day の late_start_day（前期の終わり・null は除く）
     with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -71,6 +75,11 @@ def read_record(path):
             t = o.get("t", o.get("ts"))
             if isinstance(t, int) and not isinstance(t, bool):
                 times.append(t)
+            if ty == "meta" and "session_start" in o and session_start is None:
+                ss = o["session_start"]
+                if not isinstance(ss, int) or isinstance(ss, bool):
+                    raise ValueError("session_start が整数でない")
+                session_start = ss
             if ty == "probe_assignment":
                 pid, st = o.get("probe_id"), o.get("stratum")
                 if st is None:      # 段 1 より前のビルド（層を持たない）は数えない
@@ -100,9 +109,28 @@ def read_record(path):
                                o["recall_window_start_ms"], o.get("latency_ms")))
             elif ty == "handmark_day":
                 d = o["day"]
+                ls = o.get("late_start_day")
+                if ls is not None:
+                    if not isinstance(ls, int) or isinstance(ls, bool):
+                        raise ValueError("late_start_day が整数でない")
+                    late_starts.add(ls)
                 if d not in hm or o["t"] >= hm[d][0]:
                     hm[d] = (o["t"], o["assigned"])   # 日ごとに最後の行
-    return dict(probes=probes, debug_ids=debug_ids, labels=labels, hm=hm, times=times)
+    if session_start is None:
+        raise ValueError("最初の meta に session_start が無い")
+    return dict(probes=probes, debug_ids=debug_ids, labels=labels, hm=hm, times=times,
+                session_start=session_start, late_starts=late_starts)
+
+
+def read_table(path):
+    """割付の表（handmark_assignment.json）から s1_start_day と late_start_day だけを取る。"""
+    t = json.load(open(path, encoding="utf-8"))
+    for k in ("s1_start_day", "early_days", "late_start_day"):
+        if not isinstance(t.get(k), int) or isinstance(t.get(k), bool):
+            raise ValueError("表の " + k + " が整数でない")
+    if t["late_start_day"] != t["s1_start_day"] + t["early_days"]:
+        raise ValueError("表の late_start_day が s1_start_day + early_days でない")
+    return {"s1_start_day": t["s1_start_day"], "late_start_day": t["late_start_day"]}
 
 
 def in_spans(spans, t):
@@ -148,11 +176,15 @@ def quartiles(xs):
     return [q(0.25), q(0.5), q(0.75)]
 
 
-def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, max_days=None, rule=IN_STALL):
+def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, max_days=None, rule=IN_STALL,
+          table=None):
     """records: read_record の列。episodes: 同じ順の {"C1": [(a, b)], "C2": [(a, b)]}（ms・閉区間）。
 
     max_days があれば、最初の日から max_days 日（両端を含む）の窓の中の回答と割付だけを数える
     （全員を同じ期間で比べる・判断 8）。経過日数は窓で切らずに数える（最長の期間に達したかを見るため）。
+    最初の日（窓の 1 日目）は段 1 の記録の最初の meta の session_start の日（S1-G2・S1-F2）。
+    table（read_table の出力）があれば、表の s1_start_day とのずれの日数を出す（窓の 1 日目を正とする）。
+    前期（窓の 1 日目から late_start_day の前日まで）の件数を記述で出す（判定に使わない・判断 47・51）。
     """
     by_stratum = {s: 0 for s in STRATA}
     ans_by_stratum = {s: 0 for s in STRATA}
@@ -169,10 +201,30 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
     for rec in records:
         for t in rec["times"]:
             all_days.add(local_day(t, utc_offset_secs))
-    first = min(all_days) if all_days else None
+        all_days.add(local_day(rec["session_start"], utc_offset_secs))
+    first = min(local_day(r["session_start"], utc_offset_secs) for r in records) if records else None
+    if MUTATE == "anytime":
+        first = min(all_days) if all_days else None
+    if MUTATE == "tablestart" and table is not None:
+        first = table["s1_start_day"]
+    # 前期の終わり（late_start_day）は handmark_day の行と表から。食い違えば止める
+    lates = set().union(*(r["late_starts"] for r in records)) if records else set()
+    if table is not None:
+        lates.add(table["late_start_day"])
+    if len(lates) > 1:
+        raise ValueError("late_start_day が記録と表で 1 つに決まらない")
+    late_start = next(iter(lates)) if lates else None
+    early_c = {"stuck": 0, "nonstuck": 0, "excluded": 0, "C1": [0, 0, 0], "C2": [0, 0, 0]}
+    early_days_obs = set()
+
+    def in_early(d):
+        if late_start is None:
+            return False
+        return d <= late_start if MUTATE == "earlyle" else d < late_start
 
     def in_window(d):
-        return max_days is None or MUTATE == "nowindow" or (first is not None and d - first < max_days)
+        # 窓は [窓の 1 日目, 窓の 1 日目 + max_days)。1 日目より前（時計の狂った行）も数えない
+        return max_days is None or MUTATE == "nowindow" or (first is not None and 0 <= d - first < max_days)
     for rec, eps in zip(records, episodes):
         for d, (t, a) in rec["hm"].items():
             if not in_window(d):
@@ -227,14 +279,29 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
             else:
                 cls = 2
                 n_nonstuck += 1
+            early = in_early(d)
+            if early:
+                early_days_obs.add(d)
+                early_c[{1: "stuck", 2: "nonstuck", None: "excluded"}[cls]] += 1
             for k in in_c:
                 if in_stall(spans.get(k, []), t_start, t_end, rule):
                     in_c[k][0] += 1
                     if cls is not None:
                         in_c[k][cls] += 1
+                    if early:
+                        early_c[k][0] += 1
+                        if cls is not None:
+                            early_c[k][cls] += 1
     assigned = sum(1 for _, a in hm_last.values() if a in ("on", "off"))
     obs_days = len(per_day)
-    elapsed = (max(all_days) - min(all_days) + 1) if all_days else 0
+    elapsed = (max(all_days) - first + 1) if all_days else 0
+    keys3 = ("answered", "stuck", "nonstuck")
+    early_out = None
+    if late_start is not None:
+        early_out = {"early_days": late_start - first, "observed_days": len(early_days_obs),
+                     "random_stuck": early_c["stuck"], "random_nonstuck": early_c["nonstuck"],
+                     "random_excluded": early_c["excluded"],
+                     "in_C1": dict(zip(keys3, early_c["C1"])), "in_C2": dict(zip(keys3, early_c["C2"]))}
     return {
         "elapsed_days": elapsed,
         "window_days": max_days,
@@ -253,6 +320,10 @@ def count(records, episodes, utc_offset_secs, stuck=STUCK, excluded=EXCLUDED, ma
         "in_C2": dict(zip(("answered", "stuck", "nonstuck"), in_c["C2"])),
         "episodes": n_eps,
         "assigned_days": assigned,
+        # 前期の件数（記述・H1〜H3 は前期だけで判定する・判断 47）。late_start_day が分からなければ None
+        "early": early_out,
+        # 表の s1_start_day − 窓の 1 日目（日数の差だけ・窓の 1 日目を正とする・S1-F2）。表が無ければ None
+        "table_start_offset_days": (table["s1_start_day"] - first) if (table is not None and first is not None) else None,
         "answers_per_observed_day_q": quartiles(list(per_day.values())),
         "lambda_per_observed_day": (n_random_ans / obs_days) if obs_days else None,
         # 判定に使える回答（詰まり・詰まりでない。cannot_answer を除く）の観測日あたりの数。日数の見込みはこちらを使う
@@ -383,8 +454,9 @@ def cmd_count(a):
     if a.values:
         v = json.load(open(a.values))
         check_values(v)
+    tb = read_table(a.table) if a.table else None
     c = count(recs, eps, a.utc_offset_secs, tuple(a.stuck.split(",")), tuple(a.excluded.split(",")),
-              max_days=v["max_days"] if v else None, rule=a.in_stall)
+              max_days=v["max_days"] if v else None, rule=a.in_stall, table=tb)
     c["files"] = len(paths)
     c["excluded_clock_files"] = n_clock
     c["c0_selfcheck"] = selfcheck
@@ -436,6 +508,7 @@ def main(argv):
     p.add_argument("--out", required=True)
     p.add_argument("--values")
     p.add_argument("--manifest", help="prepare_records.py の対応表。あれば時計の狂った記録を名前で除く")
+    p.add_argument("--table", help="割付の表（handmark_assignment.json）。s1_start_day のずれと前期の終わりを見る")
     p.add_argument("--in-stall", choices=IN_STALL_RULES, default=IN_STALL, help="停滞の中の対応（S1-B1）")
     p.add_argument("--stuck", default=",".join(STUCK))
     p.add_argument("--excluded", default=",".join(EXCLUDED))
