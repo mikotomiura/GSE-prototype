@@ -223,8 +223,8 @@ GSE が主張しうるのは、作業の続き方（行動の指標）の変化�
 | IME の変換の観測と漏れ | 合成入力で評価済み。この観測での人の打鍵は未 | `papers/ime-observation/` |
 | 公開の人の打鍵での照合 | KLiCKe・ENJA15 で評価済み（原稿・未公開） | `papers/keystroke-log-release-matching/`（枝 `docs/public-keystroke-matching-manuscript`） |
 | 記録の公開の形 | 加工だけで、照合を偶然に近づけつつ書く過程の指標を残す形は、試した範囲では見つかっていない。加工の外の道（書き手単位の差分プライバシー [V539]・問い合わせにだけ答える形 [V542][V545]・合成の記録 [V547]・敵対的な難読化 [V551]）にも、打鍵で照合と指標の両方を測った先行は見つからなかった（`docs/literature/20261116-release-defense-forms.md`・網は粗い）。今は点検を通した集計を既定にする（ADR-039【決 5】） | §1.2・ADR-039 D6 |
-| 段 1 | 準備中。事前登録は草案、本人の探索から | `docs/preregistration-stage1.md`・ADR-052 |
-| 手跡 | macOS で実装中。Windows 版は未着手（2026-11-08 の引き継ぎの時点） | ADR-051・ADR-052 D5 |
+| 段 1 | 本人の探索（macOS）を実施中。前期は終わり、後期は 2026-11-24〜12-08。事前登録は草案（凍結していない） | `docs/preregistration-stage1.md`・ADR-052 |
+| 手跡 | macOS は本人の段 1 の後期の配布物（v0.1.42）に入っている。Windows 版は main に入った（PR #428・2026-11-19） | ADR-051・ADR-052 D5 |
 | 段 2 | 方向だけ決めた | ADR-047 D4 |
 | Phase1（v0.3 較正） | 終了。GATE3 はデータ不足で判定できなかった | `docs/preregistration-v0.3.md`・`docs/adr/README.md` |
 

@@ -1014,6 +1014,11 @@ jobs:
         run: python3 scripts/check_doc_lexicon.py
         env:
           PYTHONUTF8: "1"
+      # 2026-11-26: 未マージの枝の番号の予約（references.md の予約の表）の扱いの陽性対照。
+      - name: Citation SSOT gate self-test (欠番の予約)
+        run: python3 scripts/check_citations.py --self-test
+        env:
+          PYTHONUTF8: "1"
       # ⚠️ 書誌 SSOT の append-only / 欠番 / 重複 key / tombstone 引用。
       #   ★ 実測: 2026-09-03 に Dhakal がコードと未踏文書で引用済みなのに `references.md` へ未登録だった。
       - name: Citation SSOT gate (append-only・欠番・重複 key)
