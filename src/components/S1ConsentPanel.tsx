@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { S1AnswerKeys, S1ModeDto } from "../probeTypes";
 
 /**
- * 直前の30秒の問いの答え方（ADR-057）。★ 優先の規則はカードから外し、ここで先に説明する（ADR-055 D2 の一文）。
+ * カードが出る前の30秒の問いの答え方（ADR-057・補訂 1）。★ 優先の規則はカードから外し、ここで先に説明する（ADR-055 D2 の一文）。
  * `modifier` はキーの名前（macOS "⌥"・Windows "Ctrl＋Alt"）。
  */
 const HowToAnswer: React.FC<{ modifier: string }> = ({ modifier }) => {
