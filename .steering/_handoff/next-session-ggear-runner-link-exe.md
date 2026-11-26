@@ -40,7 +40,7 @@
 - 残っていたのは Visual Studio Build Tools 2026（18.4・インスタンス 454f18a9・2026-04-04 導入）だけで、入っているワークロードは `Microsoft.VisualStudio.Workload.MSBuildTools` のみ。`VC` のフォルダが無い。`vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath` は空だった（手順 2 の「ツールセットが外れている」形）。
 - Windows SDK（10.0.26100.0）と Rust（既定 `stable-x86_64-pc-windows-msvc`・1.98.1・ホスト `x86_64-pc-windows-msvc`）は残っていた。手順 3 は問題なし。
 - 誰が外したか: Claude のセッション記録（`~/.claude/projects/*/*.jsonl`）に該当の操作は無い。直後（15:56 UTC〜）に同じ機械でストレージの整理のセッションが始まっているので、その直前に手で外したと見られる（推測・研究者に確かめていない）。
-- ランナーはサービス `actions.runner.mikotomiura-GSE-prototype.g-gear-win-x64`（`C:\actions-runner\.service`）。サービスのアカウントの一覧を読む操作は自動モードに拒まれたので、アカウントは memory（NetworkService）のまま確かめていない。
+- ランナーはサービス `actions.runner.mikotomiura-GSE-prototype.g-gear-win-x64`（`C:\actions-runner\.service`）。サービスの設定を読む操作は自動モードに 2 回拒まれたので、研究者が `sc qc` を打って確かめた: `SERVICE_START_NAME : NT AUTHORITY\NETWORK SERVICE`・`START_TYPE : AUTO_START (DELAYED)`・`BINARY_PATH_NAME : "C:\actions-runner\bin\RunnerService.exe"`（memory の NetworkService と一致）。
 
 ### 再現（手順 4）
 
