@@ -1,0 +1,147 @@
+{
+ "records": [
+  {
+   "copy": "r000.ndjson",
+   "sha256": "c8378dcfc58f3442a0f9e611e14739218aa21bc24e4acd5b7579e00885366c67",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r001.ndjson",
+   "sha256": "5f4e406b81bdcbce74004811924bfba7a65270bab619789298bcabce5a179fe7",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r002.ndjson",
+   "sha256": "1de6c44bcb279cc91e3a1e028b39f28a5f949343a87efdb3d468384884333f1e",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r003.ndjson",
+   "sha256": "363b6173150c72bf7fb2505f00dcf52174f5be842b6e2e7dcf7b72da426c1b66",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r004.ndjson",
+   "sha256": "84532ac283be61c1d255d8dfc0b0da382f49f846b830b37f602583fea56b4739",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r005.ndjson",
+   "sha256": "065fb02947ad7286797074c68929910ae17bf8ece67e0d3a4d52615c5cf24d49",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r006.ndjson",
+   "sha256": "36d5ed943943807424acd855904ccacbffa820ec63e12c21d18d5b7d3a952afd",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r007.ndjson",
+   "sha256": "8b87c46e2ab7a7f8affde550eca34cbdc63d25425da3c0971392a323fe9c9ebc",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r008.ndjson",
+   "sha256": "7bd011911a330e0ece74b9d9ded748e31d0cc5b54569e0c70917539762836418",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r009.ndjson",
+   "sha256": "41b44a7383e1dca1f7f26e96d6131189f8a27e37a1d02a49cc6ea6f28da97026",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r010.ndjson",
+   "sha256": "80d900c3d87c90d12357b60bdc2ef0981ed00accacf6ec0386726ee4e18bacd5",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r011.ndjson",
+   "sha256": "ff667d69093266a80ab8095f29987541c05491fbee77e0a47b23cb924075b8ae",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r012.ndjson",
+   "sha256": "86417acb14ec3043cf50155d6137b39703fa763ea3e3f014da4333d2ecb3a264",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r013.ndjson",
+   "sha256": "aff6968ab4c5005a34e08b7899cb0b46f0e11f01b1750192089916232bd5f694",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r014.ndjson",
+   "sha256": "16af8194fc2e9214c2e889a26749342f601bc2413bab6eae5cf1ed0051d1ec6c",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r015.ndjson",
+   "sha256": "1a37adf0e9b47d1fd8c5a6f957c8630ac905967ca03efa005beccfddd44bd5ba",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r016.ndjson",
+   "sha256": "2ad2c7193dce3e34f39a8bd72e72845548b255b516bda1db8b5795c5549d21a3",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r017.ndjson",
+   "sha256": "f7f3892caaf42f70d516ba5da55fe5840cee2d50a6fb8e09d3c295d2133e46ef",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r018.ndjson",
+   "sha256": "2428754e6148385385ee90f57e5721839d8db5dc51da4a3ff2d5b750db1ac270",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r019.ndjson",
+   "sha256": "09a5c20d413cbb60ab5de530d84d343c727617dbf22c24a0fd1a6b87f541ec8c",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r020.ndjson",
+   "sha256": "7421f15cb85c4fa07f45abb4081aacdfbb58aefbf642d9b248c634443c13a0ef",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r021.ndjson",
+   "sha256": "cc120677128f829b75531c760698808a07c546f422da5c596c5180e047a3e8a2",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r022.ndjson",
+   "sha256": "f71e386ea9e93e57f6a26b42520152768d54936dd21666557bef86073409f1e5",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r023.ndjson",
+   "sha256": "85d223bd6a204e6e5e156fab4f2febd6a0d206271b32463afdf86c64357f3327",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r024.ndjson",
+   "sha256": "585f976eeaf29785b8da55fffb603d934f7e268ca01167e77f2c36460b8097dc",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r025.ndjson",
+   "sha256": "c011f541bd7220e5bd0004f5fa11fe8c9bbe56fa9d4b3d6407e84c23d41f154e",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r026.ndjson",
+   "sha256": "3a5e50681335d90cacf0c96c64f17f3ba4f8bfd40415e642183ff4b24d315786",
+   "last_line_cut": false
+  },
+  {
+   "copy": "r027.ndjson",
+   "sha256": "abcc871ac9345fef0cccefd3394996c518d6a04a29ceee4ddf3df9c3f84325d0",
+   "last_line_cut": false
+  }
+ ],
+ "redaction_ledger": {
+  "sha256": "b3b34b3c5830b7dac019ac0401cccae7d121d057d3982cc71dcca038c81e7f1f"
+ }
+}

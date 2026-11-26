@@ -28,6 +28,7 @@ use serde_json::Value;
 
 use super::assignment::draw_seed;
 use super::state::{Stage, StageState, LIVE_LAG_MS};
+use super::stopped::{paused_at, stopped_view, StopGate, StoppedCfg, StoppedFrame};
 use super::trace::{Step, TraceField, CELLS};
 use super::trace_replay::{Synth, REP_PT};
 use crate::analysis::intervention::AWAY_IDLE_MS;
@@ -108,6 +109,20 @@ pub const B_STATE_NAMES: [&str; 13] = [
     "pull_mean",
     "field_nonzero",
     "ripples",
+];
+
+/// 止まりの層（ADR-056・`--stopped` のときだけ）の窓の列の名前。B′ = B_state + この列。
+/// どれも見えている値（`v × ambient`）と `v` から作る（`v = 0` の間の ambient は画面に出ないので入れない）。
+pub const B_STOPPED_NAMES: [&str; 9] = [
+    "v_mean",
+    "v_max",
+    "v_last",
+    "amb0_mean",
+    "amb1_mean",
+    "amb2_mean",
+    "amb0_sd",
+    "amb1_sd",
+    "amb2_sd",
 ];
 
 /// `feat` の行の確率（flow・inc・stuck の順）。
@@ -727,6 +742,55 @@ pub fn stream_samples(
     qs: &[u64],
     transform: &dyn Fn(StageState, Option<f64>) -> StageState,
 ) -> Stream {
+    stream_inner(seg, f, qs, transform, None).0
+}
+
+/// 一時停止の区間 `[from, to)` を、止まりの層の門に入れる出来事 `(時刻, 一時停止か)` の列にする（時刻の昇順・
+/// 同じ時刻は区間の並びのまま）。
+///
+/// 前提: `pauses` は重ならない（`parse_file` が `recording_pause` の行を時刻の順に状態機械で対にするので、
+/// 1 本の記録の中では重ならない。`resolve_overlaps` は終わりを縮めるだけ）。重なる区間を渡すと、門は
+/// 最後の出来事だけを持つので早く開きうる。
+pub fn pause_events(pauses: &[(u64, u64)]) -> Vec<(u64, bool)> {
+    let mut ev: Vec<(u64, bool)> = pauses
+        .iter()
+        .flat_map(|&(a, b)| [(a, true), (b, false)])
+        .collect();
+    ev.sort_by_key(|e| e.0);
+    ev
+}
+
+/// [`stream_samples`] と同じ流れに、止まりの層（ADR-056）の 1 コマを `qs` の順で添える。
+///
+/// 止まりの層は `stopped::replay_stopped_live(f.presses, pause_events(f.pauses), seed, t0, q, cfg)` と
+/// ビット単位で同じ（テストで縛る）。状態の変換（`transform`）は止まりの層に効かない（`idle_since` は変換の前の
+/// `Stage` から読む）。
+pub fn stream_samples_stopped(
+    seg: &Segment,
+    f: &DeskFile,
+    qs: &[u64],
+    transform: &dyn Fn(StageState, Option<f64>) -> StageState,
+    cfg: &StoppedCfg,
+) -> (Stream, Vec<StoppedFrame>) {
+    stream_inner(seg, f, qs, transform, Some(cfg))
+}
+
+fn stream_inner(
+    seg: &Segment,
+    f: &DeskFile,
+    qs: &[u64],
+    transform: &dyn Fn(StageState, Option<f64>) -> StageState,
+    stopped: Option<&StoppedCfg>,
+) -> (Stream, Vec<StoppedFrame>) {
+    let events = if stopped.is_some() {
+        pause_events(&f.pauses)
+    } else {
+        Vec::new()
+    };
+    let mut gate = StopGate::new(seg.t0, paused_at(&events, seg.t0));
+    // 起点と同じ時刻の出来事も入れる（`replay_stopped` と同じ `>= t0`・畳んだ状態と同じ値なので冪等）
+    let mut ei = events.partition_point(|e| e.0 < seg.t0);
+    let mut stopped_out = Vec::with_capacity(if stopped.is_some() { qs.len() } else { 0 });
     let mut stage = Stage::new(seg.seed, seg.t0);
     let mut field = TraceField::new(seg.t0);
     let q_last = qs.last().copied().unwrap_or(seg.t0);
@@ -746,9 +810,23 @@ pub fn stream_samples(
         while pi < presses.len() && presses[pi] <= target {
             stage.advance_to(presses[pi]);
             stage.press(presses[pi]);
+            gate.on_press(presses[pi]);
             pi += 1;
         }
         stage.advance_to(target);
+        if let Some(cfg) = stopped {
+            while ei < events.len() && events[ei].0 <= target {
+                gate.on_pause(events[ei].0, events[ei].1);
+                ei += 1;
+            }
+            stopped_out.push(stopped_view(
+                stage.idle_since(),
+                stage.grid_t(),
+                gate.is_open(),
+                seg.seed,
+                cfg,
+            ));
+        }
         // 場（刻み k の時刻は g0 + 16 k）
         while g0 + super::trace::STEP_MS * (k + 1) <= q {
             let Some(p) = synth.next() else { break };
@@ -785,10 +863,103 @@ pub fn stream_samples(
                 .collect(),
         });
     }
-    Stream {
-        samples: out,
-        ripple_starts,
+    (
+        Stream {
+            samples: out,
+            ripple_starts,
+        },
+        stopped_out,
+    )
+}
+
+/// 窓の止まりの層のコマ（`τ` の側だけ）から、[`B_STOPPED_NAMES`] の順の列を作る。
+pub fn b_stopped_features(frames: &[&StoppedFrame]) -> [f64; 9] {
+    let n = frames.len().max(1) as f64;
+    let v: Vec<f64> = frames.iter().map(|s| s.v).collect();
+    let mut out = [0.0f64; 9];
+    out[0] = v.iter().sum::<f64>() / n;
+    out[1] = v.iter().copied().fold(0.0f64, f64::max);
+    out[2] = v.last().copied().unwrap_or(0.0);
+    for c in 0..3 {
+        let shown: Vec<f64> = frames.iter().map(|s| s.v * s.ambient[c]).collect();
+        let m = shown.iter().sum::<f64>() / n;
+        out[3 + c] = m;
+        out[6 + c] = (shown.iter().map(|x| (x - m).powi(2)).sum::<f64>() / n).sqrt();
     }
+    out
+}
+
+/// 止まり（ADR-056 の止まりの層が見えうる区間）。時刻は `Stage` の時刻（コマの時刻 `q` では `q − LIVE_LAG_MS`）。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StopEpisode {
+    /// [`prepared_segments`] の区間の番号。
+    pub seg: usize,
+    pub day: i64,
+    /// 区間の起点（`grid_start` の元）と終わり（コマの時刻）。
+    pub t0: u64,
+    pub seg_end: u64,
+    /// 止まりの始まり（`Stage::idle_since`・門が開いていたもの）。
+    pub start: u64,
+    /// 止まりの終わり（含まない）。打鍵・一時停止の始まり・区間の終わり（`seg_end − LIVE_LAG_MS`）の早い方。
+    pub end: u64,
+    /// 何で終わったか（`press`・`pause`・`segment`）。
+    pub end_by: &'static str,
+}
+
+/// 区間の止まりを列挙する。門（`StopGate`）が始まりの時点で開いていたものだけ（起動・戻し・一時停止明けの後の
+/// 最初の打鍵より前と、一時停止の間は止まりにならない）。門は一時停止の始まりでしか閉じず、打鍵でしか開かない。
+/// 止まりは打鍵か一時停止の始まりで終わるので、止まりの間に門の開き閉じは起きない。
+pub fn stop_episodes(seg_index: usize, seg: &Segment, f: &DeskFile) -> Vec<StopEpisode> {
+    let events = pause_events(&f.pauses);
+    let mut gate = StopGate::new(seg.t0, paused_at(&events, seg.t0));
+    let mut ei = events.partition_point(|e| e.0 < seg.t0);
+    let mut stage = Stage::new(seg.seed, seg.t0);
+    let last = seg.end.saturating_sub(LIVE_LAG_MS);
+    let presses = &f.presses[f.presses.partition_point(|&t| t < seg.t0)..];
+    let mut out = Vec::new();
+    let mut pi = 0usize;
+    loop {
+        let next = presses.get(pi).copied().filter(|&p| p < last);
+        let until = next.unwrap_or(last);
+        stage.advance_to(until);
+        if let Some(start) = stage.idle_since().filter(|&s| s < until) {
+            while ei < events.len() && events[ei].0 <= start {
+                gate.on_pause(events[ei].0, events[ei].1);
+                ei += 1;
+            }
+            if gate.is_open() {
+                let pause_start = events[ei..]
+                    .iter()
+                    .find(|e| e.1 && e.0 < until)
+                    .map(|e| e.0);
+                let (end, end_by) = match (pause_start, next) {
+                    (Some(p), _) => (p, "pause"),
+                    (None, Some(p)) => (p, "press"),
+                    (None, None) => (last, "segment"),
+                };
+                if end > start {
+                    out.push(StopEpisode {
+                        seg: seg_index,
+                        day: seg.day,
+                        t0: seg.t0,
+                        seg_end: seg.end,
+                        start,
+                        end,
+                        end_by,
+                    });
+                }
+            }
+        }
+        let Some(p) = next else { break };
+        while ei < events.len() && events[ei].0 <= p {
+            gate.on_pause(events[ei].0, events[ei].1);
+            ei += 1;
+        }
+        stage.press(p);
+        gate.on_press(p);
+        pi += 1;
+    }
+    out
 }
 
 /// 窓の標本（`τ` の側だけ）から B_state を作る。[`B_STATE_NAMES`] の順。
@@ -857,6 +1028,9 @@ pub struct WindowRow {
     pub b_state: Vec<f64>,
     /// 感度分析に使う窓（conditions.md C7: 使う日で、切っていた区間に重ならない）。
     pub sens: bool,
+    /// 止まりの層の列（[`B_STOPPED_NAMES`]・`--stopped` のときだけ）。切っているときは出力に現れない。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub b_stopped: Option<Vec<f64>>,
 }
 
 /// 除いた窓の数。
@@ -1011,13 +1185,16 @@ pub fn build(
     transform: &dyn Fn(StageState, Option<f64>) -> StageState,
     on_frame: &mut dyn FnMut(u32, &Sample),
 ) -> Result<DeskOut> {
-    if cfg.samples == 0 || !WINDOW_MS.is_multiple_of(cfg.samples as u64) {
-        return Err(format!("標本の数 {} は 30000 を割り切らない", cfg.samples));
-    }
-    let step = WINDOW_MS / cfg.samples as u64;
-    if step <= PAIR_GAP_MS {
-        return Err(format!("標本の間隔 {step} ms が {PAIR_GAP_MS} ms 以下"));
-    }
+    build_with(files, cfg, transform, None, &mut |id, s, _| on_frame(id, s))
+}
+
+/// 記録の `handmark_day` を日ごとに畳み（同じ日は後の行）、表の SHA-256 を照らしてから区間を切る。
+/// [`build`] と [`render_queries`]・[`all_stops`] が同じ区間（番号も同じ）を使う。
+pub fn prepared_segments(
+    files: &[DeskFile],
+    cfg: &DeskConfig,
+    out: &mut DeskOut,
+) -> Result<(BTreeMap<i64, HmDay>, Vec<Segment>)> {
     let mut hm_days: BTreeMap<i64, HmDay> = BTreeMap::new();
     for f in files {
         for (d, r) in &f.hm_days {
@@ -1044,7 +1221,6 @@ pub fn build(
             "handmark_day の行の表の SHA-256 が渡した表と違う（{sh}）"
         ));
     }
-    let mut out = DeskOut::default();
     let segs = segments(
         files,
         &hm_days,
@@ -1055,6 +1231,28 @@ pub fn build(
     );
     out.segments = segs.len();
     out.segments_recorded_t0 = segs.iter().filter(|s| s.t0_recorded).count();
+    Ok((hm_days, segs))
+}
+
+/// [`build`] に、止まりの層（ADR-056）を足せる形。`stopped` が `None` なら [`build`] と同じ出力になる
+/// （`b_stopped` は `None`・`on_frame` の 3 つ目は `None`）。`Some` なら、窓に `b_stopped` を付け、コマごとの
+/// 止まりの層を `on_frame` の 3 つ目に渡す。
+pub fn build_with(
+    files: &[DeskFile],
+    cfg: &DeskConfig,
+    transform: &dyn Fn(StageState, Option<f64>) -> StageState,
+    stopped: Option<&StoppedCfg>,
+    on_frame: &mut dyn FnMut(u32, &Sample, Option<&StoppedFrame>),
+) -> Result<DeskOut> {
+    if cfg.samples == 0 || !WINDOW_MS.is_multiple_of(cfg.samples as u64) {
+        return Err(format!("標本の数 {} は 30000 を割り切らない", cfg.samples));
+    }
+    let step = WINDOW_MS / cfg.samples as u64;
+    if step <= PAIR_GAP_MS {
+        return Err(format!("標本の間隔 {step} ms が {PAIR_GAP_MS} ms 以下"));
+    }
+    let mut out = DeskOut::default();
+    let (hm_days, segs) = prepared_segments(files, cfg, &mut out)?;
     let mut id: u32 = 0;
     for seg in &segs {
         let f = &files[seg.file];
@@ -1083,13 +1281,19 @@ pub fn build(
                 qs.push(tau);
             }
         }
-        let stream = stream_samples(seg, f, &qs, transform);
+        let (stream, stopped_frames) = stream_inner(seg, f, &qs, transform, stopped);
         let samples = &stream.samples;
         for (wi, (w, tg, n_feats)) in kept.iter().enumerate() {
-            let chunk = &samples[wi * cfg.samples * 2..(wi + 1) * cfg.samples * 2];
-            for s in chunk {
-                on_frame(id, s);
+            let range = wi * cfg.samples * 2..(wi + 1) * cfg.samples * 2;
+            let chunk = &samples[range.clone()];
+            let st_chunk = stopped_frames.get(range);
+            for (k, s) in chunk.iter().enumerate() {
+                on_frame(id, s, st_chunk.map(|c| &c[k]));
             }
+            let b_stopped = st_chunk.map(|c| {
+                let taus: Vec<&StoppedFrame> = c.iter().skip(1).step_by(2).collect();
+                b_stopped_features(&taus).to_vec()
+            });
             let taus: Vec<&Sample> = chunk.iter().skip(1).step_by(2).collect();
             let ripple_starts = in_range(&stream.ripple_starts, |&t| t, *w, w + WINDOW_MS).len();
             out.windows.push(WindowRow {
@@ -1108,6 +1312,7 @@ pub fn build(
                 a: a_features(&f.presses, &f.bins, w + WINDOW_MS, seg.t0).to_vec(),
                 b_state: b_state_features(&taus, ripple_starts).to_vec(),
                 sens: false,
+                b_stopped,
             });
             id = id
                 .checked_add(1)
@@ -1116,6 +1321,72 @@ pub fn build(
     }
     mark_sensitivity(&hm_days, cfg, &mut out);
     Ok(out)
+}
+
+/// 全部の区間の止まり（[`stop_episodes`]）。区間の番号は [`prepared_segments`] の順。
+pub fn all_stops(files: &[DeskFile], cfg: &DeskConfig) -> Result<Vec<StopEpisode>> {
+    let mut out = DeskOut::default();
+    let (_, segs) = prepared_segments(files, cfg, &mut out)?;
+    Ok(segs
+        .iter()
+        .enumerate()
+        .flat_map(|(i, seg)| stop_episodes(i, seg, &files[seg.file]))
+        .collect())
+}
+
+/// 描き直しの問い合わせ 1 件: 区間の番号・その起点（照らすため）・コマの時刻 `q`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Query {
+    pub seg: usize,
+    pub t0: u64,
+    pub q: u64,
+}
+
+/// 問い合わせの時刻のコマ（今の基層・ポインタの跡・止まりの層）を、問い合わせの順に `on_frame(番号, …)` へ流す。
+///
+/// 問い合わせは区間ごとにまとまり、区間の中では `q` が昇順で、`t0 <= q <= 区間の終わり` であること。
+/// 区間は区間ごとに 1 回だけ流す（[`stream_samples_stopped`]・状態の変換なし）。
+pub fn render_queries(
+    files: &[DeskFile],
+    cfg: &DeskConfig,
+    stopped: &StoppedCfg,
+    queries: &[Query],
+    on_frame: &mut dyn FnMut(u32, &Sample, &StoppedFrame),
+) -> Result<()> {
+    let mut out = DeskOut::default();
+    let (_, segs) = prepared_segments(files, cfg, &mut out)?;
+    let ident = |s: StageState, _: Option<f64>| s;
+    let mut seen = vec![false; segs.len()];
+    let mut i = 0usize;
+    while i < queries.len() {
+        let sq = queries[i].seg;
+        let seg = segs
+            .get(sq)
+            .ok_or_else(|| format!("問い合わせ {i} の区間 {sq} が無い"))?;
+        if seen[sq] {
+            return Err(format!("区間 {sq} の問い合わせがまとまっていない"));
+        }
+        seen[sq] = true;
+        let mut j = i;
+        while j < queries.len() && queries[j].seg == sq {
+            let q = &queries[j];
+            if q.t0 != seg.t0 {
+                return Err(format!("問い合わせ {j} の起点が区間 {sq} と違う"));
+            }
+            if q.q < seg.t0 || q.q > seg.end || (j > i && q.q < queries[j - 1].q) {
+                return Err(format!("問い合わせ {j} の時刻が区間の外か昇順でない"));
+            }
+            j += 1;
+        }
+        let qs: Vec<u64> = queries[i..j].iter().map(|q| q.q).collect();
+        let (stream, st) = stream_samples_stopped(seg, &files[seg.file], &qs, &ident, stopped);
+        for (k, (s, f)) in stream.samples.iter().zip(st.iter()).enumerate() {
+            let id = u32::try_from(i + k).map_err(|_| "問い合わせが u32 を超えた".to_string())?;
+            on_frame(id, s, f);
+        }
+        i = j;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2109,5 +2380,262 @@ mod tests {
             assert_eq!((a.t1, a.t2), (b.t1, b.t2));
             assert_ne!(a.b_state[0], b.b_state[0]);
         }
+    }
+
+    // ---- 止まりの層（ADR-056） ----
+
+    use crate::analysis::handmark::stopped::{replay_stopped_live, StoppedForm};
+
+    fn scfg(rise_ms: u64) -> StoppedCfg {
+        StoppedCfg {
+            form: StoppedForm::Band,
+            rise_ms,
+            window_s: 20,
+            strength: 0.5,
+        }
+    }
+
+    /// 打鍵のまとまりと長い止まり（20 秒〜3 分）を繰り返し、ときどき一時停止を挟む記録。
+    fn stopping_file(seed: u64, t0: u64, span: u64) -> DeskFile {
+        let mut r = SplitMix64::new(seed);
+        let mut f = random_file(seed, t0, 1_000);
+        f.presses.clear();
+        f.end = t0 + span;
+        let mut t = t0 + 200 + r.below(3_000);
+        while t < t0 + span {
+            for _ in 0..(5 + r.below(30)) {
+                t += 60 + r.below(400);
+                f.presses.push(t);
+            }
+            t += 20_000 + r.below(180_000);
+            if r.below(4) == 0 {
+                // 一時停止（止まりの途中・打鍵の直前のどちらにもなる）
+                let a = t - r.below(15_000);
+                let b = a + 1 + r.below(60_000);
+                f.pauses.push((a, b));
+                t = t.max(b + r.below(2) * 30_000);
+            }
+        }
+        f.presses.retain(|&p| p < t0 + span);
+        f.bins.retain(|b| b.timestamp < t0 + span);
+        f
+    }
+
+    fn seg_of(t0: u64, span: u64, seed: u64) -> Segment {
+        Segment {
+            file: 0,
+            day: 0,
+            t0,
+            end: t0 + span,
+            t0_recorded: false,
+            seed,
+        }
+    }
+
+    #[test]
+    fn streamed_stopped_frames_match_the_live_replay_bit_for_bit() {
+        let (mut open, mut shut) = (0, 0);
+        for case in 0..10u64 {
+            let t0 = 1_700_000_000_123 + case * 13;
+            let span = 1_800_000;
+            let mut f = stopping_file(case, t0, span);
+            // 起点と同じ時刻の一時停止・起点の前から続く一時停止も混ぜる
+            match case % 3 {
+                0 => f.pauses.insert(0, (t0, t0 + 5_000)),
+                1 => f.pauses.insert(0, (t0 - 9_000, t0 + 40_000)),
+                _ => {}
+            }
+            let seg = seg_of(t0, span, 0x77 ^ case);
+            let mut r = SplitMix64::new(case + 5);
+            let mut qs: Vec<u64> = (0..300).map(|_| t0 + r.below(span)).collect();
+            qs.sort_unstable();
+            for c in [scfg(2_000), scfg(0)] {
+                let (stream, st) = stream_samples_stopped(&seg, &f, &qs, &ident, &c);
+                // 基層の流れは止まりの層を足しても変わらない
+                assert_eq!(stream, stream_samples(&seg, &f, &qs, &ident), "case {case}");
+                assert_eq!(st.len(), qs.len());
+                let ev = pause_events(&f.pauses);
+                for (q, s) in qs.iter().zip(&st) {
+                    let want = replay_stopped_live(&f.presses, &ev, seg.seed, t0, *q, &c);
+                    assert_eq!(s.bits(), want.bits(), "case {case} q {q}");
+                    if s.v > 0.0 {
+                        open += 1;
+                    } else {
+                        shut += 1;
+                    }
+                }
+            }
+        }
+        // 陽性対照: 見えている時刻と見えていない時刻が両方ある
+        assert!(open > 500 && shut > 500, "open {open} shut {shut}");
+    }
+
+    #[test]
+    fn stop_episodes_are_exactly_where_the_layer_is_visible() {
+        let mut ends = BTreeMap::new();
+        for case in 0..8u64 {
+            let t0 = 1_700_000_100_000 + case * 31;
+            let span = 2_400_000;
+            let mut f = stopping_file(100 + case, t0, span);
+            if case % 2 == 0 {
+                f.pauses.insert(0, (t0 - 1_000, t0 + 25_000));
+            }
+            let seg = seg_of(t0, span, 9 + case);
+            let stops = stop_episodes(3, &seg, &f);
+            assert!(!stops.is_empty(), "case {case}");
+            for s in &stops {
+                assert!(s.start < s.end && s.end <= seg.end - LIVE_LAG_MS);
+                assert_eq!((s.seg, s.t0, s.seg_end), (3, t0, seg.end));
+                *ends.entry(s.end_by).or_insert(0) += 1;
+            }
+            for w in stops.windows(2) {
+                assert!(w[0].end <= w[1].start, "case {case}");
+            }
+            // 立ち上がり 0 なら、v = 1 の時刻（Stage の時刻 τ = q − 遅れ）はちょうど止まりの区間の和
+            let qs: Vec<u64> = (t0 + LIVE_LAG_MS..seg.end).step_by(250).collect();
+            let (_, st) = stream_samples_stopped(&seg, &f, &qs, &ident, &scfg(0));
+            for (q, fr) in qs.iter().zip(&st) {
+                let tau = q - LIVE_LAG_MS;
+                let inside = stops.iter().any(|s| s.start <= tau && tau < s.end);
+                assert_eq!(fr.v == 1.0, inside, "case {case} tau {tau}");
+            }
+        }
+        // 3 つの終わり方がどれも出る（陽性対照）
+        for k in ["press", "pause", "segment"] {
+            assert!(ends.get(k).copied().unwrap_or(0) > 0, "{k}: {ends:?}");
+        }
+    }
+
+    #[test]
+    fn build_with_no_stopped_layer_is_build_and_the_layer_only_adds_columns() {
+        let files = vec![day_file(20_400, 0.7, 1), day_file(20_401, 0.2, 2)];
+        let mut fa: Vec<(u32, u64)> = Vec::new();
+        let a = build(&files, &cfg(), &ident, &mut |id, s| fa.push((id, s.t))).unwrap();
+        let mut fb: Vec<(u32, u64, bool)> = Vec::new();
+        let b = build_with(&files, &cfg(), &ident, None, &mut |id, s, st| {
+            fb.push((id, s.t, st.is_some()))
+        })
+        .unwrap();
+        let ja = serde_json::to_string(&a.windows).unwrap();
+        assert_eq!(ja, serde_json::to_string(&b.windows).unwrap());
+        // 切っているときは列の名前も出ない（回 2 の表の形を変えない）
+        assert!(!ja.contains("b_stopped"));
+        assert_eq!(fa, fb.iter().map(|x| (x.0, x.1)).collect::<Vec<_>>());
+        assert!(fb.iter().all(|x| !x.2));
+        let c = scfg(2_000);
+        let mut fc: Vec<(u32, u64, Option<StoppedFrame>)> = Vec::new();
+        let on = build_with(&files, &cfg(), &ident, Some(&c), &mut |id, s, st| {
+            fc.push((id, s.t, st.copied()))
+        })
+        .unwrap();
+        assert_eq!(on.windows.len(), a.windows.len());
+        for (x, y) in a.windows.iter().zip(&on.windows) {
+            assert_eq!(
+                (&x.a, &x.b_state, x.t1, x.t2),
+                (&y.a, &y.b_state, y.t1, y.t2)
+            );
+            let bs = y.b_stopped.as_ref().unwrap();
+            assert_eq!(bs.len(), B_STOPPED_NAMES.len());
+            assert!(bs.iter().all(|v| v.is_finite()));
+        }
+        assert_eq!(fa, fc.iter().map(|x| (x.0, x.1)).collect::<Vec<_>>());
+        // コマの止まりの層はライブの再生と同じ（区間は日の 10:00 から・種は日の種）
+        let mut out = DeskOut::default();
+        let (_, segs) = prepared_segments(&files, &cfg(), &mut out).unwrap();
+        for (id, t, st) in &fc {
+            let w = &on.windows[*id as usize];
+            let seg = segs
+                .iter()
+                .find(|s| s.day == w.day && s.t0 <= *t && *t <= s.end)
+                .unwrap();
+            let f = &files[seg.file];
+            let want = replay_stopped_live(
+                &f.presses,
+                &pause_events(&f.pauses),
+                seg.seed,
+                seg.t0,
+                *t,
+                &c,
+            );
+            assert_eq!(st.unwrap().bits(), want.bits());
+        }
+    }
+
+    #[test]
+    fn b_stopped_features_follow_their_definitions() {
+        let fr = |v: f64, a: f64| StoppedFrame {
+            v,
+            ambient: [a, -a, 0.5],
+            form: StoppedForm::Band,
+            strength: 0.5,
+        };
+        let xs = [fr(0.0, 0.9), fr(0.5, 0.4), fr(1.0, -0.2)];
+        let refs: Vec<&StoppedFrame> = xs.iter().collect();
+        let b = b_stopped_features(&refs);
+        assert_eq!(b[0], 0.5);
+        assert_eq!(b[1], 1.0);
+        assert_eq!(b[2], 1.0);
+        // 見えている値（v × ambient）: 0・0.2・−0.2
+        assert!((b[3] - 0.0).abs() < 1e-12);
+        assert!((b[6] - (0.08f64 / 3.0).sqrt()).abs() < 1e-12);
+        // 3 つ目のチャネル: 0・0.25・0.5
+        assert!((b[5] - 0.25).abs() < 1e-12);
+        // v = 0 の間の ambient は入らない
+        let hidden = [fr(0.0, 0.9), fr(0.0, -0.9)];
+        let refs: Vec<&StoppedFrame> = hidden.iter().collect();
+        assert_eq!(b_stopped_features(&refs), [0.0; 9]);
+    }
+
+    #[test]
+    fn render_queries_matches_the_stream_and_rejects_bad_queries() {
+        let files = vec![day_file(20_400, 0.7, 1), day_file(20_401, 0.2, 2)];
+        let c = scfg(2_000);
+        let mut out = DeskOut::default();
+        let (_, segs) = prepared_segments(&files, &cfg(), &mut out).unwrap();
+        assert!(segs.len() >= 2);
+        let qs0: Vec<u64> = (0..5).map(|k| segs[1].t0 + 40_000 + k * 7_000).collect();
+        let qs1: Vec<u64> = (0..3).map(|k| segs[0].t0 + 1_000 + k * 9_000).collect();
+        let mut queries: Vec<Query> = qs0
+            .iter()
+            .map(|&q| Query {
+                seg: 1,
+                t0: segs[1].t0,
+                q,
+            })
+            .collect();
+        queries.extend(qs1.iter().map(|&q| Query {
+            seg: 0,
+            t0: segs[0].t0,
+            q,
+        }));
+        let mut got: Vec<(u32, u64, StoppedFrame)> = Vec::new();
+        render_queries(&files, &cfg(), &c, &queries, &mut |id, s, st| {
+            got.push((id, s.t, *st))
+        })
+        .unwrap();
+        assert_eq!(got.len(), queries.len());
+        let (want1, st1) = stream_samples_stopped(&segs[1], &files[segs[1].file], &qs0, &ident, &c);
+        for (k, g) in got.iter().take(5).enumerate() {
+            assert_eq!(g.0, k as u32);
+            assert_eq!(g.1, want1.samples[k].t);
+            assert_eq!(g.2.bits(), st1[k].bits());
+        }
+        // まとまっていない・昇順でない・起点が違う・区間の外・区間が無い
+        let mut bad = queries.clone();
+        bad.push(queries[0]);
+        assert!(render_queries(&files, &cfg(), &c, &bad, &mut |_, _, _| {}).is_err());
+        let mut bad = queries.clone();
+        bad.swap(0, 1);
+        assert!(render_queries(&files, &cfg(), &c, &bad, &mut |_, _, _| {}).is_err());
+        let mut bad = queries.clone();
+        bad[0].t0 += 1;
+        assert!(render_queries(&files, &cfg(), &c, &bad, &mut |_, _, _| {}).is_err());
+        let mut bad = queries.clone();
+        bad[4].q = segs[1].end + 1;
+        assert!(render_queries(&files, &cfg(), &c, &bad, &mut |_, _, _| {}).is_err());
+        let mut bad = queries.clone();
+        bad[0].seg = segs.len();
+        assert!(render_queries(&files, &cfg(), &c, &bad, &mut |_, _, _| {}).is_err());
+        assert!(render_queries(&files, &cfg(), &c, &queries, &mut |_, _, _| {}).is_ok());
     }
 }

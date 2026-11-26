@@ -15,6 +15,7 @@ use crate::analysis::handmark::assignment::Assigned;
 use crate::analysis::handmark::day::PointerInput;
 use crate::analysis::handmark::gate::{CloseReason, Decision, RECHECK_MS};
 use crate::analysis::handmark::state::{Stage, StageState, LIVE_LAG_MS};
+use crate::analysis::handmark::stopped::{stopped_view, StopGate, StoppedCfg, StoppedFrame};
 use crate::handmark_store::{
     rewrite_or_remove, scrub_state_file, turn_input_off, turn_input_on, turn_off, turn_on,
     Evaluation, HandmarkFs,
@@ -71,6 +72,8 @@ pub enum Effect {
     },
     CloseWindow,
     State(StageState),
+    /// 止まりの層（ADR-056）。研究者用の設定が入っているときだけ、`State` の直後に出す。
+    Stopped(StoppedFrame),
     Row(HandmarkDayRow),
     TrayItem(TrayItem),
     /// ポインタのスレッドへの入れ切り（窓を出している・カーソルが入っている・クリックが入っている）。
@@ -100,6 +103,7 @@ impl Effect {
             Effect::OpenWindow { .. }
             | Effect::CloseWindow
             | Effect::State(_)
+            | Effect::Stopped(_)
             | Effect::PointerGate { .. } => Destination::Window,
             Effect::TrayItem(_) => Destination::Tray,
         }
@@ -144,6 +148,14 @@ pub struct HandmarkDriver {
     /// 今の `Stage` の起点（これより前の打鍵は入れない・再生と同じ）。
     stage_t0: u64,
     pending: Vec<u64>,
+    /// 今の `Stage` の描画の種（止まりの層の自律の動きにも使う・日の種）。
+    stage_seed: u64,
+    /// 止まりの層の設定（研究者用・`None` なら切ったままで `Effect::Stopped` を出さない）。
+    stopped: Option<StoppedCfg>,
+    /// 止まりの層の門（打鍵と一時停止の時刻だけ・設定に依らず保つ）。
+    stop_gate: StopGate,
+    /// 一時停止の始まり・終わりの時刻（打鍵と同じく `now − 500 ms` まで進めるときに入れる）。
+    pending_pauses: Vec<(u64, bool)>,
     window_open: bool,
     /// 窓の層が「出た」と知らせた(それまでは出ていた時間を積まない)。
     window_confirmed: bool,
@@ -182,6 +194,10 @@ impl HandmarkDriver {
             stage: None,
             stage_t0: now,
             pending: Vec::new(),
+            stage_seed: 0,
+            stopped: None,
+            stop_gate: StopGate::new(now, false),
+            pending_pauses: Vec::new(),
             window_open: false,
             window_confirmed: false,
             strip_visible: false,
@@ -216,6 +232,23 @@ impl HandmarkDriver {
 
     pub fn tray(&self) -> TrayItem {
         self.last_tray
+    }
+
+    /// 止まりの層の設定（研究者用）。起動の直後に 1 回入れる。門は設定に依らず保っているので、入れた次の刻みから出る。
+    pub fn set_stopped(&mut self, cfg: Option<StoppedCfg>) {
+        self.stopped = cfg;
+    }
+
+    /// 止まりの層が入っているか（`lib.rs` が、一時停止の時刻をコマンドの経路の値に揃えるかを決める）。
+    pub fn stopped_on(&self) -> bool {
+        self.stopped.is_some()
+    }
+
+    /// 一時停止の出来事を、窓が出ているときだけ溜める（窓を開くときは `new_stage` が今の状態から門を作る）。
+    fn queue_pause(&mut self, now: u64, paused: bool) {
+        if self.window_open && self.pending_pauses.len() < MAX_PENDING {
+            self.pending_pauses.push((now, paused));
+        }
     }
 
     /// 打鍵の時刻を溜めるだけ（窓が出ていないときは捨てる）。
@@ -307,9 +340,12 @@ impl HandmarkDriver {
                     click_off: r.is_some_and(|r| r.click_off),
                     stage_restarted: false,
                 });
+                self.queue_pause(now, true);
             }
             (false, Some(m)) => {
                 self.paused = None;
+                // 再開で起点を取り直すなら、`new_stage` がこの出来事ごと畳む（門は一時停止の外から始まる）。
+                self.queue_pause(now, false);
                 self.end_pause(fs, m, now, &mut fx);
             }
             _ => {}
@@ -389,7 +425,11 @@ impl HandmarkDriver {
         let seed = self.ev.draw_seed().unwrap_or(0);
         self.stage = Some(Stage::new(seed, now));
         self.stage_t0 = now;
+        self.stage_seed = seed;
         self.pending.clear();
+        // 止まりの層の門も起点から。起点までの一時停止の出来事は今の状態に畳む（再生の `paused_at` と同じ）。
+        self.stop_gate = StopGate::new(now, self.paused.is_some());
+        self.pending_pauses.clear();
         // 記録の一時停止中は起点の時刻を記録に入れない（判断 2・判断 7）。再開のときに取り直す。
         match self.paused.as_mut() {
             Some(m) => m.stage_restarted = true,
@@ -413,6 +453,7 @@ impl HandmarkDriver {
         self.strip_visible = false;
         self.stage = None;
         self.pending.clear();
+        self.pending_pauses.clear();
         fx.push(Effect::CloseWindow);
     }
 
@@ -481,10 +522,37 @@ impl HandmarkDriver {
                 for p in due {
                     if p >= self.stage_t0 {
                         stage.press(p);
+                        self.stop_gate.on_press(p);
+                    }
+                }
+                // 一時停止の出来事は時刻の順に（門は打鍵との順に依らない・`stopped.rs`）
+                let mut due_pauses: Vec<(u64, bool)> = Vec::new();
+                self.pending_pauses.retain(|&e| {
+                    if e.0 <= target {
+                        due_pauses.push(e);
+                        false
+                    } else {
+                        true
+                    }
+                });
+                due_pauses.sort_by_key(|e| e.0);
+                for (pt, paused) in due_pauses {
+                    // 起点と同じ時刻の出来事も入れる（門は同じ値に冪等・再生の `paused_at` は `<= t0` を畳む）
+                    if pt >= self.stage_t0 {
+                        self.stop_gate.on_pause(pt, paused);
                     }
                 }
                 stage.advance_to(target);
                 fx.push(Effect::State(stage.state()));
+                if let Some(cfg) = self.stopped.as_ref() {
+                    fx.push(Effect::Stopped(stopped_view(
+                        stage.idle_since(),
+                        stage.grid_t(),
+                        self.stop_gate.is_open(),
+                        self.stage_seed,
+                        cfg,
+                    )));
+                }
             }
             // 窓が出たと分かってから、かつ 1 刻みの間が 2 秒以内のときだけ(スリープの間は足さない)
             let gap = now.saturating_sub(prev_tick);
@@ -948,6 +1016,310 @@ mod tests {
             let times: Vec<u64> = presses.iter().map(|p| p.0).collect();
             let want = replay_live(&times, seed, T0, last_tick);
             assert_eq!(last_state.unwrap().bits(), want.bits(), "case {case}");
+        }
+    }
+
+    fn stopped_cfg() -> StoppedCfg {
+        StoppedCfg {
+            form: crate::analysis::handmark::stopped::StoppedForm::Motes,
+            rise_ms: 2_000,
+            window_s: 10,
+            strength: 0.5,
+        }
+    }
+
+    /// 止まりの層のライブの刻み（遅れて届く打鍵と、記録の一時停止を挟む）が、記録の打鍵と一時停止の行からの
+    /// 再生（`replay_stopped_live`）と to_bits で一致する。一時停止の間の打鍵は届かない（`lib.rs` の門）。
+    #[test]
+    fn live_stopped_frames_match_the_replay_with_pauses_in_200_cases() {
+        use crate::analysis::handmark::stopped::replay_stopped_live;
+        let cfg = stopped_cfg();
+        let mut saw_v = (false, false);
+        for case in 0..200u64 {
+            let fs = with_table();
+            let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+            d.set_stopped(Some(cfg));
+            let seed = d.evaluation().draw_seed().unwrap();
+            let mut r = SplitMix64::new(case + 4_001);
+            // 一時停止の区間（始まり・終わり）
+            let mut pauses: Vec<(u64, bool)> = Vec::new();
+            let mut t = T0;
+            for _ in 0..r.below(4) {
+                t += 1 + r.below(60_000);
+                pauses.push((t, true));
+                t += 1 + r.below(40_000);
+                pauses.push((t, false));
+            }
+            let paused_at = |x: u64| {
+                pauses
+                    .iter()
+                    .take_while(|(pt, _)| *pt <= x)
+                    .last()
+                    .is_some_and(|(_, p)| *p)
+            };
+            // 打鍵（時刻 p・届く時刻 a）。届いた時に一時停止中なら捨てる（記録にも残らない）。
+            let mut presses: Vec<(u64, u64)> = Vec::new();
+            let mut t = T0 + r.below(300);
+            for _ in 0..r.below(150) {
+                let span = match r.below(6) {
+                    0 => 40_000,
+                    1 => 4_000,
+                    _ => 250,
+                };
+                t += 1 + r.below(span);
+                let a = t + r.below(501);
+                if !paused_at(t) && !paused_at(a) {
+                    presses.push((t, a));
+                }
+            }
+            let end = presses
+                .last()
+                .map_or(T0, |p| p.0)
+                .max(pauses.last().map_or(T0, |p| p.0))
+                + 60_000;
+            let mut ticks = Vec::new();
+            let mut now = T0;
+            while now < end {
+                now += 250 + r.below(60);
+                ticks.push(now);
+            }
+            // 到着・一時停止・tick を時刻の順に（同時刻は 到着 → 一時停止 → tick）
+            let mut events: Vec<(u64, u8, usize)> = presses
+                .iter()
+                .enumerate()
+                .map(|(i, p)| (p.1, 0u8, i))
+                .chain(pauses.iter().enumerate().map(|(i, p)| (p.0, 1u8, i)))
+                .chain(ticks.iter().enumerate().map(|(i, t)| (*t, 2u8, i)))
+                .collect();
+            events.sort();
+            let times: Vec<u64> = presses.iter().map(|p| p.0).collect();
+            for (_, kind, i) in events {
+                match kind {
+                    0 => d.on_press(presses[i].0),
+                    1 => {
+                        let _ = d.on_paused(&fs, pauses[i].1, pauses[i].0);
+                    }
+                    _ => {
+                        let mut got = None;
+                        for e in d.tick(&fs, ticks[i], ON_DAY) {
+                            if let Effect::Stopped(f) = e {
+                                got = Some(f);
+                            }
+                        }
+                        let f = got.expect("設定が入っていれば毎刻み出る");
+                        let want = replay_stopped_live(&times, &pauses, seed, T0, ticks[i], &cfg);
+                        assert_eq!(f.bits(), want.bits(), "case {case} tick {}", ticks[i] - T0);
+                        if f.v == 1.0 {
+                            saw_v.0 = true;
+                        }
+                        if f.v > 0.0 && f.v < 1.0 {
+                            saw_v.1 = true;
+                        }
+                    }
+                }
+            }
+        }
+        // 陽性対照: 止まりが見えた刻みと、立ち上がりの途中の刻みが両方あった（比べが空回りしていない）
+        assert_eq!(saw_v, (true, true));
+    }
+
+    /// 日付の切り替え・時計の飛びでは、起点と日の種を取り直す。止まりの層も、新しい起点からの再生と一致する
+    /// （打鍵が来るまでは返さない）。
+    #[test]
+    fn stopped_frames_restart_on_a_new_day_and_after_a_clock_jump() {
+        use crate::analysis::handmark::stopped::replay_stopped_live;
+        let cfg = stopped_cfg();
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        d.set_stopped(Some(cfg));
+        let last = |fx: Vec<Effect>| {
+            fx.into_iter()
+                .filter_map(|e| match e {
+                    Effect::Stopped(f) => Some(f),
+                    _ => None,
+                })
+                .next_back()
+        };
+        // 打って止まる → 見える
+        for k in 0..40u64 {
+            d.on_press(T0 + 1_000 + k * 150);
+        }
+        let mut now = T0;
+        while now < T0 + 120_000 {
+            now += 250;
+            let _ = d.tick(&fs, now, ON_DAY);
+        }
+        assert_eq!(last(d.tick(&fs, now + 250, ON_DAY)).unwrap().v, 1.0);
+        // 時計の飛び（1 日を超えて前へ）: 起点を取り直し、打鍵が来るまで 0
+        let jump = now + 250 + 2 * 86_400_000;
+        let f = last(d.tick(&fs, jump, ON_DAY)).unwrap();
+        assert_eq!(f.v, 0.0);
+        let seed = d.evaluation().draw_seed().unwrap();
+        let want = replay_stopped_live(&[], &[], seed, jump, jump, &cfg);
+        assert_eq!(f.bits(), want.bits());
+        // 次の出す日に変わる: 新しい日の種で、新しい起点から
+        let day_t = jump + 1_000;
+        let f = last(d.tick(&fs, day_t, NEXT_ON_DAY)).unwrap();
+        assert_eq!(f.v, 0.0);
+        let seed2 = d.evaluation().draw_seed().unwrap();
+        assert_ne!(seed, seed2);
+        let want = replay_stopped_live(&[], &[], seed2, day_t, day_t, &cfg);
+        assert_eq!(f.bits(), want.bits());
+    }
+
+    /// 1 刻み進め、出た止まりの層を、駆動役のいまの起点と種からの再生と to_bits で比べる。
+    fn tick_and_check(
+        d: &mut HandmarkDriver,
+        fs: &MemFs,
+        now: u64,
+        today: i64,
+        presses: &[u64],
+        pauses: &[(u64, bool)],
+        cfg: &StoppedCfg,
+    ) -> StoppedFrame {
+        let fx = d.tick(fs, now, today);
+        let f = fx
+            .iter()
+            .filter_map(|e| match e {
+                Effect::Stopped(f) => Some(*f),
+                _ => None,
+            })
+            .next_back()
+            .expect("窓が出ていて設定が入っていれば毎刻み出る");
+        let want = crate::analysis::handmark::stopped::replay_stopped_live(
+            presses,
+            pauses,
+            d.stage_seed,
+            d.stage_t0,
+            now,
+            cfg,
+        );
+        assert_eq!(f.bits(), want.bits(), "t {} t0 {}", now - T0, d.stage_t0);
+        f
+    }
+
+    /// 起点の取り直しが一時停止と重なる経路（一時停止中の時計の飛び・一時停止中の日の変わり目・窓を閉じている
+    /// 間に始まった一時停止・起点と同じ ms の一時停止）でも、刻みごとに再生と一致し、取り直しの後は最初の打鍵まで
+    /// 返さない。取り直しの後に打って止まれば v が 1 に戻る（陽性対照）。
+    #[test]
+    fn stopped_frames_match_the_replay_across_restarts_while_paused() {
+        let cfg = stopped_cfg();
+        let fs = with_table();
+        let (mut d, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        d.set_stopped(Some(cfg));
+        let mut presses: Vec<u64> = Vec::new();
+        let mut pauses: Vec<(u64, bool)> = Vec::new();
+        let mut now = T0;
+        let mut today = ON_DAY;
+        // 打って止まり、`secs` 秒ぶん刻む。（見えた最大の v, 最後の刻みの v）を返す。出来事は 500 ms 遅れて
+        // 入る（ライブの規則）ので、止めた直後の数刻みは前の v のまま。「0 のまま」は最後の刻みで見る。
+        macro_rules! run {
+            ($type_first:expr, $secs:expr) => {{
+                if $type_first {
+                    for k in 0..40u64 {
+                        let p = now + 100 + k * 150;
+                        if d.is_window_open() && d.paused.is_none() {
+                            d.on_press(p);
+                            presses.push(p);
+                        }
+                    }
+                }
+                let (mut max_v, mut last_v) = (0.0f64, 0.0f64);
+                let end = now + $secs * 1_000;
+                while now < end {
+                    now += 250;
+                    let f = tick_and_check(&mut d, &fs, now, today, &presses, &pauses, &cfg);
+                    max_v = max_v.max(f.v);
+                    last_v = f.v;
+                }
+                (max_v, last_v)
+            }};
+        }
+        macro_rules! pause {
+            ($p:expr) => {{
+                let _ = d.on_paused(&fs, $p, now);
+                pauses.push((now, $p));
+            }};
+        }
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 1) 一時停止中の時計の飛び → 再開 → 打つまで 0 → 打てば 1
+        pause!(true);
+        assert_eq!(run!(false, 10).1, 0.0);
+        now += 2 * 86_400_000;
+        assert_eq!(run!(false, 10).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 2) 一時停止中の日の変わり目
+        pause!(true);
+        assert_eq!(run!(false, 5).1, 0.0);
+        today = NEXT_ON_DAY;
+        assert_eq!(run!(false, 10).1, 0.0);
+        assert!(d.is_window_open());
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 3) 窓を閉じている間に始まった一時停止（戻したときは一時停止中から始まる）
+        let _ = d.turn_off(&fs, now);
+        assert!(!d.is_window_open());
+        pause!(true);
+        now += 1_000;
+        let _ = d.turn_on(&fs, now);
+        assert!(d.is_window_open());
+        assert_eq!(run!(true, 30).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(false, 30).1, 0.0);
+        assert_eq!(run!(true, 60).0, 1.0);
+        // 4) 起点と同じ ms の一時停止（戻した直後に同じ時刻で止める）
+        let _ = d.turn_off(&fs, now);
+        let _ = d.turn_on(&fs, now);
+        assert_eq!(d.stage_t0, now);
+        pause!(true);
+        // 一時停止の判定をすり抜けた打鍵が 1 つ届いても（時刻は一時停止の後）、門は閉じたまま。
+        // 起点と同じ時刻の一時停止を落とすと、ライブだけが開く（変異で赤になることを確かめた）。
+        d.on_press(now + 50);
+        presses.push(now + 50);
+        assert_eq!(run!(false, 30).1, 0.0);
+        pause!(false);
+        assert_eq!(run!(true, 60).0, 1.0);
+    }
+
+    /// 設定が無ければ（参加者の配布物の既定）止まりの層を出さず、今の状態の列も変わらない。
+    #[test]
+    fn without_the_config_no_stopped_frames_are_emitted() {
+        let fs = with_table();
+        let (mut a, _) = HandmarkDriver::new(&fs, true, T0, ON_DAY);
+        let fs_b = with_table();
+        let (mut b, _) = HandmarkDriver::new(&fs_b, true, T0, ON_DAY);
+        b.set_stopped(Some(stopped_cfg()));
+        for i in 1..800u64 {
+            if i % 7 != 0 && i < 300 {
+                a.on_press(T0 + i * 130);
+                b.on_press(T0 + i * 130);
+            }
+            if i == 500 {
+                let _ = a.on_paused(&fs, true, T0 + i * 250);
+                let _ = b.on_paused(&fs_b, true, T0 + i * 250);
+            }
+            let fa = a.tick(&fs, T0 + i * 250, ON_DAY);
+            let fb = b.tick(&fs_b, T0 + i * 250, ON_DAY);
+            assert!(!fa.iter().any(|e| matches!(e, Effect::Stopped(_))));
+            let states = |fx: &[Effect]| -> Vec<[u64; 5]> {
+                fx.iter()
+                    .filter_map(|e| match e {
+                        Effect::State(s) => Some(s.bits()),
+                        _ => None,
+                    })
+                    .collect()
+            };
+            assert_eq!(states(&fa), states(&fb), "tick {i}");
+            assert_eq!(
+                fb.iter()
+                    .filter(|e| matches!(e, Effect::Stopped(_)))
+                    .count(),
+                1,
+                "tick {i}"
+            );
         }
     }
 

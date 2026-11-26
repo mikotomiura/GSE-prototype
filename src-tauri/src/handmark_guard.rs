@@ -697,10 +697,17 @@ const WINDOW: [(&str, &str); 2] = [
 
 /// 描画の純関数（手跡の PR 4・判断 8）。画面と机上の道具が同じに呼ぶ。窓の側と同じく保存・送信の語と名前の外の
 /// 列の検査を受けるが、イベント名を知ってよい一覧（`WINDOW`）には入れない（イベントを聞かない）。
-const DRAW: [(&str, &str); 1] = [(
-    "handmarkStageDraw.ts",
-    include_str!("../../src/components/handmarkStageDraw.ts"),
-)];
+const DRAW: [(&str, &str); 2] = [
+    (
+        "handmarkStageDraw.ts",
+        include_str!("../../src/components/handmarkStageDraw.ts"),
+    ),
+    // 止まりの層の重ね描き（ADR-056）。画面が `drawFrame` の後に呼ぶ（机上の道具 `overlay.mjs` も同じ順に呼ぶ）。
+    (
+        "handmarkStoppedDraw.ts",
+        include_str!("../../src/components/handmarkStoppedDraw.ts"),
+    ),
+];
 
 /// 帯の窓の側の本文（ADR-051・手跡の下の縁の帯）。背景の窓と同じ検査を受ける。
 /// 帯のイベント（`handmark-strip-near`・`handmark-strip-visible`）を知ってよい TS はこの 2 ファイルだけ。
@@ -747,6 +754,7 @@ fn the_draw_module_listens_to_nothing() {
         stage_event("STATE_EVENT"),
         stage_event("TRACE_EVENT"),
         stage_event("RIPPLE_EVENT"),
+        stage_event("STOPPED_EVENT"),
     ];
     let mut needles: Vec<&str> = names.iter().map(String::as_str).collect();
     needles.extend(["listen", "@tauri-apps", "emit"]);
@@ -850,7 +858,11 @@ fn only_the_stage_window_knows_the_trace_and_ripple_events() {
     for ext in ["js", "jsx", "mjs"] {
         assert!(TS_EXTS.contains(&ext), "{ext} を走査しない");
     }
-    for name in [stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT")] {
+    for name in [
+        stage_event("TRACE_EVENT"),
+        stage_event("RIPPLE_EVENT"),
+        stage_event("STOPPED_EVENT"),
+    ] {
         let name = name.as_str();
         assert!(
             others_naming(name, &files).is_empty(),
@@ -949,11 +961,14 @@ fn only_the_stage_rs_names_the_events_and_nobody_uses_listen_any() {
     );
     assert!(files.iter().any(|(n, _)| n == "handmark_stage.rs"));
     let (trace, ripple) = (stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT"));
+    let stopped = stage_event("STOPPED_EVENT");
     let events = [
         "TRACE_EVENT",
         "RIPPLE_EVENT",
+        "STOPPED_EVENT",
         trace.as_str(),
         ripple.as_str(),
+        stopped.as_str(),
     ];
     assert_eq!(
         rs_files_naming(&events, &["handmark_stage.rs"], &files),
@@ -983,6 +998,7 @@ fn only_the_stage_rs_names_the_events_and_nobody_uses_listen_any() {
         .find(|(n, _)| n == "handmark_stage.rs")
         .expect("stage");
     assert!(body(&stage.1).contains("TRACE_EVENT") && body(&stage.1).contains("RIPPLE_EVENT"));
+    assert!(body(&stage.1).contains("STOPPED_EVENT"));
 }
 
 /// 窓へ送る口（`emit_trace`・`emit_ripple`）と画面の大きさ（`screen_size_pt`）を呼べるのは `lib.rs`
@@ -1617,8 +1633,12 @@ fn only_the_strip_window_knows_the_strip_events() {
             );
         }
     }
-    // 帯の窓の TS は、場・波紋のイベントを知らない（`others_naming` は帯のファイルを除かない）。
-    for name in [stage_event("TRACE_EVENT"), stage_event("RIPPLE_EVENT")] {
+    // 帯の窓の TS は、場・波紋・止まりのイベントを知らない（`others_naming` は帯のファイルを除かない）。
+    for name in [
+        stage_event("TRACE_EVENT"),
+        stage_event("RIPPLE_EVENT"),
+        stage_event("STOPPED_EVENT"),
+    ] {
         assert!(
             STRIP_WINDOW.iter().all(|(_, t)| !body(t).contains(&name)),
             "帯の窓が {name} を知っている"
