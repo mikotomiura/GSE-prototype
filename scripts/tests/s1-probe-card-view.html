@@ -13,7 +13,7 @@
       //
       // 使い方: worktree で `npx vite --port 5179` を起動し、
       //   http://localhost:5179/scripts/tests/s1-probe-card-view.html
-      // window.__GSE_CALLS に invoke の呼び出し（コマンド名と引数）が溜まる。window.__GSE_SIZE にカードの実寸。
+      // window.__GSE_CALLS に invoke の呼び出し（コマンド名と引数）が溜まる。window.__GSE_SIZE に段ごとのカードの実寸。
       window.__GSE_CALLS = [];
       window.__TAURI_INTERNALS__ = {
         metadata: {
@@ -35,13 +35,27 @@
       const { createRoot } = await import("react-dom/client");
       await import("/src/App.css").catch(() => {});
       const S1ProbeCard = (await import("/src/components/S1ProbeCard.tsx")).default;
-      createRoot(document.getElementById("root")).render(
-        React.createElement(S1ProbeCard, {
-          probeId: "p-view",
-          onResize: (s) => { window.__GSE_SIZE = s; },
-          onDone: () => { window.__GSE_DONE = true; },
-        }),
-      );
+      // ADR-057 から段（step）は backend が決める。カードは position: absolute で決まった位置に出るので、1 回に 1 つの段だけ描く。
+      // 既定は q3。ほかの段は ?step=q1 / ?step=q2。window.__GSE_SIZE は { 段: 実寸 }。
+      window.__GSE_SIZE = {};
+      const root = document.getElementById("root");
+      root.style.height = "auto";
+      const only = new URLSearchParams(location.search).get("step") || "q3";
+      for (const step of [only]) {
+        const box = document.createElement("div");
+        box.dataset.step = step;
+        box.style.cssText = "position:relative; width:400px; margin-bottom:16px;";
+        root.appendChild(box);
+        createRoot(box).render(
+          React.createElement(S1ProbeCard, {
+            probeId: `p-view-${step}`,
+            step,
+            remaining: step === "q3" ? 0 : Number(new URLSearchParams(location.search).get("remaining") || (step === "q1" ? 2 : 1)),
+            onResize: (s) => { window.__GSE_SIZE[step] = s; },
+            onDone: () => { window.__GSE_DONE = true; },
+          }),
+        );
+      }
     </script>
   </body>
 </html>

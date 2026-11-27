@@ -8985,6 +8985,51 @@ mod s1_driver_wiring_tests {
         s.chars().filter(|c| !c.is_whitespace()).collect()
     }
 
+    /// ADR-057 補訂 2: 作業で Q2 だけ答えて閉じたカードは、q1 が null・q2 がある行と、作業の行になる。
+    #[test]
+    fn working_card_closed_after_q2_writes_q2_only_row() {
+        use crate::logger::{ActivityCategory, LogEntry};
+        use crate::s1_driver::{AnswerInput, ProbeCard, ProbeStep};
+        let consent = crate::o1::activity_label_allowed(true, true).expect("同意あり");
+        let card = ProbeCard {
+            probe_id: "p-w".to_string(),
+            stratum: crate::analysis::probe_arbiter::Stratum::Random,
+            scheduled_ts: 1_000,
+            window_start_ms: 0,
+            window_end_ms: 999,
+            debug: false,
+            shown_ts: 1_000,
+            answer: None,
+        };
+        let card = card
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Working),
+                2_000,
+            )
+            .unwrap()
+            .with_answer(ProbeStep::Q2, AnswerInput::Scale(2), 3_000)
+            .unwrap();
+        let [realtime, activity] =
+            super::s1_probe_answer_rows(&consent, 4_000, &card).expect("答えたカード");
+        let LogEntry::RealtimeLabel {
+            q1_friction,
+            q2_progress,
+            answered,
+            latency_ms,
+            ..
+        } = realtime
+        else {
+            panic!("not a realtime_label");
+        };
+        assert_eq!((q1_friction, q2_progress, answered), (None, Some(2), true));
+        assert_eq!(latency_ms, 2_000);
+        let LogEntry::ActivityLabel { category, .. } = activity else {
+            panic!("not an activity_label");
+        };
+        assert_eq!(category, ActivityCategory::Working);
+    }
+
     /// 引き継ぎ §2 の 3: 6 択の門には段 1 の判定と段 1 の同意の印を渡し、`o1::is_o1()` を渡さない。
     #[test]
     fn s1_esm_gate_passes_stage1_not_o1() {
@@ -9088,6 +9133,7 @@ mod s1_driver_wiring_tests {
             window_start_ms: 0,
             window_end_ms: 1,
             step,
+            remaining: 0,
         };
         assert_eq!(
             s1_answer_digits(&probe(ProbeStep::Q3)),
@@ -9154,6 +9200,7 @@ mod s1_driver_wiring_tests {
             window_start_ms: 0,
             window_end_ms: 1,
             step,
+            remaining: 0,
         };
         let mut card = None;
         let t0 = 1_000_000;

@@ -4818,17 +4818,15 @@ fn load_calibration_session(session_path: &PathBuf) -> Result<SessionData, Strin
                     unknown_enum_lines += 1;
                     continue;
                 };
-                // 回答済みの q は 1..=5。範囲外・q1 なしの q2 は破損とみなし skip。
+                // 回答済みの q は 1..=5。範囲外は破損とみなし skip。
                 // skip 回答 (answered=false) は q=None が正常なので検証しない。
                 // ★ 段 1 の 3 名の版は answered でも q が null になりうる（Q3 の選択肢によって Q1・Q2 を
                 //   聞かない・答える前に閉じた・ADR-057 D3）。破損ではないが較正の点にならないので、
                 //   別に数えて較正には入れない（較正の回答率・GATE の意味を変えない）。
+                // ★ q1 なしの q2 も同じ側（3 名の版は作業で Q2 → Q1 の順に聞く・ADR-057 補訂 2）。
                 if answered {
                     let in_range = |q: Option<u8>| q.is_none_or(|v| (1..=5).contains(&v));
-                    if !in_range(q1_friction)
-                        || !in_range(q2_progress)
-                        || (q1_friction.is_none() && q2_progress.is_some())
-                    {
+                    if !in_range(q1_friction) || !in_range(q2_progress) {
                         out_of_range_lines += 1;
                         continue;
                     }
@@ -8963,7 +8961,8 @@ not json\n";
     }
 
     /// 段 1 の 3 名の版の answered で q が欠けた行（ADR-057 D3）は破損ではなく、較正の点にもしない。
-    /// ★ q のそろった answered と skip は今どおり、範囲外と q1 の無い q2 は今どおり破損。
+    /// ★ q のそろった answered と skip は今どおり、範囲外は今どおり破損。
+    /// ★ q1 の無い q2 は、作業で Q2 → Q1 の順に聞く 3 名の版の正常な行（ADR-057 補訂 2）なので、q の欠けた側。
     #[test]
     fn answered_without_scales_is_counted_apart_from_corruption() {
         let row = |id: &str, q1: &str, q2: &str, answered: bool, skip: &str| {
@@ -8986,8 +8985,8 @@ not json\n";
         let s = load_calibration_session(&path).expect("load");
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(s.probes.len(), 2, "full と skip だけが較正の点");
-        assert_eq!(s.skipped_answered_without_scales, 2);
-        assert_eq!(s.skipped_out_of_range, 2);
+        assert_eq!(s.skipped_answered_without_scales, 3);
+        assert_eq!(s.skipped_out_of_range, 1);
     }
 
     /// 3 セッション (s1/s2 = 較正・s3 = 評価) を `--calibration` 相当で通し、

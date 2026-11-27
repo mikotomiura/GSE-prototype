@@ -13,6 +13,8 @@ interface S1ProbeCardProps {
   probeId: string;
   /** いま尋ねている問い（backend が決める・ADR-057）。 */
   step: ProbeStep;
+  /** いまの問いを含めて、あと何問か（Q3 の段は 0・作業は Q2 → Q1 の順・ADR-057 補訂 2）。 */
+  remaining: number;
   /** カードの実寸（logical px）を親へ。非表示時は null。 */
   onResize: (size: { w: number; h: number } | null) => void;
   /** 記録できたら親に状態を取り直させる。 */
@@ -41,13 +43,14 @@ const SCALE_QUESTIONS: Record<
 
 /**
  * 段 1 のプローブのカード（ADR-057）。1 回押せば送る（「回答する」は無い）。
- * Q3（7 択）→ 詰まり・熟考・作業なら Q1 摩擦 → Q2 前進（どれも初期値なし）。
+ * Q3（7 択）→ 詰まり・熟考なら Q1 摩擦 → Q2 前進、作業なら Q2 → Q1（ADR-057 補訂 2・どれも初期値なし）。
  * ★ 段と記録は backend が持つ（キーで答えても同じ道を通る）。ここはボタンを描いて押下を送るだけ。
  * ⚠️ 自由記述を置かない・理由を問わない（ADR-031 D3・data-privacy ルール 7）。
  */
 const S1ProbeCard: React.FC<S1ProbeCardProps> = ({
   probeId,
   step,
+  remaining,
   onResize,
   onDone,
 }) => {
@@ -197,7 +200,7 @@ const S1ProbeCard: React.FC<S1ProbeCardProps> = ({
     step === "q3" ? (
       <>
         <div style={{ fontSize: "0.86rem", margin: "0 0 0.45rem" }}>
-          直前の30秒、何をしていましたか?
+          カードが出る前の30秒、何をしていましたか?
         </div>
         <div
           role="group"
@@ -289,8 +292,8 @@ const S1ProbeCard: React.FC<S1ProbeCardProps> = ({
           marginBottom: "0.45rem",
         }}
       >
-        直前の30秒について
-        {step === "q1" ? "（あと 2 問）" : step === "q2" ? "（あと 1 問）" : ""}
+        カードが出る前の30秒について
+        {step !== "q3" && remaining > 0 ? `（あと ${remaining} 問）` : ""}
       </div>
 
       {body}

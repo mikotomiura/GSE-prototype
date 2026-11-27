@@ -102,6 +102,17 @@ impl ProbeStep {
     }
 }
 
+/// Q3 の答えの後に Q1・Q2 を聞く順（ADR-057 補訂 2）。
+///
+/// ★ 作業は Q2（前進）を先に聞く。事前登録 S1-A3 の (ii)「作業かつ Q2 ≤ 2」は Q2 で決まるので、
+///   面倒で途中で閉じても決め手が残りやすいように（A-1 判断 63）。詰まり・熟考は Q1 → Q2 のまま。
+pub fn scale_order(category: ActivityCategory) -> [ProbeStep; 2] {
+    match category {
+        ActivityCategory::Working => [ProbeStep::Q2, ProbeStep::Q1],
+        _ => [ProbeStep::Q1, ProbeStep::Q2],
+    }
+}
+
 /// 押した答え（クリックもキーも同じ形で渡る）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnswerInput {
@@ -115,9 +126,21 @@ impl ProbeCard {
         match &self.answer {
             None => Some(ProbeStep::Q3),
             Some(a) if !a.category.asks_scales() => None,
-            Some(a) if a.q1.is_none() => Some(ProbeStep::Q1),
-            Some(a) if a.q2.is_none() => Some(ProbeStep::Q2),
-            Some(_) => None,
+            Some(a) => scale_order(a.category).into_iter().find(|s| match s {
+                ProbeStep::Q1 => a.q1.is_none(),
+                ProbeStep::Q2 => a.q2.is_none(),
+                ProbeStep::Q3 => false,
+            }),
+        }
+    }
+
+    /// いまの問いを含めて、あと何問か（画面の「あと N 問」）。Q3 の段は 0（Q1・Q2 を聞くかは答えで決まる）。
+    pub fn remaining(&self) -> u8 {
+        match &self.answer {
+            Some(a) if a.category.asks_scales() => {
+                u8::from(a.q1.is_none()) + u8::from(a.q2.is_none())
+            }
+            _ => 0,
         }
     }
 
@@ -200,6 +223,8 @@ pub enum S1CardView {
         window_end_ms: u64,
         /// いま尋ねている問い（ADR-057）。
         step: ProbeStep,
+        /// いまの問いを含めて、あと何問か（Q3 の段は 0・ADR-057 補訂 2）。
+        remaining: u8,
     },
     Day {
         card_id: u64,
@@ -414,6 +439,7 @@ impl S1Driver {
                 window_end_ms: p.window_end_ms,
                 // ★ 答え終わったカードは持たない（`commit_probe_answer` が閉じる）ので `None` は来ない
                 step: p.step().unwrap_or(ProbeStep::Q3),
+                remaining: p.remaining(),
             },
             (None, Some(d)) => S1CardView::Day {
                 card_id: d.card_id,
@@ -1481,8 +1507,57 @@ mod tests {
                     | ActivityCategory::Deliberating
                     | ActivityCategory::Working
             );
-            assert_eq!(next.step(), asks.then_some(ProbeStep::Q1), "{c:?}");
+            // ★ 作業は Q2 を先に聞く（ADR-057 補訂 2）
+            let first = if c == ActivityCategory::Working {
+                ProbeStep::Q2
+            } else {
+                ProbeStep::Q1
+            };
+            assert_eq!(next.step(), asks.then_some(first), "{c:?}");
+            assert_eq!(next.remaining(), if asks { 2 } else { 0 }, "{c:?}");
         }
+    }
+
+    #[test]
+    fn working_asks_q2_before_q1_and_closing_after_q2_keeps_q2() {
+        let mut d = driver_with_frame(1_000_000);
+        fire(&mut d, Stratum::Random, 2_000_000);
+        let c = d.open_probe().unwrap().clone();
+        let n = c
+            .with_answer(
+                ProbeStep::Q3,
+                AnswerInput::Activity(ActivityCategory::Working),
+                2_001_000,
+            )
+            .unwrap();
+        assert_eq!((n.step(), n.remaining()), (Some(ProbeStep::Q2), 2));
+        // ★ Q1 の段では答えられない（見ていた問いと違う）
+        assert!(n
+            .with_answer(ProbeStep::Q1, AnswerInput::Scale(4), 2_002_000)
+            .is_err());
+        let n = n
+            .with_answer(ProbeStep::Q2, AnswerInput::Scale(1), 2_002_000)
+            .unwrap();
+        assert_eq!((n.step(), n.remaining()), (Some(ProbeStep::Q1), 1));
+        let a = n.answer.unwrap();
+        assert_eq!((a.q1, a.q2), (None, Some(1)));
+        let done = n
+            .with_answer(ProbeStep::Q1, AnswerInput::Scale(3), 2_003_000)
+            .unwrap();
+        assert_eq!((done.step(), done.remaining()), (None, 0));
+        let a = done.answer.unwrap();
+        assert_eq!((a.q1, a.q2), (Some(3), Some(1)));
+    }
+
+    #[test]
+    fn stuck_and_deliberating_keep_q1_then_q2() {
+        for c in [ActivityCategory::Stuck, ActivityCategory::Deliberating] {
+            assert_eq!(scale_order(c), [ProbeStep::Q1, ProbeStep::Q2], "{c:?}");
+        }
+        assert_eq!(
+            scale_order(ActivityCategory::Working),
+            [ProbeStep::Q2, ProbeStep::Q1]
+        );
     }
 
     #[test]
