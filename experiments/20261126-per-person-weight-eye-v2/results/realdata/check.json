@@ -1,0 +1,156 @@
+{
+ "code_hash": "1665a0b2f83fef22dcea3bed18041f8a467dac2c769b65237e6b15092ac27142",
+ "shapes": {
+  "coauthor": {
+   "k1_g0": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 0.0
+   },
+   "k5_g0": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 8.881784197001252e-16
+   },
+   "k15_g0": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 0.0
+   },
+   "k5_g5": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 8.881784197001252e-16
+   },
+   "k5_g10": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 0.0
+   }
+  },
+  "cs1": {
+   "k1_g0": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 4.440892098500626e-16
+   },
+   "k5_g0": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 4.440892098500626e-16
+   },
+   "k1_g1": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 0.0
+   },
+   "k1_g4": {
+    "match": {
+     "W": true,
+     "p": true,
+     "nA": true,
+     "nB": true,
+     "auc": true,
+     "G": true,
+     "rank1": true,
+     "eer_glob": true,
+     "eer_each": true,
+     "freq_loop_1e-12": true,
+     "freq_finite": true
+    },
+    "freq_loop_maxdiff": 4.440892098500626e-16
+   }
+  }
+ },
+ "ok": true,
+ "key_disjoint": true,
+ "stage": "check"
+}

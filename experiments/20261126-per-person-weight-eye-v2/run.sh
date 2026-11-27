@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# 重みを見る目の合成の較正（conditions.md）。実データは使わない。段ごとに回す（D8 の回す順。コミットは段の間に人が行う）。
+# 重みを見る目の合成の較正（conditions.md）。実データは realdata の段だけが読む（追記 1）。段ごとに回す（D8 の回す順。コミットは段の間に人が行う）。
 #   bash run.sh v1                      V1（selftest）→ 変異 w1〜w7 → 照合 → provenance
 #   bash run.sh select|report           本計算（第 1 の帰無・この Mac）
 #   NPZ=<path> bash run.sh select2|report2   第 2 の帰無（HP Z2・npz は repo の外）
 #   bash run.sh xmach <他機の selftest.json>  P-XMACH（両機の記号の列と版の一致）
+#   bash run.sh realdata-check|realdata-pre|realdata   D7 実データ（追記 1）: 合成で照合 → 計算の前の量 → 本計算
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 EXP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +14,7 @@ JOBS="${JOBS:-8}"
 PY="${PYTHON:-$HOME/venvs/weight-eye/bin/python}"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 RUN_ID="${RUN_ID:-$(date +%Y%m%dT%H%M%S)-$$}"
-STAGE="${1:?段を渡す（v1・select・report・select2・report2・xmach）}"
+STAGE="${1:?段を渡す（v1・select・report・select2・report2・xmach・realdata-check・realdata-pre・realdata）}"
 [ "$(cat "$EXP_DIR/SEED")" = 2026112201 ] || { echo "SEED が条件の値と違う" >&2; exit 1; }
 "$PY" -I -X utf8 -c 'import sys; v=sys.version_info; import numpy; assert (v[:3], numpy.__version__) == ((3, 11, 9), "2.4.4"), (v, numpy.__version__)' \
   || { echo "Python 3.11.9・numpy 2.4.4 で回す（P-XMACH・V2）" >&2; exit 1; }
@@ -62,6 +63,13 @@ case "$STAGE" in
     prov "$OUT/provenance.$S.null2.json" ;;
   xmach)
     "$PY" -I -X utf8 "$SC/check_xmach.py" "$OUT/v1/selftest.json" "${2:?他機の selftest.json}" "$OUT/v1/xmach.json" ;;
+  realdata-check|realdata-pre|realdata)
+    # D7 実データ（追記 1・凍結 b0f5821a）。check は合成だけ、pre は計算の前に出す量、realdata は本計算（Mac・データは repo の外）
+    D="$OUT/realdata"; mkdir -p "$D"
+    S="${STAGE#realdata}"; S="${S#-}"; S="${S:-main}"
+    prov "$D/provenance.$S.pre.json"
+    "$PY" -I -X utf8 "$SC/realdata.py" "$S" "$D/$S.json" --data-dir "${DATA_DIR:-$HOME/gse-public-data}"
+    prov "$D/provenance.$S.json" ;;
   *) echo "段が違う: $STAGE" >&2; exit 1 ;;
 esac
 echo "終わり: $STAGE $RUN_ID"
