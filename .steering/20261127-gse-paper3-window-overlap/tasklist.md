@@ -4,9 +4,9 @@
 - [x] 既存の 2 つの記号化の出どころを確かめる（主: kit/symbols・S3／重ならない窓: S13 の試験 `experiments/20261107-unsmoothed-residual-check/`・kit の `thinned_mask`）
 - [x] 枝 exp/gse-per-person-window-overlap と worktree を切る
 - [x] conditions.md の草案（コードより前）
-- [ ] 条件の commit
-- [ ] 条件の attack-me（stage prereg・Codex を加える）→ minor が 2 回続くまで
-- [ ] 凍結の commit
+- [x] 条件の commit
+- [x] 条件の attack-me（stage prereg・Codex を加える）→ round 6 で minor が 2 回続いた（判断 9）
+- [x] 凍結の commit（第 7 版）
 - [ ] コード・陽性対照・変異（合成のデータだけ）
 - [ ] 時間の見積もり（Mac の合成）と計算の場所の決定
 - [ ] 本計算・端の再現の門・notes
