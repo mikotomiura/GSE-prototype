@@ -698,7 +698,7 @@ const WINDOW: [(&str, &str); 2] = [
 
 /// 描画の純関数（手跡の PR 4・判断 8）。画面と机上の道具が同じに呼ぶ。窓の側と同じく保存・送信の語と名前の外の
 /// 列の検査を受けるが、イベント名を知ってよい一覧（`WINDOW`）には入れない（イベントを聞かない）。
-const DRAW: [(&str, &str); 2] = [
+const DRAW: [(&str, &str); 3] = [
     (
         "handmarkStageDraw.ts",
         include_str!("../../src/components/handmarkStageDraw.ts"),
@@ -707,6 +707,11 @@ const DRAW: [(&str, &str); 2] = [
     (
         "handmarkStoppedDraw.ts",
         include_str!("../../src/components/handmarkStoppedDraw.ts"),
+    ),
+    // canvas の画素の大きさと拡大を合わせる純関数（背景と帯が描くたびに呼ぶ・2026-11-28 の半分の大きさの直し）。
+    (
+        "handmarkCanvasFit.ts",
+        include_str!("../../src/components/handmarkCanvasFit.ts"),
     ),
 ];
 
