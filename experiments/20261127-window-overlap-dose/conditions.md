@@ -1,6 +1,6 @@
-# 窓の歩みの用量反応の条件（コードと実データの計算の前にコミットする・2026-11-28・第 5 版）
+# 窓の歩みの用量反応の条件（コードと実データの計算の前にコミットする・2026-11-28・第 6 版）
 
-作業記録は `.steering/20261127-gse-paper3-window-overlap/`。論文 3 の判断 6 の (1)（深さへの答えは仕組みの計算を足す）を受ける。第 1〜4 版（04918717・476a7914・b0bb909a・a2d3413c）は attack-me（prereg round 1〜4・どれも major）を受けて、この第 5 版に書き直した（判断 3〜7）。前の試験は `experiments/20261107-unsmoothed-residual-check/`（以下 S13 の試験・条件 D1〜D6・V1〜V3）。この文書には S13 の試験から変える所だけを書く。書いていない所は S13 の試験（とそれが引き継ぐ `experiments/20261104-timeseries-tau-extend/`）のとおりにする。SEED は S13 の試験と同じ 2026110401（端の再現の門のため）。用量の形（中間の歩みの並び）は図で記述するだけで、読みの語を付けない。
+作業記録は `.steering/20261127-gse-paper3-window-overlap/`。論文 3 の判断 6 の (1)（深さへの答えは仕組みの計算を足す）を受ける。第 1〜5 版（04918717・476a7914・b0bb909a・a2d3413c・8d3c865e）は attack-me（prereg round 1〜5・round 1〜4 は major・round 5 は minor）を受けて、この第 6 版に書き直した（判断 3〜8）。前の試験は `experiments/20261107-unsmoothed-residual-check/`（以下 S13 の試験・条件 D1〜D6・V1〜V3）。この文書には S13 の試験から変える所だけを書く。書いていない所は S13 の試験（とそれが引き継ぐ `experiments/20261104-timeseries-tau-extend/`）のとおりにする。SEED は S13 の試験と同じ 2026110401（端の再現の門のため）。用量の形（中間の歩みの並び）は図で記述するだけで、読みの語を付けない。
 
 ## 問い
 
@@ -10,29 +10,35 @@
 
 - (a) 重ならない窓での得の縮みに対して、記号の数をそろえた歩み 1 の連続した区間ではどれだけの差が残るか（主の問い・型を決める）。
 - (b) 本人 hmm3 が本人の連鎖に負けるか勝つかは、どの歩みで入れ替わるか（論文 3 の勧め (1) がどの記号化で効くか）。
-- (c) 構造を ar3 に固定した比べ（本人 ar3 − 共有 ar3）の値（記述だけ・型を決めない）。仕組みの後半（従属を運べる構造の共有を相手にすると差が消える）は、歩み 30 の列の記号の数では本人 ar3 のデータの重みが小さいので、この試験では判定できない（判断 7）。
+- (c) 構造を ar3 に固定した比べ（本人 ar3 − 共有 ar3）の値（記述だけ・型を決めない）。仕組みの後半（従属を運べる構造の共有を相手にすると差が消える）は、歩み 30 の列の記号の数では本人 ar3 のデータの重みが小さくなりうるので、この試験では判定しない（判断 7）。
 
 ## 言い方の限り（どの結果でも守る）
 
-句の置き方:
-- この試験の結果を述べる段落（新しい節・補足）では、下の句 (1)〜(3) を段落の最初の文に一度入れる。
-- 既にある段落（Discussion の第 1 段落・記号化の段落・結果の段落・関連研究の段落・勧めの段落・貢献の段落）に文や句を差し込むときは、句 (1)・(2) を差し込む文そのものに入れる（段落の最初の文は主の平滑した記号化の結果なので、そこには入れない）。下の型ごとの文には句を書き込んである。
+句（日本語と英訳。英訳は本文にそのまま使う）:
 
-句:
-- (1) この試験の記号はすべて平滑を外した記号（S13 の u）から作る。句「平滑を外した記号（S13 の u）で」を入れ、主の記号化（平滑あり）へは広げない。新しい節には句「平滑した主の記号化では確かめていない」も入れる。
-- (2) 列 A（歩み s）と列 C（歩み 1 の連続した区間）は、同じ記号の数で、窓の重なり（(30 − 歩み) / 30）・予測の先の長さ（続く記号の間の秒）・覆う時間の長さ（列 A は全体に散った行、列 C はセッションの約 1/s の連続した区間）が同時に違う。この試験はこの 3 つを分けない（窓の長さの列も、散らした短い束の列も作らない・判断 4・6）。句「歩み（窓の重なり・予測の先の長さ・同じ記号の数で覆う時間の長さ。この試験は分けない）」を入れ、「重なりが効いた」「重なりが従属を生む」と書かない。打鍵そのものが 1 秒先では続き 30 秒先では続かないことでも、連続した短い区間の中身がそろうことでも、同じ形は出うる。
-- (3) 列 A と列 C の比べは、記号の作り・当てはめ・評価を含む手順の全体の差である。学習と評価のどちらが効いたかは分けない（判断 5）。
+- 句 (1)「平滑を外した記号（S13 の u）で」／ "in unsmoothed symbols"。この試験の記号はすべて u から作る。主の記号化（平滑あり）へは広げない。新しい節の、この試験を述べる最初の段落に「平滑した主の記号化では確かめていない」／ "this was not checked in the smoothed symbols of the main analysis" も入れる。
+- 句 (2)「歩み（窓の重なり・予測の先の長さ・同じ記号の数で覆う時間の長さ。この試験は分けない）」／ "with the step (window overlap, prediction horizon and time covered by the same number of symbols, not separated)"。短い形「歩みの成分は分けない」／ "with the step's components not separated"。列 A（歩み s）と列 C（歩み 1 の連続した区間）は、同じ記号の数で、この 3 つが同時に違う。この試験は 3 つを分けない（窓の長さの列も、散らした短い束の列も作らない・判断 4・6）。「重なりが効いた」「重なりが従属を生む」と書かない。打鍵そのものが 1 秒先では続き 30 秒先では続かないことでも、連続した短い区間の中身がそろうことでも、同じ形は出うる。
+- 句 (3)「記号の数はそろえたが独立な情報はそろわない」／ "the same number of symbols did not carry the same independent information"。列 C は歩み 1 の連続した区間なので、続く記号はほぼ写しで、独立に近い観測は列 A より少ない。列 C30 は約 22 行（約 22 秒）で、1 つの窓（30 秒）より短い。φ ≈ 0 は「記号の数だけが効く」だけでなく、「列 C の短い区間からは本人の当てはめが学べない」でも出る。
+- 句 (4)「手順の全体の差」: 列 A と列 C の比べは、記号の作り・当てはめ・評価を含む手順の全体の差である。学習と評価のどちらが効いたかは分けない（判断 5）。限界に書き、本文の句には入れない。
+
+句の置き方:
+
+- 列 A と列 C の比べを述べる文（新しい節の結果の文・Discussion の置き換えの文・main.tex 223 行の差し替えの文・貢献の句）には、句 (1)・(2)（または (2) の短い形）・(3) を、その文そのものに入れる。下の英文はすべてそうしてある。
+- 列 A と列 C の比べを述べない差し込み（main.tex 136 行・337 行への句・勧め (1) の境の文の列 A の部分）には句 (1) だけを入れる。境の文は句 (2) の代わりに固定の括弧「（記号の数も歩みとともに減る）」を持つ。
+- 新しい節の最初の段落は S12 と S13 の結論（平滑した主の記号化を含む）だけにし、この試験の句は次の段落の最初の文から入れる。
 
 ほかの限り:
-- 列 C は比べを作るための作りで、使う場面（新しいセッションの全体を予測する）の推定ではない。勧め (1) の境は列 A だけで述べ、列 C の句は「記号の数をそろえた比べでは」と限る。英訳では「列 C」の語を使わず「the same number of symbols from a contiguous stretch at the 1-second step」と書く。
+
+- 列 C は比べを作るための作りで、使う場面（新しいセッションの全体を予測する）の推定ではない。勧め (1) の境は列 A だけで述べ、列 C の句は「記号の数をそろえた比べでは」と限る。英訳で「列 C」の語を使わず "the same number of symbols from a contiguous stretch at the 1-second step" と書く。
 - 「構造を ar3 に固定した比べ」は、論文 3 の主の強い比べ（構造と縮みを他人で選ぶジョイント）とは違う。この語を「強い比べ」と略さない。
-- 型の名と文に「仕組みと合う」「仕組みを測った」「仕組みが確かめられた」と書かない。型 1 は「記号の数をそろえても差が残る形」、型 2・3 は「その予測を支えない形」と書く。読みの規則が仕組みを当てられるかは、合成のデータで確かめていない（判断 4）。
-- 中間の歩み（5・10・15）の並びには語を付けない。図で記述するだけで、文に「歩みが短いほど」のような勾配を書かない。例外は勧め (1) の境の文（下）だけで、それは格子の歩みごとの符号の分類を述べる。
+- 型の名と文に「仕組みと合う」「仕組みを測った」「仕組みが確かめられた」と書かない。型 1 は「記号の数をそろえても差が残る形」、型 2・3 は「その予測を支えない形」と書き、支える側と支えない側の範囲をそろえる（どちらも「この比べでは」に限る）。読みの規則が仕組みを当てられるかは、合成のデータで確かめていない（判断 4）。新しい節に "The reading rules were not checked on synthetic data." を入れる。
+- 中間の歩み（5・10・15）の並びには語を付けない。図で記述するだけで、文に「歩みが短いほど」のような勾配を書かない。例外は 2 つで、どちらも格子の歩みごとの符号を数えるだけである: 勧め (1) の境の文と、型 1 の条件「4 つの s のうち 3 つ以上で stay_G(s) > 0」。
 - 量は 1 記号あたりの対数尤度の差に固定する。予測の先が違う列の差を同じ尺度で引くので、S13 の「大きさを比べない」（notes の「読まないこと」）を、この試験の φ と stay の比べの範囲でだけ外す。記録の 1 秒あたりの値は出さない。
 - 2 つのセル（k = 5・15）は同じ 17 人で学習のセッションも重なるので、独立の再現ではない。「両セルで」を再現の意味に使わない。
+- 境の文と C2a の文は中央値の符号で書く。「中央値で」／ "the median" を入れ、良い側の割合を添える（本文の "for every writer" と粒度を分ける）。
 - 1 人抜きと区間は、固定した書き手ごとの得点の集約の感度で、選びと当てはめを繰り返した頑健さでも、母集団の不確かさでもない。
 - この試験は、既知の端（S13）に条件づけた追加の分析で、独立の確かめではない（独立の確かめには取り置いた 30% の書き手が要る・研究者は選んでいない）。
-- 仮説の文: 仕組みの推測を残すときは、「〜と推測したが、確かめていない」か「〜と推測したが、この試験は支えなかった」の形でだけ書く。
+- 仮説の文: 仕組みの推測を残すときは、「〜と推測したが、確かめていない」か「〜と推測したが、この比べは支えなかった」の形でだけ書く。
 - 結果を CS1・ほかの記号化・ほかの分野へ広げない。Uto2020 の作り（30 秒の枠・10 秒の歩み）は歩み 10 に当たるが、「Uto2020 の記号化でも成り立つ」と書かない。
 
 ## 結果を見る前に知っていること（開示）
@@ -44,16 +50,19 @@
 | G = 本人 hmm3 − 共有 hmm3 | 0.140 / 0.155 | 0.043 / 0.096 |
 | C2a = 本人 hmm3 − r1 | −0.558 / −0.566 | +0.298 / +0.140 |
 | C2b = ジョイント − r1 | 0.049 / 0.012 | 0.351 / 0.140 |
-| ジョイントの残り（ジョイント − 同じ構造の共有） | 5.8e-4 / 8.0e-4 | ジョイントが全員 hmm3 を選ぶので G と同じ（導ける） |
+| ジョイントの残り（ジョイント − 同じ構造の共有） | 5.8e-4 / 8.0e-4（補足 S13） | ジョイントが全員 hmm3 を選ぶので G と同じ（導ける） |
 | r1 − 共有 hmm3（= G − C2a） | 約 +0.70 / +0.72（導ける） | 約 −0.26 / −0.04（導ける） |
 | ジョイントで選ばれた構造 | ar3 が 16 / 13 人（残りは ar2） | hmm3 が全員 |
 | 共有 hmm3 の擬似残差の遅れ 1 の自己相関（x / y の軸・k = 5 と 15 をまとめた値） | 0.315 / 0.525 | 0.037 / 0.012 |
 | 本人 hmm3（τ 他人）の同じ量 | 共有と同じ程度（u の範囲 0.24〜0.63） | 未見 |
 
+- k = 1 の値（G は u で 0.087・n で 0.0008、C2a も）も見ている（S13 の notes の結果の節）。
 - u の共有 hmm3 の遅れ 10 の自己相関（0.146〜0.457）も見ている。補足 S12（構造の埋め合わせの確かめ）の結果も見ている。
+- CoAuthor の分析の単位は 875 で行は 588,227（S13 の notes の門の表）なので、1 セッションは平均約 672 行で、列 C30・A30 は 1 系列あたり約 22 行と見込める。
 - 共有の構造の足りなさ D_s と、共有 hmm3 の残差の自己相関 ρ_h（下の D4）は、列 C（どの歩みでも 1 秒先）と列 A の比べで「列 C の側で大きい」になることが、作りと既知の値から見込める。D_s と ρ_h は型を決めず、作りの確かめとして扱う。
-- 歩み 1 ではジョイントが ar3 を 16 / 13 人に選び、その書き手ではジョイントの残りが R_ar3（本人 ar3 − 共有 ar3）にほぼ重なるので、R_ar3 の列 A1 の値は 1e-3 程度以下と導ける。歩み 30 の列の学習の記号は 1 セッションあたり約 100 で、ar3（2,033 の母数）の本人のデータの重み N / (N + τ) は τ = 10,000 でも数 %〜十数 % と見込める。R_ar3 は型を決めず記述にとどめる（判断 7）。R_ar3 の値そのものと共有 ar1 − 共有 hmm3 の値は、S13 の summary から導けるが、条件を書いた者は見ていない。
+- 歩み 1 ではジョイントが ar3 を 16 / 13 人に選び、その書き手ではジョイントの残りが R_ar3（本人 ar3 − 共有 ar3）にほぼ重なるので、R_ar3 の列 A1 の値は 1e-3 程度以下と導ける。歩み 30 の列では学習の記号が 1 セッションあたり約 22 で、ar3（2,033 の母数）の本人のデータの重み N / (N + τ) は小さくなりうると見込める。R_ar3 は型を決めず記述にとどめる（判断 7）。R_ar3 の値そのものと共有 ar1 − 共有 hmm3 の値は、S13 の summary から導けるが、条件を書いた者は見ていない。
 - 区切りを G の単位に直すと、φ(30) ≥ 1/2 は stay_G(30) が k = 5 で約 0.049、k = 15 で約 0.030 以上（開示の中央値から粗く計算した目安・実際の判定は対応のある差で取る）。
+- 勧め (1) の境の端（歩み 1 で C2a が負・歩み 30 で正）は既知で、境を決めるのは中間の歩みだけである。
 - 列 A の中間の歩み（5・10・15）・列 C と列 C′（下）のすべて・列 B（下）は未見である。主の読みは、既知の列 A の端と、未見の列 C の値を組み合わせる。
 
 ## D1 データ（変える所）
@@ -99,7 +108,7 @@
 
 ## D4 量（書き手ごと・1 記号あたりの対数尤度の差）
 
-列どうしの比べは、同じ書き手の対応のある差の中央値で取る。φ と stay と shrink は、そのセルで列 A1・A30・C30（と使う s の列 A・列 C）のすべてに値のある書き手だけで取り、人数 m を出す。
+書き手の集合: 各セル（k = 5・15）で、列 A1・A5・A10・A15・A30・C5・C10・C15・C30 のすべてに G の値のある書き手を共通の集合とし、φ・stay・shrink・C2a の比べはこの集合で取る（人数 m を出す）。M・D_s・ρ_h は k に依らないので、列 A と列 C のすべてに値のある書き手の集合で取る。m が 12 未満なら、その量は「欠けがある」とする。列どうしの比べは、同じ書き手の対応のある差の中央値で取る。
 
 主の量（型を決める）:
 
@@ -107,41 +116,43 @@
 
 主の量（型を決めない・勧め (1) の境）:
 
-- C2a = 本人 hmm3（τ 他人）− r1。
+- C2a = 本人 hmm3（τ 他人）− r1。と、同じ歩みの r1 − 共有 hmm3。
 
 作りの確かめの量（型の前に当てる・見込みどおりかを書く）:
 
-- M: パネルの書き手の評価の単位の記号で、系列（部分系列）の中の隣り合う組だけから数えた遅れ 1 の相互情報量（Miller–Madow の補正: (使われた組の数 − 使われた左の記号の数 − 使われた右の記号の数 + 1) / (2 · 組の数) を引く）。M_shuf は、同じ記号を各系列の中で並べ替えた（乱数 [SEED + 61, c, 書き手の通し番号]）同じ量で、セッションの混ぜ合わせと表の疎さから出る分を表す。判定には M − M_shuf を使う。書き手ごとに求め中央値を取る。評価の単位は k に依らないので、列ごとに 1 つ。組が 0 か値が有限でない書き手はその列で欠けとする。組の数・使われたセルの数・plug-in の値を並べる。
+- M: パネルの書き手の評価の単位の記号で、系列（部分系列）の中の隣り合う組だけから数えた遅れ 1 の相互情報量（Miller–Madow の補正: (使われた組の数 − 使われた左の記号の数 − 使われた右の記号の数 + 1) / (2 · 組の数) を引く）。M_shuf は、同じ記号を各系列の中で並べ替えた同じ量の、20 回の並べ替え（乱数 [SEED + 61, c, 書き手の通し番号, r]・r = 0〜19）の平均で、セッションの混ぜ合わせと表の疎さから出る分を表す。判定には M − M_shuf を使い、20 回の M_shuf の標準偏差も並べる。書き手ごとに求め中央値を取る。組が 0 か値が有限でない書き手はその列で欠けとする。組の数・使われたセルの数・plug-in の値を並べる。
 - D_s（共有の構造の足りなさ）= 共有 ar1 − 共有 hmm3（どちらも w を除く共有を w の評価の単位で採点・本人のデータを含まない）。列ごとに 1 つ。
 - ρ_h: 共有 hmm3 の擬似残差の遅れ 1 の自己相関（S13 の D4 と同じ作り）。x 軸と y 軸を別々に、書き手ごとに求め中央値を取る。有効な組の割合を並べる。列ごとに 1 つ。
 
 記述の量（値を並べる・型に使わない）:
 
 - R_ar3 = 本人 ar3（τ 他人）− 共有 ar3 と、τ = 10,000 の固定の行の同じ量。列 A1・A30・C30 の値と、stay_R(30) = 中央値_w(R_ar3,C30 − R_ar3,A30)。
-- 構造（hmm3・ar3）・列ごとの、選ばれた τ と τ = 10,000 でのデータの重み N / (N + τ) の中央値（N は学習の記号の数の中央値）。
-- ジョイントの残りと、ジョイントで選ばれた構造の人数。r1 − 共有 hmm3。C2b。
+- 構造（hmm3・ar3）・列・セルごとの、選ばれた τ と τ = 10,000 でのデータの重み N / (N + τ) の中央値（N は学習の記号の数の中央値）。
+- ジョイントの残りと、ジョイントで選ばれた構造の人数。C2b。
 - 本人 hmm3 の ρ_h と、本人 hmm3 と共有 hmm3 の ρ_h の差（軸ごと・列 A1 と列 C30）。
 - 副の採点: 各系列（部分系列）の最初の記号を除いた差（G・C2a）。
 - τ = 10,000 の固定の行の G。選ばれた τ の人数。
 - 列 C の区間の秒の長さの中央値（列ごと）。
+- セルごとの G_C30 > G_A30 の書き手の数と、G_A1 > G_A30 の書き手の数（どちらも / m）。
+- 列ごとの、900 記号の切れ端が掛かった系列の数。
 - 区間: stay_G(30) の、書き手の値を固定した百分位ブートストラップ（2,000 回・乱数 [SEED + 4, c, s]）。固定した得点の集約の感度。
 - 語の揺れ: G の語を、書き手を 1 人ずつ抜いた m 通りで当て直し、同じ語が出た数。固定した得点の集約の感度。
 
 ## D5 読みの形（結果を見る前に決めた・閾値と検定は置かない）
 
-1/2・1/4・1.5・「3 つ以上」・ceil(12m/17) は言い方の区切りで、検定ではない。
+1/2・1/4・1.5・「3 つ以上」・12・ceil(12m/17)・30 秒は言い方の区切りで、検定ではない。
 
 ### G の語（主・セルごと）
 
-各セル（k = 5・15）で、s ∈ {5, 10, 15, 30} について、同じ書き手の対応のある差の中央値で次を取る。
+各セル（k = 5・15）で、共通の書き手の集合の上で、s ∈ {5, 10, 15, 30} について次を取る。
 
 - shrink_G(s) = 中央値_w(G_A1 − G_As)（列 A の歩み 1 から歩み s への縮み）
 - stay_G(s) = 中央値_w(G_Cs − G_As)（記号の数をそろえた歩み 1 の区間との差）
 - φ(s) = stay_G(s) / shrink_G(s)（shrink_G(s) > 0 のときだけ）
 
-φ は 2 つの中央値の差の比である。歩み（言い方の限りの (2) の 3 つ）だけが効けば φ ≈ 1、記号の数だけが効けば φ ≈ 0 になるが、書き手ごとの分解・寄与の割合・書き手の順位ではないので、「割合」「寄与」「越える」と書かない。判定の順（最初に当たった語を採る）:
+φ は 2 つの中央値の差の比である。歩み（句 (2) の 3 つ）だけが効けば φ ≈ 1、記号の数（ただし句 (3) のとおり独立な情報はそろわない）だけが効けば φ ≈ 0 になるが、書き手ごとの分解・寄与の割合・書き手の順位ではないので、「割合」「寄与」「越える」と書かない。分母に下限は置かない（下限は結果を見る前に決めても別の区切りを 1 つ足すことになり、k = 15 で分母が小さく比が揺れやすいことは限界と 1 人抜きの句で示す）。判定の順（最初に当たった語を採る）:
 
-1. 列 A1・A30・C30 のどれかで値が欠ける → 「欠けがある」。
+1. m < 12 → 「欠けがある」。
 2. shrink_G(30) ≤ 0 → 「列 A で縮まない」。
 3. φ(30) > 1.5 → 「比が 1.5 を超える」。
 4. 「列 C では縮みが小さい」: φ(30) ≥ 1/2、かつ 4 つの s のうち 3 つ以上で stay_G(s) > 0。
@@ -155,61 +166,85 @@
 
 - (i) 列 A の M − M_shuf の中央値が、歩み 1 で正で、歩み 1 から 30 へ下がる（値(1) > 0、値(1) − 値(30) ≥ 値(1) / 2、かつ隣の 4 組のうち 3 つ以上で値(短い歩み) ≥ 値(長い歩み)）。
 - (ii) 4 つの s のうち 3 つ以上で、列 C の M − M_shuf の中央値が正で、かつ列 A より大きい（組の数は同じ）。
-- (i) か (ii) が成り立たなければ、型を付けない（型「作りの確かめが外れた」）。
-- D_s と ρ_h（x・y の両方）が、4 つの s のうち 3 つ以上で列 C − 列 A > 0、かつ s = 30 で > 0 なら「見込みどおり」、そうでなければ「見込みと違った」と書く。型は変えないが、「見込みと違った」なら型の文の補足に「（共有の構造の足りなさか残差の自己相関が見込みと違った）」と添える。
+- どれかの列の M が「欠けがある」、または (i) か (ii) が成り立たなければ、型を付けない（型「外れ」）。
+- D_s と ρ_h（x・y の両方）が、4 つの s のうち 3 つ以上で列 C − 列 A > 0、かつ s = 30 で > 0 なら「見込みどおり」、そうでなければ「見込みと違った」と書く。型は変えないが、「見込みと違った」なら補足の注に「共有の構造の足りなさか残差の自己相関が見込みと違った」と書く。
 
 ### 型（決定表）
 
 | 作りの確かめ | G の語 | 型 | 名 |
 |---|---|---|---|
-| 通る | 列 C では縮みが小さい | 1 | 記号の数をそろえても差が残る形 |
-| 通る | 列 C でも同じ程度に縮む | 2 | 記号の数をそろえると同じ程度に縮み、差が残るという予測を支えない形 |
-| 通る | 列 C でかえって大きく縮む | 3 | 記号の数をそろえるとかえって大きく縮み、差が残るという予測を支えない形 |
+| 通る | 列 C では縮みが小さい | 1 | この比べでは、記号の数をそろえても差が残る形 |
+| 通る | 列 C でも同じ程度に縮む | 2 | この比べでは、記号の数をそろえると同じ程度に縮み、差が残るという予測を支えない形 |
+| 通る | 列 C でかえって大きく縮む | 3 | この比べでは、記号の数をそろえるとかえって大きく縮み、差が残るという予測を支えない形 |
 | 通る | 比が 1.5 を超える・形が定まらない・割れる・欠けがある・列 A で縮まない | なし | 形が定まらない |
 | 外れる | どれでも | 外れ | 作りの確かめが外れた |
 
-型の文に添えるもの（どの型でも・型は変えない）:
+### 本文の文（英文で固定・<> は数を入れる所・k = 5 と 15 の値は「k = 5 / k = 15」の順で並べる）
 
-- 本文（結果の文の直後）:
-  - 「構造を ar3 に固定した比べは、歩み 30 の列の記号の数では本人 ar3 のデータの重みが <重み>（τ = 10,000 で <重み>）と小さく、従属を運べる構造の共有を相手にすると差が消えるかは、この試験では判定できない（値は補足 S<n>）」。<重み> は列 C30 と列 A30 の ar3 の重みの中央値のうち小さい方（2 セルの範囲）。
-  - 型 1 のときだけ: 「本人 hmm3 の残差の遅れ 1 の自己相関は歩み 1 で共有と同じ程度で（本人 − 共有の中央値: 列 A1 で x <値>・y <値>、列 C30 で x <値>・y <値>、k = 5 と 15 の範囲）、本人の当てはめが共有の運べない従属を運ぶかは支えられていない」。列 C30 の差の符号が列 A1 と逆なら「（列 C30 では向きが逆）」と添える。
-  - 「（1 人抜きで中央値だけを取り直して同じ語 <n>/<m>）」。<n> が ceil(12m/17) 未満なら「（1 人抜きで揺れる）」も添える。
-  - stay_G(30) の区間が 0 をまたげば「（区間が 0 をまたぐ）」。
-- 補足（同じ節の表の注）:
-  - 列 C′1 か列 C′3 で G の語が列 C と違えば「区間の位置で語が変わる: C′1 <語>・C′3 <語>」。
-  - τ = 10,000 の固定の行で G の語が違えば「τ の選びで語が変わる: <語>」。
-  - 副の採点（頭を除く）で G の語が違えば「系列の頭で語が変わる: <語>」。
-  - 作りの確かめの「見込みと違った」の句。
+新しい節の、この試験を述べる最初の段落の最初の文（どの型でも）: "In unsmoothed symbols, we compared the same number of symbols taken either at a coarser step or from a contiguous stretch at the 1-second step, with the step (window overlap, prediction horizon and time covered by the same number of symbols, not separated); this was not checked in the smoothed symbols of the main analysis, and the reading rules were not checked on synthetic data."
+
+結果の文（新しい節）:
+
+- 型 1: "In unsmoothed symbols, against the shrinkage of the gain with non-overlapping windows (median <shrink_G(30)>), the same number of symbols from a contiguous stretch at the 1-second step kept a median difference of <stay_G(30)> (ratio <φ(30)>), with the step's components not separated; the same number of symbols did not carry the same independent information."
+- 型 2: "In unsmoothed symbols, the same number of symbols from a contiguous stretch at the 1-second step shrank the gain about as much as non-overlapping windows did (ratio <φ(30)>), with the step's components not separated; the same number of symbols did not carry the same independent information, and a per-person fit may learn little from such a short stretch."
+- 型 3: "In unsmoothed symbols, the same number of symbols from a contiguous stretch at the 1-second step shrank the gain even more than non-overlapping windows did (ratio <φ(30)>), with the step's components not separated; the same number of symbols did not carry the same independent information, and a per-person fit may learn little from such a short stretch."
+- 型なし: "In unsmoothed symbols, the comparison at an equal number of symbols, with the step's components not separated, did not settle (<語の英訳>)."
+- 外れ: "In unsmoothed symbols, changing the step (window overlap, prediction horizon and time covered by the same number of symbols, not separated) did not change the dependence of consecutive symbols as intended (lag-1 mutual information minus that of shuffled symbols), so no type is assigned (values in Supplement S<n>)."
+
+結果の文の直後に付ける句（本文）:
+
+- どの型でも（外れを除く）: "With the structure fixed at the three-state AR-HMM, the per-person data carried a median weight of <w_A30> and <w_C30> in the 30-second columns with τ chosen on others (<w'_A30> and <w'_C30> at τ = 10,000; k = 5 / k = 15); this study does not judge whether the gap vanishes against a shared structure that can carry the dependence (values in Supplement S<n>)."
+- 型 1 のときだけ: "The lag-1 autocorrelation of the per-person HMM's residuals was about that of the shared HMM at the 1-second step (per-person minus shared, median: x <値>, y <値>; at the 30-second contiguous stretch x <値>, y <値>), so it is not supported that the per-person fit carries the dependence that the shared model misses." 列 C30 の差の符号が列 A1 と逆なら "(the sign is reversed at the 30-second contiguous stretch)" を足す。
+- どの型でも（外れを除く）: "(Same word in <n> of <m> leave-one-writer-out medians; the scores were not refitted.)" <n> が ceil(12m/17) 未満なら "(The word is unstable when one writer is left out.)" を足す。
+- stay_G(30) の区間が 0 をまたげば "(The interval spans zero.)"。
+- 副の採点（頭を除く）で G の語が違えば "(Without the first symbol of each sequence the word is <語の英訳>.)"。
+- 列 C30 の区間の秒の長さの中央値が 30 秒より短ければ "(The contiguous stretch at the 30-second step lasts <秒> s, shorter than one window.)"。
+
+補足の注（同じ節の表の注）:
+
+- 列 C′1 か列 C′3 で G の語が列 C と違えば「区間の位置で語が変わる: C′1 <語>・C′3 <語>」。
+- τ = 10,000 の固定の行で G の語が違えば「τ の選びで語が変わる: <語>」。
+- 作りの確かめの「見込みと違った」の注。
+
+Discussion の第 1 段落の置き換え: "The weak comparison is likely not specific to keystrokes: features computed over overlapping windows make consecutive inputs dependent, and a shared model whose structure misses that dependence makes a per-person fit look good. We have not checked this in other domains." の 2 文を、次の 2 文に置き換える。
+
+- 型 1: "In unsmoothed symbols, a gap in the same-structure gain remained at an equal number of symbols when the step differed (window overlap, prediction horizon and time covered by the same number of symbols, not separated), although the same number of symbols did not carry the same independent information. We have not checked this pattern in other domains."
+- 型 2: "In unsmoothed symbols, at an equal number of symbols, the same-structure gain shrank about as much at the 1-second step as with non-overlapping windows, with the step's components not separated and the same number of symbols not carrying the same independent information. We had guessed that overlapping windows make inputs dependent and that a shared model whose structure misses that dependence makes a per-person fit look good; in this comparison, the prediction that a gap remains at an equal number of symbols was not supported."
+- 型 3: "In unsmoothed symbols, at an equal number of symbols, the same-structure gain shrank even more at the 1-second step than with non-overlapping windows, with the step's components not separated and the same number of symbols not carrying the same independent information. We had guessed that overlapping windows make inputs dependent and that a shared model whose structure misses that dependence makes a per-person fit look good; in this comparison, the prediction that a gap remains at an equal number of symbols was not supported."
+- 型なし: "In unsmoothed symbols, the comparison at an equal number of symbols, with the step's components not separated, did not settle. We had guessed that overlapping windows make inputs dependent and that a shared model whose structure misses that dependence makes a per-person fit look good, and have not checked it."
+- 外れ: "In unsmoothed symbols, changing the step did not change the dependence of consecutive symbols as intended, so the comparison at an equal number of symbols was not read. We had guessed that overlapping windows make inputs dependent and that a shared model whose structure misses that dependence makes a per-person fit look good, and have not checked it."
+
+main.tex の結果の文（"…with non-overlapping windows, which give about one-thirtieth of the symbols, the \hmmthree{} beats the own chain in CoAuthor and its per-person fit beats the shared \hmmthree{} at $k=5$ and 15, which may also reflect the smaller amount of data (\Sref{13}).")は、", which may also reflect the smaller amount of data" を削り、"(\Sref{13})." の後に次の 1 文を足す（C2a の向きはこの文で述べず、勧め (1) の境の文で述べる）。
+
+- 型 1: "In unsmoothed symbols, with the step's components not separated, the per-person gain over the shared HMM shrank less when the same number of symbols came from a contiguous stretch at the 1-second step, so the smaller number of symbols does not account for all of that shrinkage, although it did not carry the same independent information (Section X)."
+- 型 2: "In unsmoothed symbols, with the step's components not separated, the per-person gain over the shared HMM shrank about as much when the same number of symbols came from a contiguous stretch at the 1-second step, which did not carry the same independent information (Section X)."
+- 型 3: "In unsmoothed symbols, with the step's components not separated, the per-person gain over the shared HMM shrank even more when the same number of symbols came from a contiguous stretch at the 1-second step, which did not carry the same independent information (Section X)."
+- 型なし・外れ: "In unsmoothed symbols, a comparison of the per-person gain at an equal number of symbols, with the step's components not separated, did not settle whether the smaller number of symbols accounts for that shrinkage (Section X)."
+
+main.tex の記号化の段落の "our results concern this overlapping, smoothed form" の後に、どの型でも ", except the comparison of steps in Section X, which uses unsmoothed symbols" を足す。
+
+main.tex の Discussion の "Relation to earlier findings" の段落の "so whether it holds for symbolizations like theirs is open" の後に、どの型でも "; a 10-second step was among those we varied in unsmoothed symbols (Section X), but other parts of their symbolization differ" を足す。
+
+勧め (1)（main.tex の "(1) compare per-person sequence models with at least the person's own first-order Markov chain …"）の文の後に、どの型でも境の文（下）を足す。
+
+貢献 (1)（main.tex の "A finding: …"・平滑した主の記号化の発見）: どの型でも発見の文は書き換えず、文の末尾（"(Sections~\ref{sec:res-hmm} and~\ref{sec:res-protocol}; …)" の後）に次の 1 句だけ足す。
+
+- 型 1: "An added comparison in unsmoothed symbols, conditioned on the known ends and with the step's components not separated, found that a gap remained at an equal number of symbols, which did not carry the same independent information (Section X)."
+- 型 2・3: "In an added comparison in unsmoothed symbols, conditioned on the known ends and with the step's components not separated, the prediction that a gap remains at an equal number of symbols was not supported; the same number of symbols did not carry the same independent information (Section X)."
+- 型なし・外れ: "An added comparison in unsmoothed symbols, with the step's components not separated, did not settle this (Section X)."
+
+S12 と S13 の結論（数 1 つと読み 1 文）は、新しい節の最初の段落（この試験の句の前）に上げる。足す分は本文の他の所を移す・まとめるで埋め合わせる。どの型でも同じ基本の図 1 つを載せる（横軸 = 歩み。上の枠に G の中央値を列 A は実線・列 C は破線・列 C′ は細線で。下の小さな枠に D_s・ρ_h・M − M_shuf と、R_ar3（灰色の線・型を決めない量と注に書く）。2 セル）。
 
 ### 勧め (1) の境（列 A の C2a）
 
-- 歩みごと（s ∈ {1, 5, 10, 15, 30}）に、2 セルの C2a の中央値の符号を「両方正」「両方正でない」「混ざる」「欠け」の 4 つのどれかに分ける。
-- 境の歩み s* = 「両方正」の歩みのうち最も短いもので、かつ s* 以上の格子の歩みがすべて「両方正」、s* より短い格子の歩みがすべて「両方正でない」か「混ざる」であるもの。s* = 1 は起きない（歩み 1 は既知で負）が、起きたら境の文を書かず符号を並べる。
-- s* があれば、文「平滑を外した記号（S13 の u）で、同じ記録の時間から <s*> 秒以上の格子の歩みで記号を作ると（記号の数も歩みとともに減る）、本人 hmm3 は本人の連鎖に 2 セルとも勝った。それより短い格子の歩みでは、2 セルともには勝たなかった」。続けて、列 C の s* の C2a が「両方正」なら「記号の数をそろえた比べでは、歩み 1 の区間でも勝った」、「両方正でない」なら「記号の数をそろえた比べでは、歩み 1 の区間では勝たなかった」、「混ざる」か「欠け」なら「記号の数をそろえた比べでは割れた」。
-- s* が無ければ、歩みごとの分類を並べる。
+- 歩みごと（s ∈ {1, 5, 10, 15, 30}）に、2 セルの C2a の中央値の符号を「両方正」「両方正でない」「混ざる」「欠け」の 4 つのどれかに分ける。同じ歩みの r1 − 共有 hmm3 の中央値の符号も同じ 4 つに分ける。
+- 境の歩み s* = 「両方正」の歩みのうち最も短いもので、かつ s* 以上の格子の歩みがすべて「両方正」、s* より短い格子の歩みがすべて「両方正でない」か「混ざる」であるもの。s* = 1 は起きない（歩み 1 は既知で負）が、起きたら境の文を書かず分類を並べる。
+- s* があれば、本文の英文: "In unsmoothed symbols, when symbols were made from the same recording time at a grid step of <s*> s or longer (fewer symbols at longer steps), the median per-person HMM beat the person's own first-order chain in both cells (share of writers favouring the per-person HMM: <p>, k = 5 / k = 15); at shorter grid steps it did not in both cells, and both ends of this grid were known before the check." 続けて、s* の r1 − 共有 hmm3 の分類が「両方正でない」なら "At that step the median own chain also lost to the shared HMM in both cells."、「両方正」なら "At that step the median own chain still beat the shared HMM in both cells."、「混ざる」か「欠け」なら "At that step the own chain against the shared HMM was split between cells."。さらに列 C の s* の C2a の分類が「両方正」なら "In the comparison at an equal number of symbols from a contiguous stretch at the 1-second step, with the step's components not separated, it also beat the own chain."、「両方正でない」なら同じ前置きで "it did not beat the own chain."、「混ざる」か「欠け」なら同じ前置きで "the result was split."。
+- s* が無ければ、歩みごとの分類を補足に並べ、本文には "In unsmoothed symbols, no grid step separated the median per-person HMM's wins over the own chain (Supplement S<n>)." を足す。
 
 ### 構造の選び（記述）
 
-ジョイントで ar の構造を選ばれた書き手の割合を列ごとに表に並べるだけで、文の語を付けない。Pohle 2017 [V508] は、モデルの硬さで運べない構造を余分な状態が埋め合わせ、状態の数が多く選ばれすぎると述べた。ここで ar が選ばれるのは指定が 1 次の従属に合う向きで、その埋め合わせとは別の現象である。G5 との関係は検定しない。
-
-### 論文への持ち込みの書き方（結果を見る前に決めた）
-
-- どの型でも（型なし・外れを含む）: 本文の結果に節を 1 つ置き、同じ基本の図 1 つを載せる（横軸 = 歩み。上の枠に G の中央値を列 A は実線・列 C は破線・列 C′ は細線で。下の小さな枠に D_s・ρ_h・M − M_shuf と、R_ar3（灰色の線・型を決めない量と注に書く）。2 セル）。S12 と S13 の結論（数 1 つと読み 1 文）を、この節の最初の段落に上げる。足す分は本文の他の所を移す・まとめるで埋め合わせる。
-- 置き換える文: Discussion の第 1 段落の "The weak comparison is likely not specific to keystrokes: features computed over overlapping windows make consecutive inputs dependent, and a shared model whose structure misses that dependence makes a per-person fit look good. We have not checked this in other domains." の 2 文を、下の型ごとの 2 文（英訳）に置き換える。
-
-| 型 | 結果の文（新しい節） | Discussion の置き換えの 2 文 |
-|---|---|---|
-| 1 | 「平滑を外した記号（S13 の u）で、重ならない窓での得の縮み（中央値 <shrink_G(30)>）に対して、記号の数をそろえた歩み 1 の区間との差は中央値 <stay_G(30)>（比 <φ(30)>）だった」 | 「平滑を外した記号（S13 の u）で記号の数をそろえても、歩み（窓の重なり・予測の先の長さ・同じ記号の数で覆う時間の長さ。分けていない）が違うと同じ構造どうしの比べの得に差が残った。この形をほかの分野では確かめていない」 |
-| 2 | 「平滑を外した記号（S13 の u）で、記号の数をそろえた歩み 1 の区間でも、得は重ならない窓と同じ程度まで縮んだ（比 <φ(30)>）」 | 「平滑を外した記号（S13 の u）で記号の数をそろえると、歩み 1 の区間でも同じ構造どうしの比べの得は同じ程度に縮んだ。重なる窓が従属を生み、弱い構造の共有が本人の当てはめを良く見せると推測したが、この試験は支えなかった」 |
-| 3 | 「平滑を外した記号（S13 の u）で、記号の数をそろえた歩み 1 の区間の方が、得はかえって大きく縮んだ（比 <φ(30)>）」 | 「平滑を外した記号（S13 の u）で記号の数をそろえると、歩み 1 の区間の方が同じ構造どうしの比べの得はかえって大きく縮んだ。重なる窓が従属を生み、弱い構造の共有が本人の当てはめを良く見せると推測したが、この試験は支えなかった」 |
-| なし | 「平滑を外した記号（S13 の u）で記号の数をそろえた比べでは、形が定まらなかった（<語>）」 | 「平滑を外した記号（S13 の u）で記号の数をそろえた比べでは、形が定まらなかった。重なる窓が従属を生み、弱い構造の共有が本人の当てはめを良く見せると推測したが、確かめていない」 |
-| 外れ | 「平滑を外した記号（S13 の u）で、歩み（窓の重なり・予測の先の長さ・同じ記号の数で覆う時間の長さ。分けていない）を変えても、続く記号の従属（並べ替えとの差で測った遅れ 1 の相互情報量）は意図どおりに変わらなかったので、型を付けない（値は補足 S<n>）」 | 型なしと同じ |
-
-- main.tex の結果の "which may also reflect the smaller amount of data"（S13 の向きの文の後半）は、型 1 で「which persisted at an equal number of symbols in unsmoothed symbols (Section X)」、型 2・3 で「which, in unsmoothed symbols, also appeared at an equal number of symbols from a contiguous stretch at the 1-second step (Section X)」、型なし・外れで「which a comparison at an equal number of symbols in unsmoothed symbols did not settle (Section X)」に替える（英訳の確定はこの意味で行う）。
-- main.tex の記号化の段落の "our results concern this overlapping, smoothed form" は、どの型でも残し、「except the comparison of steps in Section X, which uses unsmoothed symbols」と 1 句足す。
-- main.tex の Discussion の "Relation to earlier findings" の段落の "so whether it holds for symbolizations like theirs is open" は、どの型でも残し、「a 10-second step was among those we varied in unsmoothed symbols (Section X), but other parts of their symbolization differ」と 1 句足す。
-- 勧め (1)（main.tex の "(1) compare per-person sequence models with at least the person's own first-order Markov chain …"）: どの型でも上の境の文を 1 句（英訳）足す。列 C の句は「記号の数をそろえた比べでは」と限る。
-- 貢献 (1)（main.tex の "A finding: …"・平滑した主の記号化の発見）: どの型でも発見の文は書き換えない。末尾に 1 句だけ足す。型 1「an added comparison in unsmoothed symbols, conditioned on the known ends, found the gap to persist at an equal number of symbols (Section X)」、型 2・3「an added comparison in unsmoothed symbols, conditioned on the known ends, did not support the guess that the gap reflects the window construction (Section X)」、型なし・外れ「an added comparison in unsmoothed symbols did not settle the source of the gap (Section X)」。
+ジョイントで ar の構造を選ばれた書き手の割合を列ごとに表に並べるだけで、文の語を付けない。Pohle 2017 [V508] は、モデルの硬さで運べない構造を余分な状態が埋め合わせ、状態の数が多く選ばれすぎると述べた。ここで ar が選ばれるのは指定が 1 次の従属に合う向きで、その埋め合わせとは別の現象だと推測したが、確かめていない。G5 との関係は検定しない。
 
 ## D6 計算の量と場所
 
@@ -238,39 +273,40 @@ S13 の試験の selftest と、それが引き継ぐ tau-extend の対照は、
 | P-BLOCK | 列 C・C′ の系列ごとの行の数が列 A と一致し、行が連続し、始まりが D1 の式どおりで、系列をまたがない | m70: 列 C の始まりを 0 にする／m71: 行の数を列 A より 1 つ多くする |
 | P-PHASE | 列 B の位相が互いに行を共有せず、合わせて t − t0 ≥ 1,000 · s の行の全部になり、位相 0 が列 A と一致し、系列をまたがない | m63: 位相 r（r ≥ 1）の頭に t0 + 1,000 · r の行を入れる／m64: 系列をつないで位相を切る |
 | P-TIME | 系列の中に時刻の差が 1,000 ms でない所がある合成の入力で、読み込みが止まる | m76: 時刻の連続の検査を外す |
-| P-MI | 既知の 1 次マルコフの合成の列（26 記号）で、(a) 20,000 組で Miller–Madow の M が真の相互情報量（0.5 nats 以上）の ±3% 以内、(b) 約 100 組の短い系列を 20 本の書き手で、M − M_shuf の中央値が、独立の列では 0 の ±0.02 nats に、1 次マルコフの列では正に出る。系列の境目をまたぐ組を数えない。記号の分布が違う系列を混ぜた独立の列（系列の中は独立）で、M は正でも M − M_shuf は 0 の ±0.02 nats に落ちる | m65: 系列の境目をまたいで組を数える／m66: 周辺を全記号の頻度で取る／m77: M_shuf を系列をまたいで並べ替える |
+| P-MI | 既知の 1 次マルコフの合成の列（26 記号）で、(a) 20,000 組で Miller–Madow の M が真の相互情報量（0.5 nats 以上）の ±3% 以内、(b) 約 22 組の短い系列を 1 書き手あたり 30 本・20 書き手で、M − M_shuf（20 回の平均）の中央値が、独立の列では 0 の ±0.02 nats に、1 次マルコフの列では正に出る。系列の境目をまたぐ組を数えない。記号の分布が違う系列を混ぜた独立の列（系列の中は独立）で、M は正でも M − M_shuf は 0 の ±0.02 nats に落ちる | m65: 系列の境目をまたいで組を数える／m66: 周辺を全記号の頻度で取る／m77: M_shuf を系列をまたいで並べ替える／m80: M_shuf を 1 回の並べ替えにする |
 | P-DS | 合成の書き手で、D_s が「w を除く共有 ar1 − w を除く共有 hmm3」の評価の対数尤度の差にちょうど一致する（出力の葉から作った値と、npz から読み戻して採点した値が一致） | m72: 全員の共有（w を含む）を使う |
 | P-FIRST | 合成の書き手で、頭を除いた採点の対数尤度の和が、全記号の和から各系列の頭の記号の対数尤度を引いた値とちょうど一致し、記号の数が系列の数だけ少ない | m67: 頭の記号を除かずに分母だけ減らす |
-| P-PAIR | 列どうしの差が、同じ書き手の対応のある差の中央値で、φ では A1・A30・C30 のすべてに値のある書き手だけで取られる | m74: 中央値どうしの差にする |
+| P-PAIR | 列どうしの差が、同じ書き手の対応のある差の中央値で、共通の書き手の集合（D4）だけで取られる。共通の集合が 12 人未満なら「欠けがある」になる | m74: 中央値どうしの差にする／m81: 共通の集合を列ごとの集合にする |
 | P-SWAP | 列の読み込みを差し替えた駆動で、列 A1 の当てはめが、S13 の `fit.py` を u の列で直接回した結果と、合成の書き手 3 人で本人（全 τ）・共有・r1・診断までちょうど一致する | m68: 差し替えた読み込みで pflag を採らない |
-| P-READ | D5 の語の関数と決定表が、手で作った書き手の値の組で期待の語と型を返す。組には次を含む: 開示の端の値（k = 5 で G_A1 0.140・G_A30 0.043、k = 15 で 0.155・0.096）に「歩みだけが効く」（G_C30 = G_A1）を置いた組で G が「列 C では縮みが小さい」、「記号の数だけが効く」（G_C30 = G_A30）を置いた組で「列 C でも同じ程度に縮む」、G_C30 が G_A1 を大きく越える組で「比が 1.5 を超える」になること。作りの確かめで M − M_shuf が全部の列で負の組が「外れ」になること。ほかに、各語・φ の境（1.5・1/2・1/4・−1/4）・shrink ≤ 0・欠け・片方欠けの合わせ・2 セルの割れ・3 つ以上の境・決定表の 5 行・添えの句・1 人抜きの境 ceil(12m/17)（m = 17 と m = 15）・境の歩みの分類 4 つと単調でない並び（例 両方正でない・両方正・両方正でない・両方正・両方正）・型ごとの文と差し込みの句 | m69: 「3 つ以上」を「2 つ以上」にする／m75: φ の分母を shrink_G(30) から G_A1 にする／m79: 作りの確かめの正の条件を外す |
+| P-READ | D5 の語の関数と決定表と本文の英文の組み立てが、手で作った書き手の値の組で期待の語・型・英文を返す。組には次を含む: 開示の端の値（k = 5 で G_A1 0.140・G_A30 0.043、k = 15 で 0.155・0.096）に「歩みだけが効く」（G_C30 = G_A1）を置いた組で G が「列 C では縮みが小さい」、「記号の数だけが効く」（G_C30 = G_A30）を置いた組で「列 C でも同じ程度に縮む」、G_C30 が G_A1 を大きく越える組で「比が 1.5 を超える」になること。作りの確かめで M − M_shuf が全部の列で負の組が「外れ」になること。型 1 と列 C の C2a が「両方正でない」の組で、223 行の差し替えの文と境の文が互いに食い違わないこと（223 行の文が C2a に触れない）。ほかに、各語・φ の境（1.5・1/2・1/4・−1/4）・shrink ≤ 0・m < 12・片方欠けの合わせ・2 セルの割れ・3 つ以上の境・決定表の 5 行・本文の句の 6 つ・1 人抜きの境 ceil(12m/17)（m = 17 と m = 15）・境の歩みの分類 4 つと単調でない並び（例 両方正でない・両方正・両方正でない・両方正・両方正）・s* の r1 − 共有 hmm3 の分類 3 つ・全部の英文に句 (1)・(2)・(3) が規則どおり入っていること | m69: 「3 つ以上」を「2 つ以上」にする／m75: φ の分母を shrink_G(30) から G_A1 にする／m79: 作りの確かめの正の条件を外す／m82: 型 1 の結果の文から句 (3) を落とす |
 
 - 変異の門は S13 の試験と同じ（出力先を空にし、実行の識別子・`mutate` 欄・終了コード 3・名指しの対照の `passed = false`）。
 - P-MI の ±3%・±0.02 は配管の対照の通る条件で、実データの読みの区切りではない。
 
 ## V3 出力
 
-`results/summary.json`（列ごとの節: 尤度の差の集計・R_ar3・D_s・ρ_h・M と M_shuf・構造と τ の人数・データの重み・区間の秒の長さ・残差の集計・副の採点・対応のある差・φ・区間・語の揺れ）・`selftest.json`・`repro_check.json`・`rows_check.json`・`timing.json`・`provenance.json`・`tables.md`・`readings.json`（D5 の語と型と添えの句を機械で当てた結果）・図の元の CSV（中央値だけ）。集計値だけで、書き手・セッションの番号を書かない。
+`results/summary.json`（列ごとの節: 尤度の差の集計・R_ar3・D_s・ρ_h・M と M_shuf・構造と τ の人数・データの重み・区間の秒の長さ・書き手の数・切れ端の数・残差の集計・副の採点・対応のある差・φ・区間・語の揺れ）・`selftest.json`・`repro_check.json`・`rows_check.json`・`timing.json`・`provenance.json`・`tables.md`・`readings.json`（D5 の語と型と本文の英文を機械で組み立てた結果）・図の元の CSV（中央値だけ）。集計値だけで、書き手・セッションの番号を書かない。
 
 ## 限界（結果の前に書く）
 
-- 歩みは、窓の重なり・予測の先の長さ・同じ記号の数で覆う時間の長さを同時に変える（言い方の限りの (2)）。窓の長さを変えて歩みを固定する列と、歩み 1 の短い束を全体に散らす列は、次の試験の候補である（窓を変えると特徴の意味も変わる。休止の数などの基準値は 30 秒の窓のもの）。
-- 列 A と列 C の差は手順の全体の差で、学習と評価のどちらが効いたかは分けない。列 C は評価でもセッションの頭を外す。区間の位置は列 C′ の 2 版で感度を見るが、連続した区間と散った行の違いそのものは残る。列 C は使う場面の推定ではない。
-- 仕組みの後半（従属を運べる構造の共有を相手にすると差が消える）は、歩み 30 の列の記号の数では本人 ar3 のデータの重みが小さく、この試験では判定できない（R_ar3 は記述だけ・判断 7）。仕組みの環のうち「本人の当てはめが共有の運べない従属を運ぶ」は副の量で、歩み 1 では本人と共有の残差の自己相関が同じ程度と既に分かっている。
+- 歩みは、窓の重なり・予測の先の長さ・同じ記号の数で覆う時間の長さを同時に変える（句 (2)）。窓の長さを変えて歩みを固定する列と、歩み 1 の短い束を全体に散らす列は、次の試験の候補である（窓を変えると特徴の意味も変わる。休止の数などの基準値は 30 秒の窓のもの）。
+- 列 C は列 A と記号の数がそろうが、独立な情報はそろわない（句 (3)）。列 C30 は約 22 行で 1 つの窓より短い。φ ≈ 0 は、記号の数が効くことのほかに、列 C の短い区間からは本人の当てはめが学べないことでも出る。この試験はこの 2 つを分けない。
+- 列 A と列 C の差は手順の全体の差で、学習と評価のどちらが効いたかは分けない（句 (4)）。列 C は評価でもセッションの頭を外す。区間の位置は列 C′ の 2 版で感度を見るが、連続した区間と散った行の違いそのものは残る。列 C は使う場面の推定ではない。
+- 仕組みの後半（従属を運べる構造の共有を相手にすると差が消える）は、この試験では判定しない（R_ar3 は記述だけ・判断 7）。仕組みの環のうち「本人の当てはめが共有の運べない従属を運ぶ」は副の量で、歩み 1 では本人と共有の残差の自己相関が同じ程度と既に分かっている。
 - D_s と ρ_h の向きは作りと既知の値から見込めるので、型の支えに数えない。
-- φ は中央値の差の比で、書き手ごとの分解ではない。k = 15 では分母（約 0.06）が小さく、比が揺れやすい。
+- φ は中央値の差の比で、書き手ごとの分解ではない。k = 15 では分母（約 0.06）が小さく、比が揺れやすい（分母の下限は置かない）。
 - 2 つのセルは独立の再現ではない。1 人抜きと区間は固定した得点の集約の感度である。
-- この試験は既知の端に条件づけた追加の分析で、独立の確かめではない。
+- この試験は既知の端に条件づけた追加の分析で、独立の確かめではない。勧め (1) の境の端 2 つも既知である。
 - 列 B は記号の数をそろえるが情報はそろえず、学習の系列の頭の数と履歴の長さも変える。値は記述にとどめる。
-- 切れ端（900 記号）は s = 1 の長い系列にしか掛からない。
-- 区切り（1/2・1/4・1.5・3 つ以上・ceil(12m/17)）は既知の端を見てから置いた。φ の定義は、round 2 の査読で、開示の値から第 2 版の区切りでは k = 15 で歩みだけが効いても語が付かないと分かった後に置いた。
+- 切れ端（900 記号）は s = 1 の長い系列にしか掛からないと見込む（列ごとに掛かった系列の数を出し、s ≥ 2 で 0 でなければこの文を直す）。
+- 区切り（1/2・1/4・1.5・3 つ以上・12・ceil(12m/17)・30 秒）は既知の端を見てから置いた。φ の定義は、round 2 の査読で、開示の値から第 2 版の区切りでは k = 15 で歩みだけが効いても語が付かないと分かった後に置いた。
 - 読みの規則が仕組みを当てられるかを、書き手の差と従属を別々に置いた合成のデータで確かめていない（P-READ の手で作った組は規則の配管の確かめ）。
 - 作りの確かめ M − M_shuf はほぼ必ず通る。
 - 17 人の中央値で語が決まる（1 人抜きの一致の数を文に添える）。
 
 ## 計算の前に決めたことから外れるときの扱い
 
-S13 の試験と同じ。実データを見る前なら `decisions.md` に判断として書き、この文書の末尾に「条件の後の変更（実データを見る前）」として足す。凍結（attack-me を閉じた後の commit）の後は、歩み・列・量・読みの語・型・持ち込みの文を変えない。変えるなら新しい版として凍結し直す。実データを見た後は変えず、止めて研究者に聞き、逸脱として notes に書く。
+S13 の試験と同じ。実データを見る前なら `decisions.md` に判断として書き、この文書の末尾に「条件の後の変更（実データを見る前）」として足す。凍結（attack-me を閉じた後の commit）の後は、歩み・列・量・読みの語・型・本文の英文を変えない（英文の文法の直しは、意味と語の強さを変えないものだけを、逸脱として notes に書いて行う）。変えるなら新しい版として凍結し直す。実データを見た後は変えず、止めて研究者に聞き、逸脱として notes に書く。
 
 ## 条件の後の変更（実データを見る前）
 
