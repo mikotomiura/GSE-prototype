@@ -22,6 +22,7 @@ import {
   receiveStrip,
 } from "./handmarkStripFrame";
 import type { Shown } from "./handmarkStripFrame";
+import { fitCanvas } from "./handmarkCanvasFit";
 
 /** 状態を知らせるイベント名(src-tauri/src/handmark_stage.rs の STATE_EVENT)。閉じたときは null。 */
 const STATE_EVENT = "handmark-state";
@@ -86,13 +87,15 @@ export default function HandmarkEdgeStrip() {
         motes.push({ x0: rnd(), y: 0.2 + rnd() * 0.6, k: 0.5 + rnd(), seed: rnd() * 6.28 });
       }
     };
-    const resize = (): void => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // 画素の大きさと拡大を今の窓に合わせる。描くたびに呼ぶ（拡大が単位行列に戻っても次の 1 枚で戻る・
+    // handmarkCanvasFit.ts）。粒の配置は幅に対する割合なので、大きさが変わっても作り直さない。
+    const fit = (): void => {
       W = window.innerWidth;
       H = window.innerHeight;
-      canvas.width = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fitCanvas(canvas, ctx, W, H, window.devicePixelRatio);
+    };
+    const resize = (): void => {
+      fit();
       buildMotes(layoutSeed < 0 ? DEFAULT_SEED : layoutSeed);
     };
     resize();
@@ -119,6 +122,7 @@ export default function HandmarkEdgeStrip() {
       const calm = reduceMotion ? 0.3 : 1;
       const drift = shown.drift * calm;
       const phase = shown.phase * calm;
+      fit();
       ctx.clearRect(0, 0, W, H);
       const step = 6;
 
@@ -223,6 +227,7 @@ export default function HandmarkEdgeStrip() {
           timer = null;
         }
         pendingAt = null;
+        fit();
         ctx.clearRect(0, 0, W, H);
         return;
       }

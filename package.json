@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test:handmark": "node --test scripts/handmark-stage-trace.test.mjs scripts/handmark-edge-strip.test.mjs scripts/handmark-stage-draw.test.mjs scripts/handmark-stage-icons.test.mjs scripts/handmark-stopped-draw.test.mjs"
+    "test:handmark": "node --test scripts/handmark-stage-trace.test.mjs scripts/handmark-edge-strip.test.mjs scripts/handmark-stage-draw.test.mjs scripts/handmark-stage-icons.test.mjs scripts/handmark-stopped-draw.test.mjs scripts/handmark-canvas-fit.test.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",

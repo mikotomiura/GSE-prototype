@@ -36,6 +36,7 @@ import {
 } from "./handmarkStageTrace";
 import type { RippleMessage, TraceMessage } from "./handmarkStageTrace";
 import { buildWorld, drawFrame, viewOf } from "./handmarkStageDraw";
+import { fitCanvas } from "./handmarkCanvasFit";
 import type { RippleView, Shown, View, World } from "./handmarkStageDraw";
 import { drawStopped, lerpStopped, parseStopped, stoppedIsInvisible } from "./handmarkStoppedDraw";
 import type { StoppedShown } from "./handmarkStoppedDraw";
@@ -91,15 +92,21 @@ export default function HandmarkStage() {
       world = buildWorld(seedIn, view.W, view.H);
     };
 
-    const resize = (): void => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      view = viewOf(window.innerWidth, window.innerHeight);
-      canvas.width = Math.round(view.W * dpr);
-      canvas.height = Math.round(view.H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      rebuild(layoutSeed < 0 ? 11 : layoutSeed);
+    // 画素の大きさと拡大を今の窓に合わせる。描くたびに呼ぶ（拡大が単位行列に戻っても次の 1 枚で戻る・
+    // handmarkCanvasFit.ts）。配置は大きさから決まるので、大きさが変わったときだけ作り直す（同じ大きさなら同じ配置）。
+    const fit = (): void => {
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const sizeChanged = W !== view.W || H !== view.H;
+      if (sizeChanged) {
+        view = viewOf(W, H);
+      }
+      fitCanvas(canvas, ctx, view.W, view.H, window.devicePixelRatio);
+      if (sizeChanged) {
+        rebuild(layoutSeed < 0 ? 11 : layoutSeed);
+      }
     };
-    resize();
+    fit();
 
     // ---- 状態(Rust から届く)。from から to へ STATE_TICK_MS かけて線形に寄せる ----
     let active = false;
@@ -156,6 +163,7 @@ export default function HandmarkStage() {
         stoppedTo = null;
         stoppedShown = null;
         clearIconLayer(icons);
+        fit();
         ctx.clearRect(0, 0, view.W, view.H);
         return;
       }
@@ -216,6 +224,7 @@ export default function HandmarkStage() {
         stoppedShown = lerpStopped(stoppedFrom, stoppedTo, (now - stoppedRecvAt) / STATE_TICK_MS);
       }
       const calm = reduceMotion ? 0.3 : 1;
+      fit();
       // drawFrame の後に drawStopped(机上の道具 overlay.mjs も同じ順に呼ぶ)。アイコンの写しはその上。
       drawFrame(ctx, world, view, shown, fieldShown, rippleViews(now), calm);
       drawStopped(ctx, world, view, stoppedShown, calm);
@@ -296,7 +305,7 @@ export default function HandmarkStage() {
     }
 
     const onResize = (): void => {
-      resize();
+      fit();
     };
     window.addEventListener("resize", onResize);
     const clockTimer = window.setInterval(() => {
