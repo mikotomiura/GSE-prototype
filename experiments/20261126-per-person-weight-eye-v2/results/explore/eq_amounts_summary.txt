@@ -1,0 +1,9 @@
+coauthor/k15_g0 {'nA_min': 3740, 'nA_max': 9698, 'nB_min': 1020, 'nB_max': 3222}
+coauthor/k1_g0 {'nA_min': 150, 'nA_max': 641, 'nB_min': 1020, 'nB_max': 3222}
+coauthor/k5_g0 {'nA_min': 993, 'nA_max': 3216, 'nB_min': 1020, 'nB_max': 3222}
+coauthor/k5_g10 {'nA_min': 1040, 'nA_max': 3225, 'nB_min': 1020, 'nB_max': 3222}
+coauthor/k5_g5 {'nA_min': 995, 'nA_max': 3228, 'nB_min': 1020, 'nB_max': 3222}
+cs1/k1_g0 {'nA_min': 2849, 'nA_max': 12200, 'nB_min': 2690, 'nB_max': 12090}
+cs1/k1_g1 {'nA_min': 2664, 'nA_max': 12437, 'nB_min': 2690, 'nB_max': 12090}
+cs1/k1_g4 {'nA_min': 2840, 'nA_max': 12266, 'nB_min': 2690, 'nB_max': 12090}
+cs1/k5_g0 {'nA_min': 22000, 'nA_max': 63338, 'nB_min': 2690, 'nB_max': 12090}
