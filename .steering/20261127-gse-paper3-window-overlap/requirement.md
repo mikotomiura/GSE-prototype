@@ -28,7 +28,7 @@
 ## 受け入れ条件
 
 - [ ] conditions.md がコード・結果より前の commit にある
-- [ ] 条件の attack-me で minor が 2 回続いた（記録は `attack-me/prereg/round-N/`）
+- [ ] 条件の attack-me で minor が 2 回続いた（記録は `attack-me/prereg-window-overlap/round-N/`）
 - [ ] 端の再現の門（歩み 1 = S13 の u・歩み 30 の位相 0 = S13 の n）が相対 1e-9 で通る
 - [ ] 陽性対照と名指しの変異がすべて期待どおり
 - [ ] notes に凍結した読みの語と、論文への持ち込みの文の型が当たっている
