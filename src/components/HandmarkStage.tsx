@@ -32,6 +32,7 @@ import {
 } from "./handmarkStageTrace";
 import type { RippleMessage, TraceMessage } from "./handmarkStageTrace";
 import { buildWorld, drawFrame, viewOf } from "./handmarkStageDraw";
+import { fitCanvas } from "./handmarkCanvasFit";
 import type { RippleView, Shown, View, World } from "./handmarkStageDraw";
 
 /** 状態を知らせるイベント名(src-tauri/src/handmark_stage.rs の STATE_EVENT)。閉じたときは null。 */
@@ -81,15 +82,21 @@ export default function HandmarkStage() {
       world = buildWorld(seedIn, view.W, view.H);
     };
 
-    const resize = (): void => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      view = viewOf(window.innerWidth, window.innerHeight);
-      canvas.width = Math.round(view.W * dpr);
-      canvas.height = Math.round(view.H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      rebuild(layoutSeed < 0 ? 11 : layoutSeed);
+    // 画素の大きさと拡大を今の窓に合わせる。描くたびに呼ぶ（拡大が単位行列に戻っても次の 1 枚で戻る・
+    // handmarkCanvasFit.ts）。配置は大きさから決まるので、大きさが変わったときだけ作り直す（同じ大きさなら同じ配置）。
+    const fit = (): void => {
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const sizeChanged = W !== view.W || H !== view.H;
+      if (sizeChanged) {
+        view = viewOf(W, H);
+      }
+      fitCanvas(canvas, ctx, view.W, view.H, window.devicePixelRatio);
+      if (sizeChanged) {
+        rebuild(layoutSeed < 0 ? 11 : layoutSeed);
+      }
     };
-    resize();
+    fit();
 
     // ---- 状態(Rust から届く)。from から to へ STATE_TICK_MS かけて線形に寄せる ----
     let active = false;
@@ -135,6 +142,7 @@ export default function HandmarkStage() {
         // 窓が閉じた: 状態も、場も波紋も消す(世代は次に開いたとき進んだ値が届く)。
         active = false;
         resetPointer();
+        fit();
         ctx.clearRect(0, 0, view.W, view.H);
         return;
       }
@@ -179,6 +187,7 @@ export default function HandmarkStage() {
       // 跡の場: 届いた場へ次の写しまで線形に寄せる。1 秒来なければ 0(描画の回数では積まない)。
       sweepPointer(now);
       lerpField(fieldFrom, fieldTo, (now - traceRecvAt) / TRACE_TICK_MS, fieldShown);
+      fit();
       drawFrame(ctx, world, view, shown, fieldShown, rippleViews(now), reduceMotion ? 0.3 : 1);
       if (
         shown.speed > 0 ||
@@ -256,7 +265,7 @@ export default function HandmarkStage() {
     }
 
     const onResize = (): void => {
-      resize();
+      fit();
     };
     window.addEventListener("resize", onResize);
     const clockTimer = window.setInterval(() => {
