@@ -1,0 +1,346 @@
+{
+ "fixed": {
+  "mut_empty": true,
+  "inputs": {
+   "coauthor": {
+    "files": 1157,
+    "sha256_of_sha256_list": "6a1e24954c65f2e0b2dfd24abacde3be3539fd0e33924fa801d731325c64a9f7",
+    "sessions_json": "26c5b16efbe716ccd50d3ee0a95cb289fcc2d4c3546337eecb06aae1b87f9dda"
+   },
+   "cs1": {
+    "files": 177,
+    "sha256_of_sha256_list": "25f106f7342a40e6856d30e0d722f62c3e992c7f4386328c2c73b57579783bec",
+    "units_json": "ccd2b303fe310e01b2658c88ed5b9852a6f029cec5dff7af6a53a7aa94226d8a",
+    "build_summary": "9bb439bb706a4c63abe76455768ac054138443f6f171e971e36b3173da629809"
+   }
+  },
+  "holdout": {
+   "coauthor_sha256": "4986e64c815f16ced2b4e96c13d338ea73b2a695358deed77ceba3bc75003b67",
+   "coauthor_held_out_sessions_at_build": 288,
+   "coauthor_obs_sessions_equal_holdout_removed_work": true,
+   "cs1_sha256": "a5a32fcefeb97b038afd170e2672262fd5a71230d5e851319eaa076b606bdc47",
+   "cs1_writers_skipped_at_build": 13
+  },
+  "code_hash": "1665a0b2f83fef22dcea3bed18041f8a467dac2c769b65237e6b15092ac27142",
+  "scripts": {
+   "check_mutations.py": "6be00baf339bb00b38debca95cbfc21ba3b880d15272d3b1060bac45d4425a95",
+   "check_xmach.py": "2151b6fcc744165c82abbbc93d28cb4df0f9772febd8906dfd0c115042a74f3e",
+   "choose.py": "aca2f16e2e1e96750d818fa970e9514054a96a7c81114930b9f3e3d22a1220bb",
+   "d6_local.py": "c4a597f8d8657693c1efafe8335ac37bab10799116d83726987e56cb5a7dfa19",
+   "d6_report.py": "b1094e07fc1729bba92f41bd5797e426f56eac5fd35840687fd8084a6ae3fb29",
+   "d9.py": "f50f3995839dfaf1fbc009a20c5344cea9e86ca15e78b50e81a55b85a1032ac8",
+   "explore_eq_amounts.py": "5e30ec4158b3b9e7c00f3db0c945e84d75ff18191d0d93a4525b6d3ee3702d86",
+   "eye.py": "0a966e86dcebebe811cc3442f3b96d5bf72707818f3cba1c17c1676010f1e435",
+   "gen.py": "396cf2c00123c1b574066c604db87e6aaed795f554815b55fb3cc9e30fde1cf1",
+   "realdata.py": "c27794918d1a558fece91b45ccee8b361a95d9d6c4aebf5da21acf378431ad61",
+   "run_eye.py": "bd86ee58e92ced0abdd44a84e7d82accc316e4bb43c3e3fab87c1527e737fea1",
+   "selftest.py": "c9b9214a79e21ccf18f33031de1970e60ee10bf32dcc9a7b5c3f0d91f34c472b",
+   "summarize.py": "f9b36e74bc523a0017b12465d6e18404a8abb4af19aaf6f8aa98623e12abeb33"
+  },
+  "pinned_tau": {
+   "data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+   "ml.py": "93a3935cef367f1702d2aa4d51715b428945be3dd29a1962aa7aaecaaf64701c",
+   "hmm2.py": "d71f4c206789b2dd33e2acc1569ac69a75006be2d33de227f7f094456a3966bc"
+  },
+  "python": "3.11.9",
+  "numpy": "2.4.4",
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "d6_json_sha256": "458f4d7db3586db95263448497919a9cafa6f0a915dad886779297670495fa3a",
+  "eq_amounts_json_sha256": "06a39d5854ffa15a09e27acd229d8750bd9c56dfba3e2c48826576ea2d632736",
+  "load_seed": 2026110401
+ },
+ "datasets": {
+  "coauthor": {
+   "writers_loaded": 43,
+   "H": 5,
+   "panel_rule": "n >= 20",
+   "panel": 17,
+   "panel_ids_sha256": "8e6fce2e5e12f6760b2dcb4d6b5e92454457375c9771bcb40844b67ff2f08b57",
+   "eligible_n_ge_H1": 28,
+   "pre": {
+    "panel": 17,
+    "outside": 26,
+    "outside_units": 140,
+    "outside_units_list": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     2,
+     2,
+     2,
+     3,
+     3,
+     4,
+     4,
+     4,
+     7,
+     7,
+     7,
+     8,
+     8,
+     9,
+     9,
+     10,
+     12,
+     14,
+     18
+    ],
+    "panel_units": {
+     "min": 20.0,
+     "q1": 24.0,
+     "median": 42.0,
+     "q3": 60.0,
+     "max": 79.0
+    },
+    "panel_units_list": [
+     20,
+     21,
+     22,
+     22,
+     24,
+     26,
+     29,
+     34,
+     42,
+     45,
+     49,
+     58,
+     60,
+     63,
+     66,
+     75,
+     79
+    ],
+    "cells": {
+     "k1_g0": {
+      "nA": 552,
+      "nB": 2811,
+      "ratio_A": 0.8860353130016051,
+      "ratio_B": 0.854147675478578
+     },
+     "k5_g0": {
+      "nA": 2833,
+      "nB": 2811,
+      "ratio_A": 0.8773614122019201,
+      "ratio_B": 0.854147675478578
+     },
+     "k15_g0": {
+      "nA": 8443,
+      "nB": 2811,
+      "ratio_A": 0.8741975564299027,
+      "ratio_B": 0.854147675478578
+     },
+     "k5_g5": {
+      "nA": 2835,
+      "nB": 2811,
+      "ratio_A": 0.869098712446352,
+      "ratio_B": 0.854147675478578
+     },
+     "k5_g10": {
+      "nA": 2775,
+      "nB": 2811,
+      "ratio_A": 0.8677298311444653,
+      "ratio_B": 0.854147675478578
+     }
+    }
+   },
+   "marks": {
+    "k1_g0": {
+     "nA": "内",
+     "nB": "内",
+     "range": "内",
+     "table": {
+      "nA_max": 641,
+      "nA_min": 150,
+      "nB_max": 3222,
+      "nB_min": 1020
+     }
+    },
+    "k5_g0": {
+     "nA": "内",
+     "nB": "内",
+     "range": "内",
+     "table": {
+      "nA_max": 3216,
+      "nA_min": 993,
+      "nB_max": 3222,
+      "nB_min": 1020
+     }
+    },
+    "k15_g0": {
+     "nA": "内",
+     "nB": "内",
+     "range": "内",
+     "table": {
+      "nA_max": 9698,
+      "nA_min": 3740,
+      "nB_max": 3222,
+      "nB_min": 1020
+     }
+    },
+    "k5_g5": {
+     "nA": "内",
+     "nB": "内",
+     "range": "内",
+     "table": {
+      "nA_max": 3228,
+      "nA_min": 995,
+      "nB_max": 3222,
+      "nB_min": 1020
+     }
+    },
+    "k5_g10": {
+     "nA": "内",
+     "nB": "内",
+     "range": "内",
+     "table": {
+      "nA_max": 3225,
+      "nA_min": 1040,
+      "nB_max": 3222,
+      "nB_min": 1020
+     }
+    }
+   }
+  },
+  "cs1": {
+   "writers_loaded": 31,
+   "H": 1,
+   "panel_rule": "n >= 6",
+   "panel": 23,
+   "panel_ids_sha256": "6d6ee211fdfafbbc7a1cff454af6aaab6d09fb352d4c9fd3f6be11bd69c266ba",
+   "eligible_n_ge_H1": 25,
+   "pre": {
+    "panel": 23,
+    "outside": 8,
+    "outside_units": 10,
+    "outside_units_list": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     2,
+     2
+    ],
+    "panel_units": {
+     "min": 6.0,
+     "q1": 7.0,
+     "median": 7.0,
+     "q3": 8.0,
+     "max": 8.0
+    },
+    "panel_units_list": [
+     6,
+     6,
+     6,
+     7,
+     7,
+     7,
+     7,
+     7,
+     7,
+     7,
+     7,
+     7,
+     7,
+     7,
+     8,
+     8,
+     8,
+     8,
+     8,
+     8,
+     8,
+     8,
+     8
+    ],
+    "cells": {
+     "k1_g0": {
+      "nA": 305,
+      "nB": 48,
+      "ratio_A": 0.018647591098067986,
+      "ratio_B": 0.0045150973567867556
+     },
+     "k5_g0": {
+      "nA": 36404,
+      "nB": 48,
+      "ratio_A": 0.5173080202353209,
+      "ratio_B": 0.0045150973567867556
+     },
+     "k1_g1": {
+      "nA": 2,
+      "nB": 48,
+      "ratio_A": 0.00018000180001800017,
+      "ratio_B": 0.0045150973567867556
+     },
+     "k1_g4": {
+      "nA": 5587,
+      "nB": 48,
+      "ratio_A": 0.29343487394957984,
+      "ratio_B": 0.0045150973567867556
+     }
+    }
+   },
+   "marks": {
+    "k1_g0": {
+     "nA": "下",
+     "wide_ratio_A": "下",
+     "nB": "下",
+     "wide_ratio_B": "下",
+     "range": "外",
+     "table": {
+      "nA_max": 12200,
+      "nA_min": 2849,
+      "nB_max": 12090,
+      "nB_min": 2690
+     }
+    },
+    "k5_g0": {
+     "nA": "内",
+     "wide_ratio_A": "内",
+     "nB": "下",
+     "wide_ratio_B": "下",
+     "range": "外",
+     "table": {
+      "nA_max": 63338,
+      "nA_min": 22000,
+      "nB_max": 12090,
+      "nB_min": 2690
+     }
+    },
+    "k1_g1": {
+     "nA": "下",
+     "wide_ratio_A": "下",
+     "nB": "下",
+     "wide_ratio_B": "下",
+     "range": "外",
+     "table": {
+      "nA_max": 12437,
+      "nA_min": 2664,
+      "nB_max": 12090,
+      "nB_min": 2690
+     }
+    },
+    "k1_g4": {
+     "nA": "内",
+     "wide_ratio_A": "内",
+     "nB": "下",
+     "wide_ratio_B": "下",
+     "range": "外",
+     "table": {
+      "nA_max": 12266,
+      "nA_min": 2840,
+      "nB_max": 12090,
+      "nB_min": 2690
+     }
+    }
+   }
+  }
+ },
+ "stage": "pre"
+}

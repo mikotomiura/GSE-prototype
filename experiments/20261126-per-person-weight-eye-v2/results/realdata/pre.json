@@ -17,6 +17,12 @@
   "holdout": {
    "coauthor_sha256": "4986e64c815f16ced2b4e96c13d338ea73b2a695358deed77ceba3bc75003b67",
    "coauthor_held_out_sessions_at_build": 288,
+   "coauthor_direct": {
+    "sessions_checked": 1157,
+    "overlap_with_holdout": 0,
+    "writer_number_mismatch": 0,
+    "holdout_sessions_in_metadata": 288
+   },
    "coauthor_obs_sessions_equal_holdout_removed_work": true,
    "cs1_sha256": "a5a32fcefeb97b038afd170e2672262fd5a71230d5e851319eaa076b606bdc47",
    "cs1_writers_skipped_at_build": 13
@@ -32,7 +38,7 @@
    "explore_eq_amounts.py": "5e30ec4158b3b9e7c00f3db0c945e84d75ff18191d0d93a4525b6d3ee3702d86",
    "eye.py": "0a966e86dcebebe811cc3442f3b96d5bf72707818f3cba1c17c1676010f1e435",
    "gen.py": "396cf2c00123c1b574066c604db87e6aaed795f554815b55fb3cc9e30fde1cf1",
-   "realdata.py": "c27794918d1a558fece91b45ccee8b361a95d9d6c4aebf5da21acf378431ad61",
+   "realdata.py": "f5fec7a3a3e5c3b4d0da504abc8d616340d3e54e6cfe83d6ff48bc2fecbc7475",
    "run_eye.py": "bd86ee58e92ced0abdd44a84e7d82accc316e4bb43c3e3fab87c1527e737fea1",
    "selftest.py": "c9b9214a79e21ccf18f33031de1970e60ee10bf32dcc9a7b5c3f0d91f34c472b",
    "summarize.py": "f9b36e74bc523a0017b12465d6e18404a8abb4af19aaf6f8aa98623e12abeb33"

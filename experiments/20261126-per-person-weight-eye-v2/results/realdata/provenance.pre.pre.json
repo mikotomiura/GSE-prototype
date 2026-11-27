@@ -1,8 +1,10 @@
 {
- "run_id": "20261127T152443-87167",
+ "run_id": "20261127T153110-96013",
  "stage": "realdata-pre",
- "git_head": "992324b49b857478857baee51898e5d270c09759",
- "uncommitted": [],
+ "git_head": "6141981381cdb3e33d139b8faaa92345766ba072",
+ "uncommitted": [
+  " M experiments/20261126-per-person-weight-eye-v2/scripts/realdata.py"
+ ],
  "jobs": 8,
  "seed": 2026112201,
  "code_hash": "1665a0b2f83fef22dcea3bed18041f8a467dac2c769b65237e6b15092ac27142",
@@ -19,7 +21,7 @@
   "explore_eq_amounts.py": "5e30ec4158b3b9e7c00f3db0c945e84d75ff18191d0d93a4525b6d3ee3702d86",
   "eye.py": "0a966e86dcebebe811cc3442f3b96d5bf72707818f3cba1c17c1676010f1e435",
   "gen.py": "396cf2c00123c1b574066c604db87e6aaed795f554815b55fb3cc9e30fde1cf1",
-  "realdata.py": "c27794918d1a558fece91b45ccee8b361a95d9d6c4aebf5da21acf378431ad61",
+  "realdata.py": "f5fec7a3a3e5c3b4d0da504abc8d616340d3e54e6cfe83d6ff48bc2fecbc7475",
   "run_eye.py": "bd86ee58e92ced0abdd44a84e7d82accc316e4bb43c3e3fab87c1527e737fea1",
   "selftest.py": "c9b9214a79e21ccf18f33031de1970e60ee10bf32dcc9a7b5c3f0d91f34c472b",
   "summarize.py": "f9b36e74bc523a0017b12465d6e18404a8abb4af19aaf6f8aa98623e12abeb33"

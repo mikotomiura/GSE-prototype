@@ -19,6 +19,8 @@ import math
 import os
 import platform
 import sys
+import zipfile
+import csv
 
 import numpy as np
 
@@ -36,6 +38,9 @@ NULL_REAL, STRAND_REAL = 0, 7                                     # 実データ
 R_MAX = 20
 HOLD_CS1_SHA = "a5a32fcefeb97b038afd170e2672262fd5a71230d5e851319eaa076b606bdc47"
 PANEL = dict(coauthor="P15", cs1="C5")
+EXPECT = dict(coauthor=dict(panel=17), cs1=dict(panel=23, eligible_n_ge_H1=25))   # 追記 1 (2)・補足 S2 の人数（違えば止める）
+META_SHA = {"metadata_creative.csv": "66fd2ca541999412de4050a85c17274f02eea04424e83906b697f4cd824c65bf",
+            "metadata_argumentative.csv": "cfadf031b21c07951f648b02422b6703850359c7ff6a78a8ef513624c8e4c0d1"}
 SE_N = EY.N_PERM
 
 
@@ -48,7 +53,36 @@ def paths(data_dir):
                 coauthor_old=os.path.join(data_dir, "landscape", "coauthor_work"),
                 cs1=os.path.join(data_dir, "cs1", "work2021_obs"),
                 hold_coauthor=os.path.join(data_dir, "landscape", "holdout.json"),
-                hold_cs1=os.path.join(data_dir, "cs1", "holdout.json"))
+                hold_cs1=os.path.join(data_dir, "cs1", "holdout.json"),
+                coauthor_raw=os.path.join(data_dir, "coauthor", "raw"))
+
+
+def check_coauthor_holdout(P_):
+    """作る段（public-data-landscape の build_coauthor.py）の番号の規則をなぞり、obs の中間の各セッションが
+    取り置きの書き手でないこと・書き手の番号が規則どおりであることを直接確かめる（メタデータと zip の名前だけを読む）。"""
+    raw = P_["coauthor_raw"]
+    for f, v in META_SHA.items():
+        if sha(os.path.join(raw, f)) != v:
+            sys.exit("CoAuthor の %s の SHA-256 が作る段の値と違う" % f)
+    hold = set(json.load(open(P_["hold_coauthor"]))["coauthor"])
+    sid2w = {}
+    for f in ("metadata_creative.csv", "metadata_argumentative.csv"):
+        for r in csv.DictReader(open(os.path.join(raw, f), encoding="utf-8")):
+            sid2w[r["session_id"]] = r["worker_id"]
+    if not hold or not all(isinstance(x, str) for x in hold) or not hold <= set(sid2w.values()):
+        sys.exit("CoAuthor の取り置きの一覧がメタデータの書き手の ID と同じ形でない")
+    with zipfile.ZipFile(os.path.join(raw, "coauthor.zip")) as z:
+        by_sid = {os.path.basename(m)[:-len(".jsonl")] for m in z.namelist() if m.endswith(".jsonl")}
+    sids = sorted(by_sid & set(sid2w))
+    w_idx = {w: i for i, w in enumerate(sorted(set(sid2w[x] for x in sids)))}
+    s2w = json.load(open(os.path.join(P_["coauthor"], "sessions.json")))
+    overlap = sum(1 for k in s2w if sid2w[sids[int(k)]] in hold)
+    mismatch = sum(1 for k, v in s2w.items() if w_idx[sid2w[sids[int(k)]]] != v)
+    held_all = sum(1 for x in sids if sid2w[x] in hold)
+    if overlap or mismatch:
+        sys.exit("CoAuthor の中間に取り置きの書き手のセッション %d・番号の食い違い %d" % (overlap, mismatch))
+    return dict(sessions_checked=len(s2w), overlap_with_holdout=overlap, writer_number_mismatch=mismatch,
+                holdout_sessions_in_metadata=held_all)
 
 
 # ---------------------------------------------------------------- 固定するもの（追記 1 (2)）
@@ -89,6 +123,7 @@ def fixed(P_):
                     cs1=dict(list_hash(P_["cs1"], "u[0-9]*.json"), units_json=sha(os.path.join(P_["cs1"], "units.json")),
                              build_summary=sha(os.path.join(P_["cs1"], "build_summary.json")))),
         holdout=dict(coauthor_sha256=sha(P_["hold_coauthor"]), coauthor_held_out_sessions_at_build=bs_coa["held_out_sessions"],
+                     coauthor_direct=check_coauthor_holdout(P_),
                      coauthor_obs_sessions_equal_holdout_removed_work=True,
                      cs1_sha256=hold_cs1, cs1_writers_skipped_at_build=bs_cs1["holdout_writers_skipped"]),
         code_hash=RE.code_hash(),
@@ -140,6 +175,9 @@ def load_real(ds, path):
     rec = dict(writers_loaded=len(writers), H=H, panel_rule="n >= %d" % nmin, panel=len(idx),
                panel_ids_sha256=hashlib.sha256("\n".join(str(ids[i]) for i in idx).encode()).hexdigest(),
                eligible_n_ge_H1=sum(1 for u in writers if len(u) >= H + 1))
+    bad = {k: (rec[k], v) for k, v in EXPECT[ds].items() if rec[k] != v}
+    if bad:
+        sys.exit("パネルの人数が追記 1 (2)・補足 S2 と違う（%s）: %r" % (ds, bad))
     return UC, len(idx), H, rec
 
 
@@ -156,6 +194,12 @@ def q5(x):
     return dict(min=float(x.min()), q1=float(np.quantile(x, 0.25)), median=float(np.median(x)), q3=float(np.quantile(x, 0.75)), max=float(x.max()))
 
 
+def ratio(t):
+    """間引く前のパネルの書き手の総数の最小 ÷ 中央（中央が 0 なら NaN → 印は「算出できなかった」）。"""
+    md = float(np.median(t))
+    return float(t.min()) / md if md > 0 else float("nan")
+
+
 def pre_amounts(UC, P, H, cells):
     out = dict(panel=P, outside=len(UC) - P, outside_units=int(sum(len(u) for u in UC[P:])),
                outside_units_list=sorted(len(u) for u in UC[P:]),
@@ -165,7 +209,7 @@ def pre_amounts(UC, P, H, cells):
         tA = T["NA"].reshape(P, -1).sum(1)
         tB = T["NB"].reshape(P, -1).sum(1)
         out["cells"]["k%d_g%d" % (k, g)] = dict(nA=int(tA.min()), nB=int(tB.min()),
-                                                 ratio_A=float(tA.min() / np.median(tA)), ratio_B=float(tB.min() / np.median(tB)))
+                                                 ratio_A=ratio(tA), ratio_B=ratio(tB))
     return out
 
 
@@ -181,8 +225,12 @@ def marks(ds, pre):
         m = {}
         for side in ("A", "B"):
             n = v["n" + side]
+            if not math.isfinite(v["ratio_" + side]):
+                m["wide_ratio_" + side] = "算出できなかった"
+                if ds != "cs1":
+                    del m["wide_ratio_" + side]
             m["n" + side] = "下" if n < r["n%s_min" % side] else ("上" if n > r["n%s_max" % side] else "内")
-            if ds == "cs1":
+            if ds == "cs1" and "wide_ratio_" + side not in m:
                 lo, hi = WIDE[side]
                 x = v["ratio_" + side]
                 m["wide_ratio_" + side] = "下" if x < lo else ("上" if x > hi else "内")
@@ -259,7 +307,8 @@ def run_cell(UC, P, H, k, g, shape_no, null, strand, eq_last, perm_last, rs, ind
             if np.isfinite(s0).all():
                 c0 = EY.score_matrix(s0)
                 p0, W0 = EY.p_sampled(c0, perms)
-                out["freq"] = dict(status="計算した", W=W0, T=float(EY.t_of_w(W0, P)), p=p0, se=math.sqrt(p0 * (1 - p0) / SE_N))
+                out["freq"] = dict(status="計算した", W=W0, T=float(EY.t_of_w(W0, P)), p=p0, se=math.sqrt(p0 * (1 - p0) / SE_N),
+                                   auc_q=q5(EY.auc_rows(c0)))
             else:
                 out["freq"] = dict(status="算出できなかった")
             if indexed:
