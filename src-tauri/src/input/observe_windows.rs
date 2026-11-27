@@ -284,7 +284,10 @@ fn drain_raw_input(buf: &mut [u8], accum: &mut PointerAccum) {
             // ポインタの行が無言で 0 件になる（今回直した不具合と同じ症状）。
             // → 1 回だけ警告し、溜まった分は既定処理へ渡して後始末させる（その分は数えない）。
             if !RAW_INPUT_ERROR_LOGGED.swap(true, Ordering::Relaxed) {
-                tracing::warn!("O1: GetRawInputBuffer failed; discarding queued WM_INPUT");
+                let err = windows::core::Error::from_win32();
+                tracing::warn!(
+                    "O1: GetRawInputBuffer failed ({err:?}); discarding queued WM_INPUT"
+                );
             }
             discard_queued_raw_input();
             return;
@@ -352,13 +355,13 @@ unsafe fn accumulate_from_buffer(ptr: *const RAWINPUT, count: u32, accum: &mut P
 /// （2026-11-27 に G-GEAR で、注入した相対の移動 675 件に対して 0 件だった）。
 /// → Microsoft の *Using Raw Input* のバッファ読みの手本と同じく、`WM_INPUT` の前後の
 /// 2 つの範囲だけを回す。⚠️ 上限に 0 を渡すと「全部」の意味になるので、後ろの範囲の上限は
-/// `u32::MAX` にする（`WM_INPUT` を除く全部をちょうど覆う）。
+/// 0xFFFF にする（メッセージの値は 16 ビットの範囲で、それより上はシステムの予約）。
 ///
 /// WinEvent（`WINEVENT_OUTOFCONTEXT`）のフォーカス遷移の行がこの形でも出ることは、
 /// 2026-11-27 に G-GEAR の実アプリで確かめた（`.steering/20261127-windows-pointer-raw-input/design.md` の診断）。
 fn pump_messages_except_raw_input() {
     let mut msg = MSG::default();
-    for (min, max) in [(0, WM_INPUT - 1), (WM_INPUT + 1, u32::MAX)] {
+    for (min, max) in [(0, WM_INPUT - 1), (WM_INPUT + 1, 0xFFFF)] {
         // SAFETY: `PeekMessageW` は本スレッドのキューを読むだけで、`msg` は有効。
         //   取り出した `msg` をそのまま `dispatch` へ渡す（`dispatch` の契約）。
         while unsafe { PeekMessageW(&mut msg, None, min, max, PM_REMOVE) }.as_bool() {
@@ -693,6 +696,33 @@ mod tests {
         assert!(!user_left, "WM_INPUT 以外のメッセージを回していない");
     }
 
+    /// `GetRawInputBuffer` が失敗したときの後始末が、積まれた `WM_INPUT` を全部取り除く。
+    /// （API を失敗させる手段が無いので、後始末の関数だけを縛る。）
+    #[test]
+    fn discard_removes_queued_wm_input() {
+        let hwnd = create_message_window().expect("メッセージ専用窓を作れない");
+        // SAFETY: 自スレッドが作った窓へ積むだけ。`lParam` が 0 の WM_INPUT は既定処理が
+        //   後始末の対象を持たないだけで、無害に返る。
+        unsafe {
+            PostMessageW(hwnd, WM_INPUT, WPARAM(0), LPARAM(0)).expect("WM_INPUT を積めない");
+            PostMessageW(hwnd, WM_INPUT, WPARAM(0), LPARAM(0)).expect("WM_INPUT を積めない");
+            PostMessageW(hwnd, WM_USER, WPARAM(0), LPARAM(0)).expect("WM_USER を積めない");
+        }
+        discard_queued_raw_input();
+        let input_left = queued(WM_INPUT);
+        let user_left = queued(WM_USER);
+        pump_messages_except_raw_input();
+        // SAFETY: 本テストが作った窓を同じスレッドで壊す。
+        unsafe {
+            let _ = DestroyWindow(hwnd);
+        }
+        assert!(
+            !input_left,
+            "後始末が WM_INPUT を残している（キューに溜まり続ける）"
+        );
+        assert!(user_left, "後始末が WM_INPUT 以外まで取り除いている");
+    }
+
     /// 実機の確かめ（手元だけ・`cargo test -- --ignored`）: 本番と同じ回し方と読み方で、
     /// `SendInput` で入れた相対の移動がほぼ全部 `PointerAccum` に足される。
     ///
@@ -748,6 +778,17 @@ mod tests {
         assert!(
             sent > 0,
             "SendInput が 1 件も入らない（入力のデスクトップが無い・または前面が管理者権限で UIPI に止められた）"
+        );
+        assert!(
+            sent >= 450,
+            "SendInput が予定の 500 件のうち {sent} 件しか入らない"
+        );
+        // 上限は緩く取る（手を触れずに走らせる前提。実際のマウスが混ざると超えうる）。
+        assert!(
+            accum.abs_delta_sum <= sent * 2,
+            "届いた移動量 {} が入れた件数 {} の 2 倍を超える（数え過ぎ）",
+            accum.abs_delta_sum,
+            sent
         );
         assert!(
             accum.abs_delta_sum * 10 >= sent * 9,

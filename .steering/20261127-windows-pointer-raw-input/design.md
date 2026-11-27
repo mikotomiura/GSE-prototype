@@ -36,7 +36,8 @@
 2. 直した版の実アプリ（`npx tauri dev`・`GSE_O1_MODE=1`・`USERPROFILE` と `GSE_DATASET` は scratchpad・本物の記録に触れない）で、研究者が実際のマウスを約 60 秒動かし、途中で前面を切り替えた。数えたのは種類ごとの行の数だけ（中身は出していない）。
    - `pointer_bin` 32 行（14:56:39Z〜14:57:27Z の約 48 秒・途中に登録の画面での打鍵がある）
    - `focus_transition` 2 行（フォーカスの行は直した形でも出る）
-   - 起動から研究者が戻るまでの約 8 時間（離席）は `pointer_bin` 0 行・`focus_transition` 0 行
+   - 起動から研究者が戻るまでの約 8 時間は `pointer_bin` 0 行・`focus_transition` 0 行。研究者はその間 G-GEAR のマウスを使っていない（離席・Mac を使っていた。2026-11-28 に AskUserQuestion で確かめた）ので、0 行と矛盾しない
+   - 動かした秒の数そのものは測っていない（研究者の申告は約 60 秒・途中に登録の画面での打鍵がある）。32 行は「動かした秒の数に近い」と読むが、厳密な比は出していない
    - 直す前の版の実アプリは測っていない。直す前の量は O1 の 3 人の集計（打鍵 4.8 万に対して 424 など）と、上の 1 の 0 件で代える。
 
 ## レビューの採否（Step G）
@@ -47,6 +48,17 @@
 - code-reviewer LOW（`dispatch` が safe）: `unsafe fn` にして `# Safety` を書いた。
 - code-reviewer LOW（テストの役割分担）・security-checker LOW 2（注入が本物の O1 に混ざる）・UIPI: テストの doc とメッセージに書いた。
 - 採らなかったもの: drop guard・`RIDEV_REMOVE`（テストのプロセスの中だけで害がない）。
+
+## /cross-review の採否（2026-11-28・Codex の実消費 60,994）
+
+Claude の系統は、cross-reviewer がサブエージェントを起動できなかったため、cross-reviewer 自身が読んだ（code-reviewer の定義どおりの独立のレビューではない）。Step G の code-reviewer と合わせて 2 回の Claude の目が入っている。
+
+- 両者一致（中）実機テストが送った件数を縛っていない: `sent >= 450` と、緩い上限（届いた移動量が送った件数の 2 倍以下）を足した。
+- 両者一致（低）失敗時の後始末のテストが無い: `discard_removes_queued_wm_input` を足した（API を失敗させる手段が無いので後始末の関数だけを縛る）。
+- Codex（中）`PeekMessageW` の上限に `u32::MAX` は契約の外: Step G で 0xFFFF から `u32::MAX` にしたのを 0xFFFF に戻した（メッセージの値は 16 ビットの範囲）。戻した形で `#[ignore]` の実機テスト（本番と同じ回し方と読み方）を回し直して緑。
+- Codex（中→低）`GetLastError` を取らない: 警告に `Error::from_win32()` を添えた。バッファを広げて再試行する案は採らない（マウスだけ・16 KiB で不足は起きにくい）。
+- Codex（低）動かした秒の数が不明: 上の診断 2 に書いた。
+- Claude（低）警告が 1 回だけ: 保留（1 行は残る・続く失敗は行の数で見える）。
 
 ## 配布のときに書くこと
 
