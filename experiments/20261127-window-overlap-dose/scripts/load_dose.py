@@ -1,6 +1,6 @@
 """列 A・列 B・列 C の読み込み（conditions D1）。S13 の試験の load.py の load_column と同じ形で、列の名を受ける。
 
-列の名: "A<s>"（s ∈ 1, 5, 10, 15, 30）・"B<s>"・"C<s>"（s ∈ 5, 10, 15, 30）。
+列の名: "A<s>"（s ∈ 1, 5, 10, 15, 30）・"B<s>"・"C<s>"・"P1-<s>"・"P3-<s>"（s ∈ 5, 10, 15, 30。P1・P3 は列 C′1・C′3）。
 単位は tau-extend の data.py の読み込み（ml.load）のまま作り、S13 の load.apply_column で u に替えてから、
 系列ごとに行を採る。行の時刻は data.py が読む今の中間（coauthor_work_obs）の feat 行の第 1 列を、
 data.py と同じ選び・同じ並べで読む。読んだ単位の obs が data.py の系列と 1 つでも違えば止める。
@@ -25,10 +25,11 @@ MUT = set()  # m68: 差し替えた読み込みで pflag を採らない／m70: 
 
 
 def parse(col):
-    arm, s = col[0], int(col[1:])
-    if arm not in "ABC" or s not in MK.STRIDES or (arm in "BC" and s < 2):
+    if col not in COLS:
         raise SystemExit("列の名が違う: %s" % col)
-    return arm, s
+    if col.startswith("P"):
+        return col[:2], int(col.split("-")[1])
+    return col[0], int(col[1:])
 
 
 def coauthor_times(work):
@@ -49,11 +50,15 @@ def coauthor_times(work):
     return [sorted(by_w[w], key=lambda u: u["start"]) for w in sorted(by_w)]
 
 
-def block(n_rows, n_a):
+def block(n_rows, n_a, arm="C"):
+    """列 C は始まり floor((L − n_A) / 2)、列 C′1 は floor((L − n_A) / 4)、列 C′3 は floor(3 (L − n_A) / 4)。"""
     if n_a <= 0:
         return []
     n = n_a + 1 if "m71" in MUT else n_a
-    st = 0 if "m70" in MUT else (n_rows - n_a) // 2
+    free = n_rows - n_a
+    st = {"C": free // 2, "P1": free // 4, "P3": (3 * free) // 4}[arm]
+    if "m70" in MUT and arm == "C":
+        st = 0
     return list(range(st, min(st + n, n_rows)))
 
 
@@ -62,9 +67,9 @@ def select_rows(times, arm, s):
     if arm == "A":
         m = MK.mask_a(times, s)
         return [[i for i, v in enumerate(m) if v]]
-    if arm == "C":
+    if arm in ("C", "P1", "P3"):
         n_a = sum(MK.mask_a(times, s))
-        return [block(len(times), n_a)]
+        return [block(len(times), n_a, arm)]
     return MK.phases_b(times, s)
 
 
@@ -120,4 +125,7 @@ def load_column(ds, work, side_path, seed, col):
     return apply_rows(wu, times_all, col)
 
 
-COLS = {c: i for i, c in enumerate(["A1", "A5", "A10", "A15", "A30", "C5", "C10", "C15", "C30", "B5", "B10", "B15", "B30"])}
+# 列の番号 c（conditions D2 の表）。A1 = 1・A30 = 2 は S13 の残差の v の列の番号（u 1・n 2）と同じ。
+COLS = {c: i + 1 for i, c in enumerate(
+    ["A1", "A30", "A5", "A10", "A15", "C5", "C10", "C15", "C30", "B5", "B10", "B15", "B30",
+     "P1-5", "P1-10", "P1-15", "P1-30", "P3-5", "P3-10", "P3-15", "P3-30"])}
