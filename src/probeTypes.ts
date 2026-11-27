@@ -92,6 +92,6 @@ export const ACTIVITY_CHOICES: ReadonlyArray<{
   { value: "conversation", label: "会話", note: "会話・通話・打ち合わせをしていた" },
   { value: "away", label: "離席", note: "その場を離れていた" },
   { value: "working", label: "作業", note: "手を動かしていた（進んだかは問わない）。入力・編集・単純作業を含む" },
-  // ↑ カードは説明を（）で包むので、括弧を二重にしない（同意文書とフォームは「〜（入力・編集・単純作業を含む）」）。
+  // ↑ カードは説明をそのまま出す。同意文書とフォームは括弧を重ねない形（「手を動かしていた（進んだかは問わない。入力・編集・単純作業を含む）」・ADR-055 補訂 1）。
   { value: "cannot_answer", label: "回答不能", note: "思い出せない・当てはまらない" },
 ];
