@@ -53,3 +53,9 @@
 - **論文 3 への入れ方（v1 の追記 3 に代わる v2 の条件）**: (a) 門がすべて通る = はい、(b) 拾った ≥ 1 = はい → `d6_report.py` の表示は v1 の文言のまま「論文 3 に統合する」。v2 の条件では、実データの結果を事前に条件をコミットした探索の分析として補足に入れ、本文は 1〜2 文で触れる。v1 が門で止まったこと、v2 が v1 の結果を見てから作られたことを同じ所に書く。確認の主張には使わない。
 - 次: /cross-review（v1 からの scripts と run.sh の差分）→ D7 の追記（実データの読みの基準）を attack-me で攻めてからコミット → 実データへの適用は別のタスクの引き継ぎ。
 - /cross-review（判断 51）: 結果を変える誤りは無し。V1 の記録として、P-NULL・P-UNIF・P-POS の複製（selftest の null_rep）は eval_cell を通らず equalize と sims を直接組む（本計算の eval_cell は必ず equalize を通る）。P-EQ の (5)(7) は Ss を見ていない（通常の実行では Ss = [S] * P）。どちらもこの版では直さない。
+
+## D7 の追記の準備（2026-11-27・合成だけ・門に使わない・実データは読んでいない）
+
+- 揃えた後の量の範囲: `scripts/explore_eq_amounts.py` で、報告の組の第 1 の帰無の差なしの 11 群 × 1,000 複製の、揃えた後の n_A・n_B（パネルの最小）を数えた（`results/explore/eq_amounts.json`・要約 `eq_amounts_summary.txt`）。最小は量と重ねの筋で決まる。追記 1 (5) の表。
+- wide の量の比: 判断 48 の探索の出力 `experiments/20261122-per-person-weight-eye/results/explore/cs1_spread.json`（repo に入れない）から、wide の 5 群・4 セル・3,000 複製の比（側ごと・セルごとに、間引く前のパネルの書き手の総数の最小 ÷ 中央）を数え直した。n_A は 0.078〜0.665、n_B は 0.083〜0.552、中央値はどちらも約 0.22。判断 48 の要約の「nA/中央 0.13〜0.34」は群とセルごとの代表の値で、複製ごとの範囲ではなかった（attack-me round 3 の Codex の指摘で確かめた）。
+- attack-me（prereg・追記 1）: round 1 major → round 2 minor → round 3 minor（記録は `.steering/20261122-per-person-weight-eye/attack-me/prereg-weight-eye-v2-d7/`）。

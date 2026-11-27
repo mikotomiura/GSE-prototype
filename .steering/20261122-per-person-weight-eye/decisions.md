@@ -316,3 +316,10 @@ cross-reviewer（Opus）と Codex（本線の wrapper・約 27k）に、v1 の s
 - 片方（Claude・Codex とも low〜中）: P-NULL・P-UNIF・P-POS の複製（selftest の null_rep）は eval_cell を通らず equalize と sims を直接組む。eval_cell から equalize が抜けても P-EQ と w7 は緑のまま通りうる。条件の「本計算と同じ経路」とは厳密には違う。
 - 却下（Codex）: 全員同数のときの (4)、最小の総数が 0 のとき。今の fixture と本計算の設定では起きず、0 なら sims の有限性の検査で止まる。
 - 扱い: どれも結果を変えないので、この版のコードは直さない（直すと code_hash が変わり、D8 の再開で V1 からやり直すことになる）。次に版を作るときは、P-EQ の (5)(7) に Ss を足し、eval_cell の出力の総数が最小に等しいことを P-EQ で確かめるか null_rep を eval_cell 経由にする。V1 の記録として notes に「P-NULL などの複製は eval_cell を通らない」を 1 行書く。
+
+## 判断 52: D7 実データの読みの基準（v2 の追記 1）を凍結する（2026-11-27・研究者の選択・実データを読む前）
+
+- 中身: v2 の `conditions.md` の「追記 1: D7 実データの読みの基準」。v1 D7 の (1)〜(5) を中身にした。実データは E1 だけで、9 セル・r = 0 の揃えの 1 回の引き・2,000 置換の p ≤ 0.05 でセルごとに判定し、文の型を固定した。補正はせず Holm を記述で併記する。間のセルはすべて「安定と漂いを分けない」。頻度だけの基準線は並べるだけ。書き手の水準は G_v > c の数と率だけで、偶然の目安は置かない。揃えた後の量が合成の第 1 の帰無の範囲の外なら、その印を添える。論文 3 との対比は、論文 3 に実データの数のある 4 セルで、片方でもう片方を否定も裏付けもしない。
+- 研究者の選択（attack-me の中で）: 量の規則は合成の範囲と比べる（`scripts/explore_eq_amounts.py` で数えた・門に使わない）。代わりの説明は限界の文と頻度だけの基準線（押下のある秒だけのセルは採らない）。書き手の水準の目安は置かない。多重性は補正なしで Holm を併記。round 3 の後に閉じる。
+- attack-me（prereg・Codex を加えた）: round 1 major（R1 major・R2 major・R3 minor・Codex major）→ round 2 minor（R1〜R3 minor・Codex major）→ round 3 minor（R1〜R3 minor・Codex major）。minor が 2 回続いたので閉じた。記録は `attack-me/prereg-weight-eye-v2-d7/`。round 2 の私の直しが論文 3 の 2 つの値（fixed base と symmetric refit）を取り違え、round 3 の監査で見つかって main.tex 337 行に合わせて直した。
+- 扱い: このコミットが実データを読む前の凍結。凍結の時点はコミットの hash と GitHub の push の記録で示す。v2 は探索の版で、実データの結果は事前に条件をコミットした探索の分析として論文 3 の補足に入れる（v2 の「論文 3 への入れ方」）。実データの読み込みは別のタスク（この枝の `.steering/20261122-per-person-weight-eye/handoff-mac-v2-realdata.md`）。
