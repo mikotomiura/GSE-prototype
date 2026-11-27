@@ -1,0 +1,14 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m76"
+ ],
+ "P-TIME": {
+  "passed": false,
+  "gap_input_stopped": false,
+  "clean_input_loaded": true,
+  "seconds": 0.23395371437072754
+ },
+ "seconds": 0.23397135734558105,
+ "all_passed": false
+}

@@ -1,0 +1,302 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [],
+ "P-STRIDE": {
+  "passed": true,
+  "series_checked": 30,
+  "mismatched": 0,
+  "seconds": 0.062003135681152344
+ },
+ "P-BLOCK": {
+  "passed": true,
+  "series_checked": 156,
+  "mismatched": 0,
+  "seconds": 0.021704912185668945
+ },
+ "P-PHASE": {
+  "passed": true,
+  "series_checked": 24,
+  "mismatched": 0,
+  "seconds": 0.0024471282958984375
+ },
+ "P-TIME": {
+  "passed": true,
+  "gap_input_stopped": true,
+  "clean_input_loaded": true,
+  "seconds": 0.2341151237487793
+ },
+ "P-MI": {
+  "passed": true,
+  "true_mi": 1.3537889321959558,
+  "long_mm": 1.351542921040197,
+  "long_ok": true,
+  "short": {
+   "indep": {
+    "M_diff_median": 0.0022274662415588398,
+    "M_median": 0.26651511188636623
+   },
+   "markov": {
+    "M_diff_median": 1.1498044743831626,
+    "M_median": 1.5910857734247281
+   },
+   "mixture": {
+    "M_diff_median": 1.902766210079565e-05,
+    "M_median": 0.43446570618470554
+   }
+  },
+  "short_ok": true,
+  "mixture_ok": true,
+  "hand_ok": true,
+  "shuffle_mean_of_20_ok": true,
+  "seconds": 0.9764609336853027
+ },
+ "P-DS": {
+  "passed": true,
+  "writers": 2,
+  "mismatched": 0,
+  "seconds": 35.092482805252075
+ },
+ "P-FIRST": {
+  "passed": true,
+  "scorers": 3,
+  "mismatched": 0,
+  "seconds": 0.5854799747467041
+ },
+ "P-PAIR": {
+  "passed": true,
+  "common_ok": true,
+  "paired_ok": true,
+  "missing_word": "欠けがある",
+  "seconds": 0.002053976058959961
+ },
+ "P-SWAP": {
+  "passed": true,
+  "cells": 51,
+  "differing": 0,
+  "same_panel": true,
+  "child_swap_A5": true,
+  "A5_differs_from_u": true,
+  "seconds": 313.09469079971313
+ },
+ "P-READ": {
+  "passed": true,
+  "checks": {
+   "edge_step_only": true,
+   "edge_count_only": true,
+   "edge_ratio_big": true,
+   "construction_negative_is_out": true,
+   "phi_cut_points": true,
+   "three_or_more": true,
+   "no_shrink": true,
+   "m_below_12": true,
+   "combine": true,
+   "table_rows": true,
+   "phrases": true,
+   "words_from_table": true,
+   "reservations_three_places": true,
+   "type1_residual_no_conclusion": true,
+   "after_result_phrases": true,
+   "type1_colC_c2a_not_pos": true,
+   "reservation_phrases": true,
+   "nohead_phrase": true,
+   "classify": true,
+   "boundary": true,
+   "supplement_expectation_note": true,
+   "supplement_position_note": true
+  },
+  "seconds": 0.25693488121032715
+ },
+ "seconds": 350.3284170627594,
+ "all_passed": true,
+ "mutations": {
+  "m61": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-STRIDE": false
+   },
+   "hit": true
+  },
+  "m62": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-STRIDE": false
+   },
+   "hit": true
+  },
+  "m63": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PHASE": false
+   },
+   "hit": true
+  },
+  "m64": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PHASE": false
+   },
+   "hit": true
+  },
+  "m65": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-MI": false
+   },
+   "hit": true
+  },
+  "m66": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-MI": false
+   },
+   "hit": true
+  },
+  "m67": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-FIRST": false
+   },
+   "hit": true
+  },
+  "m68": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-SWAP": false
+   },
+   "hit": true
+  },
+  "m69": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-READ": false
+   },
+   "hit": true
+  },
+  "m70": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-BLOCK": false
+   },
+   "hit": true
+  },
+  "m71": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-BLOCK": false
+   },
+   "hit": true
+  },
+  "m72": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-DS": false
+   },
+   "hit": true
+  },
+  "m74": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PAIR": false
+   },
+   "hit": true
+  },
+  "m75": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-READ": false
+   },
+   "hit": true
+  },
+  "m76": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-TIME": false
+   },
+   "hit": true
+  },
+  "m77": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-MI": false
+   },
+   "hit": true
+  },
+  "m79": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-READ": false
+   },
+   "hit": true
+  },
+  "m80": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-MI": false
+   },
+   "hit": true
+  },
+  "m81": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-PAIR": false
+   },
+   "hit": true
+  },
+  "m82": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-READ": false
+   },
+   "hit": true
+  },
+  "m83": {
+   "exit": 3,
+   "run_id_ok": true,
+   "mutate_ok": true,
+   "controls": {
+    "P-READ": false
+   },
+   "hit": true
+  }
+ }
+}

@@ -1,0 +1,33 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m65"
+ ],
+ "P-MI": {
+  "passed": false,
+  "true_mi": 1.3537889321959558,
+  "long_mm": 1.351542921040197,
+  "long_ok": true,
+  "short": {
+   "indep": {
+    "M_diff_median": -0.0038787482419121166,
+    "M_median": 0.24510080840882997
+   },
+   "markov": {
+    "M_diff_median": 1.0873946391753453,
+    "M_median": 1.4903506270900069
+   },
+   "mixture": {
+    "M_diff_median": 0.0018987975461861595,
+    "M_median": 0.4087648801270452
+   }
+  },
+  "short_ok": true,
+  "mixture_ok": true,
+  "hand_ok": false,
+  "shuffle_mean_of_20_ok": false,
+  "seconds": 0.6572751998901367
+ },
+ "seconds": 0.6572909355163574,
+ "all_passed": false
+}

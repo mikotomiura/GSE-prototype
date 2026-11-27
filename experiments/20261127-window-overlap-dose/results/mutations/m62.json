@@ -1,0 +1,14 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m62"
+ ],
+ "P-STRIDE": {
+  "passed": false,
+  "series_checked": 30,
+  "mismatched": 12,
+  "seconds": 0.11583113670349121
+ },
+ "seconds": 0.11584806442260742,
+ "all_passed": false
+}

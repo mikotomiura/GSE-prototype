@@ -1,0 +1,14 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m70"
+ ],
+ "P-BLOCK": {
+  "passed": false,
+  "series_checked": 156,
+  "mismatched": 51,
+  "seconds": 0.06721305847167969
+ },
+ "seconds": 0.06723189353942871,
+ "all_passed": false
+}

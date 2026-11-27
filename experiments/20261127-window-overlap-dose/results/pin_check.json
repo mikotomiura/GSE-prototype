@@ -1,0 +1,23 @@
+{
+ "pin_ok": true,
+ "loaded_sha256": {
+  "S13/fit.py": "1a385200648e494edaaf0faf455f9b459a8a3aa454a3fac6fe37ec26e37c4a0c",
+  "S13/residual.py": "fe805fbbd504a2d204e50c39b29171340dc08087a459f7709844d029665b1017",
+  "S13/load.py": "d1daf1532caff1a192ac10d8e5e14caa41cde5587f386638e6cacf236573f092",
+  "S13/pinned.py": "60dcf6b0b6519208421eab087d14903e84b908e148460e29f1c3df0d86bcb5fb",
+  "tau/hmm2.py": "d71f4c206789b2dd33e2acc1569ac69a75006be2d33de227f7f094456a3966bc",
+  "tau/data.py": "dd93d58b5f942e72a89c77023237eb22f9e6cfa5849aa4e318b74990f6d182e5",
+  "tau/ml.py": "93a3935cef367f1702d2aa4d51715b428945be3dd29a1962aa7aaecaaf64701c",
+  "kit/variants.py": "8910312a2c9b067490ac1d746495feccc4b3b74688fc00a46456660130437807"
+ },
+ "loaded_from": {
+  "S13/fit.py": "experiments/20261107-unsmoothed-residual-check/scripts/fit.py",
+  "S13/residual.py": "experiments/20261107-unsmoothed-residual-check/scripts/residual.py",
+  "S13/load.py": "experiments/20261107-unsmoothed-residual-check/scripts/load.py",
+  "S13/pinned.py": "experiments/20261107-unsmoothed-residual-check/scripts/pinned.py",
+  "tau/hmm2.py": "experiments/20261104-timeseries-tau-extend/scripts/hmm2.py",
+  "tau/data.py": "experiments/20261104-timeseries-tau-extend/scripts/data.py",
+  "tau/ml.py": "experiments/20261104-timeseries-tau-extend/scripts/ml.py",
+  "kit/variants.py": "papers/per-person-learning/kit/symbols/variants.py"
+ }
+}

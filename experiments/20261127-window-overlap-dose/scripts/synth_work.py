@@ -11,6 +11,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import load_dose  # noqa: E402,F401  S13 の scripts を sys.path に入れる（pinned の読み込みの前に）
 from pinned import H  # noqa: E402
 import masks as MK  # noqa: E402
 

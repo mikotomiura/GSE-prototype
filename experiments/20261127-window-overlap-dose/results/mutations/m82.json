@@ -1,0 +1,36 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m82"
+ ],
+ "P-READ": {
+  "passed": false,
+  "checks": {
+   "edge_step_only": true,
+   "edge_count_only": true,
+   "edge_ratio_big": true,
+   "construction_negative_is_out": true,
+   "phi_cut_points": true,
+   "three_or_more": true,
+   "no_shrink": true,
+   "m_below_12": true,
+   "combine": true,
+   "table_rows": true,
+   "phrases": false,
+   "words_from_table": true,
+   "reservations_three_places": true,
+   "type1_residual_no_conclusion": true,
+   "after_result_phrases": true,
+   "type1_colC_c2a_not_pos": true,
+   "reservation_phrases": true,
+   "nohead_phrase": true,
+   "classify": true,
+   "boundary": true,
+   "supplement_expectation_note": true,
+   "supplement_position_note": true
+  },
+  "seconds": 0.38632798194885254
+ },
+ "seconds": 0.3863370418548584,
+ "all_passed": false
+}

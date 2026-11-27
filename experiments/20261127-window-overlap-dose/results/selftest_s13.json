@@ -1,0 +1,74 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [],
+ "P-KIT": {
+  "passed": true,
+  "returncode": 0,
+  "tail": "check_rejects_count_mismatch\nok test_coauthor_adapter\nok test_cs1_adapter\nok test_edge_inputs\nok test_grid\nok test_regenerate_inputs\nok test_releases\nok test_run_symbol\nok test_thinned_mask\nok test_ticks_before_first_press\nok test_unsmoothed_symbol_edges\nok test_variants_match_symbolize\nselftest ok\n"
+ },
+ "P-RAW": {
+  "passed": true,
+  "rows": 128623,
+  "mismatched": 0
+ },
+ "P-U": {
+  "passed": true,
+  "rows": 128623,
+  "run_rows": 524,
+  "mismatched": 0,
+  "edge_cases": 507,
+  "edge_mismatched": 0
+ },
+ "P-THIN": {
+  "passed": true,
+  "times_ok": true,
+  "complete": true,
+  "kept_rows": 19,
+  "pflag_ok": true,
+  "symbols_ok": true
+ },
+ "P-RES-CAL": {
+  "passed": true,
+  "x": {
+   "mean": -0.0005342225030931962,
+   "var": 0.9991309237350974,
+   "max_lag_median_abs": 0.00631783841678222
+  },
+  "y": {
+   "mean": 0.004038983518511282,
+   "var": 1.0000675912769703,
+   "max_lag_median_abs": 0.008218086916491951
+  }
+ },
+ "P-RES-MIS": {
+  "passed": true,
+  "r1_true_median": -0.006150696631762568,
+  "r1_r0_median": 0.5731114816738155,
+  "r1_r0_median_y": 0.0009824941887878512
+ },
+ "P-CRN": {
+  "passed": true,
+  "same_across_models": true,
+  "differ_across_columns": true,
+  "repeatable": true
+ },
+ "P-NPZ": {
+  "passed": true,
+  "cells": 156,
+  "mismatched": 0
+ },
+ "P-SAME": {
+  "passed": true,
+  "cells": 75,
+  "differing": 0,
+  "ref_has_folds": true,
+  "ref_from_tau_extend": true
+ },
+ "P-PIN": {
+  "passed": true,
+  "real_returncode": 0,
+  "modified_copy_returncode": 4
+ },
+ "seconds": 546.921315908432,
+ "all_passed": true
+}

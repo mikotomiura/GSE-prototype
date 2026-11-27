@@ -1,0 +1,14 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m67"
+ ],
+ "P-FIRST": {
+  "passed": false,
+  "scorers": 3,
+  "mismatched": 3,
+  "seconds": 0.6239550113677979
+ },
+ "seconds": 0.6239800453186035,
+ "all_passed": false
+}

@@ -1,0 +1,17 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m68"
+ ],
+ "P-SWAP": {
+  "passed": false,
+  "cells": 51,
+  "differing": 21,
+  "same_panel": true,
+  "child_swap_A5": true,
+  "A5_differs_from_u": true,
+  "seconds": 308.87470388412476
+ },
+ "seconds": 308.8747179508209,
+ "all_passed": false
+}

@@ -1,0 +1,15 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m81"
+ ],
+ "P-PAIR": {
+  "passed": false,
+  "common_ok": false,
+  "paired_ok": true,
+  "missing_word": "列 A で縮まない",
+  "seconds": 0.0417172908782959
+ },
+ "seconds": 0.04172968864440918,
+ "all_passed": false
+}

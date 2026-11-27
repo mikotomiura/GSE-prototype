@@ -33,7 +33,7 @@ def main(seed, out, jobs, keep=None):
     R = dict(steps={}, seconds_per_column={})
     td = tempfile.mkdtemp()
     try:
-        co, side = SW.make(td, seed, n_w=4, n_u=22, lengths=(300, 700), tag=91)
+        co, side = SW.make(td, seed, n_w=6, n_u=22, lengths=(300, 700), tag=91)
         res, raw = os.path.join(td, "results"), os.path.join(td, "raw")
         os.makedirs(res)
         os.makedirs(raw)

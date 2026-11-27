@@ -1,0 +1,14 @@
+{
+ "run_id": "synth-20261128T015108-10701",
+ "mutate": [
+  "m64"
+ ],
+ "P-PHASE": {
+  "passed": false,
+  "series_checked": 24,
+  "mismatched": 20,
+  "seconds": 0.02753925323486328
+ },
+ "seconds": 0.027554988861083984,
+ "all_passed": false
+}
