@@ -27,3 +27,4 @@
 - **採用**: ADR-055 補訂 1（説明「手を動かしていた（進んだかは問わない。…）」）・ADR-057 補訂 2（作業は Q2 → Q1・`scale_order`・`remaining`）。記録の決まり（q1 の無い q2 を落とす）を外し、JSON Schema の説明を直した。同意文書・フォーム・そのテストを同じ文にした。
 - **途中で分かったこと**: 順を変えると記録の決まりと schema の説明に当たり、データの repo の schema の写しの更新が要る。研究者に伝え直し、「両方やる」を選んでもらった。
 - **残り**: データの repo（gse-dataset）の schema の写しの更新（push は研究者に確かめる）・Windows での表示（G-GEAR・配る前の条件 14）。
+- **レビュー（103246a1）**: `/cross-review`（Claude ＋ Codex）。ADR-057 の diff は前後の行に本人の記録の集計（件数と割合）を含んだので、Codex にはその 1 ファイルを除いた 14 ファイルの diff だけを渡した（除いた diff に該当の語が 0 件と確かめた）。両者一致の MEDIUM（`gse-replay` の較正の読み手が q1 の無い q2 を破損に数える・`replay.rs:4830` とそのテスト）を、q の欠けた回答の側へ移して直した。Codex の MEDIUM（閉じる経路で q2 だけの行になるテストが無い）に `working_card_closed_after_q2_writes_q2_only_row` を足した。Claude の LOW（ADR の索引の要約・`probeTypes.ts` のコメント）を直した。データの repo の検証器（`scripts/*.py`）は q1・q2 の組を見ていないことを確かめた。順の効果は ADR-057 補訂 2 の代償と事前登録の注記で扱う。
