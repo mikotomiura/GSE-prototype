@@ -196,7 +196,7 @@ pub enum ActivityCategory {
     Conversation,
     /// 離席: その場を離れていた。
     Away,
-    /// 作業: 手を動かして作業を進めていた（入力・編集・単純作業を含む）。ADR-055。
+    /// 作業: 手を動かしていた（進んだかは問わない。入力・編集・単純作業を含む）。ADR-055・補訂 1。
     Working,
     /// 回答不能: 思い出せない・当てはまらない。
     CannotAnswer,
@@ -834,10 +834,6 @@ fn format_realtime_label_line(
         "realtime_label: skip なのに q がある"
     );
     debug_assert!(
-        q2_progress.is_none() || q1_friction.is_some(),
-        "realtime_label: q1 が無いのに q2 がある（段 1 は Q1 → Q2 の順に聞く）"
-    );
-    debug_assert!(
         q1_friction.is_none_or(|v| (1..=5).contains(&v)),
         "realtime_label: q1_friction が 1..=5 外"
     );
@@ -1461,7 +1457,8 @@ impl LogEntry {
     /// 「聞かなかった」か「答えなかった」かは、対の `activity_label.category` の
     /// [`ActivityCategory::asks_scales`] で分かる。
     /// ⚠️ 範囲外の値は `clamp` せず落とす（呼び出し側が先に拒む。ここは安全網）。
-    /// ⚠️ q2 は q1 が無ければ落とす（Q1 → Q2 の順に聞くので、q2 だけの行は作らない）。
+    /// ★ q2 だけの行がある（作業は Q2 → Q1 の順に聞き、Q2 の後に閉じた・ADR-057 補訂 2）。
+    ///   詰まり・熟考は Q1 → Q2 の順なので q2 だけの行は作らない（`s1_driver::scale_order`）。
     #[allow(clippy::too_many_arguments)]
     pub fn realtime_label_s1_answered(
         timestamp: u64,
@@ -1473,7 +1470,7 @@ impl LogEntry {
         analysis_window_end_ms: u64,
     ) -> Self {
         let q1 = q1_friction.filter(|v| (1..=5).contains(v));
-        let q2 = q2_progress.filter(|v| (1..=5).contains(v) && q1.is_some());
+        let q2 = q2_progress.filter(|v| (1..=5).contains(v));
         LogEntry::RealtimeLabel {
             timestamp,
             probe_id: probe.probe_id().map(str::to_string),
@@ -4671,10 +4668,14 @@ mod tests {
             (full["q1_friction"].clone(), full["q2_progress"].clone()),
             (4.into(), 2.into())
         );
-        // 安全網: 範囲外は落とし、q1 の無い q2 は作らない
+        // 安全網: 範囲外は落とす（q2 は残る）
         assert!(line(Some(9), Some(2))["q1_friction"].is_null());
-        assert!(line(Some(9), Some(2))["q2_progress"].is_null());
-        assert!(line(None, Some(3))["q2_progress"].is_null());
+        assert_eq!(line(Some(9), Some(2))["q2_progress"], 2);
+        // ★ 作業は Q2 → Q1 の順なので、q2 だけの行を残す（ADR-057 補訂 2）
+        let q2_only = line(None, Some(3));
+        assert!(q2_only["q1_friction"].is_null());
+        assert_eq!(q2_only["q2_progress"], 3);
+        assert!(line(None, Some(6))["q2_progress"].is_null());
     }
 
     #[test]

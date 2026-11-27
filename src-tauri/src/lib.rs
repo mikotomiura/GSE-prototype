@@ -9088,6 +9088,7 @@ mod s1_driver_wiring_tests {
             window_start_ms: 0,
             window_end_ms: 1,
             step,
+            remaining: 0,
         };
         assert_eq!(
             s1_answer_digits(&probe(ProbeStep::Q3)),
@@ -9154,6 +9155,7 @@ mod s1_driver_wiring_tests {
             window_start_ms: 0,
             window_end_ms: 1,
             step,
+            remaining: 0,
         };
         let mut card = None;
         let t0 = 1_000_000;

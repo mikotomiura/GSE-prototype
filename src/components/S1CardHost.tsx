@@ -55,6 +55,7 @@ const S1CardHost: React.FC<S1CardHostProps> = ({ onActiveChange, onResize }) => 
         key={card.probe_id}
         probeId={card.probe_id}
         step={card.step}
+        remaining={card.remaining}
         onResize={onResize}
         onDone={refresh}
       />

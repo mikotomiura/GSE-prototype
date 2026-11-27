@@ -431,7 +431,7 @@ pub enum LogEntryDto {
     ///
     /// **不変条件 (schema では緩く、producer 側で強制)**:
     /// - skip (`answered=false`) ⇒ `q1_friction`/`q2_progress` は null
-    /// - `q1_friction`/`q2_progress` があれば 1..=5。`q2_progress` は `q1_friction` が無ければ null
+    /// - `q1_friction`/`q2_progress` があれば 1..=5。段 1 の 3 名の版では、作業は Q2 → Q1 の順に聞くので `q2_progress` だけの行がある（ADR-057 補訂 2）
     /// - 較正と自己マーカーの `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5
     /// - 段 1（3 名の版・ADR-057）の `answered=true` は、答えた分だけ q が入り残りは null
     ///   （Q3 の選択肢によって Q1・Q2 を聞かない、または答える前に閉じた。対の `activity_label` で分かる）
@@ -918,7 +918,7 @@ pub enum ActivityCategoryDto {
     Conversation,
     /// 離席: その場を離れていた。
     Away,
-    /// 作業: 手を動かして作業を進めていた（入力・編集・単純作業を含む）。ADR-055。
+    /// 作業: 手を動かしていた（進んだかは問わない。入力・編集・単純作業を含む）。ADR-055・補訂 1。
     Working,
     /// 回答不能: 思い出せない・当てはまらない。
     CannotAnswer,

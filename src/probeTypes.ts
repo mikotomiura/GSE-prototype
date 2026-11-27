@@ -37,6 +37,8 @@ export type S1CardState =
       window_end_ms: number;
       /** いま尋ねている問い（ADR-057）。backend `s1_driver::ProbeStep`。 */
       step: ProbeStep;
+      /** いまの問いを含めて、あと何問か（Q3 の段は 0・ADR-057 補訂 2）。 */
+      remaining: number;
     }
   | {
       kind: "day";
@@ -89,7 +91,7 @@ export const ACTIVITY_CHOICES: ReadonlyArray<{
   { value: "external_material", label: "外部資料", note: "本・書類・画面などを読んでいた" },
   { value: "conversation", label: "会話", note: "会話・通話・打ち合わせをしていた" },
   { value: "away", label: "離席", note: "その場を離れていた" },
-  { value: "working", label: "作業", note: "手を動かして作業を進めていた。入力・編集・単純作業を含む" },
+  { value: "working", label: "作業", note: "手を動かしていた（進んだかは問わない）。入力・編集・単純作業を含む" },
   // ↑ カードは説明を（）で包むので、括弧を二重にしない（同意文書とフォームは「〜（入力・編集・単純作業を含む）」）。
   { value: "cannot_answer", label: "回答不能", note: "思い出せない・当てはまらない" },
 ];

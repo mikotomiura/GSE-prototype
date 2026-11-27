@@ -50,6 +50,7 @@
           React.createElement(S1ProbeCard, {
             probeId: `p-view-${step}`,
             step,
+            remaining: step === "q3" ? 0 : Number(new URLSearchParams(location.search).get("remaining") || (step === "q1" ? 2 : 1)),
             onResize: (s) => { window.__GSE_SIZE[step] = s; },
             onDone: () => { window.__GSE_DONE = true; },
           }),
