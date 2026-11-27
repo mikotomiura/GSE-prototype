@@ -302,7 +302,7 @@ For every analysis and check, the conditions (rows, grids, readings, and how eac
 \item the extended grid of $\tau$ and the joint choice;
 \item the prior mode and the smoothing effect.
 \end{enumerate}
-The twelve later checks, counted as listed:
+The thirteen later checks, counted as listed:
 \begin{enumerate}
 \item unsmoothed and non-overlapping symbolizations with pseudo-residuals (S13);
 \item structure compensation (S12);
@@ -315,7 +315,8 @@ The twelve later checks, counted as listed:
 \item the writer split (S9);
 \item the smoothing checks: the base smoothing and the own chain's added value chosen on other writers, the shared-only refit, the symmetric refit and its controls, including the data swap (S9);
 \item the second null (S10);
-\item the score without first symbols (S4).
+\item the score without first symbols (S4);
+\item identification in one-state transition tables (exploratory; its reading committed before the data were read; S14).
 \end{enumerate}
 Six changes were made after seeing results: (a) the extension of the $\tau$ grid, after the second analysis chose the top of its grid; (b) the change of structure families in the third analysis; both bear on the main result. (c) The symmetric refit was added, and read as the comparison bearing on a designer's decision, after the shared-only refit had made the remainder vanish; (d) its controls, with the report of the chosen $\tau$, were added after seeing the symmetric refit; (e) the second null was added after reviewing how the first null behaved; (f) the score without first symbols was added last. Changes (c) to (f) are marked post hoc in the paper; the controls and the score without first symbols report $k=5$ and 15, the points fixed in their conditions. Readings were committed before computation also for these additions.
 
@@ -564,6 +565,45 @@ $n$ & CS1, $k=5$ & 0.319 / 0.311 & $-0.013$ / $-0.033$ & $-0.007$ / $-0.024$ \\
 \end{tabular}}
 \end{center}
 The per-person \hmmthree{} is similar to the shared one (0.24 to 0.63). Over lags 1 to 10, $|r|$ stays at or below 0.017 for the shared \arthree{} and the joint choice and at or below 0.029 for the own chain, whereas the shared \hmmthree{} still has 0.11 to 0.52 at lag 10.
+
+% ---------------------------------------------------------------------------
+\Ssec{14}{Identification in one-state transition tables (exploratory)}
+
+\paragraph{Question and status.} Among the writers of a panel, are a writer's training units closer to the writer's own held-out units than other writers' training units are, in a space of transition counts? This is a question of ranking, not of predictive gain. The check is exploratory and is not used for confirmatory claims. A first version, without the equalization below, stopped at its synthetic false-positive gates: writers' records differ in length, so the amount of data sharpened both of a writer's tables and the label-permutation null failed. The version reported here was designed after seeing that result. Its synthetic calibration and the reading rules for the real data (the cells, the wording of each reading, and the ranges of amounts below) were committed before either dataset was read by this check.
+
+\paragraph{Tables and closeness.} The panels, the units and the split are those of S2: for writer $v$, $B$ is the $H$ held-out units and $A$ the $k$ units before them, or before a gap of $g$ units. Transitions between consecutive symbols within a sequence are counted into $26\times26$ tables $N^A_v$ and $N^B_v$. Each writer's $A$ counts are thinned without replacement (multivariate hypergeometric) to the smallest total over the panel, and likewise the $B$ counts. The shared table $S$ is the row-normalized sum of the counts of the non-held-out units of all writers that pass the data loading, with 0.5 added to every entry; it is not thinned. A writer's table is $p^A_w=(N^A_w+26S)/(\text{row sum}+26)$. The closeness $s(w\to v)$ is the mean of $\log p^A_w$ over the transitions of $v$'s $B$. For each $v$, $\mathrm{AUC}_v$ is the share of the other writers $w$ with $s(w\to v)<s(v\to v)$ (ties count one half), and $T$ is the mean of $\mathrm{AUC}_v$ over the panel. The $p$-value permutes the $B$ labels 2,000 times, $p=(1+\#\{T_\sigma\ge T\})/2{,}001$, so its smallest value is 0.0005. The reading uses one thinning draw ($r=0$); twenty further draws with the same permutations are reported but do not change it. A frequency baseline collapses the rows: $A$'s symbol frequencies (smoothed the same way towards the shared frequencies) score $B$'s symbols; it is descriptive and has no gate.
+
+\paragraph{Choice and calibration.} Three closeness measures (this cross-likelihood, a weighted correlation of deviations from $S$, and a row-wise Jensen--Shannon divergence) were compared on synthetic writers with the panel's numbers of writers and units, generated from the two nulls of S10 and from further strands (a changed structure, unit-to-unit wobble, drift between units, and differences in the amount of data per writer). The cross-likelihood was chosen by an order of criteria fixed beforehand. For it all 55 false-positive gates passed: in each no-difference strand and cell, 36 to 62 of 1,000 replications had $p\le0.05$ (gate 73). The rate of $p\le0.05$ for planted differences of \e{1}{-3}, \e{3}{-3}, \e{1}{-2} and \e{3}{-2} at $k=5$ in CoAuthor was 0.124, 0.462, 0.998 and 1.0 under the first null and 0.844, 0.998, 1.0 and 1.0 under the second (500 replications each). Synthetic drift between units ($\rho=0.9$) was detected in all four gap cells, so no cell separates stable differences from closeness in time.
+
+\paragraph{Results.} No cell failed to compute. Nine cells, unadjusted $p$ (Holm-adjusted $p$ alongside, descriptive):
+\begin{center}\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrl}
+\toprule
+Cell & $n_A$ & $n_B$ & $T$ & $p$ & Holm & redraws $p\le0.05$ & baseline $T$ & baseline $p$ & amounts \\
+\midrule
+CoAuthor, $k=1$ & 552 & 2,811 & 0.912 & 0.0005 & 0.004 & 20/20 & 0.941 & 0.0005 & in range \\
+CoAuthor, $k=5$ & 2,833 & 2,811 & 0.982 & 0.0005 & 0.004 & 20/20 & 0.982 & 0.0005 & in range \\
+CoAuthor, $k=15$ & 8,443 & 2,811 & 0.996 & 0.0005 & 0.004 & 20/20 & 0.989 & 0.0005 & in range \\
+CoAuthor, $k=5$, $g=5$ & 2,835 & 2,811 & 0.963 & 0.0005 & 0.004 & 20/20 & 0.960 & 0.0005 & in range \\
+CoAuthor, $k=5$, $g=10$ & 2,775 & 2,811 & 0.960 & 0.0005 & 0.004 & 20/20 & 0.941 & 0.0005 & in range \\
+CS1, $k=1$ & 305 & 48 & 0.664 & 0.0045 & 0.018 & 6/20 & 0.654 & 0.0025 & below \\
+CS1, $k=5$ & 36,404 & 48 & 0.615 & 0.029 & 0.087 & 15/20 & 0.759 & 0.0005 & below \\
+CS1, $k=1$, $g=1$ & 2 & 48 & 0.489 & 0.584 & 1.000 & 0/20 & 0.528 & 0.312 & below \\
+CS1, $k=1$, $g=4$ & 5,587 & 48 & 0.488 & 0.589 & 1.000 & 12/20 & 0.662 & 0.0015 & below \\
+\bottomrule
+\end{tabular}}
+\end{center}
+$n_A$ and $n_B$ are the totals after thinning. ``Amounts'' compares them with the range of the synthetic no-difference strands of the first null. In CS1 one writer's held-out assignment has 48 transitions, so every $B$ is thinned to 48, and at $k=1$, $g=1$ every $A$ to 2. If the nine cells were independent, the chance that at least one had $p\le0.05$ by chance would be about 0.37 (0.45 at most under any dependence). Per-writer $\mathrm{AUC}_v$ (median [minimum]): CoAuthor 0.938 [0.625], 1.0 [0.812], 1.0 [0.938], 1.0 [0.875] and 1.0 [0.875] in the order of the table; CS1 0.727 [0.045], 0.591 [0.091], 0.5 [0] and 0.409 [0]. Rank-1 rates are 0.41, 0.82, 0.94, 0.59 and 0.59 in CoAuthor and 0.13, 0.26, 0.04 and 0.04 in CS1; they are rates in a closed set of 16 or 22 other writers and are not comparable with equal error rates or identification rates from the keystroke-matching literature.
+
+\paragraph{Readings} (in the wording committed before the data were read).
+\begin{itemize}
+\item Each CoAuthor cell ($k=1$, 5 and 15 without a gap; $k=5$ with $g=5$ and with $g=10$): on the panel average, a writer's $A$ ranked closer to the writer's own $B$ than other writers' $A$ did ($p=0.0005$, the smallest value, in each cell; exploratory; no correction over the nine cells; one thinning draw, with $p\le0.05$ in 20 of 20 redraws). These cells do not separate stable differences from closeness in time (drift). The mean can be set by a few writers, so the per-writer distribution is given above and which writers were close is not read. Over $g=0$, 5 and 10 at $k=5$ the check detected at every $g$; the synthetic rates at these three gaps were 0.462, 0.480 and 0.450 for \e{3}{-3} and 0.610, 0.064 and 0.040 for drift with $\rho=0.5$.
+\item CS1, $k=1$ and $k=5$ without a gap: on the panel average, a writer's $A$ ranked closer to the writer's own $B$ than other writers' $A$ did ($p=0.0045$ and 0.029; one thinning draw, with $p\le0.05$ in 6 and 15 of 20 redraws; at $k=1$ more than half of the redraws had $p>0.05$). CS1, $k=1$ with $g=1$ and $g=4$: that a writer's $A$ ranked closer to the writer's own $B$ could not be said ($p=0.584$ and 0.589; 0 and 12 of 20 redraws); the non-detection does not bound the size of a real difference. All four CS1 cells lie below the synthetic range of amounts. With amounts spread over writers as in the real CS1 (0.2 to 5 times), the synthetic rates were 41 to 54 per 1,000 without a difference, 0.12 to 0.13 ($k=1$) and 0.23 ($k=5$) at \e{1}{-3}, 0.54 to 0.58 and 0.91 at \e{3}{-3}, and 1.0 from \e{1}{-2}; the real ratios of the smallest to the median amount (0.005 for $B$) lie below that construction's range as well. None of these rates is the detection rate in the real data.
+\item Relation to the main analyses. In the same CoAuthor records at $k=1$, 5 and 15, in the space of one-state transition tables, a writer's $A$ ranked closer to the writer's own $B$ on the panel average; the main analyses concluded on the same records that the remainder of the strong comparison does not show stable per-person differences. In CS1 at $k=5$ the same held, and the main analyses chose the shared model itself for every writer. Neither result is used to deny or support the other: one is a ranking and the other a predictive gain; the rules differ ($p\le0.05$ here, against the main protocol's rule with 0 false alarms in 10 synthetic replications without a difference, an upper bound of about 0.31, in S10); the tables have one state, unlike the models of the main analyses; and both use the overlapping-window symbols, for which the direction of the gain reversed with non-overlapping windows (S13). The synthetic generator is expected to favour a measure that counts transitions. Identification from keystroke timing survives coarse timestamps \citep{Dehling2024}, so a non-detection is not read as a consequence of the coarse symbols alone, and label-permutation nulls are sensitive to clustering of people \citep{Wang2021}, for which no synthetic strand was run. The result does not change how the per-person weight is chosen.
+\item ``Own'' includes everything constant within a writer: device, keyboard and setting, the way of working (the share and runs of pause seconds; the pause share ranges from 0.082 to 0.900 over CS1 writers, S6) and the combination of topics or assignments in $A$ and $B$. It is not read as a person-specific typing difference. The frequency baseline reflects marginal differences such as the pause share; no statement is made about the difference between it and the cross-likelihood.
+\item Writer level, descriptive. The number of writers whose gain of $p^A_v$ over $S$ on $B$ exceeds the synthetic 95\% point $c$ (one per cell, all negative): CoAuthor 14, 16, 17, 14 and 15 of 17 ($c=-0.0065$ to $-0.0005$), with a largest per-writer false-alarm rate of 0.050 in the synthetic no-difference strands; CS1, outside the range of amounts, 23, 15, 23 and 20 of 23. Exceeding a negative $c$ does not mean that the writer's table predicted $B$ better than $S$, and the counts are not read as signs of writer differences.
+\end{itemize}
 
 \bibliographystyle{plainnat}
 \bibliography{references}
