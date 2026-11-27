@@ -26,7 +26,7 @@ use windows::Win32::UI::Input::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetWindowThreadProcessId,
     PeekMessageW, RegisterClassW, TranslateMessage, HWND_MESSAGE, MSG, PM_REMOVE, WINDOW_EX_STYLE,
-    WINDOW_STYLE, WNDCLASSW,
+    WINDOW_STYLE, WM_INPUT, WNDCLASSW,
 };
 
 use crate::analysis::pointer_bin::{PointerAccum, PointerBin};
@@ -99,6 +99,10 @@ const BIN_MS: u64 = 1000;
 /// ★ 高ポーリングレートのマウス（1000 Hz）でも 1 回の呼び出しで捌けるだけ取る。
 /// ⚠️ 足りなければ次のループで続きを取るだけなので、取りこぼしにはならない。
 const RAW_BUFFER_BYTES: usize = 16 * 1024;
+
+/// `GetRawInputBuffer` の失敗を 1 回だけ警告するための印（観測スレッドからだけ触る）。
+static RAW_INPUT_ERROR_LOGGED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -272,7 +276,17 @@ fn drain_raw_input(buf: &mut [u8], accum: &mut PointerAccum) {
                 std::mem::size_of::<RAWINPUTHEADER>() as u32,
             )
         };
-        if count == 0 || count == u32::MAX {
+        if count == 0 {
+            return;
+        }
+        if count == u32::MAX {
+            // `WM_INPUT` は pump で取り除かないので、読めないまま返すとキューに溜まり続け、
+            // ポインタの行が無言で 0 件になる（今回直した不具合と同じ症状）。
+            // → 1 回だけ警告し、溜まった分は既定処理へ渡して後始末させる（その分は数えない）。
+            if !RAW_INPUT_ERROR_LOGGED.swap(true, Ordering::Relaxed) {
+                tracing::warn!("O1: GetRawInputBuffer failed; discarding queued WM_INPUT");
+            }
+            discard_queued_raw_input();
             return;
         }
 
@@ -330,6 +344,51 @@ unsafe fn accumulate_from_buffer(ptr: *const RAWINPUT, count: u32, accum: &mut P
     }
 }
 
+/// 本スレッドのキューのメッセージを、`WM_INPUT` を除いて回す。
+///
+/// `GetRawInputBuffer` が読むのは、呼び出し元スレッドのキューに残っている raw input
+/// だけである。ここで `WM_INPUT` まで取り除くと（`PeekMessageW(.., 0, 0, PM_REMOVE)`）、
+/// 取り除いた分は `DefWindowProcW` が捨て、`GetRawInputBuffer` には届かない
+/// （2026-11-27 に G-GEAR で、注入した相対の移動 675 件に対して 0 件だった）。
+/// → Microsoft の *Using Raw Input* のバッファ読みの手本と同じく、`WM_INPUT` の前後の
+/// 2 つの範囲だけを回す。⚠️ 上限に 0 を渡すと「全部」の意味になるので、後ろの範囲の上限は
+/// `u32::MAX` にする（`WM_INPUT` を除く全部をちょうど覆う）。
+///
+/// WinEvent（`WINEVENT_OUTOFCONTEXT`）のフォーカス遷移の行がこの形でも出ることは、
+/// 2026-11-27 に G-GEAR の実アプリで確かめた（`.steering/20261127-windows-pointer-raw-input/design.md` の診断）。
+fn pump_messages_except_raw_input() {
+    let mut msg = MSG::default();
+    for (min, max) in [(0, WM_INPUT - 1), (WM_INPUT + 1, u32::MAX)] {
+        // SAFETY: `PeekMessageW` は本スレッドのキューを読むだけで、`msg` は有効。
+        //   取り出した `msg` をそのまま `dispatch` へ渡す（`dispatch` の契約）。
+        while unsafe { PeekMessageW(&mut msg, None, min, max, PM_REMOVE) }.as_bool() {
+            unsafe { dispatch(&msg) };
+        }
+    }
+}
+
+/// `GetRawInputBuffer` が失敗したとき、キューに溜まった `WM_INPUT` を既定処理へ渡して捨てる。
+fn discard_queued_raw_input() {
+    let mut msg = MSG::default();
+    // SAFETY: 本スレッドのキューから `WM_INPUT` だけを取り出し、そのまま `dispatch` へ渡す。
+    while unsafe { PeekMessageW(&mut msg, None, WM_INPUT, WM_INPUT, PM_REMOVE) }.as_bool() {
+        unsafe { dispatch(&msg) };
+    }
+}
+
+/// # Safety
+///
+/// `msg` は、本スレッドで `PeekMessageW(.., PM_REMOVE)` が直前に埋めた構造体であること
+/// （`DispatchMessageW` は `WM_TIMER` の `lParam` を関数として呼ぶことがあるので、
+/// 任意の `MSG` を渡してはならない）。
+unsafe fn dispatch(msg: &MSG) {
+    // SAFETY: 呼び出し側の契約による。
+    unsafe {
+        let _ = TranslateMessage(msg);
+        DispatchMessageW(msg);
+    }
+}
+
 /// O1 観測スレッドを起こす。
 pub fn start() {
     thread::spawn(|| {
@@ -370,15 +429,7 @@ pub fn start() {
 
         loop {
             // ★ メッセージを回す (WinEvent のコールバックはここで駆動される)。
-            let mut msg = MSG::default();
-            // SAFETY: `PeekMessageW` は本スレッドのキューを読むだけで、`msg` は有効。
-            while unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) }.as_bool() {
-                // SAFETY: `msg` は直前に `PeekMessageW` が埋めた有効な構造体である。
-                unsafe {
-                    let _ = TranslateMessage(&msg);
-                    DispatchMessageW(&msg);
-                }
-            }
+            pump_messages_except_raw_input();
 
             if raw_ok {
                 drain_raw_input(&mut buf, &mut accum);
@@ -595,5 +646,114 @@ mod tests {
         // SAFETY: 1 件だけの妥当なバッファである。
         unsafe { accumulate_from_buffer(&ri as *const RAWINPUT, 1, &mut accum) };
         assert_eq!(accum, PointerAccum::default(), "マウス以外を数えている");
+    }
+
+    use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, PM_NOREMOVE, WM_USER};
+
+    /// 自スレッドのキューに `msg_id` が残っているか（取り除かずに見る）。
+    fn queued(msg_id: u32) -> bool {
+        let mut msg = MSG::default();
+        // SAFETY: 本スレッドのキューを PM_NOREMOVE で覗くだけである。
+        unsafe { PeekMessageW(&mut msg, None, msg_id, msg_id, PM_NOREMOVE) }.as_bool()
+    }
+
+    /// メッセージを回しても `WM_INPUT` はキューに残し、それ以外は取り除く。
+    ///
+    /// `GetRawInputBuffer` が読むのはキューに残っている raw input だけなので、
+    /// 回すときに `WM_INPUT` を取り除くと、ポインタの行がほとんど残らない
+    /// （2026-11-27 に G-GEAR で、注入した相対の移動 675 件に対して 0 件だった）。
+    /// 入力のデスクトップに依らないよう、メッセージは自分で積む。
+    /// このテストが縛るのは「回すときに `WM_INPUT` を残す」ことだけで、本物の raw input
+    /// （入力キュー由来）を `GetRawInputBuffer` が読めることは `injected_moves_reach_the_accumulator`
+    /// （`#[ignore]`・実機）が受け持つ。
+    #[test]
+    fn pump_keeps_wm_input_for_get_raw_input_buffer() {
+        let hwnd = create_message_window().expect("メッセージ専用窓を作れない");
+        // SAFETY: 自スレッドが作った窓へ積むだけで、`lParam` は誰にも読まれる前に
+        //   下の後始末で取り除く。
+        unsafe {
+            PostMessageW(hwnd, WM_INPUT, WPARAM(0), LPARAM(0)).expect("WM_INPUT を積めない");
+            PostMessageW(hwnd, WM_USER, WPARAM(0), LPARAM(0)).expect("WM_USER を積めない");
+        }
+        pump_messages_except_raw_input();
+        let input_left = queued(WM_INPUT);
+        let user_left = queued(WM_USER);
+        // 後始末: 積んだ WM_INPUT を既定処理へ渡さずに捨てる。
+        let mut msg = MSG::default();
+        // SAFETY: 本スレッドのキューから取り除くだけである。
+        while unsafe { PeekMessageW(&mut msg, None, WM_INPUT, WM_INPUT, PM_REMOVE) }.as_bool() {}
+        // SAFETY: 本テストが作った窓を同じスレッドで壊す。
+        unsafe {
+            let _ = DestroyWindow(hwnd);
+        }
+        assert!(
+            input_left,
+            "WM_INPUT を取り除いている（GetRawInputBuffer に残らない）"
+        );
+        assert!(!user_left, "WM_INPUT 以外のメッセージを回していない");
+    }
+
+    /// 実機の確かめ（手元だけ・`cargo test -- --ignored`）: 本番と同じ回し方と読み方で、
+    /// `SendInput` で入れた相対の移動がほぼ全部 `PointerAccum` に足される。
+    ///
+    /// ⚠️ 入力のデスクトップが要る（CI の runner のサービスでは走らない）ので `#[ignore]`。
+    /// カーソルは ±1 px を往復するだけで、位置は元に戻る。
+    /// ⚠️ 注入した移動は他のプロセスの Raw Input にも届く（打鍵の `keybd_event` と違う）ので、
+    /// 本物の O1 を先に終了してから走らせる（約 2 秒ぶんの偽の `pointer_bin` が入る）。
+    #[test]
+    #[ignore]
+    fn injected_moves_reach_the_accumulator() {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_MOVE, MOUSEINPUT,
+        };
+        let hwnd = create_message_window().expect("メッセージ専用窓を作れない");
+        assert!(register_raw_mouse(hwnd), "Raw Input を登録できない");
+        let sender = thread::spawn(|| {
+            let mut sent = 0u64;
+            for i in 0..500 {
+                let inp = INPUT {
+                    r#type: INPUT_MOUSE,
+                    Anonymous: INPUT_0 {
+                        mi: MOUSEINPUT {
+                            dx: if i % 2 == 0 { 1 } else { -1 },
+                            dy: 0,
+                            dwFlags: MOUSEEVENTF_MOVE,
+                            ..Default::default()
+                        },
+                    },
+                };
+                // SAFETY: 1 件の妥当な INPUT を渡し、`cbSize` は同じ型から取る。
+                sent +=
+                    u64::from(unsafe { SendInput(&[inp], std::mem::size_of::<INPUT>() as i32) });
+                thread::sleep(Duration::from_millis(4));
+            }
+            sent
+        });
+        let mut buf = vec![0u8; RAW_BUFFER_BYTES];
+        let mut accum = PointerAccum::default();
+        while !sender.is_finished() {
+            pump_messages_except_raw_input();
+            drain_raw_input(&mut buf, &mut accum);
+            thread::sleep(Duration::from_millis(5));
+        }
+        let sent = sender.join().expect("送り手のスレッドが落ちた");
+        thread::sleep(Duration::from_millis(50));
+        pump_messages_except_raw_input();
+        drain_raw_input(&mut buf, &mut accum);
+        // SAFETY: 本テストが作った窓を同じスレッドで壊す。
+        unsafe {
+            let _ = DestroyWindow(hwnd);
+        }
+        // 1 件は |dx| = 1 なので、足された移動量はほぼ届いた件数になる。
+        assert!(
+            sent > 0,
+            "SendInput が 1 件も入らない（入力のデスクトップが無い・または前面が管理者権限で UIPI に止められた）"
+        );
+        assert!(
+            accum.abs_delta_sum * 10 >= sent * 9,
+            "届いた移動量 {} が入れた件数 {} の 9 割に届かない",
+            accum.abs_delta_sum,
+            sent
+        );
     }
 }
