@@ -8,6 +8,7 @@
 - [x] `npm run test:handmark`（64 件）・`npx tsc --noEmit`・`cargo test --lib handmark_store::guard`（42 件・禁止語を植えると赤）
 - [x] Chrome で崩れ方と直りを canvas の画素で確かめる（判断 5）
 - [x] code-reviewer ＋ security-checker（判断 4）
-- [ ] /finish-task（/cross-review を含む）・main へ
+- [x] /finish-task（/cross-review 1 巡・判断 7・cargo test 1455 件ほか緑）
+- [ ] main へ（PR）
 - [ ] 直した版のタグを作り、配布物で入れ替える（判断 6）
 - [ ] 入れ替えた版で帯が全幅に描かれることを画面で見る
