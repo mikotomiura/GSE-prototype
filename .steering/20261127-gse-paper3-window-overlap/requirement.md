@@ -40,3 +40,8 @@
 - round 1 の判定: `.steering/20261125-paper3-next-venue/attack-me/revision-integrated/round-1/verdict.md`
 - S13 の条件と notes: `experiments/20261107-unsmoothed-residual-check/`
 - `docs/experiment-tracking.md`
+
+## 運用メモ
+- /reimagine 適用: No
+- 理由: 研究者の回答（2026-11-27）。凍結の前の attack-me（Codex を加える）が別の目の役を果たす。
+- 本計算の場所: Mac（研究者の回答・2026-11-27）。
