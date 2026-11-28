@@ -118,8 +118,8 @@ json.dump(dict(git_head=head, git_dirty_paths=[l for l in dirty.splitlines() if 
                    "".join(os.path.basename(f) + h(f) for f in fs).encode()).hexdigest()),
                sidecar_sha256=h(side), writer_level_files=len(raw_files),
                input_manifest_sha256=h(man), variant_manifest_sha256=h(vman), jobs=int(jobs), drop_b=drop_b == "1",
-               platform=platform.platform(), machine=platform.machine(), cpu=subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
-               capture_output=True, text=True).stdout.strip(), python=sys.version.split()[0], numpy=numpy.__version__, blas=blas,
+               platform=platform.platform(), machine=platform.machine(), cpu=(subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
+               capture_output=True, text=True).stdout.strip() if sys.platform == "darwin" else platform.processor()), python=sys.version.split()[0], numpy=numpy.__version__, blas=blas,
                venv=os.path.realpath(sys.prefix).replace(os.path.expanduser("~"), "~")), open(out, "w"), indent=1)
 PY
 stamp "済んだ"

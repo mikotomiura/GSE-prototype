@@ -1,0 +1,29 @@
+{
+ "A30": {
+  "column": "A30",
+  "against": "S13/n",
+  "leaves": 6816,
+  "mismatched": 116,
+  "max_rel_diff": 1.0,
+  "tolerance_rel": 1e-09,
+  "mismatched_sections": [
+   "A30/fit/em",
+   "A30/residual"
+  ],
+  "passed": false
+ },
+ "A1": {
+  "column": "A1",
+  "against": "S13/u",
+  "leaves": 6815,
+  "mismatched": 144,
+  "max_rel_diff": 1.0,
+  "tolerance_rel": 1e-09,
+  "mismatched_sections": [
+   "A1/fit/em",
+   "A1/residual"
+  ],
+  "passed": false
+ },
+ "passed": false
+}
