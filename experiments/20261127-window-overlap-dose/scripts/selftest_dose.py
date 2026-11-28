@@ -101,9 +101,10 @@ def p_phase(seed):
 
 
 def p_time(seed):
-    """時刻の差が 1,000 ms でない所のある合成の入力で読み込みが止まり、ない入力では止まらない。"""
+    """時刻の差が 1,000 ms でも 2,000 ms でもない所（3,000 ms）のある合成の入力で読み込みが止まり、
+    1 行の抜け（2,000 ms）の入力と抜けのない入力では止まらない（判断 12）。"""
     with tempfile.TemporaryDirectory() as td:
-        co, side = SW.make(os.path.join(td, "bad"), seed, n_w=2, n_u=6, lengths=(40, 60), gap_at=(1, 3))
+        co, side = SW.make(os.path.join(td, "bad"), seed, n_w=2, n_u=6, lengths=(40, 60), gap_at=(1, 3), gap_ms=2000)
         try:
             LD.load_u_and_times(co, side, seed)
             stopped = False
@@ -115,7 +116,14 @@ def p_time(seed):
             clean_ok = True
         except SystemExit:
             clean_ok = False
-    return dict(passed=stopped and clean_ok, gap_input_stopped=stopped, clean_input_loaded=clean_ok)
+        co3, side3 = SW.make(os.path.join(td, "skip"), seed, n_w=2, n_u=6, lengths=(40, 60), gap_at=(1, 3), gap_ms=1000)
+        try:
+            LD.load_u_and_times(co3, side3, seed)
+            skip_ok = True
+        except SystemExit:
+            skip_ok = False
+    return dict(passed=stopped and clean_ok and skip_ok, gap_input_stopped=stopped, clean_input_loaded=clean_ok,
+                one_row_skip_loaded=skip_ok)
 
 
 # ---------------------------------------------------------------- M

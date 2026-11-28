@@ -1,29 +1,30 @@
 {
- "run_id": "synth-20261128T015108-10701",
+ "run_id": "synth-20261128T120943-p12",
  "mutate": [],
  "P-STRIDE": {
   "passed": true,
   "series_checked": 30,
   "mismatched": 0,
-  "seconds": 0.062003135681152344
+  "seconds": 0.06374788284301758
  },
  "P-BLOCK": {
   "passed": true,
   "series_checked": 156,
   "mismatched": 0,
-  "seconds": 0.021704912185668945
+  "seconds": 0.00978994369506836
  },
  "P-PHASE": {
   "passed": true,
   "series_checked": 24,
   "mismatched": 0,
-  "seconds": 0.0024471282958984375
+  "seconds": 0.0016531944274902344
  },
  "P-TIME": {
   "passed": true,
   "gap_input_stopped": true,
   "clean_input_loaded": true,
-  "seconds": 0.2341151237487793
+  "one_row_skip_loaded": true,
+  "seconds": 0.0763249397277832
  },
  "P-MI": {
   "passed": true,
@@ -48,26 +49,26 @@
   "mixture_ok": true,
   "hand_ok": true,
   "shuffle_mean_of_20_ok": true,
-  "seconds": 0.9764609336853027
+  "seconds": 0.23723602294921875
  },
  "P-DS": {
   "passed": true,
   "writers": 2,
   "mismatched": 0,
-  "seconds": 35.092482805252075
+  "seconds": 12.998763084411621
  },
  "P-FIRST": {
   "passed": true,
   "scorers": 3,
   "mismatched": 0,
-  "seconds": 0.5854799747467041
+  "seconds": 0.1823408603668213
  },
  "P-PAIR": {
   "passed": true,
   "common_ok": true,
   "paired_ok": true,
   "missing_word": "欠けがある",
-  "seconds": 0.002053976058959961
+  "seconds": 0.0014040470123291016
  },
  "P-SWAP": {
   "passed": true,
@@ -76,7 +77,7 @@
   "same_panel": true,
   "child_swap_A5": true,
   "A5_differs_from_u": true,
-  "seconds": 313.09469079971313
+  "seconds": 122.96601390838623
  },
  "P-READ": {
   "passed": true,
@@ -104,9 +105,9 @@
    "supplement_expectation_note": true,
    "supplement_position_note": true
   },
-  "seconds": 0.25693488121032715
+  "seconds": 0.10778403282165527
  },
- "seconds": 350.3284170627594,
+ "seconds": 136.64507412910461,
  "all_passed": true,
  "mutations": {
   "m61": {

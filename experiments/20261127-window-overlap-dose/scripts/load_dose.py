@@ -4,7 +4,7 @@
 単位は tau-extend の data.py の読み込み（ml.load）のまま作り、S13 の load.apply_column で u に替えてから、
 系列ごとに行を採る。行の時刻は data.py が読む今の中間（coauthor_work_obs）の feat 行の第 1 列を、
 data.py と同じ選び・同じ並べで読む。読んだ単位の obs が data.py の系列と 1 つでも違えば、時刻の数が系列の長さと違えば、
-系列の中で隣の行の時刻の差が 1,000 ms でない所があれば止める（V1・P-TIME）。
+系列の中で隣の行の時刻の差が 1,000 ms でも 2,000 ms（1 行の抜け）でもない所があれば止める（V1・P-TIME・判断 12 で 2,000 ms を許した）。
 単位とパネルの顔ぶれは全部の列で同じ（行が 0 になった系列は落とし、単位は残す）。
 
 S13 の load.py は "load13" の名で読み込む（"load" の名は駆動がこのモジュールに差し替える・swap.py）。
@@ -40,6 +40,7 @@ def _load13():
 
 L13 = _load13()
 TICK = 1000
+TICK_OK = (1000, 2000)  # 判断 12: 実データに 1 行の抜け（差 2,000 ms）が 139 単位・147 か所ある
 MASK_MUT = ("m61", "m62", "m63", "m64")
 MUT = set(m for m in os.environ.get("DOSE_MUT", "").split(",") if m)
 # m68: pflag を採らない（全部 True）／m70: 列 C の始まりを 0 に／m71: 列 C の行の数を 1 つ多く／m76: 時刻の連続の検査を外す
@@ -67,10 +68,10 @@ def parse(col):
 
 
 def check_ticks(t):
-    """系列の中で隣の行の時刻の差がすべて 1,000 ms か（m76 は検査を外す）。"""
+    """系列の中で隣の行の時刻の差がすべて 1,000 ms か 2,000 ms か（m76 は検査を外す）。"""
     if "m76" in MUT or len(t) < 2:
         return True
-    return bool(np.all(np.diff(np.asarray(t, dtype=np.int64)) == TICK))
+    return bool(np.all(np.isin(np.diff(np.asarray(t, dtype=np.int64)), TICK_OK)))
 
 
 def coauthor_times(work):
@@ -91,7 +92,7 @@ def coauthor_times(work):
             raise SystemExit("feat 行の時刻が整数の ms でない")
         t = [int(x) for x in t]
         if not check_ticks(t):
-            raise SystemExit("系列の中に時刻の差が 1,000 ms でない所がある")
+            raise SystemExit("系列の中に時刻の差が 1,000 ms でも 2,000 ms でもない所がある")
         by_w.setdefault(s2w[sid], []).append(dict(start=a, t=t, obs=F[:, 6].astype(np.int64)))
     return [sorted(by_w[w], key=lambda u: u["start"]) for w in sorted(by_w)]
 

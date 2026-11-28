@@ -1,5 +1,5 @@
 {
- "run_id": "synth-20261128T015108-10701",
+ "run_id": "synth-20261128T120943-p12",
  "mutate": [
   "m66"
  ],
@@ -26,8 +26,8 @@
   "mixture_ok": true,
   "hand_ok": false,
   "shuffle_mean_of_20_ok": false,
-  "seconds": 0.7669591903686523
+  "seconds": 0.312241792678833
  },
- "seconds": 0.7669689655303955,
+ "seconds": 0.31225013732910156,
  "all_passed": false
 }

@@ -1,5 +1,5 @@
 {
- "run_id": "synth-20261128T015108-10701",
+ "run_id": "synth-20261128T120943-p12",
  "mutate": [
   "m68"
  ],
@@ -10,8 +10,8 @@
   "same_panel": true,
   "child_swap_A5": true,
   "A5_differs_from_u": true,
-  "seconds": 308.87470388412476
+  "seconds": 138.4861249923706
  },
- "seconds": 308.8747179508209,
+ "seconds": 138.4861307144165,
  "all_passed": false
 }
