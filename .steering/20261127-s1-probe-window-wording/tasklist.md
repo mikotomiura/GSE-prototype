@@ -11,4 +11,7 @@
 - [x] G-GEAR の引き継ぎ `.steering/_handoff/next-session-ggear-s1-n3-windows-before-start.md`
 - [ ] 正本のフォームを作り直す（配る前の条件 2・13。この枝が main に入り、3 名の配布物のフォルダ〔`S1_APP_DOWNLOAD_URL`〕が決まってから）
 - [ ] Windows での表示と答え方の確かめ（G-GEAR・配る前の条件 4・10・12〜15）
+  - [x] 15: ポインタの行（fix/windows-pointer-raw-input・PR #442）。開発版で実際のマウスの `pointer_bin` 32 行
+  - [x] 2026-11-28 の開発版（段 1・研究者デバッグ・約 12 時間・行の形と数だけを見た）: カードが 5 回出て `realtime_label` と `activity_label` が 5 行ずつ（答えた 1・閉じた 4）。手跡の日ごとの行は動いている間に書かれ（29 行）、`reveal_count` の欄がある
+  - [ ] 配る版で確かめる（開発版では見ていない）: カードの表示（1 行に収まるか）・作業で Q2 だけ答えて閉じた行・Ctrl＋Alt＋数字（文字が入らない・2 分で外れる・ボタンだけ）・トレイの「やめる」「描く」（通知領域）・どけて `reveal_count` が増える・一時停止中の後半の表示
 - [ ] push と PR（研究者に確かめてから）
